@@ -27,6 +27,8 @@ contract capitalHandler is IERC20 {
 
 	address public yieldTokenAddress;
 
+	address public bondMinterAddress;
+
 //--------ERC 20 Storage---------------
 
 	uint8 public override decimals;
@@ -36,7 +38,12 @@ contract capitalHandler is IERC20 {
 
 //--------------functionality----------
 
-	constructor(address _aw, uint64 _maturity, address _yieldTokenDeployer) public {
+	constructor(
+		address _aw,
+		uint64 _maturity,
+		address _yieldTokenDeployer,
+		address _bondMinterAddress
+		) public {
 		aaveWrapper temp = aaveWrapper(_aw);
 		aw = temp;
 		decimals = temp.decimals();
@@ -48,6 +55,7 @@ contract capitalHandler is IERC20 {
 		(bool success , ) = _yieldTokenDeployer.call(abi.encodeWithSignature("deploy(address)", _aw));
 		require(success);
 		yieldTokenAddress = yieldTokenDeployer(_yieldTokenDeployer).addr();
+		bondMinterAddress = _bondMinterAddress;
 	}
 
 	function wrappedTokenFree(address _owner) public view returns (uint wrappedTknFree) {
@@ -112,26 +120,12 @@ contract capitalHandler is IERC20 {
 			balance = balance.sub(uint(-bondBal));
 	}
 
-	/*
-	function convertToWrapped(uint _amountATkn) internal view returns (uint _amountWrappedTkn) {
-		if (inPayoutPhase){
-			_amountWrappedTkn = _amountATkn.mul(1e18);
-			_amountWrappedTkn = _amountWrappedTkn/maturityConversionRate + (_amountWrappedTkn%maturityConversionRate  == 0 ? 0 : 1);
-		}
-		else
-			wrappedTknFree = aw.ATokenToWrappedToken(_amountATkn);
+	function mintZCBTo(address _owner, uint _amount) external {
+		require(msg.sender == bondMinterAddress);
+
+		balanceBonds[_owner] += int(_amount);
 	}
 
-	function convertToATkn(uint _amountWrappedTkn) internal view returns (uint _amountATkn) {
-		if (inPayoutPhase){
-			_amountATkn = _amountWrappedTkn.mul(maturityConversionRate);
-			_amountATkn = _amountATkn/1e18 + (_amountATkn%1e18  == 0 ? 0 : 1);
-		}
-		else
-			_amountATkn = aw.WrappedTokenToAToken(_amountWrappedTkn);
-
-	}
-	*/
 
 //-------------ERC20 Implementation----------------
 

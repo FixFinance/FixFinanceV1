@@ -6,6 +6,7 @@ const IERC20 = artifacts.require("IERC20");
 
 const helper = require("../helper/helper.js");
 
+const nullAddress = "0x0000000000000000000000000000000000000000";
 const BN = web3.utils.BN;
 const _10To18 = (new BN('10')).pow(new BN('18'));
 
@@ -16,7 +17,7 @@ contract('capitalHandler', async function(accounts){
 		aaveWrapperInstance = await aaveWrapper.new(dummyATokenInstance.address);
 		yieldTokenDeployerInstance = await yieldTokenDeployer.new();
 		timeNow = (await web3.eth.getBlock('latest')).timestamp;
-		capitalHandlerInstance = await capitalHandler.new(aaveWrapperInstance.address, timeNow+86400, yieldTokenDeployerInstance.address);
+		capitalHandlerInstance = await capitalHandler.new(aaveWrapperInstance.address, timeNow+86400, yieldTokenDeployerInstance.address, nullAddress);
 		inflation = await dummyATokenInstance.inflation();
 		yieldTokenInstance = await IERC20.at(await capitalHandlerInstance.yieldTokenAddress());
 		//wrap aTokens

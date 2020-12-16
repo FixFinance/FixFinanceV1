@@ -3,11 +3,14 @@ const capitalHandler = artifacts.require('capitalHandler');
 const dummyAToken = artifacts.require('dummyAToken');
 const organizer = artifacts.require('organizer');
 const yieldTokenDeployer = artifacts.require('yieldTokenDeployer');
+const BondMinter = artifacts.require("BondMinter");
 const UniswapV2Factory = artifacts.require('UniswapV2Factory');
 
 const UniswapV2FactoryAddress = "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f";
 
 const kovanAEthAddress = "0xD483B49F2d55D2c53D32bE6efF735cB001880F79";
+
+const nullAddress = "0x0000000000000000000000000000000000000000";
 
 
 const start2021 = "1609459200";
@@ -34,7 +37,8 @@ module.exports = async function(deployer) {
 	dummyATokenInstance = await deployer.deploy(dummyAToken);
 	dummyATokenInstance = await deployer.deploy(dummyAToken);
 	yieldTokenDeployerInstance = await deployer.deploy(yieldTokenDeployer);
-	organizerInstance = await deployer.deploy(organizer, yieldTokenDeployerInstance.address);
+	bondMinterInstance = await deployer.deploy(BondMinter, nullAddress);
+	organizerInstance = await deployer.deploy(organizer, yieldTokenDeployerInstance.address, bondMinterInstance.address);
 	await organizerInstance.deployATokenWrapper(dummyATokenInstance.address);
 	await organizerInstance.deployCapitalHandlerInstance(dummyATokenInstance.address, start2026);
 };

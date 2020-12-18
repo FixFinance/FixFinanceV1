@@ -1,9 +1,10 @@
 pragma solidity >=0.6.5 <0.7.0;
 import "./interfaces/IERC20.sol";
+import "./interfaces/IAaveWrapper.sol";
 import "./ERC20.sol";
 import "./libraries/SafeMath.sol";
 
-contract aaveWrapper is ERC20 {
+contract aaveWrapper is ERC20, IAaveWrapper {
 	using SafeMath for uint;
 
 	address public aToken;
@@ -15,7 +16,11 @@ contract aaveWrapper is ERC20 {
 		symbol = string(abi.encodePacked('w', IERC20(_aToken).symbol()));
 	}
 
-	function firstDeposit(address _to, uint _amountAToken) public returns (uint _amountWrappedToken) {
+	function balanceAToken(address _owner) external view override returns (uint balance) {
+		return balanceOf[_owner] * IERC20(aToken).balanceOf(address(this)) / totalSupply;
+	}
+
+	function firstDeposit(address _to, uint _amountAToken) public override returns (uint _amountWrappedToken) {
 		require(totalSupply == 0);
 		IERC20 _aToken = IERC20(aToken);
 		_aToken.transferFrom(msg.sender, address(this), _amountAToken);
@@ -24,7 +29,7 @@ contract aaveWrapper is ERC20 {
 		_amountWrappedToken = _amountAToken;
 	}
 
-	function deposit(address _to, uint _amountAToken) public returns (uint _amountWrappedToken) {
+	function deposit(address _to, uint _amountAToken) public override returns (uint _amountWrappedToken) {
 		IERC20 _aToken = IERC20(aToken);
 		uint contractBalance = _aToken.balanceOf(address(this));
 		_aToken.transferFrom(msg.sender, address(this), _amountAToken);
@@ -33,7 +38,7 @@ contract aaveWrapper is ERC20 {
 		totalSupply += _amountWrappedToken;
 	}
 
-	function withdrawAToken(address _to, uint _amountAToken) public returns (uint _amountWrappedToken) {
+	function withdrawAToken(address _to, uint _amountAToken) public override returns (uint _amountWrappedToken) {
 		IERC20 _aToken = IERC20(aToken);
 		uint contractBalance = _aToken.balanceOf(address(this));
 		//_amountWrappedToken == ceil(totalSupply*_amountAToken/contractBalance)
@@ -45,7 +50,7 @@ contract aaveWrapper is ERC20 {
 		_aToken.transfer(_to, _amountAToken);
 	}
 
-	function withdrawWrappedToken(address _to, uint _amountWrappedToken) public returns (uint _amountAToken) {
+	function withdrawWrappedToken(address _to, uint _amountWrappedToken) public override returns (uint _amountAToken) {
 		require(balanceOf[msg.sender] >= _amountWrappedToken);
 		IERC20 _aToken = IERC20(aToken);
 		uint contractBalance = _aToken.balanceOf(address(this));
@@ -55,7 +60,7 @@ contract aaveWrapper is ERC20 {
 		_aToken.transfer(_to, _amountAToken);
 	}
 
-	function ATokenToWrappedToken(uint _amountAToken) public view returns (uint _amountWrappedToken) {
+	function ATokenToWrappedToken(uint _amountAToken) public view override returns (uint _amountWrappedToken) {
 		IERC20 _aToken = IERC20(aToken);
 		uint contractBalance = _aToken.balanceOf(address(this));
 		uint _totalSupply = totalSupply;
@@ -67,7 +72,7 @@ contract aaveWrapper is ERC20 {
 		_amountWrappedToken = (_amountWrappedToken%contractBalance == 0 ? 0 : 1) + _amountWrappedToken/contractBalance;
 	}
 
-	function WrappedTokenToAToken(uint _amountWrappedToken) public view returns (uint _amountAToken) {
+	function WrappedTokenToAToken(uint _amountWrappedToken) public view override returns (uint _amountAToken) {
 		IERC20 _aToken = IERC20(aToken);
 		uint contractBalance = _aToken.balanceOf(address(this));
 		uint _totalSupply = totalSupply;

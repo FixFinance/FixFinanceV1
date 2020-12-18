@@ -1,9 +1,12 @@
+pragma experimental ABIEncoderV2;
 pragma solidity >=0.6.5 <0.7.0;
+
 import "./capitalHandler.sol";
 import "./interfaces/IVaultHealth.sol";
 import "./interfaces/IERC20.sol";
+import "./Ownable.sol";
 
-contract BondMinter {
+contract BondMinter is Ownable {
 
 	struct Vault {
 		address assetSupplied;
@@ -80,18 +83,25 @@ contract BondMinter {
 		return vaults[_owner].length;
 	}
 
+	function allVaults(address _owner) external view returns(Vault[] memory _vaults) {
+		_vaults = vaults[_owner];
+	}
+
 	//------------------------------------vault management-----------------------------------
 
 	function openVault(address _assetSupplied, address _assetBorrowed, uint _amountSupplied, uint _amountBorrowed) external {
 		address chBorrowAddress = assetToCapitalHandler[_assetBorrowed];
-		require(chBorrowAddress != address(0));
+		/*
+			users can only borrow ZCBs
+		*/
+		require(chBorrowAddress != address(0) && chBorrowAddress == _assetBorrowed);
 		/*
 			when chSupplyAddress == _assetSupplied
 			the supplied asset is a zcb
 		*/
 		address chSupplyAddress = assetToCapitalHandler[_assetSupplied];
 		require(chSupplyAddress != address(0));
-		require(vaultHealthContract.upperLimitSuppliedAsset(_assetSupplied, _assetBorrowed, _amountBorrowed) > _amountSupplied);
+		require(vaultHealthContract.upperLimitSuppliedAsset(_assetSupplied, _assetBorrowed, _amountSupplied, _amountBorrowed));
 
 		IERC20(_assetSupplied).transferFrom(msg.sender, address(this), _amountSupplied);
 		capitalHandler(chBorrowAddress).mintZCBTo(msg.sender, _amountBorrowed);
@@ -122,15 +132,15 @@ contract BondMinter {
 		require(vaults[msg.sender].length > _index);
 		Vault memory vault = vaults[msg.sender][_index];
 
-		uint required = vaultHealthContract.upperLimitSuppliedAsset(
+		require(vault.amountSupplied >= _amount);
+		require(vaultHealthContract.upperLimitSuppliedAsset(
 			vault.assetSupplied,
 			vault.assetBorrowed,
+			vault.amountSupplied - _amount,
 			vault.amountBorrowed
-		);
+		));
 
-		require(vault.amountSupplied > required);
-		require(vault.amountSupplied - required >= _amount);
-		vault.amountSupplied -= _amount;
+		vaults[msg.sender][_index].amountSupplied -= _amount;
 
 		IERC20(vault.assetSupplied).transfer(_to, _amount);
 
@@ -149,13 +159,12 @@ contract BondMinter {
 		require(vaults[msg.sender].length > _index);
 		Vault memory vault = vaults[msg.sender][_index];
 
-		uint required = vaultHealthContract.upperLimitSuppliedAsset(
+		require(vaultHealthContract.upperLimitSuppliedAsset(
 			vault.assetSupplied,
 			vault.assetBorrowed,
+			vault.amountSupplied,
 			vault.amountBorrowed + _amount
-		);
-
-		require(vault.amountSupplied > required);
+		));
 
 		vaults[msg.sender][_index].amountBorrowed += _amount;
 
@@ -166,7 +175,7 @@ contract BondMinter {
 
 	function repay(address _owner, uint _index, uint _amount) external {
 		require(vaults[_owner].length > _index);
-		require(vaults[_owner][_index].amountBorrowed <= _amount);
+		require(vaults[_owner][_index].amountBorrowed >= _amount);
 		IERC20(vaults[_owner][_index].assetBorrowed).transferFrom(msg.sender, address(this), _amount);
 		vaults[_owner][_index].amountBorrowed -= _amount;
 
@@ -177,7 +186,7 @@ contract BondMinter {
 
 	function sendToLiquidation(address _owner, uint _index, uint _bid) external {
 		Vault memory vault = vaults[_owner][_index];
-		require(vaultHealthContract.lowerLimitSuppliedAsset(vault.assetSupplied, vault.assetBorrowed, vault.amountBorrowed) < vault.amountSupplied);
+		require(!vaultHealthContract.lowerLimitSuppliedAsset(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied, vault.amountBorrowed));
 		if (_bid < vault.amountBorrowed) {
 			uint maturity = capitalHandler(assetToCapitalHandler[vault.assetBorrowed]).maturity();
 			require(maturity < block.timestamp + (7 days));
@@ -215,6 +224,13 @@ contract BondMinter {
 		delete Liquidations[_index];
 
 		IERC20(liquidation.assetSupplied).transfer(msg.sender, liquidation.amountSupplied);
+	}
+
+	//--------------------------------------------management---------------------------------------------
+
+	function setCapitalHandler(address _capitalHandlerAddress) public onlyOwner {
+		assetToCapitalHandler[address(capitalHandler(_capitalHandlerAddress).aw())] = _capitalHandlerAddress;
+		assetToCapitalHandler[_capitalHandlerAddress] = _capitalHandlerAddress;
 	}
 }
 

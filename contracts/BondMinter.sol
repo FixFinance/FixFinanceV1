@@ -27,6 +27,9 @@ contract BondMinter is Ownable {
 		uint bidTimestamp;
 	}
 
+	//asset => amount
+	mapping(address => uint) public revenue;
+
 	//asset => capitalHandler
 	mapping(address => address) public assetToCapitalHandler;
 
@@ -116,8 +119,9 @@ contract BondMinter is Ownable {
 		require(len > _index);
 		Vault memory vault = vaults[msg.sender][_index];
 
+		//burn borrowed ZCB
 		if (vault.amountBorrowed > 0)
-			IERC20(vault.assetBorrowed).transferFrom(msg.sender, address(this), vault.amountBorrowed);
+			IERC20(vault.assetBorrowed).transferFrom(msg.sender, address(0), vault.amountBorrowed);
 		if (vault.amountSupplied > 0)
 			IERC20(vault.assetSupplied).transfer(_to, vault.amountSupplied);
 
@@ -168,7 +172,7 @@ contract BondMinter is Ownable {
 
 		vaults[msg.sender][_index].amountBorrowed += _amount;
 
-		IERC20(vault.assetBorrowed).transfer(_to, _amount);
+		capitalHandler(vault.assetBorrowed).mintZCBTo(_to, _amount);
 
 		emit Borrow(msg.sender, _index, _amount);
 	}
@@ -176,7 +180,8 @@ contract BondMinter is Ownable {
 	function repay(address _owner, uint _index, uint _amount) external {
 		require(vaults[_owner].length > _index);
 		require(vaults[_owner][_index].amountBorrowed >= _amount);
-		IERC20(vaults[_owner][_index].assetBorrowed).transferFrom(msg.sender, address(this), _amount);
+		//burn borrowed ZCB
+		IERC20(vaults[_owner][_index].assetBorrowed).transferFrom(msg.sender, address(0), _amount);
 		vaults[_owner][_index].amountBorrowed -= _amount;
 
 		emit Repay(_owner, _index, _amount);
@@ -185,13 +190,21 @@ contract BondMinter is Ownable {
 	//----------------------------------------------Liquidations------------------------------------------
 
 	function sendToLiquidation(address _owner, uint _index, uint _bid) external {
+		require(vaults[_owner].length > _index);
 		Vault memory vault = vaults[_owner][_index];
-		require(!vaultHealthContract.lowerLimitSuppliedAsset(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied, vault.amountBorrowed));
-		if (_bid < vault.amountBorrowed) {
+		require(_bid >= vault.amountBorrowed);
+		if (vaultHealthContract.lowerLimitSuppliedAsset(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied, vault.amountBorrowed)) {
 			uint maturity = capitalHandler(assetToCapitalHandler[vault.assetBorrowed]).maturity();
 			require(maturity < block.timestamp + (7 days));
 		}
-		IERC20(vault.assetBorrowed).transferFrom(msg.sender, address(this), _bid);
+		//burn borrowed ZCB
+		IERC20(vault.assetBorrowed).transferFrom(msg.sender, address(0), vault.amountBorrowed);
+		//any surplus in the bid may be added as revenue
+		if (_bid > vault.amountBorrowed){
+			IERC20(vault.assetBorrowed).transferFrom(msg.sender, address(this), _bid - vault.amountBorrowed);
+			revenue[vault.assetBorrowed] += vault.amountBorrowed - _bid;
+		}
+
 		delete vaults[_owner][_index];
 		Liquidations.push(Liquidation(
 			vault.assetSupplied,
@@ -207,9 +220,10 @@ contract BondMinter is Ownable {
 		require(Liquidations.length > _index);
 		Liquidation memory liquidation = Liquidations[_index];
 		require(_bid > liquidation.bidAmount);
+		require(liquidation.bidTimestamp - block.timestamp < 30 minutes);
 		IERC20(liquidation.assetBorrowed).transferFrom(msg.sender, address(this), _bid);
 		IERC20(liquidation.assetBorrowed).transfer(liquidation.bidder, liquidation.bidAmount);
-
+		revenue[liquidation.assetBorrowed] += _bid - liquidation.bidAmount;
 		Liquidations[_index].bidAmount = _bid;
 		Liquidations[_index].bidder = msg.sender;
 		Liquidations[_index].bidTimestamp = block.timestamp;
@@ -219,11 +233,30 @@ contract BondMinter is Ownable {
 		require(Liquidations.length > _index);
 		Liquidation memory liquidation = Liquidations[_index];
 		require(msg.sender == liquidation.bidder);
-		require(liquidation.bidTimestamp - block.timestamp > 30 minutes);
+		require(liquidation.bidTimestamp - block.timestamp >= 30 minutes);
 
 		delete Liquidations[_index];
 
 		IERC20(liquidation.assetSupplied).transfer(msg.sender, liquidation.amountSupplied);
+	}
+
+	/*
+		@Description: when there is less than 1 day until maturity vaults may be liquidated instantly without going through the auction process
+	*/
+	function instantLiquidation(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _maxBid, uint _minOut, address _to) external {
+		require(vaults[_owner].length > _index);
+		Vault memory vault = vaults[_owner][_index];
+		require(vault.assetBorrowed == _assetBorrowed);
+		require(vault.assetSupplied == _assetSupplied);
+		require(vault.amountBorrowed <= _maxBid);
+		require(vault.amountSupplied >= _minOut);
+
+		require(capitalHandler(assetToCapitalHandler[_assetBorrowed]).maturity() < block.timestamp + (1 days));
+
+		//burn borrowed ZCB
+		IERC20(_assetBorrowed).transferFrom(msg.sender, address(0), vault.amountBorrowed);
+		IERC20(_assetSupplied).transfer(_to, vault.amountSupplied);
+		delete vaults[_owner][_index];
 	}
 
 	//--------------------------------------------management---------------------------------------------
@@ -231,6 +264,11 @@ contract BondMinter is Ownable {
 	function setCapitalHandler(address _capitalHandlerAddress) public onlyOwner {
 		assetToCapitalHandler[address(capitalHandler(_capitalHandlerAddress).aw())] = _capitalHandlerAddress;
 		assetToCapitalHandler[_capitalHandlerAddress] = _capitalHandlerAddress;
+	}
+
+	function claimRevenue(address _asset, uint _amount) public onlyOwner {
+		require(revenue[_asset] >= _amount);
+		IERC20(_asset).transfer(msg.sender, _amount);
 	}
 }
 

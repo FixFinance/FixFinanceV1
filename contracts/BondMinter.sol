@@ -236,7 +236,7 @@ contract BondMinter is Ownable {
 		Liquidations[_index].bidTimestamp = block.timestamp;
 	}
 
-	function claimLiquidation(uint _index) external {
+	function claimLiquidation(uint _index, address _to) external {
 		require(Liquidations.length > _index);
 		Liquidation memory liquidation = Liquidations[_index];
 		require(msg.sender == liquidation.bidder);
@@ -244,7 +244,7 @@ contract BondMinter is Ownable {
 
 		delete Liquidations[_index];
 
-		IERC20(liquidation.assetSupplied).transfer(msg.sender, liquidation.amountSupplied);
+		IERC20(liquidation.assetSupplied).transfer(_to, liquidation.amountSupplied);
 	}
 
 	/*
@@ -257,8 +257,7 @@ contract BondMinter is Ownable {
 		require(vault.assetSupplied == _assetSupplied);
 		require(vault.amountBorrowed <= _maxBid);
 		require(vault.amountSupplied >= _minOut);
-
-		require(capitalHandler(assetToCapitalHandler[_assetBorrowed]).maturity() < block.timestamp + (1 days));
+		require(capitalHandler(_assetBorrowed).maturity() < block.timestamp + (1 days));
 
 		//burn borrowed ZCB
 		IERC20(_assetBorrowed).transferFrom(msg.sender, address(0), vault.amountBorrowed);

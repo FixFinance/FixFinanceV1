@@ -250,7 +250,7 @@ contract('BondMinter', async function(accounts) {
 
 		let prevBalW1 = await wAsset1.balanceOf(accounts[1]);
 
-		await bondMinterInstance.claimLiquidation(0, {from: accounts[1]});
+		await bondMinterInstance.claimLiquidation(0, accounts[1], {from: accounts[1]});
 
 		let newBalW1 = await wAsset1.balanceOf(accounts[1]);
 
@@ -297,6 +297,31 @@ contract('BondMinter', async function(accounts) {
 		assert.equal(liquidation.bidTimestamp.toString(), timestamp, "correct value of liqudiation.bidTimestamp");
 
 		vault = await bondMinterInstance.vaults(accounts[0], 1);
+
+		assert.equal(vault.assetBorrowed, nullAddress, "assetBorrowed is null");
+		assert.equal(vault.assetSupplied, nullAddress, "assetSupplied is null");
+		assert.equal(vault.amountBorrowed.toString(), "0", "amountBorrowed is null");
+		assert.equal(vault.amountSupplied.toString(), "0", "amountSupplied is null");
+	});
+
+	it('instant liquidations', async () => {
+		let caught = false;
+		try {
+			await bondMinterInstance.instantLiquidation(accounts[0], 2, zcbAsset0.address, wAsset1.address, amountBorrowed.toString(), _10To18.toString(), accounts[1], {from: accounts[1]});
+		} catch (err) {
+			caught = true;
+		}
+		if (!caught) assert.fail("vault was subject to instant liquidation with more than 1 day to maturity");
+
+		/*
+			first advance 6 days into future so that instant liquidations are allowed because of 1 day to maturity rule
+		*/
+		let _6days = _8days*3/4;
+		await helper.advanceTime(_6days);
+
+		await bondMinterInstance.instantLiquidation(accounts[0], 2, zcbAsset0.address, wAsset1.address, amountBorrowed.toString(), _10To18.toString(), accounts[1], {from: accounts[1]});
+
+		vault = await bondMinterInstance.vaults(accounts[0], 2);
 
 		assert.equal(vault.assetBorrowed, nullAddress, "assetBorrowed is null");
 		assert.equal(vault.assetSupplied, nullAddress, "assetSupplied is null");

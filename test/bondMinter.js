@@ -180,7 +180,7 @@ contract('BondMinter', async function(accounts) {
 
 		let caught = false;
 		try {
-			await bondMinterInstance.auctionLiquidation(accounts[0], 0, zcbAsset0.address, wAsset1.address, currentBorrowed.toString(), currentSupplied.toString());
+			await bondMinterInstance.auctionLiquidation(accounts[0], 0, zcbAsset0.address, wAsset1.address, currentBorrowed.toString(), currentSupplied.toString(), {from: accounts[1]});
 		} catch (err) {
 			caught = true;
 		}
@@ -194,16 +194,27 @@ contract('BondMinter', async function(accounts) {
 
 		caught = false;
 		try {
-			await bondMinterInstance.auctionLiquidation(accounts[0], 0, zcbAsset0.address, wAsset1.address, bid.toString(), currentSupplied.toString());
+			await bondMinterInstance.auctionLiquidation(accounts[0], 0, zcbAsset0.address, wAsset1.address, bid.toString(), currentSupplied.toString(), {from: accounts[1]});
 		} catch (err) {
 			caught = true;
 		}
 		if (!caught) assert.fail("liquidation was triggered despite vault health being above lower limit");
 
+		//get back to original bid value
 		bid = bid.add(new BN("1"));
-		rec = await bondMinterInstance.auctionLiquidation(accounts[0], 0, zcbAsset0.address, wAsset1.address, bid.toString(), currentSupplied.toString());
+
+		//increase to new higher bid value
+		bid = bid.add(new BN("1"));
+
+		let prevRevenue = await bondMinterInstance.revenue(zcbAsset0.address);
+		
+		rec = await bondMinterInstance.auctionLiquidation(accounts[0], 0, zcbAsset0.address, wAsset1.address, bid.toString(), currentSupplied.toString(), {from: accounts[1]});
 
 		let timestamp = (await web3.eth.getBlock(rec.receipt.blockNumber)).timestamp;
+
+		let currentRevenue = await bondMinterInstance.revenue(zcbAsset0.address);
+
+		assert.equal(currentRevenue.sub(prevRevenue).toString(), "1", "correct amount of revenue");
 
 		assert.equal((await bondMinterInstance.liquidationsLength()).toString(), "1", "correct length of liquidations array");
 
@@ -212,7 +223,7 @@ contract('BondMinter', async function(accounts) {
 		assert.equal(liquidation.assetBorrowed, zcbAsset0.address, "correct value of liquidation.assetBorrowed");
 		assert.equal(liquidation.assetSupplied, wAsset1.address, "correct value of liquidation.assetSupplied");
 		assert.equal(liquidation.amountSupplied.toString(), currentSupplied.toString(), "correct value of liquidation.amountSupplied");
-		assert.equal(liquidation.bidder, accounts[0], "correct value of liqudiation.bidder");
+		assert.equal(liquidation.bidder, accounts[1], "correct value of liqudiation.bidder");
 		assert.equal(liquidation.bidAmount.toString(), bid.toString(), "correct value of liquidation.bidAmount");
 		assert.equal(liquidation.bidTimestamp.toString(), timestamp, "correct value of liqudiation.bidTimestamp");
 
@@ -230,9 +241,15 @@ contract('BondMinter', async function(accounts) {
 		*/
 		bid = bid.add(new BN('10'));
 		
+		let prevRevenue = await bondMinterInstance.revenue(zcbAsset0.address);
+
 		rec = await bondMinterInstance.bidOnLiquidation(0, bid.toString(), {from: accounts[1]});
 
 		let timestamp = (await web3.eth.getBlock(rec.receipt.blockNumber)).timestamp;
+
+		let currentRevenue = await bondMinterInstance.revenue(zcbAsset0.address);
+
+		assert.equal(currentRevenue.sub(prevRevenue).toString(), "10", "correct amount of revenue");
 
 		liquidation = await bondMinterInstance.Liquidations(0);
 
@@ -329,5 +346,35 @@ contract('BondMinter', async function(accounts) {
 		assert.equal(vault.amountSupplied.toString(), "0", "amountSupplied is null");
 	});
 
+	it('contract owner withdraws revenue', async () => {
+		let revenue = await bondMinterInstance.revenue(zcbAsset0.address);
+
+		let caught = false;
+		try {
+			await bondMinterInstance.claimRevenue(zcbAsset0.address, revenue.add(new BN("1")).toString());
+		} catch (err) {
+			caught = true;
+		}
+		if (!caught) assert.fail("more revenue was claimed than is allowed in the revenue[] mapping");
+
+		caught = false;
+		try {
+			await bondMinterInstance.claimRevenue(zcbAsset0.address, revenue.toString(), {from: accounts[1]});
+		} catch (err) {
+			caught = true;
+		}
+		if (!caught) assert.fail("only contract owner should be able to claim revenue");
+
+		let prevBalance = await zcbAsset0.balanceOf(accounts[0]);
+
+		await bondMinterInstance.claimRevenue(zcbAsset0.address, revenue.toString());
+
+		let newRevenue = await bondMinterInstance.revenue(zcbAsset0.address);
+
+		let newBalance = await zcbAsset0.balanceOf(accounts[0]);
+
+		assert.equal(newRevenue.toString(), "0", "revenue storage value reduced to 0 after all is withdrawn");
+		assert.equal(newBalance.sub(prevBalance).toString(), revenue.toString(), "correct amount paid to contract owner");
+	});
 
 });

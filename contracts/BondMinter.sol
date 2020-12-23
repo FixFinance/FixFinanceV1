@@ -209,7 +209,7 @@ contract BondMinter is Ownable {
 		//any surplus in the bid may be added as revenue
 		if (_bid > vault.amountBorrowed){
 			IERC20(vault.assetBorrowed).transferFrom(msg.sender, address(this), _bid - vault.amountBorrowed);
-			revenue[vault.assetBorrowed] += vault.amountBorrowed - _bid;
+			revenue[vault.assetBorrowed] += _bid - vault.amountBorrowed;
 		}
 
 		delete vaults[_owner][_index];
@@ -275,6 +275,7 @@ contract BondMinter is Ownable {
 	function claimRevenue(address _asset, uint _amount) public onlyOwner {
 		require(revenue[_asset] >= _amount);
 		IERC20(_asset).transfer(msg.sender, _amount);
+		revenue[_asset] -= _amount;
 	}
 }
 

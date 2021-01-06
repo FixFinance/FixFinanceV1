@@ -78,4 +78,13 @@ contract aaveWrapper is ERC20, IAaveWrapper {
 		uint _totalSupply = totalSupply;
 		_amountAToken = _totalSupply == 0 ? _amountWrappedToken : contractBalance*_amountWrappedToken/_totalSupply;
 	}
+
+	function WrappedTokenToAToken_RoundUp(uint _amountWrappedToken) public view returns (uint _amountAToken) {
+		IERC20 _aToken = IERC20(aToken);
+		uint contractBalance = _aToken.balanceOf(address(this));
+		uint _totalSupply = totalSupply;
+		if (_totalSupply == 0) return _amountWrappedToken;
+		_amountAToken = contractBalance*_amountWrappedToken;
+		_amountAToken = _amountAToken/_totalSupply + (_amountAToken % _totalSupply == 0 ? 0 : 1);
+	}
 }

@@ -60,4 +60,14 @@ contract yieldToken is IERC20 {
         return true;
     }
 
+    //_value denominated in AToken not in wrapped AToken
+    function transfer_2(address _to, uint256 _value) public {
+        transfer(_to, aw.WrappedTokenToAToken_RoundUp(_value));
+    }
+
+    //_value denominated in AToken not in wrapped AToken
+    function transferFrom_2(address _from, address _to, uint256 _value) public {
+        transferFrom(_from, _to, aw.WrappedTokenToAToken_RoundUp(_value));
+    }
+
 }

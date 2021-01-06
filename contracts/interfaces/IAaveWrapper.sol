@@ -7,9 +7,10 @@ interface IAaveWrapper {
 	function withdrawWrappedToken(address _to, uint _amountWrappedToken) external returns (uint _amountAToken);
 
 	function balanceAToken(address _owner) external view returns (uint balance);
-	function ATokenToWrappedToken(uint _amountAToken) external view returns (uint _amountWrappedToken);
-	function WrappedTokenToAToken(uint _amountWrappedToken) external view returns (uint _amountAToken);
-
+	function ATokenToWrappedToken_RoundDown(uint _amountAToken) external view returns (uint _amountWrappedToken);
+	function ATokenToWrappedToken_RoundUp(uint _amountAToken) external view returns (uint _amountWrappedToken);
+	function WrappedTokenToAToken_RoundDown(uint _amountWrappedToken) external view returns (uint _amountAToken);
+	function WrappedTokenToAToken_RoundUp(uint _amountWrappedToken) external view returns (uint _amountAToken);
 
 }
 

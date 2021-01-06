@@ -68,7 +68,7 @@ contract capitalHandler is IERC20 {
 				wrappedTknFree = wrappedTknFree.sub(toSub);
 			}
 			else
-				wrappedTknFree = wrappedTknFree.sub(aw.ATokenToWrappedToken(uint(-bondBal)));
+				wrappedTknFree = wrappedTknFree.sub(aw.ATokenToWrappedToken_RoundUp(uint(-bondBal)));
 		}
 	}
 
@@ -105,14 +105,14 @@ contract capitalHandler is IERC20 {
 	function enterPayoutPhase() public {
 		require(!inPayoutPhase && block.timestamp >= maturity);
 		inPayoutPhase = true;
-		maturityConversionRate = aw.WrappedTokenToAToken(1e18);
+		maturityConversionRate = aw.WrappedTokenToAToken_RoundDown(1e18);
 	}
 
 	function minimumATokensAtMaturity(address _owner) internal view returns (uint balance) {
 		if (inPayoutPhase)
 			balance = balanceYield[_owner]*maturityConversionRate/1e18;
 		else
-			balance = aw.WrappedTokenToAToken(balanceYield[_owner]);
+			balance = aw.WrappedTokenToAToken_RoundDown(balanceYield[_owner]);
 		int bondBal = balanceBonds[_owner];
 		if (bondBal > 0)
 			balance = balance.add(uint(bondBal));
@@ -168,7 +168,7 @@ contract capitalHandler is IERC20 {
     }
 
     function totalSupply() public view override returns (uint _supply) {
-    	_supply = aw.WrappedTokenToAToken(aw.balanceOf(address(this)));
+    	_supply = aw.WrappedTokenToAToken_RoundDown(aw.balanceOf(address(this)));
     }
 
 //---------Yield Token--------------------
@@ -176,7 +176,7 @@ contract capitalHandler is IERC20 {
 	function transferYield(address _from, address _to, uint _amount) public {
 		require(msg.sender == yieldTokenAddress);
 		require(wrappedTokenFree(_from) >= _amount);
-		uint _amountATkn = inPayoutPhase ? _amount.mul(maturityConversionRate)/1e18 : aw.WrappedTokenToAToken(_amount);
+		uint _amountATkn = inPayoutPhase ? _amount.mul(maturityConversionRate)/1e18 : aw.WrappedTokenToAToken_RoundDown(_amount);
 		balanceYield[_from] -= _amount;
 		balanceYield[_to] += _amount;
 		balanceBonds[_from] += int(_amountATkn);

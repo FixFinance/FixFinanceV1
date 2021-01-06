@@ -382,7 +382,7 @@ library BigMath {
     return exponent.mul( int128( U ).log_2() ).exp_2().add(  exponent.mul( int128( Z ).log_2() ).exp_2()  );
   }
 
-  function ZUB_U_reserve_change(uint reserve0, uint reserve1, uint r, int128 changeReserve0) external pure returns (int128 changeReserve1) {
+  function ZCB_U_reserve_change(uint reserve0, uint reserve1, uint r, int128 changeReserve0) external pure returns (int128 changeReserve1) {
     int128 K = ZCB_U_PoolConstant(reserve0, reserve1, r);
     /*
       K == U**(1-r) + Z**(1-r)

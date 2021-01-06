@@ -22,7 +22,7 @@ contract DummyVaultHealth is IVaultHealth {
 		uint _amountBorrowed
 		) external view override returns (bool) {
 
-		return upperRatio[_assetSupplied][_assetBorrowed] * _amountBorrowed / 1e18 < IAaveWrapper(_assetSupplied).WrappedTokenToAToken(_amountSupplied);
+		return upperRatio[_assetSupplied][_assetBorrowed] * _amountBorrowed / 1e18 < IAaveWrapper(_assetSupplied).WrappedTokenToAToken_RoundDown(_amountSupplied);
 	}
 	//collateral must be greater than or equal to the return value to avoid liquidation
 	function lowerLimitSuppliedAsset(
@@ -32,7 +32,7 @@ contract DummyVaultHealth is IVaultHealth {
 		uint _amountBorrowed
 		) external view override returns (bool) {
 
-		return lowerRatio[_assetSupplied][_assetBorrowed] * _amountBorrowed / 1e18 < IAaveWrapper(_assetSupplied).WrappedTokenToAToken(_amountSupplied);
+		return lowerRatio[_assetSupplied][_assetBorrowed] * _amountBorrowed / 1e18 < IAaveWrapper(_assetSupplied).WrappedTokenToAToken_RoundDown(_amountSupplied);
 	}
 
 	function setUpper(

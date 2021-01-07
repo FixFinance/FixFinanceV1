@@ -1,12 +1,13 @@
 pragma solidity >=0.6.0;
 
-import "../ERC20.sol";
+//import "../ERC20.sol";
+import "../helpers/doubleAssetYieldEnabledToken.sol";
 import "../libraries/ABDKMath64x64.sol";
 import "../libraries/BigMath.sol";
 import "../capitalHandler.sol";
 import "../yieldToken.sol";
 
-contract ZCBamm is ERC20 {
+contract ZCBamm is doubleAssetYieldEnabledToken {
 
 	using ABDKMath64x64 for int128;
 
@@ -19,16 +20,21 @@ contract ZCBamm is ERC20 {
 	uint ZCBreserves;
 	uint Ureserves;
 
+	string public override name;
+	string public override symbol;
+
 	constructor(address _capitalHandlerAddress) public {
 		name = "aZCB amm Liquidity Token";
 		symbol = "aZCBLT";
 		capitalHandlerAddress = _capitalHandlerAddress;
-		yieldTokenAddress = capitalHandler(_capitalHandlerAddress).yieldTokenAddress();
+		address _yieldTokenAddress = capitalHandler(_capitalHandlerAddress).yieldTokenAddress();
+		yieldTokenAddress = _yieldTokenAddress;
 		uint64 _maturity = capitalHandler(_capitalHandlerAddress).maturity();
 		require(_maturity > block.timestamp + 10 days);
 		maturity = _maturity;
 		//we want time remaining / anchor to be less than 1, thus make anchor greater than time remaining
 		anchor = 10 * (maturity - block.timestamp) / 9;
+		init(_capitalHandlerAddress, _yieldTokenAddress);
 	}
 
 	function _mint(address _to, uint _amount) internal {
@@ -68,7 +74,7 @@ contract ZCBamm is ERC20 {
 		yieldToken(yieldTokenAddress).transfer_2(msg.sender, _amount);
 	}
 
-	function timeRemaining() internal returns (uint) {
+	function timeRemaining() internal view returns (uint) {
 		return uint(int128((maturity-block.timestamp)<<64).div(int128(anchor<<64)));
 	}
 
@@ -191,6 +197,29 @@ contract ZCBamm is ERC20 {
 		}
 
 	}
+
+
+	//-------------------------implement double asset yield enabled token-------------------------------
+
+	function contractClaimDividend() external override returns (uint asset1, uint asset2) {
+		require(lastWithdraw < block.timestamp - 86400, "this function can only be called once every 24 hours");
+
+		uint _ZCBreserves = ZCBreserves;	//gas savings
+		uint _Ureserves = Ureserves;	//gas savings
+
+		asset1 = Asset1Contract.balanceOf(address(this));
+		require(asset1 >= _ZCBreserves);
+		asset1 -= _ZCBreserves;
+		asset2 = Asset2Contract.balanceOf(address(this));
+		require(asset2 >= _Ureserves);
+		asset2 -= _Ureserves;
+
+		lastWithdraw = block.timestamp;
+
+		contractBalanceAsset1.push(contractBalanceAsset1[contractBalanceAsset1.length-1] + asset1);
+		contractBalanceAsset2.push(contractBalanceAsset2[contractBalanceAsset2.length-1] + asset2);
+	}
+
 
 }
 

@@ -1,9 +1,9 @@
 pragma solidity >=0.6.0;
 import "./Ownable.sol";
 import "../interfaces/IERC20.sol";
-import "../interfaces/yieldEnabled.sol";
+import "../interfaces/IYieldEnabled.sol";
 
-abstract contract doubleAssetYieldEnabledToken is IERC20, Ownable, yieldEnabled {
+abstract contract doubleAssetYieldEnabledToken is IERC20, Ownable, IYieldEnabled {
 	
 	//smart contract of the asset in the numerator of oracle price
 	IERC20 public Asset1Contract;

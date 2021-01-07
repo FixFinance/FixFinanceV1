@@ -1,5 +1,5 @@
 pragma solidity >=0.6.5 <0.7.0;
-import "./interfaces/IERC20.sol";
+import "../interfaces/IERC20.sol";
 
 /*
     For the purposes of this project all we need our dummy aToken to be able to do is

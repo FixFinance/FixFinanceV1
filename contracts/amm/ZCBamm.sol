@@ -1,6 +1,5 @@
 pragma solidity >=0.6.0;
 
-//import "../ERC20.sol";
 import "../helpers/doubleAssetYieldEnabledToken.sol";
 import "../libraries/ABDKMath64x64.sol";
 import "../libraries/BigMath.sol";

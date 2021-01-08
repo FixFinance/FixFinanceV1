@@ -220,6 +220,15 @@ contract ZCBamm is doubleAssetYieldEnabledToken {
 	}
 
 
+	//------------------------------v-i-e-w-s-----------------------------------------------
+
+	function getReserves() external view returns (uint _Ureserves, uint _ZCBreserves, uint _TimeRemaining) {
+		_Ureserves = Ureserves;
+		_ZCBreserves = ZCBreserves;
+		_TimeRemaining = timeRemaining();
+	}
+
+
 }
 
 

@@ -27,6 +27,11 @@ contract('ZCBamm', async function(accounts){
 		amm = await ZCBamm.new(capitalHandlerInstance.address);
 		anchor = (await amm.anchor()).toNumber();
 
+
+		//simulate generation of 100% returns in money market
+		await aTokenInstance.setInflation("2"+_10To18BN.toString().substring(1));
+
+
 		//mint funds to accounts[0]
 		balance = _10To18BN;
 		await aTokenInstance.approve(aaveWrapperInstance.address, balance);
@@ -35,6 +40,7 @@ contract('ZCBamm', async function(accounts){
 		await capitalHandlerInstance.depositWrappedToken(accounts[0], balance);
 		await capitalHandlerInstance.approve(amm.address, balance);
 		await yieldTokenInstance.approve(amm.address, balance);
+
 	});
 
 	it('make first deposit in amm', async () => {
@@ -56,7 +62,7 @@ contract('ZCBamm', async function(accounts){
 		assert.equal(ZCBreserves.substring(0, 10), ZCBexpected.substring(0, 10), "ZCBreserves is accurate to within 10 digits");
 
 		balanceLT = await amm.balanceOf(accounts[0]);
-		balanceYT = await yieldTokenInstance.balanceOf(accounts[0]);
+		balanceYT = await yieldTokenInstance.balanceOf_2(accounts[0]);
 		balanceZCB = await capitalHandlerInstance.balanceOf(accounts[0]);
 		totalSupplyLT = await amm.totalSupply();
 
@@ -86,7 +92,7 @@ contract('ZCBamm', async function(accounts){
 		assert.equal(ZCBreserves.substring(0, 10), ZCBexpected.substring(0, 10), "ZCBreserves is accurate to within 10 digits");
 
 		balanceLT = await amm.balanceOf(accounts[0]);
-		balanceYT = await yieldTokenInstance.balanceOf(accounts[0]);
+		balanceYT = await yieldTokenInstance.balanceOf_2(accounts[0]);
 		balanceZCB = await capitalHandlerInstance.balanceOf(accounts[0]);
 		totalSupplyLT = await amm.totalSupply();
 
@@ -115,7 +121,7 @@ contract('ZCBamm', async function(accounts){
 		assert.equal(ZCBreserves.substring(0, 10), ZCBexpected.substring(0, 10), "ZCBreserves is accurate to within 10 digits");
 
 		balanceLT = await amm.balanceOf(accounts[0]);
-		balanceYT = await yieldTokenInstance.balanceOf(accounts[0]);
+		balanceYT = await yieldTokenInstance.balanceOf_2(accounts[0]);
 		balanceZCB = await capitalHandlerInstance.balanceOf(accounts[0]);
 		totalSupplyLT = await amm.totalSupply();
 
@@ -146,7 +152,7 @@ contract('ZCBamm', async function(accounts){
 		assert.equal(ZCBreserves.length, ZCBexpected.length, "correct length of ZCBreserves");
 		assert.equal(ZCBreserves.substring(0, 10), ZCBexpected.substring(0, 10), "ZCBreserves is accurate to within 10 digits");
 
-		balanceYT = await yieldTokenInstance.balanceOf(accounts[0]);
+		balanceYT = await yieldTokenInstance.balanceOf_2(accounts[0]);
 		balanceZCB = await capitalHandlerInstance.balanceOf(accounts[0]);
 
 		assert.equal(balanceLT.toString(), Uin.toString());
@@ -175,7 +181,7 @@ contract('ZCBamm', async function(accounts){
 		assert.equal(ZCBreserves.length, ZCBexpected.length, "correct length of ZCBreserves");
 		assert.equal(ZCBreserves.substring(0, 10), ZCBexpected.substring(0, 10), "ZCBreserves is accurate to within 10 digits");
 
-		balanceYT = await yieldTokenInstance.balanceOf(accounts[0]);
+		balanceYT = await yieldTokenInstance.balanceOf_2(accounts[0]);
 		balanceZCB = await capitalHandlerInstance.balanceOf(accounts[0]);
 
 		assert.equal(balanceYT.toString(), balance.sub(new BN(Ureserves)).toString(), "correct balance YT");
@@ -203,7 +209,7 @@ contract('ZCBamm', async function(accounts){
 		assert.equal(ZCBreserves.length, ZCBexpected.length, "correct length of ZCBreserves");
 		assert.equal(ZCBreserves.substring(0, 10), ZCBexpected.substring(0, 10), "ZCBreserves is accurate to within 10 digits");
 
-		balanceYT = await yieldTokenInstance.balanceOf(accounts[0]);
+		balanceYT = await yieldTokenInstance.balanceOf_2(accounts[0]);
 		balanceZCB = await capitalHandlerInstance.balanceOf(accounts[0]);
 
 		assert.equal(balanceYT.toString(), balance.sub(new BN(Ureserves)).toString(), "correct balance YT");
@@ -231,7 +237,7 @@ contract('ZCBamm', async function(accounts){
 		assert.equal(ZCBreserves.length, ZCBexpected.length, "correct length of ZCBreserves");
 		assert.equal(ZCBreserves.substring(0, 10), ZCBexpected.substring(0, 10), "ZCBreserves is accurate to within 10 digits");
 
-		balanceYT = await yieldTokenInstance.balanceOf(accounts[0]);
+		balanceYT = await yieldTokenInstance.balanceOf_2(accounts[0]);
 		balanceZCB = await capitalHandlerInstance.balanceOf(accounts[0]);
 
 		assert.equal(balanceYT.toString(), balance.sub(new BN(Ureserves)).toString(), "correct balance YT");

@@ -10,9 +10,6 @@ contract ZCBamm is doubleAssetYieldEnabledToken {
 
 	using ABDKMath64x64 for int128;
 
-	address public capitalHandlerAddress;
-	address public yieldTokenAddress;
-
 	uint64 public maturity;
 	uint public anchor;
 
@@ -22,27 +19,27 @@ contract ZCBamm is doubleAssetYieldEnabledToken {
 	string public override name;
 	string public override symbol;
 
-	constructor(address _capitalHandlerAddress) public {
+	constructor(address _ZCBaddress) public {
 		name = "aZCB amm Liquidity Token";
 		symbol = "aZCBLT";
-		capitalHandlerAddress = _capitalHandlerAddress;
-		address _yieldTokenAddress = capitalHandler(_capitalHandlerAddress).yieldTokenAddress();
-		yieldTokenAddress = _yieldTokenAddress;
-		uint64 _maturity = capitalHandler(_capitalHandlerAddress).maturity();
+		address _YTaddress = capitalHandler(_ZCBaddress).yieldTokenAddress();
+		uint64 _maturity = capitalHandler(_ZCBaddress).maturity();
 		require(_maturity > block.timestamp + 10 days);
 		maturity = _maturity;
 		//we want time remaining / anchor to be less than 1, thus make anchor greater than time remaining
 		anchor = 10 * (maturity - block.timestamp) / 9;
-		init(_capitalHandlerAddress, _yieldTokenAddress);
+		init(_ZCBaddress, _YTaddress);
 	}
 
 	function _mint(address _to, uint _amount) internal {
+        claimDividendInternal(_to, _to);
 		balanceOf[_to] += _amount;
 		totalSupply += _amount;
 	}
 
 	function _burn(address _from, uint _amount) internal {
 		require(balanceOf[_from] >= _amount);
+        claimDividendInternal(_from, _from);
 		balanceOf[_from] -= _amount;
 		totalSupply -= _amount;
 	}
@@ -53,11 +50,11 @@ contract ZCBamm is doubleAssetYieldEnabledToken {
 	}
 
 	function getZCB(uint _amount) internal {
-		capitalHandler(capitalHandlerAddress).transferFrom(msg.sender, address(this), _amount);
+		capitalHandler(ZCBaddress).transferFrom(msg.sender, address(this), _amount);
 	}
 
 	function getYT(uint _amount) internal {
-		yieldToken(yieldTokenAddress).transferFrom_2(msg.sender, address(this), _amount);
+		yieldToken(YTaddress).transferFrom_2(msg.sender, address(this), _amount, true);
 	}
 
 	function sendU(uint _amount) internal {
@@ -66,11 +63,11 @@ contract ZCBamm is doubleAssetYieldEnabledToken {
 	}
 
 	function sendZCB(uint _amount) internal {
-		capitalHandler(capitalHandlerAddress).transfer(msg.sender, _amount);
+		capitalHandler(ZCBaddress).transfer(msg.sender, _amount);
 	}
 
 	function sendYT(uint _amount) internal {
-		yieldToken(yieldTokenAddress).transfer_2(msg.sender, _amount);
+		yieldToken(YTaddress).transfer_2(msg.sender, _amount, false);
 	}
 
 	function timeRemaining() internal view returns (uint) {
@@ -199,24 +196,25 @@ contract ZCBamm is doubleAssetYieldEnabledToken {
 
 
 	//-------------------------implement double asset yield enabled token-------------------------------
-
-	function contractClaimDividend() external override returns (uint asset1, uint asset2) {
+	function contractClaimDividend() external override {
 		require(lastWithdraw < block.timestamp - 86400, "this function can only be called once every 24 hours");
 
 		uint _ZCBreserves = ZCBreserves;	//gas savings
 		uint _Ureserves = Ureserves;	//gas savings
 
-		asset1 = Asset1Contract.balanceOf(address(this));
-		require(asset1 >= _ZCBreserves);
-		asset1 -= _ZCBreserves;
-		asset2 = Asset2Contract.balanceOf(address(this));
-		require(asset2 >= _Ureserves);
-		asset2 -= _Ureserves;
+		uint amount = capitalHandler(ZCBaddress).balanceOf(address(this));
+		require(amount > _ZCBreserves + _Ureserves);
+		amount = amount - _ZCBreserves - _Ureserves + ZCBdividendOut;
+		require(amount > contractBalanceAsset1[contractBalanceAsset1.length-1]);
+		contractBalanceAsset1.push(amount);
+
+		amount = yieldToken(YTaddress).balanceOf_2(address(this));
+		require(amount > _Ureserves);
+		amount = amount - _Ureserves + YTdividendOut;
+		require(amount > contractBalanceAsset2[contractBalanceAsset2.length-1]);
+		contractBalanceAsset2.push(amount);
 
 		lastWithdraw = block.timestamp;
-
-		contractBalanceAsset1.push(contractBalanceAsset1[contractBalanceAsset1.length-1] + asset1);
-		contractBalanceAsset2.push(contractBalanceAsset2[contractBalanceAsset2.length-1] + asset2);
 	}
 
 

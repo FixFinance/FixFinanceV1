@@ -6,6 +6,8 @@ const yieldToken = artifacts.require("yieldToken");
 const yieldTokenDeployer = artifacts.require("yieldTokenDeployer");
 const ZCBamm = artifacts.require("ZCBamm");
 
+const helper = require("../helper/helper.js");
+
 const BN = web3.utils.BN;
 const nullAddress = "0x0000000000000000000000000000000000000000";
 const _10To18BN = (new BN("10")).pow(new BN("18"));
@@ -234,6 +236,119 @@ contract('ZCBamm', async function(accounts){
 
 		assert.equal(balanceYT.toString(), balance.sub(new BN(Ureserves)).toString(), "correct balance YT");
 		assert.equal(balanceZCB.toString(), balance.sub((new BN(ZCBreserves)).add(new BN(Ureserves))).toString(), "correct balance ZCB");
+	});
+
+
+	it('Valid reserves', async () => {
+		let balZCB = await capitalHandlerInstance.balanceOf(amm.address);
+		let balYT = await yieldTokenInstance.balanceOf_2(amm.address);
+		assert.equal(Ureserves, balYT.toString(), "valid Ureserves");
+		assert.equal(ZCBreserves, balZCB.sub(balYT).toString(), "valid ZCBreserves");
+	});
+
+	it('Yield Generation does not affect pool reserves before contract claim dividend', async () => {
+		//simulate generation of yield by sending funds directly to pool address
+		amtZCB = balance.div(new BN(1000));
+		amtYT = balance.div(new BN(500));
+		await capitalHandlerInstance.transfer(amm.address, amtZCB);
+		await yieldTokenInstance.transfer_2(amm.address, amtYT, true);
+
+		let results = await amm.getReserves();
+		assert.equal(results._Ureserves.toString(), Ureserves, "U reserves not affected by yield generation");
+		assert.equal(results._ZCBreserves.toString(), ZCBreserves, "U reserves not affected by yield generation");
+	});
+
+	it('Contract Claim Dividend', async () => {
+		await amm.contractClaimDividend();
+
+		assert.equal((await amm.length()).toString(), "2");
+		assert.equal((await amm.contractBalanceAsset1(1)).toString(), amtZCB.toString());
+		assert.equal((await amm.contractBalanceAsset2(1)).toString(), amtYT.toString());
+	})
+
+	it('Yield Generation does not affect pool reserves after contract claim dividend', async () => {
+		let results = await amm.getReserves();
+		assert.equal(results._Ureserves.toString(), Ureserves, "U reserves not affected by yield generation");
+		assert.equal(results._ZCBreserves.toString(), ZCBreserves, "U reserves not affected by yield generation");
+	});
+
+	it('User Claims Generated Yield', async () => {
+		rec = await amm.claimDividend(accounts[1]);
+		let event = rec.logs[2].args;
+		assert.equal(event._claimer.toString(), accounts[0]);
+		assert.equal(event._to.toString(), accounts[1]);
+		assert.equal(event._amtZCB.toString(), amtZCB.toString());
+		assert.equal(event._amtYT.toString(), amtYT.toString());
+	});
+
+	it('ClaimContract Dividend After Dividend Payouts', async () => {
+		//advance 1 day and 1 second
+		await helper.advanceTime(1 + 24*60*60);
+
+		amtZCB2 = amtZCB.div(new BN(2));
+		amtYT2 = amtYT.div(new BN(5));
+
+		await capitalHandlerInstance.transfer(amm.address, amtZCB2);
+		await yieldTokenInstance.transfer_2(amm.address, amtYT2, true);
+
+		await amm.contractClaimDividend();
+
+		assert.equal((await amm.length()).toString(), "3");
+		assert.equal((await amm.contractBalanceAsset1(2)).toString(), amtZCB.add(amtZCB2).toString());
+		assert.equal((await amm.contractBalanceAsset2(2)).toString(), amtYT.add(amtYT2).toString());
+	});
+
+	it('ClaimContract Dividend After Dividend Payouts', async () => {
+		//advance 1 day and 1 second
+		await helper.advanceTime(1 + 24*60*60);
+		let caught = false;
+		try {
+			await amm.contractClaimDividend();
+		} catch (err) {
+			caught = true;
+		}
+		if (!caught) assert.fail('Cannot Call claimContractDividend() when no yield has been generated');
+	});
+
+
+	it('Claims Dividend On transfer() call', async () => {
+		balance = await amm.balanceOf(accounts[0]);
+		amount = balance.div(new BN(2))
+		rec = await amm.transfer(accounts[1], amount);
+		/*
+			first event is ZCB dividend transfer
+			second event is YT dividend transfer
+			third event is what we want
+			fourth event is transfer of LP tokens
+		*/
+		let event = rec.logs[2].args;
+
+		assert.equal(event._claimer.toString(), accounts[0]);
+		assert.equal(event._to.toString(), accounts[0]);
+		assert.equal(event._amtZCB.toString(), amtZCB2.toString());
+		assert.equal(event._amtYT.toString(), amtYT2.toString());
+	});
+
+	it('Claims Dividend on transferFrom() call', async () => {
+		//generate yield for LPs
+		await capitalHandlerInstance.transfer(amm.address, amtZCB);
+		await yieldTokenInstance.transfer_2(amm.address, amtYT, true);
+		await amm.contractClaimDividend();
+
+		await amm.approve(accounts[0], amount, {from: accounts[1]});
+		rec = await amm.transferFrom(accounts[1], accounts[0], amount);
+
+		let event = rec.logs[2].args;
+		assert.equal(event._claimer.toString(), accounts[1]);
+		assert.equal(event._to.toString(), accounts[1]);
+		assert.equal(event._amtZCB.toString(), amtZCB.div(new BN(2)).toString());
+		assert.equal(event._amtYT.toString(), amtYT.div(new BN(2)).toString());
+
+		event = rec.logs[5].args;
+		assert.equal(event._claimer.toString(), accounts[0]);
+		assert.equal(event._to.toString(), accounts[0]);
+		assert.equal(event._amtZCB.toString(), amtZCB.div(new BN(2)).toString());
+		assert.equal(event._amtYT.toString(), amtYT.div(new BN(2)).toString());
 	});
 
 });

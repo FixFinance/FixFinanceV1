@@ -369,6 +369,15 @@ library BigMath {
     return ((termMulLog >> 64).mul(ei) >> 64).sub(int256(Y).mul(APYoexp) >> 64);
   }
 
+  function YT_U_reserve_change(uint256 Y, uint256 L, uint256 r, int128 APYo, int128 changeYreserve) external pure returns (int128) {
+    require(changeYreserve > -int(Y));
+    int256 KminusU = YT_U_PoolConstantMinusU(Y, L, r, APYo);
+    int256 newKminusU = YT_U_PoolConstantMinusU(uint(int(Y) + changeYreserve), L, r, APYo);
+    int256 result = KminusU.sub(newKminusU);
+    require(result.abs() < MAX);
+    return int128(result);
+  }
+
   /*
       All params inflated by 64 bits
   */

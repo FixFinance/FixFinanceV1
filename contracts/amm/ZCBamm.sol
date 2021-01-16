@@ -19,6 +19,9 @@ contract ZCBamm is doubleAssetYieldEnabledToken {
 	string public override name;
 	string public override symbol;
 
+	int128[3] impliedRates;
+	uint[3] heights;
+
 	constructor(address _ZCBaddress) public {
 		name = "aZCB amm Liquidity Token";
 		symbol = "aZCBLT";
@@ -95,7 +98,7 @@ contract ZCBamm is doubleAssetYieldEnabledToken {
 		Ureserves = effectiveU;
 	}
 
-	function mint(uint _amount, uint _maxUin, uint _maxZCBin) public {
+	function mint(uint _amount, uint _maxUin, uint _maxZCBin) public setRateModifier {
 		uint _totalSupply = totalSupply;	//gas savings
 		uint Uin = _amount*Ureserves;
 		Uin = Uin/_totalSupply + (Uin%_totalSupply == 0 ? 0 : 1);
@@ -114,7 +117,7 @@ contract ZCBamm is doubleAssetYieldEnabledToken {
 		ZCBreserves += ZCBin;
 	}
 
-	function burn(uint _amount) public {
+	function burn(uint _amount) public setRateModifier {
 		uint _totalSupply = totalSupply;	//gas savings
 		uint Uout = _amount*Ureserves/_totalSupply;
 		uint ZCBout = _amount*ZCBreserves/_totalSupply;
@@ -128,7 +131,7 @@ contract ZCBamm is doubleAssetYieldEnabledToken {
 		ZCBreserves -= ZCBout;
 	}
 
-	function SwapFromSpecificTokens(int128 _amount, bool _ZCBin) public {
+	function SwapFromSpecificTokens(int128 _amount, bool _ZCBin) public setRateModifier {
 		require(_amount > 0);
 		int _amtOut;
 		uint r = timeRemaining();
@@ -162,7 +165,7 @@ contract ZCBamm is doubleAssetYieldEnabledToken {
 
 	}
 
-	function SwapToSpecificTokens(int128 _amount, bool _ZCBout) public {
+	function SwapToSpecificTokens(int128 _amount, bool _ZCBout) public setRateModifier {
 		require(_amount > 0);
 		int _amtIn;
 		uint r = timeRemaining();
@@ -217,14 +220,90 @@ contract ZCBamm is doubleAssetYieldEnabledToken {
 		lastWithdraw = block.timestamp;
 	}
 
+	//------------------------e-n-a-b-l-e---p-o-o-l---t-o---a-c-t---a-s---r-a-t-e---o-r-a-c-l-e-----------------
+	function indexToSet() internal view returns (uint8) {
+		uint8 i = 2;
+		for (;i > 0 && heights[i] >= heights[i-1]; i--) {}
+		return i;
+	}
 
-	//------------------------------v-i-e-w-s-----------------------------------------------
+	function setOracleRate(uint8 _index) internal {
+		/*
+			APY**(anchor/1 year) == ZCBreserves/Ureserves
+			APY == (ZCBreserves/Ureserves)**(1 year/anchor)
+
+			the main function of our rate oracle is to feed info to the YTamm which knows the anchor so we are good with storing ZCBreserves/Ureserves here
+		*/
+		uint _Ureserves = Ureserves;
+		uint _ZCBreserves = totalSupply + ZCBreserves;
+		//only record when rate is a positive real number, also _ZCB reserves must fit into 192 bits
+		if (Ureserves == 0 || _ZCBreserves >> 192 != 0  || _ZCBreserves <= _Ureserves) return;
+		uint rate = (_ZCBreserves << 64) / _Ureserves;
+		//rate must fit into 127 bits
+		if (rate >= 1 << 128) return;
+		heights[_index] = block.number;
+		impliedRates[_index] = int128(rate);
+	}
+
+	modifier setRateModifier() {
+		uint8 toSet = indexToSet();
+		uint8 mostRecent = (2+toSet)%3;
+		if (block.number != heights[mostRecent]) setOracleRate(toSet);
+		_;
+	}
+
+	//returns APY**(anchor/1 year)
+	function getRateFromOracle() public view returns (int128 rate) {
+		require(heights[2] != 0);	//rate data must be non-null
+
+		int128 first = impliedRates[0];
+		int128 second = impliedRates[1];
+		int128 third = impliedRates[2];
+
+        (first,second) = first > second ? (first, second) : (second,first);
+        (second,third) = second > third ? (second, third) : (third,second);
+        (first,second) = first > second ? (first, second) : (second,first);
+
+        return second;
+	}
+
+	function getAPYFromOracle() external view returns (int128 APY) {
+		/*
+			APY == getRateFromOr111acle()**(1 year / anchor)
+			APY == exp2 ( log 2 ( getRateFromOracle()**(1 year / anchor)))
+			APY == exp2 ( (1 year / anchor) * log 2 ( getRateFromOracle()))
+		*/
+		APY = getRateFromOracle();
+		// 31556926 is the number of seconds in a year
+		int128 _1overAnchor = int128((31556926 << 64) / anchor);
+		APY = APY.log_2().mul(_1overAnchor).exp_2();
+	}
+
+	function getImpliedRateData() external view returns (
+		int128 impliedRate0,
+		int128 impliedRate1,
+		int128 impliedRate2,
+		uint height0,
+		uint height1,
+		uint height2
+	) {
+		impliedRate0 = impliedRates[0];
+		impliedRate1 = impliedRates[1];
+		impliedRate2 = impliedRates[2];
+		height0 = heights[0];
+		height1 = heights[1];
+		height2 = heights[2];
+	}
+
+
+	//-----------------------o-t-h-e-r---v-i-e-w-s-----------------------------------------------
 
 	function getReserves() external view returns (uint _Ureserves, uint _ZCBreserves, uint _TimeRemaining) {
 		_Ureserves = Ureserves;
 		_ZCBreserves = ZCBreserves;
 		_TimeRemaining = timeRemaining();
 	}
+
 
 
 }

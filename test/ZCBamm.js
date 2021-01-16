@@ -11,6 +11,7 @@ const helper = require("../helper/helper.js");
 const BN = web3.utils.BN;
 const nullAddress = "0x0000000000000000000000000000000000000000";
 const _10To18BN = (new BN("10")).pow(new BN("18"));
+const secondsPerYear = 31556926;
 
 contract('ZCBamm', async function(accounts){
 	it('before each', async () => {
@@ -76,7 +77,13 @@ contract('ZCBamm', async function(accounts){
 		let maxUin = Uin;
 		let maxZCBin = ZCBin;
 
-		await amm.mint(balanceLT, maxUin, maxZCBin);
+		rec = await amm.mint(balanceLT, maxUin, maxZCBin);
+
+		rateData = await amm.getImpliedRateData();
+
+		expectedNewRate = (new BN(ZCBreserves)).add(totalSupplyLT).mul( (new BN(2)).pow(new BN(64)) ).div(new BN(Ureserves));
+		assert.equal(rateData.impliedRate0.toString(), expectedNewRate.toString(), "correct rate stored");
+		assert.equal(rateData.height0.toString(), rec.receipt.blockNumber.toString(), "correct height stored")
 
 		let Uexpected = (new BN(Ureserves)).mul(new BN(2)).toString();
 		let ZCBexpected = (new BN(ZCBreserves)).mul(new BN(2)).toString();
@@ -100,12 +107,22 @@ contract('ZCBamm', async function(accounts){
 		assert.equal(balanceYT.toString(), balance.sub(new BN(Ureserves)).toString(), "correct balance YT");
 		assert.equal(balanceZCB.toString(), balance.sub((new BN(ZCBreserves)).add(new BN(Ureserves))).toString(), "correct balance ZCB");
 		assert.equal(totalSupplyLT.toString(), balanceLT.toString(), "correct total supply of liquidity tokens");
-	})
+	});
 
 	it('burn liquidity tokens', async () => {
 		let toBurn = Uin;
 
-		await amm.burn(toBurn);
+		rec = await amm.burn(toBurn);
+
+		let newRateData = await amm.getImpliedRateData();
+		expectedNewRate = (new BN(ZCBreserves)).add(totalSupplyLT).mul( (new BN(2)).pow(new BN(64)) ).div(new BN(Ureserves));
+		assert.equal(newRateData.impliedRate1.toString(), expectedNewRate.toString(), "correct rate stored");
+		assert.equal(newRateData.height1.toString(), rec.receipt.blockNumber.toString(), "correct height stored")
+		assert.equal(newRateData.impliedRate0.toString(), rateData.impliedRate0.toString(), "correct rate");
+		assert.equal(newRateData.height0.toString(), rateData.height0.toString(), "correct height");
+		assert.equal(newRateData.impliedRate2.toString(), rateData.impliedRate2.toString(), "correct rate");
+		assert.equal(newRateData.height2.toString(), rateData.height2.toString(), "correct height");
+		rateData = newRateData;
 
 		let Uexpected = (new BN(Ureserves)).div(new BN(2)).toString();
 		let ZCBexpected = (new BN(ZCBreserves)).div(new BN(2)).toString();
@@ -135,6 +152,17 @@ contract('ZCBamm', async function(accounts){
 		amtIn = balance.div(new BN(100));
 
 		rec = await amm.SwapFromSpecificTokens(amtIn, true);
+
+		let newRateData = await amm.getImpliedRateData();
+		expectedNewRate = (new BN(ZCBreserves)).add(totalSupplyLT).mul( (new BN(2)).pow(new BN(64)) ).div(new BN(Ureserves));
+		assert.equal(newRateData.impliedRate2.toString(), expectedNewRate.toString(), "correct rate stored");
+		assert.equal(newRateData.height2.toString(), rec.receipt.blockNumber.toString(), "correct height stored")
+		assert.equal(newRateData.impliedRate0.toString(), rateData.impliedRate0.toString(), "correct rate");
+		assert.equal(newRateData.height0.toString(), rateData.height0.toString(), "correct height");
+		assert.equal(newRateData.impliedRate1.toString(), rateData.impliedRate1.toString(), "correct rate");
+		assert.equal(newRateData.height1.toString(), rateData.height1.toString(), "correct height");
+		rateData = newRateData;
+
 		let timestamp = (await web3.eth.getBlock(rec.receipt.blockNumber)).timestamp;
 		let r = (maturity-timestamp)/anchor;
 		let k = Math.pow(parseInt(Ureserves), 1-r) + Math.pow(parseInt(totalSupplyLT.add(new BN(ZCBreserves)).toString()), 1-r);
@@ -164,6 +192,17 @@ contract('ZCBamm', async function(accounts){
 		amtIn = balance.div(new BN(100));
 
 		rec = await amm.SwapFromSpecificTokens(amtIn, false);
+
+		let newRateData = await amm.getImpliedRateData();
+		expectedNewRate = (new BN(ZCBreserves)).add(totalSupplyLT).mul( (new BN(2)).pow(new BN(64)) ).div(new BN(Ureserves));
+		assert.equal(newRateData.impliedRate0.toString(), expectedNewRate.toString(), "correct rate stored");
+		assert.equal(newRateData.height0.toString(), rec.receipt.blockNumber.toString(), "correct height stored")
+		assert.equal(newRateData.impliedRate1.toString(), rateData.impliedRate1.toString(), "correct rate");
+		assert.equal(newRateData.height1.toString(), rateData.height1.toString(), "correct height");
+		assert.equal(newRateData.impliedRate2.toString(), rateData.impliedRate2.toString(), "correct rate");
+		assert.equal(newRateData.height2.toString(), rateData.height2.toString(), "correct height");
+		rateData = newRateData;
+
 		let timestamp = (await web3.eth.getBlock(rec.receipt.blockNumber)).timestamp;
 		let r = (maturity-timestamp)/anchor;
 		let k = Math.pow(parseInt(Ureserves), 1-r) + Math.pow(parseInt(totalSupplyLT.add(new BN(ZCBreserves)).toString()), 1-r);
@@ -192,6 +231,17 @@ contract('ZCBamm', async function(accounts){
 		let amtOut = balance.div(new BN(100));
 
 		rec = await amm.SwapToSpecificTokens(amtOut, true);
+
+		let newRateData = await amm.getImpliedRateData();
+		expectedNewRate = (new BN(ZCBreserves)).add(totalSupplyLT).mul( (new BN(2)).pow(new BN(64)) ).div(new BN(Ureserves));
+		assert.equal(newRateData.impliedRate1.toString(), expectedNewRate.toString(), "correct rate stored");
+		assert.equal(newRateData.height1.toString(), rec.receipt.blockNumber.toString(), "correct height stored")
+		assert.equal(newRateData.impliedRate0.toString(), rateData.impliedRate0.toString(), "correct rate");
+		assert.equal(newRateData.height0.toString(), rateData.height0.toString(), "correct height");
+		assert.equal(newRateData.impliedRate2.toString(), rateData.impliedRate2.toString(), "correct rate");
+		assert.equal(newRateData.height2.toString(), rateData.height2.toString(), "correct height");
+		rateData = newRateData;
+
 		let timestamp = (await web3.eth.getBlock(rec.receipt.blockNumber)).timestamp;
 		let r = (maturity-timestamp)/anchor;
 		let k = Math.pow(parseInt(Ureserves), 1-r) + Math.pow(parseInt(totalSupplyLT.add(new BN(ZCBreserves)).toString()), 1-r);
@@ -220,6 +270,17 @@ contract('ZCBamm', async function(accounts){
 		let amtOut = balance.div(new BN(100));
 
 		rec = await amm.SwapToSpecificTokens(amtOut, false);
+
+		let newRateData = await amm.getImpliedRateData();
+		expectedNewRate = (new BN(ZCBreserves)).add(totalSupplyLT).mul( (new BN(2)).pow(new BN(64)) ).div(new BN(Ureserves));
+		assert.equal(newRateData.impliedRate2.toString(), expectedNewRate.toString(), "correct rate stored");
+		assert.equal(newRateData.height2.toString(), rec.receipt.blockNumber.toString(), "correct height stored")
+		assert.equal(newRateData.impliedRate0.toString(), rateData.impliedRate0.toString(), "correct rate");
+		assert.equal(newRateData.height0.toString(), rateData.height0.toString(), "correct height");
+		assert.equal(newRateData.impliedRate1.toString(), rateData.impliedRate1.toString(), "correct rate");
+		assert.equal(newRateData.height1.toString(), rateData.height1.toString(), "correct height");
+		rateData = newRateData;
+
 		let timestamp = (await web3.eth.getBlock(rec.receipt.blockNumber)).timestamp;
 		let r = (maturity-timestamp)/anchor;
 		let k = Math.pow(parseInt(Ureserves), 1-r) + Math.pow(parseInt(totalSupplyLT.add(new BN(ZCBreserves)).toString()), 1-r);
@@ -357,4 +418,21 @@ contract('ZCBamm', async function(accounts){
 		assert.equal(event._amtYT.toString(), amtYT.div(new BN(2)).toString());
 	});
 
+	it('Return Median of past 3 rates from getRateFromOracle() call', async () => {
+		let first = rateData.impliedRate0;
+		let second = rateData.impliedRate1;
+		let third = rateData.impliedRate2;
+		[first, second] = first.cmp(second) == 1 ? [first, second] : [second, first];
+		[second, third] = second.cmp(third) == 1 ? [second, third] : [third, second];
+		[first, second] = first.cmp(second) == 1 ? [first, second] : [second, first];
+		expectedRate = second.toString();
+		assert.equal((await amm.getRateFromOracle()).toString(), expectedRate, "correct rate returned");
+	});
+
+	it('Returne Correct value from getAPYFromOracle() call', async () => {
+		expectedAPY = (Math.pow(parseInt(expectedRate) * Math.pow(2, -64), secondsPerYear/anchor) * Math.pow(2, 64)).toLocaleString('fullwide', {useGrouping: false});
+		result = (await amm.getAPYFromOracle()).toString();
+		assert.equal(result.length, expectedAPY.length, "result has same length of characters as expected result");
+		assert.equal(result.substring(0, 10), expectedAPY.substring(0, 10), "first 10 digits of expected and result are the same");
+	});
 });

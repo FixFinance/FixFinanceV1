@@ -91,7 +91,7 @@ contract('capitalHandler', async function(accounts){
 	});
 
 	it('cannot transfer too much yield', async () => {
-		maxTransfer = await capitalHandlerInstance.wrappedTokenFree(accounts[0]);
+		maxTransfer = await capitalHandlerInstance.balanceYield(accounts[0]);
 		caught = false;
 		await yieldTokenInstance.transfer(accounts[1], maxTransfer.add(new BN("1")).toString()).catch(() => {
 			caught = true;
@@ -100,6 +100,7 @@ contract('capitalHandler', async function(accounts){
 		});
 		//transfer max amount
 		await yieldTokenInstance.transfer(accounts[1], maxTransfer.toString());
+		await yieldTokenInstance.transfer(accounts[0], maxTransfer.toString(), {from: accounts[1]});
 	});
 
 	it('enters payout phase', async () => {

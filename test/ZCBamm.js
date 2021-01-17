@@ -429,7 +429,7 @@ contract('ZCBamm', async function(accounts){
 		assert.equal((await amm.getRateFromOracle()).toString(), expectedRate, "correct rate returned");
 	});
 
-	it('Returne Correct value from getAPYFromOracle() call', async () => {
+	it('Return Correct value from getAPYFromOracle() call', async () => {
 		expectedAPY = (Math.pow(parseInt(expectedRate) * Math.pow(2, -64), secondsPerYear/anchor) * Math.pow(2, 64)).toLocaleString('fullwide', {useGrouping: false});
 		result = (await amm.getAPYFromOracle()).toString();
 		assert.equal(result.length, expectedAPY.length, "result has same length of characters as expected result");

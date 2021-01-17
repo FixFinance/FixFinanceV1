@@ -175,12 +175,17 @@ contract capitalHandler is IERC20 {
 
 	function transferYield(address _from, address _to, uint _amount) public {
 		require(msg.sender == yieldTokenAddress);
-		require(wrappedTokenFree(_from) >= _amount);
+		require(balanceYield[_from] >= _amount);
 		uint _amountATkn = inPayoutPhase ? _amount.mul(maturityConversionRate)/1e18 : aw.WrappedTokenToAToken_RoundDown(_amount);
 		balanceYield[_from] -= _amount;
 		balanceYield[_to] += _amount;
 		balanceBonds[_from] += int(_amountATkn);
 		balanceBonds[_to] -= int(_amountATkn);
+		//ensure that _from address's position may be cashed out to a positive amount of wrappedToken
+		int bonds = balanceBonds[_from];
+		if (bonds >= 0) return;
+		uint bondsToWrappedToken = inPayoutPhase ? uint(-bonds).mul(maturityConversionRate)/1e18 : aw.ATokenToWrappedToken_RoundUp(uint(-bonds));
+		require(balanceYield[_from] >= bondsToWrappedToken);
 	}
 
 

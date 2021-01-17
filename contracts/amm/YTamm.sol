@@ -137,8 +137,8 @@ contract YTamm is doubleAssetYieldEnabledToken {
 		uint _YTtoLmultiplier = YTtoLmultiplier;
 		require(_totalSupply > _YTtoLmultiplier);
 		uint _TimeRemaining = timeRemaining();
-		int128 APYo = ZCBamm(ZCBammAddress).getRateFromOracle();
-		uint Uout = uint(-BigMath.YT_U_reserve_change(YTreserves, _totalSupply / _YTtoLmultiplier, _TimeRemaining, APYo, _amount));
+		int128 OracleRate = ZCBamm(ZCBammAddress).getRateFromOracle();
+		uint Uout = uint(-BigMath.YT_U_reserve_change(YTreserves, _totalSupply / _YTtoLmultiplier, _TimeRemaining, OracleRate, _amount));
 
 		require(Ureserves > Uout);
 
@@ -155,8 +155,8 @@ contract YTamm is doubleAssetYieldEnabledToken {
 		uint _YTtoLmultiplier = YTtoLmultiplier;
 		require(_totalSupply > _YTtoLmultiplier);
 		uint _TimeRemaining = timeRemaining();
-		int128 APYo = ZCBamm(ZCBammAddress).getRateFromOracle();
-		uint Uin = uint(BigMath.YT_U_reserve_change(YTreserves, _totalSupply / _YTtoLmultiplier, _TimeRemaining, APYo, -_amount));
+		int128 OracleRate = ZCBamm(ZCBammAddress).getRateFromOracle();
+		uint Uin = uint(BigMath.YT_U_reserve_change(YTreserves, _totalSupply / _YTtoLmultiplier, _TimeRemaining, OracleRate, -_amount));
 
 		require(YTreserves > uint(_amount));
 

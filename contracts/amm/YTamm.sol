@@ -3,8 +3,8 @@ pragma solidity >=0.6.0;
 import "../helpers/doubleAssetYieldEnabledToken.sol";
 import "../libraries/ABDKMath64x64.sol";
 import "../libraries/BigMath.sol";
+import "../interfaces/IYieldToken.sol";
 import "../interfaces/IERC20.sol";
-import "../yieldToken.sol";
 import "./ZCBamm.sol";
 
 contract YTamm is doubleAssetYieldEnabledToken {
@@ -61,7 +61,7 @@ contract YTamm is doubleAssetYieldEnabledToken {
 	}
 
 	function getYT(uint _amount) internal {
-		yieldToken(YTaddress).transferFrom_2(msg.sender, address(this), _amount, true);
+		IYieldToken(YTaddress).transferFrom_2(msg.sender, address(this), _amount, true);
 	}
 
 	function sendU(uint _amount) internal {
@@ -74,7 +74,7 @@ contract YTamm is doubleAssetYieldEnabledToken {
 	}
 
 	function sendYT(uint _amount) internal {
-		yieldToken(YTaddress).transfer_2(msg.sender, _amount, false);
+		IYieldToken(YTaddress).transfer_2(msg.sender, _amount, false);
 	}
 
 	function timeRemaining() internal view returns (uint) {
@@ -181,7 +181,7 @@ contract YTamm is doubleAssetYieldEnabledToken {
 		require(amount > contractBalanceAsset1[contractBalanceAsset1.length-1]);
 		contractBalanceAsset1.push(amount);
 
-		amount = yieldToken(YTaddress).balanceOf_2(address(this));
+		amount = IYieldToken(YTaddress).balanceOf_2(address(this), false);
 		require(amount > _Ureserves + _YTreserves);
 		amount = amount - _Ureserves - _YTreserves + YTdividendOut;
 		require(amount > contractBalanceAsset2[contractBalanceAsset2.length-1]);
@@ -199,7 +199,5 @@ contract YTamm is doubleAssetYieldEnabledToken {
 		_TimeRemaining = timeRemaining();
 	}
 
-
 }
-
 

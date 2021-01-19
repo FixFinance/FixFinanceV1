@@ -2,8 +2,8 @@ const aToken = artifacts.require("dummyAToken");
 const aaveWrapper = artifacts.require("aaveWrapper");
 const BigMath = artifacts.require("BigMath");
 const capitalHandler = artifacts.require("CapitalHandler");
-const yieldToken = artifacts.require("yieldToken");
-const yieldTokenDeployer = artifacts.require("yieldTokenDeployer");
+const yieldToken = artifacts.require("YieldToken");
+const yieldTokenDeployer = artifacts.require("YieldTokenDeployer");
 const ZCBamm = artifacts.require("ZCBamm");
 const YTamm = artifacts.require("YTamm");
 
@@ -67,7 +67,7 @@ contract('YTamm', async function(accounts){
 		OracleRate = parseInt((await amm0.getRateFromOracle()).toString()) * Math.pow(2, -64);
 		APYo = parseInt((await amm0.getAPYFromOracle()).toString()) * Math.pow(2, -64);
 		assert.equal((await capitalHandlerInstance.balanceOf(accounts[0])).toString(), balance.toString(), "correct balance ZCB");
-		assert.equal((await yieldTokenInstance.balanceOf_2(accounts[0])).toString(), balance.toString(), "correct balance YT");
+		assert.equal((await yieldTokenInstance.balanceOf_2(accounts[0], false)).toString(), balance.toString(), "correct balance YT");
 	});
 
 	it('First Liquidity Token Mint', async () => {
@@ -75,7 +75,7 @@ contract('YTamm', async function(accounts){
 		await amm1.firstMint(toMint);
 		assert.equal((await amm1.balanceOf(accounts[0])).toString(), toMint.toString(), "correct balance of YTamm liquidity tokens");
 		assert.equal((await capitalHandlerInstance.balanceOf(accounts[0])).toString(), balance.sub(toMint).toString(), "correct balance ZCB");
-		assert.equal((await yieldTokenInstance.balanceOf_2(accounts[0])).toString(), balance.sub(toMint.mul(new BN(YTtoLmultiplier+1))).toString(), "correct balance YT");
+		assert.equal((await yieldTokenInstance.balanceOf_2(accounts[0], false)).toString(), balance.sub(toMint.mul(new BN(YTtoLmultiplier+1))).toString(), "correct balance YT");
 		let results = await amm1.getReserves();
 		assert.equal(results._Ureserves.toString(), toMint.toString(), "correct value of Ureserves");
 		assert.equal(results._YTreserves.toString(), toMint.mul(new BN(YTtoLmultiplier)).toString(), "correct value of Ureserves");
@@ -87,7 +87,7 @@ contract('YTamm', async function(accounts){
 		await amm1.mint(toMint, toMint, toMint.mul(new BN(YTtoLmultiplier)));
 		assert.equal((await amm1.balanceOf(accounts[0])).toString(), toMint.mul(new BN(2)).toString(), "correct balance of YTamm liquidity tokens");
 		assert.equal((await capitalHandlerInstance.balanceOf(accounts[0])).toString(), balance.sub(toMint.mul(new BN(2))).toString(), "correct balance ZCB");
-		assert.equal((await yieldTokenInstance.balanceOf_2(accounts[0])).toString(), balance.sub(toMint.mul(new BN(2*YTtoLmultiplier+2))).toString(), "correct balance YT");
+		assert.equal((await yieldTokenInstance.balanceOf_2(accounts[0], false)).toString(), balance.sub(toMint.mul(new BN(2*YTtoLmultiplier+2))).toString(), "correct balance YT");
 		let results = await amm1.getReserves();
 		assert.equal(results._Ureserves.toString(), toMint.mul(new BN(2)).toString(), "correct value of Ureserves");
 		assert.equal(results._YTreserves.toString(), toMint.mul(new BN(2*YTtoLmultiplier)).toString(), "correct value of Ureserves");
@@ -99,7 +99,7 @@ contract('YTamm', async function(accounts){
 		await amm1.burn(toMint);
 		amm1balance = await amm1.balanceOf(accounts[0]);
 		ZCBbalance = await capitalHandlerInstance.balanceOf(accounts[0]);
-		YTbalance = await yieldTokenInstance.balanceOf_2(accounts[0]);
+		YTbalance = await yieldTokenInstance.balanceOf_2(accounts[0], false);
 		assert.equal(amm1balance.toString(), toMint, "correct balance of YTamm liquidity tokens");
 		assert.equal(ZCBbalance.toString(), balance.sub(toMint).toString(), "correct balance ZCB");
 		assert.equal(YTbalance.toString(), balance.sub(toMint.mul(new BN(YTtoLmultiplier+1))).toString(), "correct balance YT");
@@ -125,7 +125,7 @@ contract('YTamm', async function(accounts){
 		let error = Math.abs(parseInt(Uout.toString())/expectedUout - 1);
 		assert.isBelow(error, 0.000001, "acceptable margin of error")
 		let prevYTbalance = YTbalance;
-		YTbalance = await yieldTokenInstance.balanceOf_2(accounts[0]);
+		YTbalance = await yieldTokenInstance.balanceOf_2(accounts[0], false);
 		assert.equal(prevYTbalance.add(Uout).sub(YTbalance).toString(), amtIn.toString(), "correct amount U in");
 	});
 
@@ -145,7 +145,7 @@ contract('YTamm', async function(accounts){
 		let error = Math.abs(parseInt(Uin.toString())/expectedUin - 1);
 		assert.isBelow(error, 0.000001, "acceptable margin of error")
 		let prevYTbalance = YTbalance;
-		YTbalance = await yieldTokenInstance.balanceOf_2(accounts[0]);
+		YTbalance = await yieldTokenInstance.balanceOf_2(accounts[0], false);
 		assert.equal(YTbalance.sub(prevYTbalance.sub(Uin)).toString(), amtOut.toString(), "correct amount U out");
 	});
 
@@ -154,7 +154,7 @@ contract('YTamm', async function(accounts){
 		Ureserves = results._Ureserves.toString();
 		YTreserves = results._YTreserves.toString();
 		let balZCB = await capitalHandlerInstance.balanceOf(amm1.address);
-		let balYT = await yieldTokenInstance.balanceOf_2(amm1.address);
+		let balYT = await yieldTokenInstance.balanceOf_2(amm1.address, false);
 		assert.equal(Ureserves, balZCB.toString(), "valid Ureserves");
 		assert.equal(YTreserves, balYT.sub(balZCB).toString(), "valid ZCBreserves");
 	});

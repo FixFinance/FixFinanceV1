@@ -4,8 +4,8 @@ import "../helpers/doubleAssetYieldEnabledToken.sol";
 import "../libraries/ABDKMath64x64.sol";
 import "../libraries/BigMath.sol";
 import "../interfaces/ICapitalHandler.sol";
+import "../interfaces/IYieldToken.sol";
 import "../interfaces/IERC20.sol";
-import "../yieldToken.sol";
 
 contract ZCBamm is doubleAssetYieldEnabledToken {
 
@@ -58,7 +58,7 @@ contract ZCBamm is doubleAssetYieldEnabledToken {
 	}
 
 	function getYT(uint _amount) internal {
-		yieldToken(YTaddress).transferFrom_2(msg.sender, address(this), _amount, true);
+		IYieldToken(YTaddress).transferFrom_2(msg.sender, address(this), _amount, true);
 	}
 
 	function sendU(uint _amount) internal {
@@ -71,7 +71,7 @@ contract ZCBamm is doubleAssetYieldEnabledToken {
 	}
 
 	function sendYT(uint _amount) internal {
-		yieldToken(YTaddress).transfer_2(msg.sender, _amount, false);
+		IYieldToken(YTaddress).transfer_2(msg.sender, _amount, false);
 	}
 
 	function timeRemaining() internal view returns (uint) {
@@ -212,7 +212,7 @@ contract ZCBamm is doubleAssetYieldEnabledToken {
 		require(amount > contractBalanceAsset1[contractBalanceAsset1.length-1]);
 		contractBalanceAsset1.push(amount);
 
-		amount = yieldToken(YTaddress).balanceOf_2(address(this));
+		amount = IYieldToken(YTaddress).balanceOf_2(address(this), false);
 		require(amount > _Ureserves);
 		amount = amount - _Ureserves + YTdividendOut;
 		require(amount > contractBalanceAsset2[contractBalanceAsset2.length-1]);

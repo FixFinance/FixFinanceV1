@@ -2,7 +2,7 @@ const aaveWrapper = artifacts.require('aaveWrapper');
 const capitalHandler = artifacts.require('CapitalHandler');
 const dummyAToken = artifacts.require('dummyAToken');
 const organizer = artifacts.require('organizer');
-const yieldTokenDeployer = artifacts.require('yieldTokenDeployer');
+const yieldTokenDeployer = artifacts.require('YieldTokenDeployer');
 const BondMinter = artifacts.require("BondMinter");
 const UniswapV2Factory = artifacts.require('UniswapV2Factory');
 

@@ -2,8 +2,8 @@ const aToken = artifacts.require("dummyAToken");
 const aaveWrapper = artifacts.require("aaveWrapper");
 const BigMath = artifacts.require("BigMath");
 const capitalHandler = artifacts.require("CapitalHandler");
-const yieldToken = artifacts.require("yieldToken");
-const yieldTokenDeployer = artifacts.require("yieldTokenDeployer");
+const yieldToken = artifacts.require("YieldToken");
+const yieldTokenDeployer = artifacts.require("YieldTokenDeployer");
 const ZCBamm = artifacts.require("ZCBamm");
 
 const helper = require("../helper/helper.js");
@@ -63,7 +63,7 @@ contract('ZCBamm', async function(accounts){
 		assert.equal(ZCBreserves.substring(0, 10), ZCBexpected.substring(0, 10), "ZCBreserves is accurate to within 10 digits");
 
 		balanceLT = await amm.balanceOf(accounts[0]);
-		balanceYT = await yieldTokenInstance.balanceOf_2(accounts[0]);
+		balanceYT = await yieldTokenInstance.balanceOf_2(accounts[0], false);
 		balanceZCB = await capitalHandlerInstance.balanceOf(accounts[0]);
 		totalSupplyLT = await amm.totalSupply();
 
@@ -99,7 +99,7 @@ contract('ZCBamm', async function(accounts){
 		assert.equal(ZCBreserves.substring(0, 10), ZCBexpected.substring(0, 10), "ZCBreserves is accurate to within 10 digits");
 
 		balanceLT = await amm.balanceOf(accounts[0]);
-		balanceYT = await yieldTokenInstance.balanceOf_2(accounts[0]);
+		balanceYT = await yieldTokenInstance.balanceOf_2(accounts[0], false);
 		balanceZCB = await capitalHandlerInstance.balanceOf(accounts[0]);
 		totalSupplyLT = await amm.totalSupply();
 
@@ -138,7 +138,7 @@ contract('ZCBamm', async function(accounts){
 		assert.equal(ZCBreserves.substring(0, 10), ZCBexpected.substring(0, 10), "ZCBreserves is accurate to within 10 digits");
 
 		balanceLT = await amm.balanceOf(accounts[0]);
-		balanceYT = await yieldTokenInstance.balanceOf_2(accounts[0]);
+		balanceYT = await yieldTokenInstance.balanceOf_2(accounts[0], false);
 		balanceZCB = await capitalHandlerInstance.balanceOf(accounts[0]);
 		totalSupplyLT = await amm.totalSupply();
 
@@ -180,7 +180,7 @@ contract('ZCBamm', async function(accounts){
 		assert.equal(ZCBreserves.length, ZCBexpected.length, "correct length of ZCBreserves");
 		assert.equal(ZCBreserves.substring(0, 10), ZCBexpected.substring(0, 10), "ZCBreserves is accurate to within 10 digits");
 
-		balanceYT = await yieldTokenInstance.balanceOf_2(accounts[0]);
+		balanceYT = await yieldTokenInstance.balanceOf_2(accounts[0], false);
 		balanceZCB = await capitalHandlerInstance.balanceOf(accounts[0]);
 
 		assert.equal(balanceLT.toString(), Uin.toString());
@@ -220,7 +220,7 @@ contract('ZCBamm', async function(accounts){
 		assert.equal(ZCBreserves.length, ZCBexpected.length, "correct length of ZCBreserves");
 		assert.equal(ZCBreserves.substring(0, 10), ZCBexpected.substring(0, 10), "ZCBreserves is accurate to within 10 digits");
 
-		balanceYT = await yieldTokenInstance.balanceOf_2(accounts[0]);
+		balanceYT = await yieldTokenInstance.balanceOf_2(accounts[0], false);
 		balanceZCB = await capitalHandlerInstance.balanceOf(accounts[0]);
 
 		assert.equal(balanceYT.toString(), balance.sub(new BN(Ureserves)).toString(), "correct balance YT");
@@ -259,7 +259,7 @@ contract('ZCBamm', async function(accounts){
 		assert.equal(ZCBreserves.length, ZCBexpected.length, "correct length of ZCBreserves");
 		assert.equal(ZCBreserves.substring(0, 10), ZCBexpected.substring(0, 10), "ZCBreserves is accurate to within 10 digits");
 
-		balanceYT = await yieldTokenInstance.balanceOf_2(accounts[0]);
+		balanceYT = await yieldTokenInstance.balanceOf_2(accounts[0], false);
 		balanceZCB = await capitalHandlerInstance.balanceOf(accounts[0]);
 
 		assert.equal(balanceYT.toString(), balance.sub(new BN(Ureserves)).toString(), "correct balance YT");
@@ -298,7 +298,7 @@ contract('ZCBamm', async function(accounts){
 		assert.equal(ZCBreserves.length, ZCBexpected.length, "correct length of ZCBreserves");
 		assert.equal(ZCBreserves.substring(0, 10), ZCBexpected.substring(0, 10), "ZCBreserves is accurate to within 10 digits");
 
-		balanceYT = await yieldTokenInstance.balanceOf_2(accounts[0]);
+		balanceYT = await yieldTokenInstance.balanceOf_2(accounts[0], false);
 		balanceZCB = await capitalHandlerInstance.balanceOf(accounts[0]);
 
 		assert.equal(balanceYT.toString(), balance.sub(new BN(Ureserves)).toString(), "correct balance YT");
@@ -308,7 +308,7 @@ contract('ZCBamm', async function(accounts){
 
 	it('Valid reserves', async () => {
 		let balZCB = await capitalHandlerInstance.balanceOf(amm.address);
-		let balYT = await yieldTokenInstance.balanceOf_2(amm.address);
+		let balYT = await yieldTokenInstance.balanceOf_2(amm.address, false);
 		assert.equal(Ureserves, balYT.toString(), "valid Ureserves");
 		assert.equal(ZCBreserves, balZCB.sub(balYT).toString(), "valid ZCBreserves");
 	});

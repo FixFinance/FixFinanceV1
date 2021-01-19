@@ -1,12 +1,13 @@
 pragma solidity >=0.6.5 <0.7.0;
 import "./interfaces/ICapitalHandler.sol";
 import "./interfaces/IAaveWrapper.sol";
+import "./interfaces/IYieldToken.sol";
 import "./interfaces/IERC20.sol";
 import "./libraries/SafeMath.sol";
 
-contract yieldToken is IERC20 {
+contract YieldToken is IYieldToken {
 
-	ICapitalHandler public ch;
+	ICapitalHandler ch;
 	IAaveWrapper aw;
 
     string public override name;
@@ -60,17 +61,17 @@ contract yieldToken is IERC20 {
         return true;
     }
 
-    function balanceOf_2(address _owner) external view returns (uint) {
-        return aw.WrappedTokenToAToken_RoundDown(balanceOf(_owner));
+    function balanceOf_2(address _owner, bool _roundUp) external view override returns (uint) {
+        return _roundUp ? aw.WrappedTokenToAToken_RoundUp(balanceOf(_owner)) : aw.WrappedTokenToAToken_RoundDown(balanceOf(_owner));
     }
 
     //_value denominated in AToken not in wrapped AToken
-    function transfer_2(address _to, uint256 _value, bool _roundUp) external {
+    function transfer_2(address _to, uint256 _value, bool _roundUp) external override {
         transfer(_to, _roundUp ? aw.ATokenToWrappedToken_RoundUp(_value) : aw.ATokenToWrappedToken_RoundDown(_value));
     }
 
     //_value denominated in AToken not in wrapped AToken
-    function transferFrom_2(address _from, address _to, uint256 _value, bool _roundUp) external {
+    function transferFrom_2(address _from, address _to, uint256 _value, bool _roundUp) external override {
         transferFrom(_from, _to, _roundUp ? aw.ATokenToWrappedToken_RoundUp(_value) : aw.ATokenToWrappedToken_RoundDown(_value));
     }
 

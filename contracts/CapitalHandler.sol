@@ -3,7 +3,7 @@ import "./interfaces/ICapitalHandler.sol";
 import "./interfaces/IAaveWrapper.sol";
 import "./interfaces/IERC20.sol";
 import "./ERC20.sol";
-import "./yieldTokenDeployer.sol";
+import "./YieldTokenDeployer.sol";
 import "./libraries/SafeMath.sol";
 import "./libraries/SignedSafeMath.sol";
 
@@ -55,7 +55,7 @@ contract CapitalHandler is ICapitalHandler {
 		maturity = _maturity;
 		(bool success , ) = _yieldTokenDeployer.call(abi.encodeWithSignature("deploy(address)", _aw));
 		require(success);
-		yieldTokenAddress = yieldTokenDeployer(_yieldTokenDeployer).addr();
+		yieldTokenAddress = YieldTokenDeployer(_yieldTokenDeployer).addr();
 		bondMinterAddress = _bondMinterAddress;
 	}
 

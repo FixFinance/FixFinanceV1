@@ -1,8 +1,8 @@
 pragma solidity >=0.6.0;
 import "../interfaces/ICapitalHandler.sol";
 import "../interfaces/IYieldEnabled.sol";
+import "../interfaces/IYieldToken.sol";
 import "../interfaces/IERC20.sol";
-import "../yieldToken.sol";
 import "./Ownable.sol";
 
 abstract contract doubleAssetYieldEnabledToken is IERC20, Ownable, IYieldEnabled {
@@ -118,7 +118,7 @@ abstract contract doubleAssetYieldEnabledToken is IERC20, Ownable, IYieldEnabled
 
 		uint toSendYT = totalIncreace * _balanceOf / _totalSupply;
 
-		yieldToken(YTaddress).transfer_2(_to, toSendYT, false);
+		IYieldToken(YTaddress).transfer_2(_to, toSendYT, false);
 		YTdividendOut += toSendYT;
 
 		emit DividendDistributed(_from, _to, toSendZCB, toSendYT);

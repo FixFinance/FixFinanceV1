@@ -3,7 +3,7 @@ pragma solidity >=0.6.0;
 import "../helpers/doubleAssetYieldEnabledToken.sol";
 import "../libraries/ABDKMath64x64.sol";
 import "../libraries/BigMath.sol";
-import "../capitalHandler.sol";
+import "../interfaces/IERC20.sol";
 import "../yieldToken.sol";
 import "./ZCBamm.sol";
 
@@ -57,7 +57,7 @@ contract YTamm is doubleAssetYieldEnabledToken {
 	}
 
 	function getZCB(uint _amount) internal {
-		capitalHandler(ZCBaddress).transferFrom(msg.sender, address(this), _amount);
+		IERC20(ZCBaddress).transferFrom(msg.sender, address(this), _amount);
 	}
 
 	function getYT(uint _amount) internal {
@@ -70,7 +70,7 @@ contract YTamm is doubleAssetYieldEnabledToken {
 	}
 
 	function sendZCB(uint _amount) internal {
-		capitalHandler(ZCBaddress).transfer(msg.sender, _amount);
+		IERC20(ZCBaddress).transfer(msg.sender, _amount);
 	}
 
 	function sendYT(uint _amount) internal {
@@ -175,7 +175,7 @@ contract YTamm is doubleAssetYieldEnabledToken {
 		uint _YTreserves = YTreserves;	//gas savings
 		uint _Ureserves = Ureserves;	//gas savings
 
-		uint amount = capitalHandler(ZCBaddress).balanceOf(address(this));
+		uint amount = IERC20(ZCBaddress).balanceOf(address(this));
 		require(amount > _Ureserves);
 		amount = amount - _Ureserves + ZCBdividendOut;
 		require(amount > contractBalanceAsset1[contractBalanceAsset1.length-1]);

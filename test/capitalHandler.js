@@ -1,6 +1,6 @@
 const dummyAToken = artifacts.require('dummyAToken');
 const aaveWrapper = artifacts.require('aaveWrapper');
-const capitalHandler = artifacts.require('capitalHandler');
+const capitalHandler = artifacts.require('CapitalHandler');
 const yieldTokenDeployer = artifacts.require('yieldTokenDeployer');
 const IERC20 = artifacts.require("IERC20");
 

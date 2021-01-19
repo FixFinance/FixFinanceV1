@@ -1,6 +1,6 @@
 pragma solidity >=0.6.0 <0.7.0;
 import "./aaveWrapper.sol";
-import "./capitalHandler.sol";
+import "./CapitalHandler.sol";
 
 contract organizer {
 
@@ -37,7 +37,7 @@ contract organizer {
 		require(capitalHandlerMapping[_aTokenAddress][_maturity] == address(0), "capital handler with these parameters already exists");
 		address aaveWrapperAddress = aTokenWrappers[_aTokenAddress];
 		require(aaveWrapperAddress != address(0), "deploy a wrapper for this aToken first");
-		address capitalHandlerAddress = address(new capitalHandler(aaveWrapperAddress, _maturity, yieldTokenDeployerAddress, bondMinterAddress));
+		address capitalHandlerAddress = address(new CapitalHandler(aaveWrapperAddress, _maturity, yieldTokenDeployerAddress, bondMinterAddress));
 		capitalHandlerInstances.push(capitalHandlerAddress);
 		capitalHandlerMapping[_aTokenAddress][_maturity] = capitalHandlerAddress;
 	}

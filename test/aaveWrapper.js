@@ -1,6 +1,6 @@
 const dummyAToken = artifacts.require('dummyAToken');
 const aaveWrapper = artifacts.require('aaveWrapper');
-const capitalHandler = artifacts.require('capitalHandler');
+const capitalHandler = artifacts.require('CapitalHandler');
 const BN = web3.utils.BN;
 const _10To18 = (new BN('10')).pow(new BN('18'));
 

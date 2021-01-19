@@ -1,33 +1,34 @@
 pragma solidity >=0.6.5 <0.7.0;
+import "./interfaces/ICapitalHandler.sol";
+import "./interfaces/IAaveWrapper.sol";
 import "./interfaces/IERC20.sol";
 import "./ERC20.sol";
-import "./aaveWrapper.sol";
 import "./yieldTokenDeployer.sol";
 import "./libraries/SafeMath.sol";
 import "./libraries/SignedSafeMath.sol";
 
-contract capitalHandler is IERC20 {
+contract CapitalHandler is ICapitalHandler {
 	using SafeMath for uint;
 	using SignedSafeMath for int;
 
-	bool public inPayoutPhase;
+	bool public override inPayoutPhase;
 
-	uint64 public maturity;
+	uint64 public override maturity;
 
 	//1e18 * aToken / wrappedToken
-	uint public maturityConversionRate;
+	uint public override maturityConversionRate;
 
-	aaveWrapper public aw;
+	IAaveWrapper public override aw;
 
-	address public aToken;
+	address public override aToken;
 
-	mapping(address => int) public balanceBonds;
+	mapping(address => int) public override balanceBonds;
 
-	mapping(address => uint) public balanceYield;
+	mapping(address => uint) public override balanceYield;
 
-	address public yieldTokenAddress;
+	address public override yieldTokenAddress;
 
-	address public bondMinterAddress;
+	address public override bondMinterAddress;
 
 //--------ERC 20 Storage---------------
 
@@ -44,7 +45,7 @@ contract capitalHandler is IERC20 {
 		address _yieldTokenDeployer,
 		address _bondMinterAddress
 		) public {
-		aaveWrapper temp = aaveWrapper(_aw);
+		IAaveWrapper temp = IAaveWrapper(_aw);
 		aw = temp;
 		decimals = temp.decimals();
 		IERC20 temp2 = IERC20(temp.aToken());
@@ -58,7 +59,7 @@ contract capitalHandler is IERC20 {
 		bondMinterAddress = _bondMinterAddress;
 	}
 
-	function wrappedTokenFree(address _owner) public view returns (uint wrappedTknFree) {
+	function wrappedTokenFree(address _owner) public view override returns (uint wrappedTknFree) {
 		wrappedTknFree = balanceYield[_owner];
 		int bondBal = balanceBonds[_owner];
 		if (bondBal < 0){
@@ -72,12 +73,12 @@ contract capitalHandler is IERC20 {
 		}
 	}
 
-	function depositWrappedToken(address _to, uint _amountWrappedTkn) public {
+	function depositWrappedToken(address _to, uint _amountWrappedTkn) external override {
 		aw.transferFrom(msg.sender, address(this), _amountWrappedTkn);
 		balanceYield[_to] += _amountWrappedTkn;
 	}
 
-	function withdraw(address _to, uint _amountWrappedTkn, bool _unwrap) public {
+	function withdraw(address _to, uint _amountWrappedTkn, bool _unwrap) external override {
 		require(wrappedTokenFree(msg.sender) >= _amountWrappedTkn);
 		balanceYield[msg.sender] -= _amountWrappedTkn;
 		if (_unwrap)
@@ -86,7 +87,7 @@ contract capitalHandler is IERC20 {
 			aw.transfer(_to, _amountWrappedTkn);
 	}
 
-	function withdrawAll(address _to, bool _unwrap) public {
+	function withdrawAll(address _to, bool _unwrap) external override {
 		uint freeToMove = wrappedTokenFree(msg.sender);
 		balanceYield[msg.sender] -= freeToMove;
 		if (_unwrap)
@@ -95,14 +96,14 @@ contract capitalHandler is IERC20 {
 			aw.transfer(_to, freeToMove);
 	}
 
-	function claimBondPayout(address _to) public {
+	function claimBondPayout(address _to) external override {
 		int bondBal = balanceBonds[msg.sender];
 		require(block.timestamp >= maturity && bondBal > 0);
 		aw.withdrawWrappedToken(_to, uint(bondBal)*1e18/maturityConversionRate);
 		balanceBonds[msg.sender] = 0;
 	}
 
-	function enterPayoutPhase() public {
+	function enterPayoutPhase() external override {
 		require(!inPayoutPhase && block.timestamp >= maturity);
 		inPayoutPhase = true;
 		maturityConversionRate = aw.WrappedTokenToAToken_RoundDown(1e18);
@@ -120,7 +121,7 @@ contract capitalHandler is IERC20 {
 			balance = balance.sub(uint(-bondBal));
 	}
 
-	function mintZCBTo(address _owner, uint _amount) external {
+	function mintZCBTo(address _owner, uint _amount) external override {
 		require(msg.sender == bondMinterAddress);
 
 		balanceBonds[_owner] += int(_amount);
@@ -173,7 +174,7 @@ contract capitalHandler is IERC20 {
 
 //---------Yield Token--------------------
 
-	function transferYield(address _from, address _to, uint _amount) public {
+	function transferYield(address _from, address _to, uint _amount) external override {
 		require(msg.sender == yieldTokenAddress);
 		require(balanceYield[_from] >= _amount);
 		uint _amountATkn = inPayoutPhase ? _amount.mul(maturityConversionRate)/1e18 : aw.WrappedTokenToAToken_RoundDown(_amount);

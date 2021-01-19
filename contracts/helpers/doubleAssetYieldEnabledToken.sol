@@ -1,8 +1,9 @@
 pragma solidity >=0.6.0;
-import "./Ownable.sol";
-import "../interfaces/IERC20.sol";
+import "../interfaces/ICapitalHandler.sol";
 import "../interfaces/IYieldEnabled.sol";
+import "../interfaces/IERC20.sol";
 import "../yieldToken.sol";
+import "./Ownable.sol";
 
 abstract contract doubleAssetYieldEnabledToken is IERC20, Ownable, IYieldEnabled {
 	
@@ -111,7 +112,7 @@ abstract contract doubleAssetYieldEnabledToken is IERC20, Ownable, IYieldEnabled
 		uint totalIncreace = contractBalanceAsset1[lastIndex] - contractBalanceAsset1[mostRecent];
 		uint toSendZCB = totalIncreace * _balanceOf / _totalSupply;
 
-		capitalHandler(ZCBaddress).transfer(_to, toSendZCB);
+		IERC20(ZCBaddress).transfer(_to, toSendZCB);
 		ZCBdividendOut += toSendZCB;
 		totalIncreace = contractBalanceAsset2[lastIndex] - contractBalanceAsset2[mostRecent];
 

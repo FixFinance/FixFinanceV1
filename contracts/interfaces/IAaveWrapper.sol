@@ -1,6 +1,8 @@
 pragma solidity >=0.6.5 <0.7.0;
+import "./IERC20.sol";
 
-interface IAaveWrapper {
+interface IAaveWrapper is IERC20 {
+	function aToken() external view returns(address);
 	function firstDeposit(address _to, uint _amountAToken) external returns (uint _amountWrappedToken);
 	function deposit(address _to, uint _amountAToken) external returns (uint _amountWrappedToken);
 	function withdrawAToken(address _to, uint _amountAToken) external returns (uint _amountWrappedToken);

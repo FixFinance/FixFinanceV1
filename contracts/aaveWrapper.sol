@@ -7,7 +7,7 @@ import "./libraries/SafeMath.sol";
 contract aaveWrapper is ERC20, IAaveWrapper {
 	using SafeMath for uint;
 
-	address public aToken;
+	address public override aToken;
 
 	constructor (address _aToken) public {
 		aToken = _aToken;

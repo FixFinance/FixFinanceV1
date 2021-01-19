@@ -1,10 +1,10 @@
 pragma experimental ABIEncoderV2;
 pragma solidity >=0.6.5 <0.7.0;
 
-import "./capitalHandler.sol";
+import "./interfaces/ICapitalHandler.sol";
 import "./interfaces/IVaultHealth.sol";
 import "./interfaces/IERC20.sol";
-import "./Ownable.sol";
+import "./helpers/Ownable.sol";
 
 contract BondMinter is Ownable {
 
@@ -111,7 +111,7 @@ contract BondMinter is Ownable {
 		require(vaultHealthContract.upperLimitSuppliedAsset(_assetSupplied, _assetBorrowed, _amountSupplied, _amountBorrowed));
 
 		IERC20(_assetSupplied).transferFrom(msg.sender, address(this), _amountSupplied);
-		capitalHandler(chBorrowAddress).mintZCBTo(msg.sender, _amountBorrowed);
+		ICapitalHandler(chBorrowAddress).mintZCBTo(msg.sender, _amountBorrowed);
 
 		vaults[msg.sender].push(Vault(_assetSupplied, _assetBorrowed, _amountSupplied, _amountBorrowed));
 
@@ -176,7 +176,7 @@ contract BondMinter is Ownable {
 
 		vaults[msg.sender][_index].amountBorrowed += _amount;
 
-		capitalHandler(vault.assetBorrowed).mintZCBTo(_to, _amount);
+		ICapitalHandler(vault.assetBorrowed).mintZCBTo(_to, _amount);
 
 		emit Borrow(msg.sender, _index, _amount);
 	}
@@ -201,7 +201,7 @@ contract BondMinter is Ownable {
 		require(vault.amountBorrowed <= _bid);
 		require(vault.amountSupplied >= _minOut);
 		if (vaultHealthContract.lowerLimitSuppliedAsset(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied, vault.amountBorrowed)) {
-			uint maturity = capitalHandler(assetToCapitalHandler[vault.assetBorrowed]).maturity();
+			uint maturity = ICapitalHandler(assetToCapitalHandler[vault.assetBorrowed]).maturity();
 			require(maturity < block.timestamp + (7 days));
 		}
 		//burn borrowed ZCB
@@ -257,7 +257,7 @@ contract BondMinter is Ownable {
 		require(vault.assetSupplied == _assetSupplied);
 		require(vault.amountBorrowed <= _maxBid);
 		require(vault.amountSupplied >= _minOut);
-		require(capitalHandler(_assetBorrowed).maturity() < block.timestamp + (1 days));
+		require(ICapitalHandler(_assetBorrowed).maturity() < block.timestamp + (1 days));
 
 		//burn borrowed ZCB
 		IERC20(_assetBorrowed).transferFrom(msg.sender, address(0), vault.amountBorrowed);
@@ -268,7 +268,7 @@ contract BondMinter is Ownable {
 	//--------------------------------------------management---------------------------------------------
 
 	function setCapitalHandler(address _capitalHandlerAddress) public onlyOwner {
-		assetToCapitalHandler[address(capitalHandler(_capitalHandlerAddress).aw())] = _capitalHandlerAddress;
+		assetToCapitalHandler[address(ICapitalHandler(_capitalHandlerAddress).aw())] = _capitalHandlerAddress;
 		assetToCapitalHandler[_capitalHandlerAddress] = _capitalHandlerAddress;
 	}
 

@@ -1,5 +1,5 @@
 const aaveWrapper = artifacts.require('aaveWrapper');
-const capitalHandler = artifacts.require('capitalHandler');
+const capitalHandler = artifacts.require('CapitalHandler');
 const dummyAToken = artifacts.require('dummyAToken');
 const organizer = artifacts.require('organizer');
 const yieldTokenDeployer = artifacts.require('yieldTokenDeployer');

@@ -1,13 +1,13 @@
 pragma solidity >=0.6.5 <0.7.0;
+import "./interfaces/ICapitalHandler.sol";
+import "./interfaces/IAaveWrapper.sol";
 import "./interfaces/IERC20.sol";
 import "./libraries/SafeMath.sol";
-import "./capitalHandler.sol";
-import "./aaveWrapper.sol";
 
 contract yieldToken is IERC20 {
 
-	capitalHandler public ch;
-	aaveWrapper aw;
+	ICapitalHandler public ch;
+	IAaveWrapper aw;
 
     string public override name;
     string public override symbol;
@@ -16,12 +16,12 @@ contract yieldToken is IERC20 {
     mapping(address => mapping(address => uint256)) public override allowance;
 
 	constructor(address _aToken, address _capitalHandler) public {
-		aaveWrapper _aTkn = aaveWrapper(_aToken);
+		IAaveWrapper _aTkn = IAaveWrapper(_aToken);
 		decimals = _aTkn.decimals();
 		symbol = string(abi.encodePacked(_aTkn.symbol(),'yt'));
 		name = string(abi.encodePacked(_aTkn.name(),'yield token'));
 		aw = _aTkn;
-		ch = capitalHandler(_capitalHandler);
+		ch = ICapitalHandler(_capitalHandler);
 	}
 
 	function totalSupply() public view override returns (uint _supply){

@@ -3,7 +3,8 @@ pragma solidity >=0.6.0;
 import "../helpers/doubleAssetYieldEnabledToken.sol";
 import "../libraries/ABDKMath64x64.sol";
 import "../libraries/BigMath.sol";
-import "../capitalHandler.sol";
+import "../interfaces/ICapitalHandler.sol";
+import "../interfaces/IERC20.sol";
 import "../yieldToken.sol";
 
 contract ZCBamm is doubleAssetYieldEnabledToken {
@@ -25,8 +26,8 @@ contract ZCBamm is doubleAssetYieldEnabledToken {
 	constructor(address _ZCBaddress) public {
 		name = "aZCB amm Liquidity Token";
 		symbol = "aZCBLT";
-		address _YTaddress = capitalHandler(_ZCBaddress).yieldTokenAddress();
-		uint64 _maturity = capitalHandler(_ZCBaddress).maturity();
+		address _YTaddress = ICapitalHandler(_ZCBaddress).yieldTokenAddress();
+		uint64 _maturity = ICapitalHandler(_ZCBaddress).maturity();
 		require(_maturity > block.timestamp + 10 days);
 		maturity = _maturity;
 		//we want time remaining / anchor to be less than 1, thus make anchor greater than time remaining
@@ -53,7 +54,7 @@ contract ZCBamm is doubleAssetYieldEnabledToken {
 	}
 
 	function getZCB(uint _amount) internal {
-		capitalHandler(ZCBaddress).transferFrom(msg.sender, address(this), _amount);
+		ICapitalHandler(ZCBaddress).transferFrom(msg.sender, address(this), _amount);
 	}
 
 	function getYT(uint _amount) internal {
@@ -66,7 +67,7 @@ contract ZCBamm is doubleAssetYieldEnabledToken {
 	}
 
 	function sendZCB(uint _amount) internal {
-		capitalHandler(ZCBaddress).transfer(msg.sender, _amount);
+		ICapitalHandler(ZCBaddress).transfer(msg.sender, _amount);
 	}
 
 	function sendYT(uint _amount) internal {
@@ -205,7 +206,7 @@ contract ZCBamm is doubleAssetYieldEnabledToken {
 		uint _ZCBreserves = ZCBreserves;	//gas savings
 		uint _Ureserves = Ureserves;	//gas savings
 
-		uint amount = capitalHandler(ZCBaddress).balanceOf(address(this));
+		uint amount = ICapitalHandler(ZCBaddress).balanceOf(address(this));
 		require(amount > _ZCBreserves + _Ureserves);
 		amount = amount - _ZCBreserves - _Ureserves + ZCBdividendOut;
 		require(amount > contractBalanceAsset1[contractBalanceAsset1.length-1]);

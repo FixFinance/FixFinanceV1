@@ -1,5 +1,5 @@
 pragma solidity >=0.6.0 <0.7.0;
-import "./aaveWrapper.sol";
+import "./AaveWrapper.sol";
 import "./CapitalHandler.sol";
 
 contract organizer {
@@ -29,7 +29,7 @@ contract organizer {
 
 	function deployATokenWrapper(address _aTokenAddress) public {
 		require(aTokenWrappers[_aTokenAddress] == address(0), "can only make a wrapper if none currently exists");
-		aTokenWrappers[_aTokenAddress] = address(new aaveWrapper(_aTokenAddress));
+		aTokenWrappers[_aTokenAddress] = address(new AaveWrapper(_aTokenAddress));
 	}
 
 	function deployCapitalHandlerInstance(address _aTokenAddress, uint64 _maturity) public {

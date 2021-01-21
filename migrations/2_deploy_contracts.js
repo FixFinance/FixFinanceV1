@@ -1,4 +1,4 @@
-const aaveWrapper = artifacts.require('aaveWrapper');
+const aaveWrapper = artifacts.require('AaveWrapper');
 const capitalHandler = artifacts.require('CapitalHandler');
 const dummyAToken = artifacts.require('dummyAToken');
 const organizer = artifacts.require('organizer');

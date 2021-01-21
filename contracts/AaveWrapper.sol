@@ -4,7 +4,7 @@ import "./interfaces/IAaveWrapper.sol";
 import "./ERC20.sol";
 import "./libraries/SafeMath.sol";
 
-contract aaveWrapper is ERC20, IAaveWrapper {
+contract AaveWrapper is ERC20, IAaveWrapper {
 	using SafeMath for uint;
 
 	address public override aToken;

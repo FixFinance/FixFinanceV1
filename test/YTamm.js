@@ -1,5 +1,5 @@
 const aToken = artifacts.require("dummyAToken");
-const aaveWrapper = artifacts.require("aaveWrapper");
+const aaveWrapper = artifacts.require("AaveWrapper");
 const BigMath = artifacts.require("BigMath");
 const capitalHandler = artifacts.require("CapitalHandler");
 const yieldToken = artifacts.require("YieldToken");

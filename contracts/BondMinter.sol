@@ -200,7 +200,7 @@ contract BondMinter is Ownable {
 		require(vault.assetSupplied == _assetSupplied);
 		require(vault.amountBorrowed <= _bid);
 		require(vault.amountSupplied >= _minOut);
-		if (vaultHealthContract.lowerLimitSuppliedAsset(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied, vault.amountBorrowed)) {
+		if (vaultHealthContract.middleLimitSuppliedAsset(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied, vault.amountBorrowed)) {
 			uint maturity = ICapitalHandler(assetToCapitalHandler[vault.assetBorrowed]).maturity();
 			require(maturity < block.timestamp + (7 days));
 		}
@@ -248,7 +248,7 @@ contract BondMinter is Ownable {
 	}
 
 	/*
-		@Description: when there is less than 1 day until maturity vaults may be liquidated instantly without going through the auction process
+		@Description: when there is less than 1 day until maturity or vaults are under the lower collateralisation limit vaults may be liquidated instantly without going through the auction process
 	*/
 	function instantLiquidation(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _maxBid, uint _minOut, address _to) external {
 		require(vaults[_owner].length > _index);
@@ -257,7 +257,8 @@ contract BondMinter is Ownable {
 		require(vault.assetSupplied == _assetSupplied);
 		require(vault.amountBorrowed <= _maxBid);
 		require(vault.amountSupplied >= _minOut);
-		require(ICapitalHandler(_assetBorrowed).maturity() < block.timestamp + (1 days));
+		require(ICapitalHandler(_assetBorrowed).maturity() < block.timestamp + (1 days) || 
+			!vaultHealthContract.lowerLimitSuppliedAsset(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied, vault.amountBorrowed));
 
 		//burn borrowed ZCB
 		IERC20(_assetBorrowed).transferFrom(msg.sender, address(0), vault.amountBorrowed);
@@ -265,6 +266,45 @@ contract BondMinter is Ownable {
 		delete vaults[_owner][_index];
 	}
 
+	function partialLiquidationSpecificIn(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _in, uint _minOut, address _to) external {
+		require(vaults[_owner].length > _index);
+		Vault memory vault = vaults[_owner][_index];
+		require(vault.assetBorrowed == _assetBorrowed);
+		require(vault.assetSupplied == _assetSupplied);
+		require(_in <= vault.amountBorrowed);
+		uint amtOut = _in*vault.amountSupplied/vault.amountBorrowed;
+		require(vault.amountSupplied >= amtOut);
+		require(amtOut >= _minOut);
+		require(ICapitalHandler(_assetBorrowed).maturity() < block.timestamp + (1 days) || 
+			!vaultHealthContract.lowerLimitSuppliedAsset(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied, vault.amountBorrowed));
+
+		//burn borrowed ZCB
+		IERC20(_assetBorrowed).transferFrom(msg.sender, address(0), _in);
+		IERC20(_assetSupplied).transfer(_to, amtOut);
+
+		vaults[_owner][_index].amountBorrowed -= _in;
+		vaults[_owner][_index].amountSupplied -= amtOut;
+	}
+
+	function partialLiquidationSpecificOut(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _out, uint _maxIn, address _to) external {
+		require(vaults[_owner].length > _index);
+		Vault memory vault = vaults[_owner][_index];
+		require(vault.assetBorrowed == _assetBorrowed);
+		require(vault.assetSupplied == _assetSupplied);
+		require(vault.amountSupplied >= _out);
+		uint amtIn = _out*vault.amountBorrowed;
+		amtIn = amtIn/vault.amountSupplied + (amtIn%vault.amountSupplied == 0 ? 0 : 1);
+		require(amtIn <= _maxIn);
+		require(ICapitalHandler(_assetBorrowed).maturity() < block.timestamp + (1 days) || 
+			!vaultHealthContract.lowerLimitSuppliedAsset(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied, vault.amountBorrowed));
+
+		//burn borrowed ZCB
+		IERC20(_assetBorrowed).transferFrom(msg.sender, address(0), amtIn);
+		IERC20(_assetSupplied).transfer(_to, _out);
+
+		vaults[_owner][_index].amountBorrowed -= amtIn;
+		vaults[_owner][_index].amountSupplied -= _out;
+	}
 	//--------------------------------------------management---------------------------------------------
 
 	function setCapitalHandler(address _capitalHandlerAddress) public onlyOwner {

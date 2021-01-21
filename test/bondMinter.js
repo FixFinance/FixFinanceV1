@@ -79,7 +79,11 @@ contract('BondMinter', async function(accounts) {
 		await vaultHealthInstance.setUpper(wAsset1.address, zcbAsset0.address, upperRatio);
 
 		// 1.2 * 10**18
-		lowerRatio = "12" + _10To18.toString().substring(2);
+		middleRatio = "12" + _10To18.toString().substring(2);
+		await vaultHealthInstance.setMiddle(wAsset1.address, zcbAsset0.address, middleRatio);
+
+		// 1.1 * 10**18
+		lowerRatio = "11" + _10To18.toString().substring(2);
 		await vaultHealthInstance.setLower(wAsset1.address, zcbAsset0.address, lowerRatio);
 	});
 
@@ -184,11 +188,11 @@ contract('BondMinter', async function(accounts) {
 		} catch (err) {
 			caught = true;
 		}
-		if (!caught) assert.fail("liquidations should be dependant on lower ratio not upper ratio");
+		if (!caught) assert.fail("liquidations should be dependant on middle ratio not upper ratio");
 
 		// 1.6 * 10**18
-		lowerRatio = "16" + _10To18.toString().substring(2);
-		await vaultHealthInstance.setLower(wAsset1.address, zcbAsset0.address, lowerRatio);
+		middleRatio = "16" + _10To18.toString().substring(2);
+		await vaultHealthInstance.setMiddle(wAsset1.address, zcbAsset0.address, middleRatio);
 
 		bid = currentBorrowed.sub(new BN("1"));
 
@@ -198,7 +202,7 @@ contract('BondMinter', async function(accounts) {
 		} catch (err) {
 			caught = true;
 		}
-		if (!caught) assert.fail("liquidation was triggered despite vault health being above lower limit");
+		if (!caught) assert.fail("liquidation was triggered despite vault health being above middle limit");
 
 		//get back to original bid value
 		bid = bid.add(new BN("1"));
@@ -274,7 +278,7 @@ contract('BondMinter', async function(accounts) {
 		assert.equal(newBalW1.sub(prevBalW1).toString(), liquidation.amountSupplied);
 	});
 
-	it('liquidates vaults due to time', async () => {
+	it('instant liquidations upon dropping below lowerCollateralLimit', async () => {
 		/*
 			first open vaults
 		*/
@@ -282,15 +286,62 @@ contract('BondMinter', async function(accounts) {
 		await bondMinterInstance.openVault(wAsset1.address, zcbAsset0.address, _10To18.toString(), amountBorrowed);
 		await bondMinterInstance.openVault(wAsset1.address, zcbAsset0.address, _10To18.toString(), amountBorrowed);
 
+		lowerRatio =  _10To18.mul(_10To18).div(new BN(amountBorrowed)).add(new BN(10000)).toString();
+		await vaultHealthInstance.setLower(wAsset1.address, zcbAsset0.address, lowerRatio);
+
+		vaultIndex = (await bondMinterInstance.vaultsLength(accounts[0])).toNumber() - 2;
+
+		await bondMinterInstance.instantLiquidation(accounts[0], vaultIndex, zcbAsset0.address, wAsset1.address, amountBorrowed.toString(), _10To18.toString(), accounts[1], {from: accounts[1]});
+
+		vault = await bondMinterInstance.vaults(accounts[0], vaultIndex);
+
+		assert.equal(vault.assetBorrowed, nullAddress, "assetBorrowed is null");
+		assert.equal(vault.assetSupplied, nullAddress, "assetSupplied is null");
+		assert.equal(vault.amountBorrowed.toString(), "0", "amountBorrowed is null");
+		assert.equal(vault.amountSupplied.toString(), "0", "amountSupplied is null");
+	});
+
+	it('partial liquidations Specific In', async () => {
+		vaultIndex++;
+
+		await bondMinterInstance.partialLiquidationSpecificIn(accounts[0], vaultIndex, zcbAsset0.address, wAsset1.address,
+			(new BN(amountBorrowed)).div(new BN(2)).toString(), _10To18.div(new BN(3)).toString(), accounts[1], {from: accounts[1]});
+
+		vault = await bondMinterInstance.vaults(accounts[0], vaultIndex);
+
+		assert.equal(vault.assetBorrowed, zcbAsset0.address, "assetBorrowed is null");
+		assert.equal(vault.assetSupplied, wAsset1.address, "assetSupplied is null");
+		assert.equal(vault.amountBorrowed.toString(), (new BN(amountBorrowed)).div(new BN(2)).add(new BN(1)).toString(), "amountBorrowed is correct");
+		assert.equal(vault.amountSupplied.toString(), _10To18.div(new BN(2)).add(new BN(1)).toString(), "amountSupplied is correct");
+	});
+
+	it('partial liquidation Specific Out', async () => {
+		await bondMinterInstance.partialLiquidationSpecificOut(accounts[0], vaultIndex, zcbAsset0.address, wAsset1.address,
+			vault.amountSupplied.toString(), vault.amountBorrowed.toString(), accounts[1], {from: accounts[1]});
+
+		vault = await bondMinterInstance.vaults(accounts[0], vaultIndex);
+
+		assert.equal(vault.assetBorrowed, zcbAsset0.address, "assetBorrowed is null");
+		assert.equal(vault.assetSupplied, wAsset1.address, "assetSupplied is null");
+		assert.equal(vault.amountBorrowed.toString(), "0", "amountBorrowed is correct");
+		assert.equal(vault.amountSupplied.toString(), "0", "amountSupplied is correct");
+	});
+
+	it('liquidates vaults due to time', async () => {
+		await bondMinterInstance.openVault(wAsset1.address, zcbAsset0.address, _10To18.toString(), amountBorrowed);
+		await bondMinterInstance.openVault(wAsset1.address, zcbAsset0.address, _10To18.toString(), amountBorrowed);
+
+		vaultIndex = (await bondMinterInstance.vaultsLength(accounts[0])).toNumber() - 2;
+
 		bid = amountBorrowed;
 
 		let caught = false;
 		try {
-			await bondMinterInstance.auctionLiquidation(accounts[0], 1, zcbAsset0.address, wAsset1.address, amountBorrowed.toString(), _10To18.toString(), {from: accounts[1]});
+			await bondMinterInstance.auctionLiquidation(accounts[0], vaultIndex, zcbAsset0.address, wAsset1.address, amountBorrowed.toString(), _10To18.toString(), {from: accounts[1]});
 		} catch (err) {
 			caught = true;
 		}
-		if (!caught) assert.fail("vault was liquidated while above lower and upper health limit and before time liquidation period");
+		if (!caught) assert.fail("vault was liquidated while above middle and upper health limit and before time liquidation period");
 
 
 		/*
@@ -299,7 +350,7 @@ contract('BondMinter', async function(accounts) {
 		*/
 		await helper.advanceTime(86401)
 
-		rec = await bondMinterInstance.auctionLiquidation(accounts[0], 1, zcbAsset0.address, wAsset1.address, amountBorrowed.toString(), _10To18.toString(), {from: accounts[1]});
+		rec = await bondMinterInstance.auctionLiquidation(accounts[0], vaultIndex, zcbAsset0.address, wAsset1.address, amountBorrowed.toString(), _10To18.toString(), {from: accounts[1]});
 		let timestamp = (await web3.eth.getBlock(rec.receipt.blockNumber)).timestamp;
 
 		assert.equal((await bondMinterInstance.liquidationsLength()).toString(), "2", "correct length of liquidations array");
@@ -321,10 +372,16 @@ contract('BondMinter', async function(accounts) {
 		assert.equal(vault.amountSupplied.toString(), "0", "amountSupplied is null");
 	});
 
-	it('instant liquidations', async () => {
+	it('instant liquidations due to time to maturity', async () => {
+		vaultIndex++;
 		let caught = false;
+
+		//change lower ratio so that vault is safe
+		lowerRatio =  _10To18.mul(_10To18).div(new BN(amountBorrowed)).toString();
+		await vaultHealthInstance.setLower(wAsset1.address, zcbAsset0.address, lowerRatio);
+
 		try {
-			await bondMinterInstance.instantLiquidation(accounts[0], 2, zcbAsset0.address, wAsset1.address, amountBorrowed.toString(), _10To18.toString(), accounts[1], {from: accounts[1]});
+			await bondMinterInstance.instantLiquidation(accounts[0], vaultIndex, zcbAsset0.address, wAsset1.address, amountBorrowed.toString(), _10To18.toString(), accounts[1], {from: accounts[1]});
 		} catch (err) {
 			caught = true;
 		}
@@ -336,9 +393,9 @@ contract('BondMinter', async function(accounts) {
 		let _6days = _8days*3/4;
 		await helper.advanceTime(_6days);
 
-		await bondMinterInstance.instantLiquidation(accounts[0], 2, zcbAsset0.address, wAsset1.address, amountBorrowed.toString(), _10To18.toString(), accounts[1], {from: accounts[1]});
+		await bondMinterInstance.instantLiquidation(accounts[0], vaultIndex, zcbAsset0.address, wAsset1.address, amountBorrowed.toString(), _10To18.toString(), accounts[1], {from: accounts[1]});
 
-		vault = await bondMinterInstance.vaults(accounts[0], 2);
+		vault = await bondMinterInstance.vaults(accounts[0], vaultIndex);
 
 		assert.equal(vault.assetBorrowed, nullAddress, "assetBorrowed is null");
 		assert.equal(vault.assetSupplied, nullAddress, "assetSupplied is null");

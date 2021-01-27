@@ -1,20 +1,20 @@
 pragma solidity >=0.6.0;
 
-import "../helpers/doubleAssetYieldEnabledToken.sol";
+import "../helpers/IYTamm.sol";
 import "../libraries/ABDKMath64x64.sol";
 import "../libraries/BigMath.sol";
 import "../interfaces/IYieldToken.sol";
 import "../interfaces/IERC20.sol";
 import "./ZCBamm.sol";
 
-contract YTamm is doubleAssetYieldEnabledToken {
+contract YTamm is IYTamm {
 
 	using ABDKMath64x64 for int128;
 
-	address public ZCBammAddress;
+	address public override ZCBammAddress;
 
-	uint64 public maturity;
-	uint public anchor;
+	uint64 public override maturity;
+	uint public override anchor;
 
 	uint YTreserves;
 	uint Ureserves;
@@ -85,7 +85,7 @@ contract YTamm is doubleAssetYieldEnabledToken {
 		@Description first deposit in pool, pool starts at equilibrim
 		this means the implied rate of the pool is the same as the rate fetched from the oracle
 	*/
-	function firstMint(uint128 _Uin) public {
+	function firstMint(uint128 _Uin) external override {
 		require(totalSupply == 0);
 		uint YTin = YTtoLmultiplier * _Uin;
 
@@ -98,7 +98,7 @@ contract YTamm is doubleAssetYieldEnabledToken {
 		YTreserves = YTin;
 	}
 
-	function mint(uint _amount, uint _maxUin, uint _maxYTin) public {
+	function mint(uint _amount, uint _maxUin, uint _maxYTin) external override {
 		uint _totalSupply = totalSupply;	//gas savings
 		uint Uin = _amount*Ureserves;
 		Uin = Uin/_totalSupply + (Uin%_totalSupply == 0 ? 0 : 1);
@@ -117,7 +117,7 @@ contract YTamm is doubleAssetYieldEnabledToken {
 		YTreserves += YTin;
 	}
 
-	function burn(uint _amount) public {
+	function burn(uint _amount) external override {
 		uint _totalSupply = totalSupply;	//gas savings
 		uint Uout = _amount*Ureserves/_totalSupply;
 		uint YTout = _amount*YTreserves/_totalSupply;
@@ -131,7 +131,7 @@ contract YTamm is doubleAssetYieldEnabledToken {
 		YTreserves -= YTout;
 	}
 
-	function SwapFromSpecificYT(int128 _amount) public {
+	function SwapFromSpecificYT(int128 _amount) external override {
 		require(_amount > 0);
 		uint _totalSupply = totalSupply;
 		uint _YTtoLmultiplier = YTtoLmultiplier;
@@ -149,7 +149,7 @@ contract YTamm is doubleAssetYieldEnabledToken {
 		Ureserves -= Uout;
 	}
 
-	function SwapToSpecificYT(int128 _amount) public {
+	function SwapToSpecificYT(int128 _amount) external override {
 		require(_amount > 0);
 		uint _totalSupply = totalSupply;
 		uint _YTtoLmultiplier = YTtoLmultiplier;

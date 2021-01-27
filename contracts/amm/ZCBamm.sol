@@ -81,7 +81,7 @@ contract ZCBamm is IZCBamm {
 	/*
 		@Description first deposit in pool
 	*/
-	function firstMint(uint128 _Uin, uint128 _ZCBin) public override {
+	function firstMint(uint128 _Uin, uint128 _ZCBin) external override {
 		require(totalSupply == 0);
 
 		uint r = timeRemaining();
@@ -99,7 +99,7 @@ contract ZCBamm is IZCBamm {
 		Ureserves = effectiveU;
 	}
 
-	function mint(uint _amount, uint _maxUin, uint _maxZCBin) public override setRateModifier {
+	function mint(uint _amount, uint _maxUin, uint _maxZCBin) external override setRateModifier {
 		uint _totalSupply = totalSupply;	//gas savings
 		uint Uin = _amount*Ureserves;
 		Uin = Uin/_totalSupply + (Uin%_totalSupply == 0 ? 0 : 1);
@@ -118,7 +118,7 @@ contract ZCBamm is IZCBamm {
 		ZCBreserves += ZCBin;
 	}
 
-	function burn(uint _amount) public override setRateModifier {
+	function burn(uint _amount) external override setRateModifier {
 		uint _totalSupply = totalSupply;	//gas savings
 		uint Uout = _amount*Ureserves/_totalSupply;
 		uint ZCBout = _amount*ZCBreserves/_totalSupply;
@@ -132,7 +132,7 @@ contract ZCBamm is IZCBamm {
 		ZCBreserves -= ZCBout;
 	}
 
-	function SwapFromSpecificTokens(int128 _amount, bool _ZCBin) public override setRateModifier {
+	function SwapFromSpecificTokens(int128 _amount, bool _ZCBin) external override setRateModifier {
 		require(_amount > 0);
 		int _amtOut;
 		uint r = timeRemaining();
@@ -166,7 +166,7 @@ contract ZCBamm is IZCBamm {
 
 	}
 
-	function SwapToSpecificTokens(int128 _amount, bool _ZCBout) public override setRateModifier {
+	function SwapToSpecificTokens(int128 _amount, bool _ZCBout) external override setRateModifier {
 		require(_amount > 0);
 		int _amtIn;
 		uint r = timeRemaining();

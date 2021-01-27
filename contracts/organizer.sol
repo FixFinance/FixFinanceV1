@@ -1,6 +1,11 @@
 pragma solidity >=0.6.0 <0.7.0;
 import "./AaveWrapper.sol";
 import "./CapitalHandler.sol";
+import "./amm/ZCBamm.sol";
+import "./amm/YTamm.sol";
+import "./amm/ZCBammDeployer.sol";
+import "./amm/YTammDeployer.sol";
+import "./DeployCapitalHandler.sol";
 
 contract organizer {
 
@@ -10,13 +15,29 @@ contract organizer {
 
 	//aToken => maturity of bond => capitalHandler
 	mapping(address => mapping(uint64 => address)) public capitalHandlerMapping;
+	mapping(address => address) public capitalHandlerToAToken;
+
+	mapping(address => address) public YTamms;
+	mapping(address => address) public ZCBamms;
 
 	address public yieldTokenDeployerAddress;
 	address public bondMinterAddress;
+	address public CapitalHandlerDeployerAddress;
+	address public ZCBammDeployerAddress;
+	address public YTammDeployerAddress;
 
-	constructor (address _yieldTokenDeployerAddress, address _bondMinterAddress) public {
+	constructor (
+		address _yieldTokenDeployerAddress,
+		address _bondMinterAddress,
+		address _CapitalhandlerDeployerAddress,
+		address _ZCBammDeployerAddress,
+		address _YTammDeployerAddress
+		) public {
 		yieldTokenDeployerAddress = _yieldTokenDeployerAddress;	
 		bondMinterAddress = _bondMinterAddress;
+		CapitalHandlerDeployerAddress = _CapitalhandlerDeployerAddress;
+		ZCBammDeployerAddress = _ZCBammDeployerAddress;
+		YTammDeployerAddress = _YTammDeployerAddress;
 	}
 
 	function capitalHandlerInstancesLength() public view returns(uint) {
@@ -37,8 +58,23 @@ contract organizer {
 		require(capitalHandlerMapping[_aTokenAddress][_maturity] == address(0), "capital handler with these parameters already exists");
 		address aaveWrapperAddress = aTokenWrappers[_aTokenAddress];
 		require(aaveWrapperAddress != address(0), "deploy a wrapper for this aToken first");
-		address capitalHandlerAddress = address(new CapitalHandler(aaveWrapperAddress, _maturity, yieldTokenDeployerAddress, bondMinterAddress));
+		address capitalHandlerAddress = DeployCapitalHandler(CapitalHandlerDeployerAddress).deploy(aaveWrapperAddress, _maturity, yieldTokenDeployerAddress, bondMinterAddress);
 		capitalHandlerInstances.push(capitalHandlerAddress);
 		capitalHandlerMapping[_aTokenAddress][_maturity] = capitalHandlerAddress;
+		capitalHandlerToAToken[capitalHandlerAddress] = _aTokenAddress;
 	}
+
+	function deployZCBamm(address _capitalHandlerAddress) public {
+		require(ZCBamms[_capitalHandlerAddress] == address(0));
+		require(capitalHandlerToAToken[_capitalHandlerAddress] != address(0));
+		ZCBamms[_capitalHandlerAddress] = ZCBammDeployer(ZCBammDeployerAddress).deploy(_capitalHandlerAddress);
+	}
+
+	function deployYTamm(address _capitalHandlerAddress) public {
+		require(YTamms[_capitalHandlerAddress] == address(0));
+		address ZCBammAddress = ZCBamms[_capitalHandlerAddress];
+		require(ZCBammAddress != address(0));
+		YTamms[_capitalHandlerAddress] = YTammDeployer(YTammDeployerAddress).deploy(ZCBammAddress ,40);
+	}
+
 }

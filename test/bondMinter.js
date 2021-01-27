@@ -6,6 +6,10 @@ const yieldTokenDeployer = artifacts.require('YieldTokenDeployer');
 const organizer = artifacts.require('organizer');
 const BondMinter = artifacts.require('BondMinter');
 const IERC20 = artifacts.require("IERC20");
+const BigMath = artifacts.require("BigMath");
+const DeployCapitalHandler = artifacts.require('DeployCapitalHandler');
+const ZCBammDeployer = artifacts.require('ZCBammDeployer');
+const YTammDeployer = artifacts.require('YTammDeployer');
 
 const helper = require("../helper/helper.js");
 
@@ -30,7 +34,13 @@ contract('BondMinter', async function(accounts) {
 		yieldTokenDeployerInstance = await yieldTokenDeployer.new();
 		vaultHealthInstance = await dummyVaultHealth.new();
 		bondMinterInstance = await BondMinter.new(vaultHealthInstance.address);
-		organizerInstance = await organizer.new(yieldTokenDeployerInstance.address, bondMinterInstance.address);
+		BigMathInstance = await BigMath.new();
+		await ZCBammDeployer.link("BigMath", BigMathInstance.address);
+		await YTammDeployer.link("BigMath", BigMathInstance.address);
+		ZCBammDeployerInstance = await ZCBammDeployer.new();
+		YTammDeployerInstance = await YTammDeployer.new();
+		DeployCapitalHandlerInstance = await DeployCapitalHandler.new();
+		organizerInstance = await organizer.new(yieldTokenDeployerInstance.address, bondMinterInstance.address, DeployCapitalHandlerInstance.address, ZCBammDeployerInstance.address, YTammDeployerInstance.address);
 
 		maturity = ((await web3.eth.getBlock('latest')).timestamp + _8days).toString();
 

@@ -5,7 +5,7 @@ import "../libraries/ABDKMath64x64.sol";
 import "../libraries/BigMath.sol";
 import "../interfaces/IYieldToken.sol";
 import "../interfaces/IERC20.sol";
-import "./ZCBamm.sol";
+import "../helpers/IZCBamm.sol";
 
 contract YTamm is IYTamm {
 
@@ -27,12 +27,12 @@ contract YTamm is IYTamm {
 	constructor(address _ZCBammAddress, uint32 _YTtoLmultiplier) public {
 		name = "aYT amm Liquidity Token";
 		symbol = "aYTLT";
-		address _ZCBaddress = ZCBamm(_ZCBammAddress).ZCBaddress();
-		address _YTaddress = ZCBamm(_ZCBammAddress).YTaddress();
-		uint64 _maturity = ZCBamm(_ZCBammAddress).maturity();
+		address _ZCBaddress = IZCBamm(_ZCBammAddress).ZCBaddress();
+		address _YTaddress = IZCBamm(_ZCBammAddress).YTaddress();
+		uint64 _maturity = IZCBamm(_ZCBammAddress).maturity();
 		require(_maturity > block.timestamp + 10 days);
 		maturity = _maturity;
-		anchor = ZCBamm(_ZCBammAddress).anchor();
+		anchor = IZCBamm(_ZCBammAddress).anchor();
 		ZCBammAddress = _ZCBammAddress;
 		YTtoLmultiplier = _YTtoLmultiplier;
 		init(_ZCBaddress, _YTaddress);
@@ -141,7 +141,7 @@ contract YTamm is IYTamm {
 		uint _YTtoLmultiplier = YTtoLmultiplier;
 		require(_totalSupply > _YTtoLmultiplier);
 		uint _TimeRemaining = timeRemaining();
-		int128 OracleRate = ZCBamm(ZCBammAddress).getRateFromOracle();
+		int128 OracleRate = IZCBamm(ZCBammAddress).getRateFromOracle();
 		uint Uout = uint(-BigMath.YT_U_reserve_change(YTreserves, _totalSupply / _YTtoLmultiplier, _TimeRemaining, OracleRate, _amount));
 
 		require(Ureserves > Uout);
@@ -161,7 +161,7 @@ contract YTamm is IYTamm {
 		uint _YTtoLmultiplier = YTtoLmultiplier;
 		require(_totalSupply > _YTtoLmultiplier);
 		uint _TimeRemaining = timeRemaining();
-		int128 OracleRate = ZCBamm(ZCBammAddress).getRateFromOracle();
+		int128 OracleRate = IZCBamm(ZCBammAddress).getRateFromOracle();
 		uint Uin = uint(BigMath.YT_U_reserve_change(YTreserves, _totalSupply / _YTtoLmultiplier, _TimeRemaining, OracleRate, -_amount));
 
 		require(YTreserves > uint(_amount));

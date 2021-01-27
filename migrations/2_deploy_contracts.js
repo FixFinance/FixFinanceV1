@@ -5,6 +5,11 @@ const organizer = artifacts.require('organizer');
 const yieldTokenDeployer = artifacts.require('YieldTokenDeployer');
 const BondMinter = artifacts.require("BondMinter");
 const UniswapV2Factory = artifacts.require('UniswapV2Factory');
+const DeployCapitalHandler = artifacts.require('DeployCapitalHandler');
+const ZCBammDeployer = artifacts.require('ZCBammDeployer');
+const YTammDeployer = artifacts.require('YTammDeployer');
+const BigMath = artifacts.require("BigMath");
+
 
 const UniswapV2FactoryAddress = "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f";
 
@@ -38,7 +43,12 @@ module.exports = async function(deployer) {
 	dummyATokenInstance = await deployer.deploy(dummyAToken);
 	yieldTokenDeployerInstance = await deployer.deploy(yieldTokenDeployer);
 	bondMinterInstance = await deployer.deploy(BondMinter, nullAddress);
-	organizerInstance = await deployer.deploy(organizer, yieldTokenDeployerInstance.address, bondMinterInstance.address);
+	deployCapitalHandlerInstance = await deployer.deploy(DeployCapitalHandler);
+	bigMathInstance = await deployer.deploy(BigMath);
+	await deployer.link(BigMath, [ZCBammDeployer, YTammDeployer]);
+	ZCBammDeployerInstance = await deployer.deploy(ZCBammDeployer);
+	YTammDeployerInstance = await deployer.deploy(YTammDeployer);
+	organizerInstance = await deployer.deploy(organizer, yieldTokenDeployerInstance.address, bondMinterInstance.address, deployCapitalHandlerInstance.address, ZCBammDeployerInstance.address, YTammDeployerInstance.address);
 	await organizerInstance.deployATokenWrapper(dummyATokenInstance.address);
 	await organizerInstance.deployCapitalHandlerInstance(dummyATokenInstance.address, start2026);
 };

@@ -5,7 +5,7 @@ import "../interfaces/IYieldToken.sol";
 import "../interfaces/IERC20.sol";
 import "./Ownable.sol";
 
-abstract contract doubleAssetYieldEnabledToken is IERC20, Ownable, IYieldEnabled {
+abstract contract doubleAssetYieldEnabledToken is IERC20, IYieldEnabled {
 	
 	address public ZCBaddress;
 	address public YTaddress;

@@ -1,18 +1,18 @@
 pragma solidity >=0.6.0;
 
-import "../helpers/doubleAssetYieldEnabledToken.sol";
+import "../helpers/IZCBamm.sol";
 import "../libraries/ABDKMath64x64.sol";
 import "../libraries/BigMath.sol";
 import "../interfaces/ICapitalHandler.sol";
 import "../interfaces/IYieldToken.sol";
 import "../interfaces/IERC20.sol";
 
-contract ZCBamm is doubleAssetYieldEnabledToken {
+contract ZCBamm is IZCBamm {
 
 	using ABDKMath64x64 for int128;
 
-	uint64 public maturity;
-	uint public anchor;
+	uint64 public override maturity;
+	uint public override anchor;
 
 	uint ZCBreserves;
 	uint Ureserves;
@@ -81,7 +81,7 @@ contract ZCBamm is doubleAssetYieldEnabledToken {
 	/*
 		@Description first deposit in pool
 	*/
-	function firstMint(uint128 _Uin, uint128 _ZCBin) public {
+	function firstMint(uint128 _Uin, uint128 _ZCBin) public override {
 		require(totalSupply == 0);
 
 		uint r = timeRemaining();
@@ -99,7 +99,7 @@ contract ZCBamm is doubleAssetYieldEnabledToken {
 		Ureserves = effectiveU;
 	}
 
-	function mint(uint _amount, uint _maxUin, uint _maxZCBin) public setRateModifier {
+	function mint(uint _amount, uint _maxUin, uint _maxZCBin) public override setRateModifier {
 		uint _totalSupply = totalSupply;	//gas savings
 		uint Uin = _amount*Ureserves;
 		Uin = Uin/_totalSupply + (Uin%_totalSupply == 0 ? 0 : 1);
@@ -118,7 +118,7 @@ contract ZCBamm is doubleAssetYieldEnabledToken {
 		ZCBreserves += ZCBin;
 	}
 
-	function burn(uint _amount) public setRateModifier {
+	function burn(uint _amount) public override setRateModifier {
 		uint _totalSupply = totalSupply;	//gas savings
 		uint Uout = _amount*Ureserves/_totalSupply;
 		uint ZCBout = _amount*ZCBreserves/_totalSupply;
@@ -132,7 +132,7 @@ contract ZCBamm is doubleAssetYieldEnabledToken {
 		ZCBreserves -= ZCBout;
 	}
 
-	function SwapFromSpecificTokens(int128 _amount, bool _ZCBin) public setRateModifier {
+	function SwapFromSpecificTokens(int128 _amount, bool _ZCBin) public override setRateModifier {
 		require(_amount > 0);
 		int _amtOut;
 		uint r = timeRemaining();
@@ -166,7 +166,7 @@ contract ZCBamm is doubleAssetYieldEnabledToken {
 
 	}
 
-	function SwapToSpecificTokens(int128 _amount, bool _ZCBout) public setRateModifier {
+	function SwapToSpecificTokens(int128 _amount, bool _ZCBout) public override setRateModifier {
 		require(_amount > 0);
 		int _amtIn;
 		uint r = timeRemaining();
@@ -254,7 +254,7 @@ contract ZCBamm is doubleAssetYieldEnabledToken {
 	}
 
 	//returns APY**(anchor/1 year)
-	function getRateFromOracle() public view returns (int128 rate) {
+	function getRateFromOracle() public view override returns (int128 rate) {
 		require(heights[2] != 0);	//rate data must be non-null
 
 		int128 first = impliedRates[0];
@@ -268,7 +268,7 @@ contract ZCBamm is doubleAssetYieldEnabledToken {
         return second;
 	}
 
-	function getAPYFromOracle() external view returns (int128 APY) {
+	function getAPYFromOracle() external view override returns (int128 APY) {
 		/*
 			APY == getRateFromOr111acle()**(1 year / anchor)
 			APY == exp2 ( log 2 ( getRateFromOracle()**(1 year / anchor)))
@@ -280,7 +280,7 @@ contract ZCBamm is doubleAssetYieldEnabledToken {
 		APY = APY.log_2().mul(_1overAnchor).exp_2();
 	}
 
-	function getImpliedRateData() external view returns (
+	function getImpliedRateData() external view override returns (
 		int128 impliedRate0,
 		int128 impliedRate1,
 		int128 impliedRate2,

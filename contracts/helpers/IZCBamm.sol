@@ -3,6 +3,23 @@ pragma solidity >=0.6.0;
 import "./doubleAssetYieldEnabledToken.sol";
 
 abstract contract IZCBamm is doubleAssetYieldEnabledToken {
+	event Mint(
+		address user,
+		uint amount
+	);
+
+	event Burn(
+		address user,
+		uint amount
+	);
+
+	event Swap(
+		address user,
+		uint amountZCB,
+		uint amountU,
+		bool ZCBin
+	);
+
 	function maturity() external virtual view returns (uint64);
 	function anchor() external virtual view returns (uint);
 	function firstMint(uint128 _Uin, uint128 _ZCBin) external virtual;

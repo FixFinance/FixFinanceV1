@@ -3,6 +3,23 @@ pragma solidity >=0.6.0;
 import "./doubleAssetYieldEnabledToken.sol";
 
 abstract contract IYTamm is doubleAssetYieldEnabledToken {
+	event Mint(
+		address user,
+		uint amount
+	);
+
+	event Burn(
+		address user,
+		uint amount
+	);
+
+	event Swap(
+		address user,
+		uint amountYT,
+		uint amountU,
+		bool YTin
+	);
+
 	function ZCBammAddress() external virtual view returns (address);
 	function maturity() external virtual view returns (uint64);
 	function anchor() external virtual view returns (uint);

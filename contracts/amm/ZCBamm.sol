@@ -39,6 +39,8 @@ contract ZCBamm is IZCBamm {
         claimDividendInternal(_to, _to);
 		balanceOf[_to] += _amount;
 		totalSupply += _amount;
+
+		emit Mint(_to, _amount);
 	}
 
 	function _burn(address _from, uint _amount) internal {
@@ -46,6 +48,8 @@ contract ZCBamm is IZCBamm {
         claimDividendInternal(_from, _from);
 		balanceOf[_from] -= _amount;
 		totalSupply -= _amount;
+
+		emit Burn(_from, _amount);
 	}
 
 	function getU(uint _amount) internal {
@@ -149,6 +153,9 @@ contract ZCBamm is IZCBamm {
 
 			ZCBreserves += uint(_amount);
 			Ureserves -= uint(_amtOut);
+
+			emit Swap(msg.sender, uint(_amount), uint(_amtOut), true);
+
 		} else {
 			_amtOut = -int(BigMath.ZCB_U_reserve_change(Ureserves, ZCBreserves+totalSupply, r, _amount));
 
@@ -162,6 +169,8 @@ contract ZCBamm is IZCBamm {
 
 			Ureserves += uint(_amount);
 			ZCBreserves -= uint(_amtOut);
+
+			emit Swap(msg.sender, uint(_amtOut), uint(_amount), false);
 		}
 
 	}
@@ -183,6 +192,9 @@ contract ZCBamm is IZCBamm {
 
 			Ureserves += uint(_amtIn);
 			ZCBreserves -= uint(_amount);
+
+			emit Swap(msg.sender, uint(_amount), uint(_amtIn), false);
+
 		} else {
 			require(Ureserves >= uint(_amount));
 			_amtIn = int(BigMath.ZCB_U_reserve_change(Ureserves, ZCBreserves+totalSupply, r, -_amount));
@@ -194,6 +206,8 @@ contract ZCBamm is IZCBamm {
 
 			ZCBreserves += uint(_amtIn);
 			Ureserves -= uint(_amount);
+
+			emit Swap(msg.sender, uint(_amtIn), uint(_amount), true);
 		}
 
 	}

@@ -42,6 +42,8 @@ contract YTamm is IYTamm {
         claimDividendInternal(_to, _to);
 		balanceOf[_to] += _amount;
 		totalSupply += _amount;
+
+		emit Mint(_to, _amount);
 	}
 
 	function _burn(address _from, uint _amount) internal {
@@ -49,6 +51,8 @@ contract YTamm is IYTamm {
         claimDividendInternal(_from, _from);
 		balanceOf[_from] -= _amount;
 		totalSupply -= _amount;
+
+		emit Burn(_from, _amount);
 	}
 
 	function getU(uint _amount) internal {
@@ -147,6 +151,8 @@ contract YTamm is IYTamm {
 
 		YTreserves += uint(_amount);
 		Ureserves -= Uout;
+
+		emit Swap(msg.sender, uint(_amount), Uout, true);
 	}
 
 	function SwapToSpecificYT(int128 _amount) external override {
@@ -165,6 +171,8 @@ contract YTamm is IYTamm {
 
 		YTreserves -= uint(_amount);
 		Ureserves += Uin;
+
+		emit Swap(msg.sender, uint(_amount), Uin, false);
 	}
 
 

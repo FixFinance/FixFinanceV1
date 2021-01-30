@@ -212,6 +212,7 @@ contract ZCBamm is IZCBamm {
 
 	}
 
+	function forceRateDataUpdate() external setRateModifier {}
 
 	//-------------------------implement double asset yield enabled token-------------------------------
 	function contractClaimDividend() external override {

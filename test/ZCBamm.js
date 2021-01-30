@@ -305,6 +305,20 @@ contract('ZCBamm', async function(accounts){
 		assert.equal(balanceZCB.toString(), balance.sub((new BN(ZCBreserves)).add(new BN(Ureserves))).toString(), "correct balance ZCB");
 	});
 
+	it('Force Update Rate Data', async () => {
+		rec = await amm.forceRateDataUpdate();
+
+		let newRateData = await amm.getImpliedRateData();
+		expectedNewRate = (new BN(ZCBreserves)).add(totalSupplyLT).mul( (new BN(2)).pow(new BN(64)) ).div(new BN(Ureserves));
+		assert.equal(newRateData.impliedRate0.toString(), expectedNewRate.toString(), "correct rate stored");
+		assert.equal(newRateData.height0.toString(), rec.receipt.blockNumber.toString(), "correct height stored")
+		assert.equal(newRateData.impliedRate1.toString(), rateData.impliedRate1.toString(), "correct rate");
+		assert.equal(newRateData.height1.toString(), rateData.height1.toString(), "correct height");
+		assert.equal(newRateData.impliedRate2.toString(), rateData.impliedRate2.toString(), "correct rate");
+		assert.equal(newRateData.height2.toString(), rateData.height2.toString(), "correct height");
+		rateData = newRateData;
+	});
+
 
 	it('Valid reserves', async () => {
 		let balZCB = await capitalHandlerInstance.balanceOf(amm.address);

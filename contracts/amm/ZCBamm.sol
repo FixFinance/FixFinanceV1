@@ -136,7 +136,7 @@ contract ZCBamm is IZCBamm {
 		ZCBreserves -= ZCBout;
 	}
 
-	function SwapFromSpecificTokens(int128 _amount, bool _ZCBin) external override setRateModifier {
+	function SwapFromSpecificTokens(int128 _amount, bool _ZCBin) external override setRateModifier returns (uint) {
 		require(_amount > 0);
 		int _amtOut;
 		uint r = timeRemaining();
@@ -173,9 +173,10 @@ contract ZCBamm is IZCBamm {
 			emit Swap(msg.sender, uint(_amtOut), uint(_amount), false);
 		}
 
+		return uint(_amtOut);
 	}
 
-	function SwapToSpecificTokens(int128 _amount, bool _ZCBout) external override setRateModifier {
+	function SwapToSpecificTokens(int128 _amount, bool _ZCBout) external override setRateModifier returns (uint) {
 		require(_amount > 0);
 		int _amtIn;
 		uint r = timeRemaining();
@@ -210,9 +211,10 @@ contract ZCBamm is IZCBamm {
 			emit Swap(msg.sender, uint(_amtIn), uint(_amount), true);
 		}
 
+		return uint(_amtIn);
 	}
 
-	function forceRateDataUpdate() external setRateModifier {}
+	function forceRateDataUpdate() external override setRateModifier {}
 
 	//-------------------------implement double asset yield enabled token-------------------------------
 	function contractClaimDividend() external override {

@@ -55,8 +55,8 @@ contract('BondMinter', async function(accounts) {
 		await asset0.approve(wAsset0.address, _10To18.toString());
 		await asset1.approve(wAsset1.address, _10To18.toString());
 
-		await wAsset0.firstDeposit(accounts[0], _10To18.toString());
-		await wAsset1.firstDeposit(accounts[0], _10To18.toString());
+		await wAsset0.deposit(accounts[0], _10To18.toString());
+		await wAsset1.deposit(accounts[0], _10To18.toString());
 
 		zcbAsset0 = await capitalHandler.at(await organizerInstance.capitalHandlerMapping(asset0.address, maturity));
 		zcbAsset1 = await capitalHandler.at(await organizerInstance.capitalHandlerMapping(asset1.address, maturity));

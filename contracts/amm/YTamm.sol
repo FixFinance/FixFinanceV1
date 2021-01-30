@@ -224,7 +224,7 @@ contract YTamm is IYTamm {
 		return Uin;
 	}
 
-	function TakeQuote(uint _amountU, int128 _amountYT, bool _YTin) external verifyQuote(_amountU, _amountYT, _YTin) {
+	function TakeQuote(uint _amountU, int128 _amountYT, bool _YTin) external override verifyQuote(_amountU, _amountYT, _YTin) {
 		if (_YTin) {
 			require(Ureserves > _amountU);
 			getYT(uint(_amountYT));

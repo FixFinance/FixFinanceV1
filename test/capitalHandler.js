@@ -23,7 +23,7 @@ contract('capitalHandler', async function(accounts){
 		//wrap aTokens
 		amount = '100000';
 		await dummyATokenInstance.approve(aaveWrapperInstance.address, amount);
-		await aaveWrapperInstance.firstDeposit(accounts[0], amount);
+		await aaveWrapperInstance.deposit(accounts[0], amount);
 	});
 
 	it('deposits funds', async () => {

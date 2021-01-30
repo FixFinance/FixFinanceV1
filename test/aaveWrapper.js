@@ -17,7 +17,7 @@ contract('aaveWrapper', async function(accounts){
 	it('executes 1st deposit', async () => {
 		amount = '10000';
 		await dummyATokenInstance.approve(aaveWrapperInstance.address, amount);
-		await aaveWrapperInstance.firstDeposit(accounts[0], amount);
+		await aaveWrapperInstance.deposit(accounts[0], amount);
 		totalSupply = await aaveWrapperInstance.totalSupply();
 		assert.equal(totalSupply.toString(), amount, "correct total supply after 1st deposit");
 		assert.equal((await aaveWrapperInstance.balanceOf(accounts[0])).toString(), amount, "correct balance of account 0 after 1st deposit");

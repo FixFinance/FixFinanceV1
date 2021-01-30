@@ -20,8 +20,7 @@ contract AaveWrapper is ERC20, IAaveWrapper {
 		return balanceOf[_owner] * IERC20(aToken).balanceOf(address(this)) / totalSupply;
 	}
 
-	function firstDeposit(address _to, uint _amountAToken) public override returns (uint _amountWrappedToken) {
-		require(totalSupply == 0);
+	function firstDeposit(address _to, uint _amountAToken) internal returns (uint _amountWrappedToken) {
 		IERC20 _aToken = IERC20(aToken);
 		_aToken.transferFrom(msg.sender, address(this), _amountAToken);
 		balanceOf[_to] = _amountAToken;
@@ -30,6 +29,10 @@ contract AaveWrapper is ERC20, IAaveWrapper {
 	}
 
 	function deposit(address _to, uint _amountAToken) public override returns (uint _amountWrappedToken) {
+		uint _totalSupply = totalSupply;
+		if (_totalSupply == 0) {
+			return firstDeposit(_to, _amountAToken);
+		}
 		IERC20 _aToken = IERC20(aToken);
 		uint contractBalance = _aToken.balanceOf(address(this));
 		_aToken.transferFrom(msg.sender, address(this), _amountAToken);

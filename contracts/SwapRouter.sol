@@ -39,16 +39,16 @@ contract SwapRouter is ISwapRouter {
 	}
 
 /*
-	function WrappedATknToYT(address _capitalHandlerAddress, uint _amount) external {}
+	function ATknToYT(address _capitalHandlerAddress, uint _amount, uint _maxATkn) external override {}
 
-	function LiquidateAllToATkn(address _capitalHandler) external {}
+	function LiquidateAllToATkn(address _capitalHandler) external override {}
 
-	function SwapZCBtoYT(address _capitalHandlerAddress, uint _amountYT) external {}
+	function SwapZCBtoYT(address _capitalHandlerAddress, uint _amountYT) external override {}
 
-	function SwapYTtoZCB(address _capitalHandlerAddress, uint _amountYT) external {}
+	function SwapYTtoZCB(address _capitalHandlerAddress, uint _amountYT) external override {}
 
-	function SwapZCBtoU(address _capitalHandlerAddress, uint _amountYT) external {}
+	function SwapZCBtoU(address _capitalHandlerAddress, uint _amountYT) external override {}
 
-	function SwapUtoZCB(address _capitalHandlerAddress, uint _amountYT) external {}
+	function SwapUtoZCB(address _capitalHandlerAddress, uint _amountYT) external override {}
 */
 }

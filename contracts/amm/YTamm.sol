@@ -176,7 +176,7 @@ contract YTamm is IYTamm {
 		emit Swap(msg.sender, uint(_amount), Uout, true);
 	}
 
-	function reserveQuoteFromYT(int128 _amount) external returns (uint) {
+	function ReserveQuoteFromYT(int128 _amount) external override returns (uint) {
 		require(_amount > 0);
 		uint _totalSupply = totalSupply;
 		uint _YTtoLmultiplier = YTtoLmultiplier;
@@ -210,7 +210,7 @@ contract YTamm is IYTamm {
 		emit Swap(msg.sender, uint(_amount), Uin, false);
 	}
 
-	function reserveQuoteToYT(int128 _amount) external returns (uint) {
+	function ReserveQuoteToYT(int128 _amount) external override returns (uint) {
 		require(_amount > 0);
 		uint _YTreserves = YTreserves;
 		require(_YTreserves > uint(_amount));

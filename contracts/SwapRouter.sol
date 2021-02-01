@@ -15,6 +15,8 @@ contract SwapRouter is ISwapRouter {
 
 	uint private constant MinBalance = 0x1000;
 
+	uint private constant RoudingBuffer = 0x10;
+
 	constructor(address _organizerAddress) public {
 		org = organizer(_organizerAddress);
 	}
@@ -94,23 +96,30 @@ contract SwapRouter is ISwapRouter {
 		ch.withdrawAll(msg.sender, _unwrap);
 	}
 
-/*
-	function SwapZCBtoYT(address _capitalHandlerAddress, uint _amountYT) external override {
+	function SwapZCBtoYT(address _capitalHandlerAddress, uint _amountYT, uint _maxZCBin) external override {
 		require(_amountYT < uint(MAX));
 		ICapitalHandler ch = ICapitalHandler(_capitalHandlerAddress);
 		IYieldToken yt = IYieldToken(ch.yieldTokenAddress());
 		organizer _org = org;
-		IERC20 aToken = IERC20(_org.capitalHandlerToAToken(_capitalHandlerAddress));
 		IZCBamm zAmm = IZCBamm(_org.ZCBamms(_capitalHandlerAddress));
 		IYTamm yAmm = IYTamm(_org.YTamms(_capitalHandlerAddress));
 
-		uint _amtU = yAmm.ReserveQuoteToYT(int(_amountYT));
+		//force rate update so that rate is not updated upon zAmm call thus invalidating the quote in the yAmm
+		zAmm.forceRateDataUpdate();
+
+		uint _amtU = yAmm.ReserveQuoteToYT(int128(_amountYT+RoudingBuffer));
+		uint _amtZCB = zAmm.ReserveQuoteToSpecificTokens(int128(_amtU+RoudingBuffer), true);
+		require(_amtZCB <= _maxZCBin);
+		ch.transferFrom(msg.sender, address(this), _amtZCB);
+		ch.approve(address(zAmm), _amtZCB);
+		zAmm.TakeQuote(_amtZCB, _amtU+RoudingBuffer, true);
+		//approvals for before yAmm swap
 		ch.approve(address(yAmm), _amtU);
 		yt.approve_2(address(yAmm), _amtU, true);
-
-		//finish implementing after adding ReserveQuote feature in ZCBamm
+		yAmm.TakeQuote(_amtU, int128(_amountYT+RoudingBuffer), false);
+		yt.transfer(msg.sender, yt.balanceOf(address(this)));
 	}
-
+/*
 	function SwapYTtoZCB(address _capitalHandlerAddress, uint _amountYT) external override {}
 
 	function SwapZCBtoU(address _capitalHandlerAddress, uint _amountYT) external override {}

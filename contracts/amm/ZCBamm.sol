@@ -20,8 +20,14 @@ contract ZCBamm is IZCBamm {
 	string public override name;
 	string public override symbol;
 
+	bytes32 quoteSignature;
+	uint256 quotedAmountIn;
+	uint256 quotedAmountOut;
+
 	int128[3] impliedRates;
 	uint[3] heights;
+
+	int128 private constant MAX = 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
 
 	constructor(address _ZCBaddress) public {
 		name = "aZCB amm Liquidity Token";
@@ -80,6 +86,23 @@ contract ZCBamm is IZCBamm {
 
 	function timeRemaining() internal view returns (uint) {
 		return uint(int128((maturity-block.timestamp)<<64).div(int128(anchor<<64)));
+	}
+
+	function getQuoteSignature(bool _ZCBin) internal view returns (bytes32) {
+		return keccak256(abi.encodePacked(totalSupply, ZCBreserves, Ureserves, _ZCBin, block.number));
+	}
+
+	function writeQuoteSignature(bool _ZCBin, uint _amountIn, uint _amountOut) internal returns (bytes32) {
+		quoteSignature = getQuoteSignature(_ZCBin);
+		quotedAmountIn = _amountIn;
+		quotedAmountOut = _amountOut;
+	}
+
+	modifier verifyQuote(uint _amountIn, uint _amountOut, bool _ZCBin) {
+		require(quotedAmountIn == _amountIn);
+		require(quotedAmountOut == _amountOut);
+		require(getQuoteSignature(_ZCBin) == quoteSignature);
+		_;
 	}
 
 	/*
@@ -212,6 +235,70 @@ contract ZCBamm is IZCBamm {
 		}
 
 		return uint(_amtIn);
+	}
+
+
+	function ReserveQuoteFromSpecificTokens(int128 _amount, bool _ZCBin) external override setRateModifier returns(uint _out) {
+		require(_amount > 0);
+		int _amtOut;
+		uint r = timeRemaining();
+
+		if (_ZCBin) {
+			_amtOut = -int(BigMath.ZCB_U_reserve_change(ZCBreserves+totalSupply, Ureserves, r, _amount));
+
+			require(_amtOut > 0);
+
+			require(Ureserves > uint(_amtOut));
+
+		} else {
+			_amtOut = -int(BigMath.ZCB_U_reserve_change(Ureserves, ZCBreserves+totalSupply, r, _amount));
+
+			require(_amtOut > 0);
+			require(_amount < _amtOut, "cannot swap to ZCB at negative rate");
+
+			require(ZCBreserves > uint(_amtOut));
+		}
+		_out = uint(_amtOut);
+		writeQuoteSignature(_ZCBin, uint(_amount), _out);
+	}
+
+	function ReserveQuoteToSpecificTokens(int128 _amount, bool _ZCBin) external override setRateModifier returns(uint _in) {
+		require(_amount > 0);
+		int _amtIn;
+		uint r = timeRemaining();
+
+		if (_ZCBin) {
+			require(Ureserves >= uint(_amount));
+			_amtIn = int(BigMath.ZCB_U_reserve_change(Ureserves, ZCBreserves+totalSupply, r, -_amount));
+
+			require(_amtIn > 0);
+		} else {
+			require(ZCBreserves >= uint(_amount));
+			_amtIn = int(BigMath.ZCB_U_reserve_change(ZCBreserves+totalSupply, Ureserves, r, -_amount));
+
+			require(_amtIn > 0);
+			require(_amount > _amtIn, "cannot swap to ZCB at negative rate");
+		}
+		_in = uint(_amtIn);
+		writeQuoteSignature(_ZCBin, _in, uint(_amount));
+	}
+
+	function TakeQuote(uint _amountIn, uint _amountOut, bool _ZCBin) external override verifyQuote(_amountIn, _amountOut, _ZCBin) {
+		if (_ZCBin) {
+			require(Ureserves >= _amountOut);
+			getZCB(_amountIn);
+			sendU(_amountOut);
+			ZCBreserves += _amountIn;
+			Ureserves -= _amountOut;
+			emit Swap(msg.sender, _amountIn, _amountOut, _ZCBin);
+		} else {
+			require(ZCBreserves >= _amountOut);
+			getU(_amountIn);
+			sendZCB(_amountOut);
+			Ureserves += _amountIn;
+			ZCBreserves -= _amountOut;
+			emit Swap(msg.sender, _amountOut, _amountIn, _ZCBin);
+		}
 	}
 
 	function forceRateDataUpdate() external override setRateModifier {}

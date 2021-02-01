@@ -156,7 +156,7 @@ contract YTamm is IYTamm {
 		YTreserves -= YTout;
 	}
 
-	function SwapFromSpecificYT(int128 _amount) external override {
+	function SwapFromSpecificYT(int128 _amount) external override returns (uint) {
 		require(_amount > 0);
 		uint _totalSupply = totalSupply;
 		uint _YTtoLmultiplier = YTtoLmultiplier;
@@ -174,6 +174,7 @@ contract YTamm is IYTamm {
 		Ureserves -= Uout;
 
 		emit Swap(msg.sender, uint(_amount), Uout, true);
+		return Uout;
 	}
 
 	function ReserveQuoteFromYT(int128 _amount) external override returns (uint) {
@@ -190,7 +191,7 @@ contract YTamm is IYTamm {
 		return Uout;
 	}
 
-	function SwapToSpecificYT(int128 _amount) external override {
+	function SwapToSpecificYT(int128 _amount) external override returns (uint) {
 		require(_amount > 0);
 		uint _YTreserves = YTreserves;
 		require(_YTreserves > uint(_amount));
@@ -208,6 +209,7 @@ contract YTamm is IYTamm {
 		Ureserves += Uin;
 
 		emit Swap(msg.sender, uint(_amount), Uin, false);
+		return Uin;
 	}
 
 	function ReserveQuoteToYT(int128 _amount) external override returns (uint) {

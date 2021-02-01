@@ -71,6 +71,11 @@ contract YieldToken is IYieldToken {
     }
 
     //_value denominated in AToken not in wrapped AToken
+    function approve_2(address _spender, uint256 _value, bool _roundUp) external override {
+        approve(_spender, _roundUp ? aw.ATokenToWrappedToken_RoundUp(_value) : aw.ATokenToWrappedToken_RoundDown(_value));        
+    }
+
+    //_value denominated in AToken not in wrapped AToken
     function transferFrom_2(address _from, address _to, uint256 _value, bool _roundUp) external override {
         transferFrom(_from, _to, _roundUp ? aw.ATokenToWrappedToken_RoundUp(_value) : aw.ATokenToWrappedToken_RoundDown(_value));
     }

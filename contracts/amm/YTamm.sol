@@ -156,7 +156,7 @@ contract YTamm is IYTamm {
 		YTreserves -= YTout;
 	}
 
-	function SwapFromSpecificYT(int128 _amount) external override returns (uint) {
+	function SwapFromSpecificYT(int128 _amount) public override returns (uint) {
 		require(_amount > 0);
 		uint _totalSupply = totalSupply;
 		uint _YTtoLmultiplier = YTtoLmultiplier;
@@ -177,21 +177,7 @@ contract YTamm is IYTamm {
 		return Uout;
 	}
 
-	function ReserveQuoteFromYT(int128 _amount) external override returns (uint) {
-		require(_amount > 0);
-		uint _totalSupply = totalSupply;
-		uint _YTtoLmultiplier = YTtoLmultiplier;
-		require(_totalSupply > _YTtoLmultiplier);
-		uint _TimeRemaining = timeRemaining();
-		int128 OracleRate = IZCBamm(ZCBammAddress).getRateFromOracle();
-		uint _YTreserves = YTreserves;
-		uint Uout = uint(-BigMath.YT_U_reserve_change(_YTreserves, _totalSupply / _YTtoLmultiplier, _TimeRemaining, OracleRate, _amount));
-		require(Ureserves > Uout);
-		writeQuoteSignature(_totalSupply, _YTreserves, OracleRate, true, _amount, Uout);
-		return Uout;
-	}
-
-	function SwapToSpecificYT(int128 _amount) external override returns (uint) {
+	function SwapToSpecificYT(int128 _amount) public override returns (uint) {
 		require(_amount > 0);
 		uint _YTreserves = YTreserves;
 		require(_YTreserves > uint(_amount));
@@ -210,6 +196,32 @@ contract YTamm is IYTamm {
 
 		emit Swap(msg.sender, uint(_amount), Uin, false);
 		return Uin;
+	}
+
+	function SwapFromSpecificYTWithLimit(int128 _amount, uint _minUout) external override returns (uint) {
+		uint ret = SwapFromSpecificYT(_amount);
+		require(ret >= _minUout);
+		return ret;
+	}
+
+	function SwapToSpecificYTWithLimit(int128 _amount, uint _maxUin) external override returns (uint) {
+		uint ret = SwapToSpecificYT(_amount);
+		require(ret <= _maxUin);
+		return ret;
+	}
+
+	function ReserveQuoteFromYT(int128 _amount) external override returns (uint) {
+		require(_amount > 0);
+		uint _totalSupply = totalSupply;
+		uint _YTtoLmultiplier = YTtoLmultiplier;
+		require(_totalSupply > _YTtoLmultiplier);
+		uint _TimeRemaining = timeRemaining();
+		int128 OracleRate = IZCBamm(ZCBammAddress).getRateFromOracle();
+		uint _YTreserves = YTreserves;
+		uint Uout = uint(-BigMath.YT_U_reserve_change(_YTreserves, _totalSupply / _YTtoLmultiplier, _TimeRemaining, OracleRate, _amount));
+		require(Ureserves > Uout);
+		writeQuoteSignature(_totalSupply, _YTreserves, OracleRate, true, _amount, Uout);
+		return Uout;
 	}
 
 	function ReserveQuoteToYT(int128 _amount) external override returns (uint) {

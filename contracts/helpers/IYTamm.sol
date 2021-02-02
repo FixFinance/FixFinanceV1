@@ -28,6 +28,8 @@ abstract contract IYTamm is doubleAssetYieldEnabledToken {
 	function burn(uint _amount) external virtual;
 	function SwapFromSpecificYT(int128 _amount) external virtual returns (uint);
 	function SwapToSpecificYT(int128 _amount) external virtual returns (uint);
+	function SwapFromSpecificYTWithLimit(int128 _amount, uint _minUout) external virtual returns (uint);
+	function SwapToSpecificYTWithLimit(int128 _amount, uint _maxUin) external virtual returns (uint);
 	function ReserveQuoteFromYT(int128 _amount) external virtual returns (uint);
 	function ReserveQuoteToYT(int128 _amount) external virtual returns (uint);
 	function TakeQuote(uint _amountU, int128 _amountYT, bool _YTin) external virtual;

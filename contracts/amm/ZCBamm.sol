@@ -159,7 +159,7 @@ contract ZCBamm is IZCBamm {
 		ZCBreserves -= ZCBout;
 	}
 
-	function SwapFromSpecificTokens(int128 _amount, bool _ZCBin) external override setRateModifier returns (uint) {
+	function SwapFromSpecificTokens(int128 _amount, bool _ZCBin) public override setRateModifier returns (uint) {
 		require(_amount > 0);
 		int _amtOut;
 		uint r = timeRemaining();
@@ -199,7 +199,7 @@ contract ZCBamm is IZCBamm {
 		return uint(_amtOut);
 	}
 
-	function SwapToSpecificTokens(int128 _amount, bool _ZCBin) external override setRateModifier returns (uint) {
+	function SwapToSpecificTokens(int128 _amount, bool _ZCBin) public override setRateModifier returns (uint) {
 		require(_amount > 0);
 		int _amtIn;
 		uint r = timeRemaining();
@@ -236,6 +236,15 @@ contract ZCBamm is IZCBamm {
 		return uint(_amtIn);
 	}
 
+	function SwapFromSpecificTokensWithLimit(int128 _amount, bool _ZCBin, uint _minAmtOut) external override returns(uint _out) {
+		_out = SwapFromSpecificTokens(_amount, _ZCBin);
+		require(_out >= _minAmtOut);
+	}
+
+	function SwapToSpecificTokensWithLimit(int128 _amount, bool _ZCBin, uint _maxAmtIn) external override returns(uint _in) {
+		_in = SwapToSpecificTokens(_amount, _ZCBin);
+		require(_in <= _maxAmtIn);
+	}
 
 	function ReserveQuoteFromSpecificTokens(int128 _amount, bool _ZCBin) external override setRateModifier returns(uint _out) {
 		require(_amount > 0);

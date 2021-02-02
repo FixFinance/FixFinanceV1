@@ -81,16 +81,12 @@ contract SwapRouter is ISwapRouter {
 		if (_balanceZCB > MinBalance && _balanceZCB < uint(MAX)) {
 			ch.transferFrom(msg.sender, address(this), _balanceZCB);
 			ch.approve(address(zAmm), _balanceZCB);
-			uint temp = zAmm.SwapFromSpecificTokens(int128(_balanceZCB), true);
-			require(temp >= _minUfromZCB);
-			_Uout += temp;
+			_Uout += zAmm.SwapFromSpecificTokensWithLimit(int128(_balanceZCB), true, _minUfromZCB);
 		}
 		if (_balanceYT > MinBalance && _balanceYT < uint(MAX)) {
 			yt.transferFrom_2(msg.sender, address(this), _balanceYT, false);
 			yt.approve_2(address(yAmm), _balanceYT, false);
-			uint temp = yAmm.SwapFromSpecificYT(int128(_balanceYT));
-			require(temp >= _minUfromYT);
-			_Uout += temp;
+			_Uout += yAmm.SwapFromSpecificYTWithLimit(int128(_balanceYT), _minUfromYT);
 		}
 		require(_Uout >= _minTotalUout);
 		ch.withdrawAll(msg.sender, _unwrap);
@@ -115,16 +111,12 @@ contract SwapRouter is ISwapRouter {
 		if (_amountZCB > MinBalance && _amountZCB < uint(MAX)) {
 			ch.transferFrom(msg.sender, address(this), _amountZCB);
 			ch.approve(address(zAmm), _amountZCB);
-			uint temp = zAmm.SwapFromSpecificTokens(int128(_amountZCB), true);
-			require(temp >= _minUfromZCB);
-			_Uout += temp;
+			_Uout += zAmm.SwapFromSpecificTokensWithLimit(int128(_amountZCB), true, _minUfromZCB);
 		}
 		if (_amountYT > MinBalance && _amountYT < uint(MAX)) {
 			yt.transferFrom_2(msg.sender, address(this), _amountYT, false);
 			yt.approve_2(address(yAmm), _amountYT, false);
-			uint temp = yAmm.SwapFromSpecificYT(int128(_amountYT));
-			require(temp >= _minUfromYT);
-			_Uout += temp;
+			_Uout += yAmm.SwapFromSpecificYTWithLimit(int128(_amountYT), _minUfromYT);
 		}
 		require(_Uout >= _minTotalUout);
 		ch.withdrawAll(msg.sender, _unwrap);
@@ -165,15 +157,13 @@ contract SwapRouter is ISwapRouter {
 		yt.transferFrom_2(msg.sender, address(this), _amountYT, false);
 		yt.approve_2(address(yAmm), _amountYT, false);
 
-		uint _amtU = yAmm.SwapFromSpecificYT(int128(_amountYT));
-		require(_amtU > RoundingBuffer);
+		uint _amtU = yAmm.SwapFromSpecificYTWithLimit(int128(_amountYT), RoundingBuffer);
 		_amtU -= RoundingBuffer;
 		require(_amtU < uint(MAX));
 
 		ch.approve(address(zAmm), _amtU);
 		yt.approve_2(address(zAmm), _amtU, false);
-		uint _amtZCB = zAmm.SwapFromSpecificTokens(int128(_amtU), false);
-		require(_amtZCB >= _minZCBout);
+		uint _amtZCB = zAmm.SwapFromSpecificTokensWithLimit(int128(_amtU), false, _minZCBout);
 
 		ch.transfer(msg.sender, _amtZCB);
 	}

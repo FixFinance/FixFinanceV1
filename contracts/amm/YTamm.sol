@@ -93,8 +93,8 @@ contract YTamm is IYTamm {
 		return keccak256(abi.encodePacked(totalSupply, YTreserves, IZCBamm(ZCBammAddress).getRateFromOracle(), _YTin, block.number));
 	}
 
-	function writeQuoteSignature(uint _totalSupply, uint _YTreserves, int _oracleRate, bool _YTin, int128 _amountYT, uint _amountU) internal returns (bytes32) {
-		quoteSignature = keccak256(abi.encodePacked(_totalSupply, _YTreserves, _oracleRate, _YTin, block.number));
+	function writeQuoteSignature(bool _YTin, int128 _amountYT, uint _amountU) internal returns (bytes32) {
+		quoteSignature = getQuoteSignature(_YTin);
 		quotedAmountYT = _amountYT;
 		quotedAmountU = _amountU;
 	}
@@ -220,7 +220,7 @@ contract YTamm is IYTamm {
 		uint _YTreserves = YTreserves;
 		uint Uout = uint(-BigMath.YT_U_reserve_change(_YTreserves, _totalSupply / _YTtoLmultiplier, _TimeRemaining, OracleRate, _amount));
 		require(Ureserves > Uout);
-		writeQuoteSignature(_totalSupply, _YTreserves, OracleRate, true, _amount, Uout);
+		writeQuoteSignature(true, _amount, Uout);
 		return Uout;
 	}
 
@@ -234,7 +234,7 @@ contract YTamm is IYTamm {
 		uint _TimeRemaining = timeRemaining();
 		int128 OracleRate = IZCBamm(ZCBammAddress).getRateFromOracle();
 		uint Uin = uint(BigMath.YT_U_reserve_change(_YTreserves, _totalSupply / _YTtoLmultiplier, _TimeRemaining, OracleRate, -_amount));
-		writeQuoteSignature(_totalSupply, _YTreserves, OracleRate, false, _amount, Uin);
+		writeQuoteSignature(false, _amount, Uin);
 		return Uin;
 	}
 

@@ -30,6 +30,8 @@ contract CapitalHandler is ICapitalHandler {
 
 	address public override bondMinterAddress;
 
+	uint private constant BIGUNIT = 1e18;
+
 //--------ERC 20 Storage---------------
 
 	uint8 public override decimals;
@@ -136,10 +138,11 @@ contract CapitalHandler is ICapitalHandler {
 	}
 
     function transfer(address _to, uint256 _value) public override returns (bool success) {
-        require(_value <= minimumATokensAtMaturity(msg.sender));
 
         balanceBonds[msg.sender] -= int(_value);
         balanceBonds[_to] += int(_value);
+
+        minimumATokensAtMaturity(msg.sender);
 
         emit Transfer(msg.sender, _to, _value);
 
@@ -156,10 +159,11 @@ contract CapitalHandler is ICapitalHandler {
 
     function transferFrom(address _from, address _to, uint256 _value) public override returns (bool success) {
         require(_value <= allowance[_from][msg.sender]);
-    	require(_value <= minimumATokensAtMaturity(_from));
 
     	balanceBonds[_from] -= int(_value);
     	balanceBonds[_to] += int(_value);
+
+        minimumATokensAtMaturity(_from);
 
         allowance[_from][msg.sender] -= _value;
 
@@ -183,10 +187,11 @@ contract CapitalHandler is ICapitalHandler {
 		balanceBonds[_from] += int(_amountATkn);
 		balanceBonds[_to] -= int(_amountATkn);
 		//ensure that _from address's position may be cashed out to a positive amount of wrappedToken
-		int bonds = balanceBonds[_from];
-		if (bonds >= 0) return;
-		uint bondsToWrappedToken = inPayoutPhase ? uint(-bonds).mul(maturityConversionRate)/1e18 : aw.ATokenToWrappedToken_RoundUp(uint(-bonds));
-		require(balanceYield[_from] >= bondsToWrappedToken);
+		//int bonds = balanceBonds[_from];
+		//if (bonds >= 0) return;
+		//uint bondsToWrappedToken = inPayoutPhase ? uint(-bonds).mul(maturityConversionRate)/1e18 : aw.ATokenToWrappedToken_RoundUp(uint(-bonds));
+		//require(balanceYield[_from] >= bondsToWrappedToken);
+		minimumATokensAtMaturity(_from);
 	}
 
 

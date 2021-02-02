@@ -21,7 +21,7 @@ contract SwapRouter is ISwapRouter {
 		org = organizer(_organizerAddress);
 	}
 
-	function ATknToZCB(address _capitalHandlerAddress, uint _amount) external override {
+	function ATknToZCB(address _capitalHandlerAddress, uint _amount, uint _minZCBout) external override {
 		ICapitalHandler ch = ICapitalHandler(_capitalHandlerAddress);
 		organizer _org = org;
 		IERC20 aToken = IERC20(_org.capitalHandlerToAToken(_capitalHandlerAddress));
@@ -38,7 +38,7 @@ contract SwapRouter is ISwapRouter {
 		yt.approve(address(amm), _amountWrapped);
 		uint _amountToSwap = aw.WrappedTokenToAToken_RoundUp(_amountWrapped);
 		require(_amountToSwap <= uint(MAX));
-		uint _out = amm.SwapFromSpecificTokens(int128(_amountToSwap), false);
+		uint _out = amm.SwapFromSpecificTokensWithLimit(int128(_amountToSwap), false, _minZCBout);
 		ch.transfer(msg.sender, _out);
 	}
 
@@ -54,7 +54,7 @@ contract SwapRouter is ISwapRouter {
 
 		uint _amtATkn = amm.ReserveQuoteToYT(_amountYT);
 		//remove possibility for problems due to rounding error
-		uint _amtTransfer = _amtATkn + 100;
+		uint _amtTransfer = _amtATkn + RoundingBuffer;
 		require(_amtTransfer <= _maxATkn, "Required AToken in is Greater than _maxATkn");
 
 		aToken.transferFrom(msg.sender, address(this), _amtTransfer);
@@ -64,7 +64,7 @@ contract SwapRouter is ISwapRouter {
 		ch.depositWrappedToken(address(this), _amountWrapped);
 		ch.approve(address(amm), _amtTransfer);
 		yt.approve(address(amm), _amountWrapped);
-		amm.TakeQuote(_maxATkn, int128(_amountYT), false);
+		amm.TakeQuote(_amtATkn, int128(_amountYT), false);
 		yt.transfer(msg.sender, yt.balanceOf(address(this)));
 	}
 
@@ -76,7 +76,7 @@ contract SwapRouter is ISwapRouter {
 		IYTamm yAmm = IYTamm(_org.YTamms(_capitalHandlerAddress));
 
 		uint _balanceZCB = ch.balanceOf(msg.sender);
-		uint _balanceYT = yt.balanceOf_2(msg.sender, false);
+		uint _balanceYT = yt.balanceOf(msg.sender);
 		uint _Uout;
 		if (_balanceZCB > MinBalance && _balanceZCB < uint(MAX)) {
 			ch.transferFrom(msg.sender, address(this), _balanceZCB);
@@ -84,7 +84,8 @@ contract SwapRouter is ISwapRouter {
 			_Uout += zAmm.SwapFromSpecificTokensWithLimit(int128(_balanceZCB), true, _minUfromZCB);
 		}
 		if (_balanceYT > MinBalance && _balanceYT < uint(MAX)) {
-			yt.transferFrom_2(msg.sender, address(this), _balanceYT, false);
+			yt.transferFrom(msg.sender, address(this), _balanceYT);
+			_balanceYT = yt.balanceOf_2(address(this), false);
 			yt.approve_2(address(yAmm), _balanceYT, false);
 			_Uout += yAmm.SwapFromSpecificYTWithLimit(int128(_balanceYT), _minUfromYT);
 		}

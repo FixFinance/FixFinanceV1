@@ -5,9 +5,10 @@ const organizer = artifacts.require('organizer');
 const yieldTokenDeployer = artifacts.require('YieldTokenDeployer');
 const BondMinter = artifacts.require("BondMinter");
 const UniswapV2Factory = artifacts.require('UniswapV2Factory');
-const DeployCapitalHandler = artifacts.require('DeployCapitalHandler');
+const CapitalHandlerDeployer = artifacts.require('CapitalHandlerDeployer');
 const ZCBammDeployer = artifacts.require('ZCBammDeployer');
 const YTammDeployer = artifacts.require('YTammDeployer');
+const SwapRouterDeployer = artifacts.require('SwapRouterDeployer');
 const BigMath = artifacts.require("BigMath");
 
 
@@ -43,12 +44,21 @@ module.exports = async function(deployer) {
 	dummyATokenInstance = await deployer.deploy(dummyAToken);
 	yieldTokenDeployerInstance = await deployer.deploy(yieldTokenDeployer);
 	bondMinterInstance = await deployer.deploy(BondMinter, nullAddress);
-	deployCapitalHandlerInstance = await deployer.deploy(DeployCapitalHandler);
+	capitalHandlerDeployerInstance = await deployer.deploy(CapitalHandlerDeployer);
+	swapRouterDeployerInstance = await deployer.deploy(SwapRouterDeployer);
 	bigMathInstance = await deployer.deploy(BigMath);
 	await deployer.link(BigMath, [ZCBammDeployer, YTammDeployer]);
 	ZCBammDeployerInstance = await deployer.deploy(ZCBammDeployer);
 	YTammDeployerInstance = await deployer.deploy(YTammDeployer);
-	organizerInstance = await deployer.deploy(organizer, yieldTokenDeployerInstance.address, bondMinterInstance.address, deployCapitalHandlerInstance.address, ZCBammDeployerInstance.address, YTammDeployerInstance.address);
+	organizerInstance = await deployer.deploy(
+		organizer,
+		yieldTokenDeployerInstance.address,
+		bondMinterInstance.address,
+		capitalHandlerDeployerInstance.address,
+		ZCBammDeployerInstance.address,
+		YTammDeployerInstance.address,
+		swapRouterDeployerInstance.address
+	);
 	await organizerInstance.deployATokenWrapper(dummyATokenInstance.address);
 	await organizerInstance.deployCapitalHandlerInstance(dummyATokenInstance.address, start2026);
 };

@@ -7,11 +7,13 @@ const organizer = artifacts.require('organizer');
 const BondMinter = artifacts.require('BondMinter');
 const IERC20 = artifacts.require("IERC20");
 const BigMath = artifacts.require("BigMath");
-const DeployCapitalHandler = artifacts.require('DeployCapitalHandler');
+const CapitalHandlerDeployer = artifacts.require('CapitalHandlerDeployer');
 const ZCBamm = artifacts.require('ZCBamm');
 const YTamm = artifacts.require('YTamm');
 const ZCBammDeployer = artifacts.require('ZCBammDeployer');
 const YTammDeployer = artifacts.require('YTammDeployer');
+const SwapRouterDeployer = artifacts.require('SwapRouterDeployer');
+const SwapRouter = artifacts.require("SwapRouter");
 
 const nullAddress = "0x0000000000000000000000000000000000000000";
 
@@ -27,9 +29,19 @@ contract('organizer', function(accounts) {
 		await YTammDeployer.link("BigMath", BigMathInstance.address);
 		ZCBammDeployerInstance = await ZCBammDeployer.new();
 		YTammDeployerInstance = await YTammDeployer.new();
-		DeployCapitalHandlerInstance = await DeployCapitalHandler.new();
-		organizerInstance = await organizer.new(yieldTokenDeployerInstance.address, bondMinterInstance.address, DeployCapitalHandlerInstance.address, ZCBammDeployerInstance.address, YTammDeployerInstance.address);
+		capitalHandlerDeployerInstance = await CapitalHandlerDeployer.new();
+		swapRouterDeployerInstance = await SwapRouterDeployer.new();
+		organizerInstance = await organizer.new(
+			yieldTokenDeployerInstance.address,
+			bondMinterInstance.address,
+			capitalHandlerDeployerInstance.address,
+			ZCBammDeployerInstance.address,
+			YTammDeployerInstance.address,
+			swapRouterDeployerInstance.address
+		);
+		router = await SwapRouter.at(await organizerInstance.SwapRouterAddress());
 
+		assert.notEqual(router.address, nullAddress, "SwapRouter is non null");
 		maturity = (await web3.eth.getBlock('latest')).timestamp + 1000000;
 		asset0 = await dummyAToken.new();
 	});

@@ -1,7 +1,7 @@
 pragma solidity >=0.6.0;
 import "./CapitalHandler.sol";
 
-contract DeployCapitalHandler {
+contract CapitalHandlerDeployer {
 	//address public addr;
 
 	function deploy(
@@ -11,7 +11,6 @@ contract DeployCapitalHandler {
 		address _bondMinterAddress
 		) public returns (address) {
 
-		address addr = address(new CapitalHandler(_aw, _maturity, _yieldTokenDeployer, _bondMinterAddress));
-		return addr;
+		return address(new CapitalHandler(_aw, _maturity, _yieldTokenDeployer, _bondMinterAddress));
 	}
 }

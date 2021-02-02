@@ -27,7 +27,7 @@ abstract contract IZCBamm is doubleAssetYieldEnabledToken {
 	function mint(uint _amount, uint _maxUin, uint _maxZCBin) external virtual;
 	function burn(uint _amount) external virtual;
 	function SwapFromSpecificTokens(int128 _amount, bool _ZCBin) external virtual returns(uint _out);
-	function SwapToSpecificTokens(int128 _amount, bool _ZCBout) external virtual returns(uint _in);
+	function SwapToSpecificTokens(int128 _amount, bool _ZCBin) external virtual returns(uint _in);
 	function ReserveQuoteFromSpecificTokens(int128 _amount, bool _ZCBin) external virtual returns(uint _out);
 	function ReserveQuoteToSpecificTokens(int128 _amount, bool _ZCBin) external virtual returns(uint _out);
 	function TakeQuote(uint _amountIn, uint _amountOut, bool _ZCBin) external virtual;

@@ -227,10 +227,10 @@ contract('ZCBamm', async function(accounts){
 		assert.equal(balanceZCB.toString(), balance.sub((new BN(ZCBreserves)).add(new BN(Ureserves))).toString(), "correct balance ZCB");
 	});
 
-	it('SwapToSpecificTokens _ZCBout:true', async () => {
+	it('SwapToSpecificTokens _ZCBin:false', async () => {
 		let amtOut = balance.div(new BN(100));
 
-		rec = await amm.SwapToSpecificTokens(amtOut, true);
+		rec = await amm.SwapToSpecificTokens(amtOut, false);
 
 		let newRateData = await amm.getImpliedRateData();
 		expectedNewRate = (new BN(ZCBreserves)).add(totalSupplyLT).mul( (new BN(2)).pow(new BN(64)) ).div(new BN(Ureserves));
@@ -266,10 +266,10 @@ contract('ZCBamm', async function(accounts){
 		assert.equal(balanceZCB.toString(), balance.sub((new BN(ZCBreserves)).add(new BN(Ureserves))).toString(), "correct balance ZCB");
 	});
 
-	it('SwapToSpecificTokens _ZCBout:false', async () => {
+	it('SwapToSpecificTokens _ZCBin:true', async () => {
 		let amtOut = balance.div(new BN(100));
 
-		rec = await amm.SwapToSpecificTokens(amtOut, false);
+		rec = await amm.SwapToSpecificTokens(amtOut, true);
 
 		let newRateData = await amm.getImpliedRateData();
 		expectedNewRate = (new BN(ZCBreserves)).add(totalSupplyLT).mul( (new BN(2)).pow(new BN(64)) ).div(new BN(Ureserves));

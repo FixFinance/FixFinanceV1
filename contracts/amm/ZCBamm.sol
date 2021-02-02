@@ -199,12 +199,25 @@ contract ZCBamm is IZCBamm {
 		return uint(_amtOut);
 	}
 
-	function SwapToSpecificTokens(int128 _amount, bool _ZCBout) external override setRateModifier returns (uint) {
+	function SwapToSpecificTokens(int128 _amount, bool _ZCBin) external override setRateModifier returns (uint) {
 		require(_amount > 0);
 		int _amtIn;
 		uint r = timeRemaining();
 
-		if (_ZCBout) {
+		if (_ZCBin) {
+			require(Ureserves >= uint(_amount));
+			_amtIn = int(BigMath.ZCB_U_reserve_change(Ureserves, ZCBreserves+totalSupply, r, -_amount));
+
+			require(_amtIn > 0);
+
+			getZCB(uint(_amtIn));
+			sendU(uint(_amount));
+
+			ZCBreserves += uint(_amtIn);
+			Ureserves -= uint(_amount);
+
+			emit Swap(msg.sender, uint(_amtIn), uint(_amount), true);
+		} else {
 			require(ZCBreserves >= uint(_amount));
 			_amtIn = int(BigMath.ZCB_U_reserve_change(ZCBreserves+totalSupply, Ureserves, r, -_amount));
 
@@ -218,20 +231,6 @@ contract ZCBamm is IZCBamm {
 			ZCBreserves -= uint(_amount);
 
 			emit Swap(msg.sender, uint(_amount), uint(_amtIn), false);
-
-		} else {
-			require(Ureserves >= uint(_amount));
-			_amtIn = int(BigMath.ZCB_U_reserve_change(Ureserves, ZCBreserves+totalSupply, r, -_amount));
-
-			require(_amtIn > 0);
-
-			getZCB(uint(_amtIn));
-			sendU(uint(_amount));
-
-			ZCBreserves += uint(_amtIn);
-			Ureserves -= uint(_amount);
-
-			emit Swap(msg.sender, uint(_amtIn), uint(_amount), true);
 		}
 
 		return uint(_amtIn);

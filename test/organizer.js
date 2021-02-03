@@ -39,6 +39,7 @@ contract('organizer', function(accounts) {
 			YTammDeployerInstance.address,
 			swapRouterDeployerInstance.address
 		);
+		await organizerInstance.DeploySwapRouter();
 		router = await SwapRouter.at(await organizerInstance.SwapRouterAddress());
 
 		assert.notEqual(router.address, nullAddress, "SwapRouter is non null");

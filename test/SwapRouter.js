@@ -46,6 +46,7 @@ contract('SwapRouter', async function(accounts) {
 			YTammDeployerInstance.address,
 			swapRouterDeployerInstance.address
 		);
+		await organizerInstance.DeploySwapRouter();
 		router = await SwapRouter.at(await organizerInstance.SwapRouterAddress());
 
 		let timestamp = (await web3.eth.getBlock('latest')).timestamp;
@@ -145,18 +146,82 @@ contract('SwapRouter', async function(accounts) {
 		}
 	});
 
-	it('LiquidateAllToUnderlying()', async () => {
+	it('SwapZCBtoYT()', async () => {
+		balanceZCB = await capitalHandlerInstance.balanceOf(accounts[0]);
+		balanceYT = await yieldTokenInstance.balanceOf_2(accounts[0], false);
+
+		let amtYT = "90000";
+		let maxZCBin = "1000000";
+		await capitalHandlerInstance.approve(router.address, maxZCBin);
+		await router.SwapZCBtoYT(capitalHandlerInstance.address, amtYT, maxZCBin);
+
+		newBalanceYT = await yieldTokenInstance.balanceOf_2(accounts[0], false);
+		newBalanceZCB = await capitalHandlerInstance.balanceOf(accounts[0]);
+
+		if (newBalanceYT.sub(balanceYT).cmp(new BN(amtYT)) === -1)  {
+			assert.fail("the amount of YT gained ought to be greater than or equal to _amountYT");
+		}
+		if (balanceZCB.sub(newBalanceZCB).cmp(new BN(maxZCBin)) === 1) {
+			assert.fail("the amount of ZCB in ought to have been less than or equal to _maxZCBin")
+		}
+	});
+
+	it('SwapYTtoZCB()', async () => {
+		balanceZCB = await capitalHandlerInstance.balanceOf(accounts[0]);
+		balanceYT = await yieldTokenInstance.balanceOf_2(accounts[0], false);
+
+		let amtYT = "900000";
+		let minZCBout = "10";
+		await yieldTokenInstance.approve_2(router.address, amtYT, false);
+		await router.SwapYTtoZCB(capitalHandlerInstance.address, amtYT, minZCBout);
+
+		newBalanceYT = await yieldTokenInstance.balanceOf_2(accounts[0], false);
+		newBalanceZCB = await capitalHandlerInstance.balanceOf(accounts[0]);
+
+		if (balanceYT.sub(newBalanceYT).cmp(new BN(amtYT)) === 1)  {
+			assert.fail("the amount of YT in ought to be less than or equal to _amountYT");
+		}
+		if (newBalanceZCB.sub(balanceZCB).cmp(new BN(minZCBout)) === -1) {
+			assert.fail("the amount of ZCB out ought to have been greater than or equal to _minZCBout");
+		}
+	});
+
+	it('LiquidateSpecificToUnderlying()', async () => {
 		//process.exit();
+		balanceATkn = await aTokenInstance.balanceOf(accounts[0]);
+		balanceZCB = await capitalHandlerInstance.balanceOf(accounts[0]);
+		balanceYT = await yieldTokenInstance.balanceOf_2(accounts[0], false);
+
+		let amtYT = "1006";
+		let amtZCB = "900";
+		let minUtotal = "2";
+		await capitalHandlerInstance.approve(router.address, amtZCB);
+		await yieldTokenInstance.approve_2(router.address, amtYT, true);
+		await router.LiquidateSpecificToUnderlying(capitalHandlerInstance.address, amtZCB, amtYT, minUtotal, true);
+
+		newBalanceATkn = await aTokenInstance.balanceOf(accounts[0]);
+		newBalanceYT = await yieldTokenInstance.balanceOf_2(accounts[0], false);
+		newBalanceZCB = await capitalHandlerInstance.balanceOf(accounts[0]);
+
+		if (balanceYT.sub(newBalanceYT).toString() !== amtYT) {
+			let acceptedAmtYT = "1005";
+			assert.equal(balanceYT.sub(newBalanceYT).toString(), acceptedAmtYT, "YT balance is in correct range");
+		}
+		assert.equal(balanceZCB.sub(newBalanceZCB).toString(), amtZCB, "ZCB balance is correct");
+		if (newBalanceATkn.sub(balanceATkn).cmp(new BN(minUtotal)) < 1) {
+			assert.fail("an amount of aTkn greater than or equal to _minUtotal ought to have been paid out by router");
+		}
+	});
+
+	it('LiquidateAllToUnderlying()', async () => {
 		balanceATkn = await aTokenInstance.balanceOf(accounts[0]);
 		balanceZCB = await capitalHandlerInstance.balanceOf(accounts[0]);
 		balanceYT = await yieldTokenInstance.balanceOf(accounts[0]);
 
-		let minUfromZCB = "1";
-		let minUfromYT = "1";
 		let minUtotal = "2";
 		await capitalHandlerInstance.approve(router.address, balanceZCB);
 		await yieldTokenInstance.approve(router.address, balanceYT);
-		await router.LiquidateAllToUnderlying(capitalHandlerInstance.address, minUfromZCB, minUfromYT, minUtotal, true);
+		await router.LiquidateAllToUnderlying(capitalHandlerInstance.address, minUtotal, true);
 
 		newBalanceATkn = await aTokenInstance.balanceOf(accounts[0]);
 		newBalanceYT = await yieldTokenInstance.balanceOf(accounts[0]);

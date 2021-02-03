@@ -68,28 +68,43 @@ contract SwapRouter is ISwapRouter {
 		yt.transfer(msg.sender, yt.balanceOf(address(this)));
 	}
 
-	function LiquidateAllToUnderlying(address _capitalHandlerAddress, uint _minUfromZCB, uint _minUfromYT, uint _minTotalUout, bool _unwrap) external override {
+	function LiquidateAllToUnderlying(address _capitalHandlerAddress, uint _minUout, bool _unwrap) external override {
 		ICapitalHandler ch = ICapitalHandler(_capitalHandlerAddress);
 		IYieldToken yt = IYieldToken(ch.yieldTokenAddress());
-		organizer _org = org;
-		IZCBamm zAmm = IZCBamm(_org.ZCBamms(_capitalHandlerAddress));
-		IYTamm yAmm = IYTamm(_org.YTamms(_capitalHandlerAddress));
 
-		uint _balanceZCB = ch.balanceOf(msg.sender);
-		uint _balanceYT = yt.balanceOf(msg.sender);
-		uint _Uout;
-		if (_balanceZCB > MinBalance && _balanceZCB < uint(MAX)) {
-			ch.transferFrom(msg.sender, address(this), _balanceZCB);
-			ch.approve(address(zAmm), _balanceZCB);
-			_Uout += zAmm.SwapFromSpecificTokensWithLimit(int128(_balanceZCB), true, _minUfromZCB);
+		yt.transferFrom(msg.sender, address(this), yt.balanceOf(msg.sender));
+		ch.transferFrom(msg.sender, address(this), ch.balanceOf(msg.sender));
+
+		int _bondBal = ch.balanceBonds(address(this));
+
+		if (_bondBal < -int(MinBalance)) {
+			require(_bondBal >= -int(MAX));
+			uint totalBalance = ch.balanceOf(address(this));
+			//yAmm swap
+			IYTamm yAmm = IYTamm(org.YTamms(_capitalHandlerAddress));
+			yt.approve_2(address(yAmm), uint(-_bondBal), true);
+			if (_minUout + RoundingBuffer > totalBalance) {
+				yAmm.SwapFromSpecificYTWithLimit(int128(-_bondBal), _minUout-totalBalance+RoundingBuffer);
+			}
+			else {
+				yAmm.SwapFromSpecificYT(int128(-_bondBal));
+			}
+
 		}
-		if (_balanceYT > MinBalance && _balanceYT < uint(MAX)) {
-			yt.transferFrom(msg.sender, address(this), _balanceYT);
-			_balanceYT = yt.balanceOf_2(address(this), false);
-			yt.approve_2(address(yAmm), _balanceYT, false);
-			_Uout += yAmm.SwapFromSpecificYTWithLimit(int128(_balanceYT), _minUfromYT);
+		else if (_bondBal > int(MinBalance)) {
+			require(_bondBal <= int(MAX));
+			uint totalBalance = yt.balanceOf_2(address(this), false);
+			//zAmm swap
+			IZCBamm zAmm = IZCBamm(org.ZCBamms(_capitalHandlerAddress));
+			ch.approve(address(zAmm), uint(_bondBal));
+			if (_minUout + RoundingBuffer > totalBalance) {
+				zAmm.SwapFromSpecificTokensWithLimit(int128(_bondBal), true, _minUout-totalBalance+RoundingBuffer);
+			}
+			else {
+				zAmm.SwapFromSpecificTokens(int128(_bondBal), true);				
+			}
 		}
-		require(_Uout >= _minTotalUout);
+
 		ch.withdrawAll(msg.sender, _unwrap);
 	}
 
@@ -97,29 +112,45 @@ contract SwapRouter is ISwapRouter {
 			address _capitalHandlerAddress,
 			uint _amountZCB,
 			uint _amountYT,
-			uint _minUfromZCB,
-			uint _minUfromYT,
-			uint _minTotalUout, 
+			uint _minUout,
 			bool _unwrap
 		) external override {
 		ICapitalHandler ch = ICapitalHandler(_capitalHandlerAddress);
 		IYieldToken yt = IYieldToken(ch.yieldTokenAddress());
-		organizer _org = org;
-		IZCBamm zAmm = IZCBamm(_org.ZCBamms(_capitalHandlerAddress));
-		IYTamm yAmm = IYTamm(_org.YTamms(_capitalHandlerAddress));
 
-		uint _Uout;
-		if (_amountZCB > MinBalance && _amountZCB < uint(MAX)) {
-			ch.transferFrom(msg.sender, address(this), _amountZCB);
-			ch.approve(address(zAmm), _amountZCB);
-			_Uout += zAmm.SwapFromSpecificTokensWithLimit(int128(_amountZCB), true, _minUfromZCB);
+		yt.transferFrom_2(msg.sender, address(this), _amountYT, false);
+		ch.transferFrom(msg.sender, address(this), _amountZCB);
+
+		int _bondBal = ch.balanceBonds(address(this));
+
+		if (_bondBal < -int(MinBalance)) {
+			require(_bondBal >= -int(MAX));
+			uint totalBalance = ch.balanceOf(address(this));
+			//yAmm swap
+			IYTamm yAmm = IYTamm(org.YTamms(_capitalHandlerAddress));
+			yt.approve_2(address(yAmm), uint(-_bondBal), true);
+			if (_minUout + RoundingBuffer > totalBalance) {
+				yAmm.SwapFromSpecificYTWithLimit(int128(-_bondBal), _minUout-totalBalance+RoundingBuffer);
+			}
+			else {
+				yAmm.SwapFromSpecificYT(int128(-_bondBal));
+			}
+
 		}
-		if (_amountYT > MinBalance && _amountYT < uint(MAX)) {
-			yt.transferFrom_2(msg.sender, address(this), _amountYT, false);
-			yt.approve_2(address(yAmm), _amountYT, false);
-			_Uout += yAmm.SwapFromSpecificYTWithLimit(int128(_amountYT), _minUfromYT);
+		else if (_bondBal > int(MinBalance)) {
+			require(_bondBal <= int(MAX));
+			uint totalBalance = yt.balanceOf_2(address(this), false);
+			//zAmm swap
+			IZCBamm zAmm = IZCBamm(org.ZCBamms(_capitalHandlerAddress));
+			ch.approve(address(zAmm), uint(_bondBal));
+			if (_minUout + RoundingBuffer > totalBalance) {
+				zAmm.SwapFromSpecificTokensWithLimit(int128(_bondBal), true, _minUout-totalBalance+RoundingBuffer);
+			}
+			else {
+				zAmm.SwapFromSpecificTokens(int128(_bondBal), true);				
+			}
 		}
-		require(_Uout >= _minTotalUout);
+
 		ch.withdrawAll(msg.sender, _unwrap);
 	}
 
@@ -148,7 +179,7 @@ contract SwapRouter is ISwapRouter {
 	}
 
 	function SwapYTtoZCB(address _capitalHandlerAddress, uint _amountYT, uint _minZCBout) external override {
-		require(_amountYT < uint(MAX));
+		require(_amountYT < uint(MAX) && _amountYT > RoundingBuffer);
 		ICapitalHandler ch = ICapitalHandler(_capitalHandlerAddress);
 		IYieldToken yt = IYieldToken(ch.yieldTokenAddress());
 		organizer _org = org;
@@ -158,12 +189,11 @@ contract SwapRouter is ISwapRouter {
 		yt.transferFrom_2(msg.sender, address(this), _amountYT, false);
 		yt.approve_2(address(yAmm), _amountYT, false);
 
-		uint _amtU = yAmm.SwapFromSpecificYTWithLimit(int128(_amountYT), RoundingBuffer);
-		_amtU -= RoundingBuffer;
+		uint _amtU = yAmm.SwapFromSpecificYTWithLimit(int128(_amountYT-RoundingBuffer), RoundingBuffer);
 		require(_amtU < uint(MAX));
 
 		ch.approve(address(zAmm), _amtU);
-		yt.approve_2(address(zAmm), _amtU, false);
+		yt.approve_2(address(zAmm), _amtU+RoundingBuffer, false);
 		uint _amtZCB = zAmm.SwapFromSpecificTokensWithLimit(int128(_amtU), false, _minZCBout);
 
 		ch.transfer(msg.sender, _amtZCB);

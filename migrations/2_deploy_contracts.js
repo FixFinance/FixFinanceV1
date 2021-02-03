@@ -40,6 +40,7 @@ module.exports = async function(deployer) {
 		await factory.createPair(kovanAEthAddress, capitalHandlers[i]);
 	}
 	*/
+
 	dummyATokenInstance = await deployer.deploy(dummyAToken);
 	dummyATokenInstance = await deployer.deploy(dummyAToken);
 	yieldTokenDeployerInstance = await deployer.deploy(yieldTokenDeployer);
@@ -59,6 +60,8 @@ module.exports = async function(deployer) {
 		YTammDeployerInstance.address,
 		swapRouterDeployerInstance.address
 	);
+	//await organizerInstance.DeploySwapRouter();
 	await organizerInstance.deployATokenWrapper(dummyATokenInstance.address);
 	await organizerInstance.deployCapitalHandlerInstance(dummyATokenInstance.address, start2026);
+
 };

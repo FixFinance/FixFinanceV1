@@ -29,6 +29,7 @@ contract organizer {
 	address public CapitalHandlerDeployerAddress;
 	address public ZCBammDeployerAddress;
 	address public YTammDeployerAddress;
+	address internal SwapRouterDeployerAddress;
 	address public SwapRouterAddress;
 
 	constructor (
@@ -44,7 +45,12 @@ contract organizer {
 		CapitalHandlerDeployerAddress = _CapitalhandlerDeployerAddress;
 		ZCBammDeployerAddress = _ZCBammDeployerAddress;
 		YTammDeployerAddress = _YTammDeployerAddress;
-		SwapRouterAddress = SwapRouterDeployer(_SwapRouterDeployerAddress).deploy(address(this));
+		SwapRouterDeployerAddress = _SwapRouterDeployerAddress;
+	}
+
+	function DeploySwapRouter() external {
+		require(SwapRouterAddress == address(0));
+		SwapRouterAddress = SwapRouterDeployer(SwapRouterDeployerAddress).deploy(address(this));		
 	}
 
 	function capitalHandlerInstancesLength() public view returns(uint) {

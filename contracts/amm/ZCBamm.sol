@@ -29,6 +29,8 @@ contract ZCBamm is IZCBamm {
 
 	int128 private constant MAX = 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
 
+	uint private constant SecondsPerYear = 31556926;
+
 	constructor(address _ZCBaddress) public {
 		name = "aZCB amm Liquidity Token";
 		symbol = "aZCBLT";
@@ -382,13 +384,12 @@ contract ZCBamm is IZCBamm {
 
 	function getAPYFromOracle() external view override returns (int128 APY) {
 		/*
-			APY == getRateFromOr111acle()**(1 year / anchor)
+			APY == getRateFromOracle()**(1 year / anchor)
 			APY == exp2 ( log 2 ( getRateFromOracle()**(1 year / anchor)))
 			APY == exp2 ( (1 year / anchor) * log 2 ( getRateFromOracle()))
 		*/
 		APY = getRateFromOracle();
-		// 31556926 is the number of seconds in a year
-		int128 _1overAnchor = int128((31556926 << 64) / anchor);
+		int128 _1overAnchor = int128((SecondsPerYear << 64) / anchor);
 		APY = APY.log_2().mul(_1overAnchor).exp_2();
 	}
 

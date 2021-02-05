@@ -6,6 +6,7 @@ const yieldToken = artifacts.require("YieldToken");
 const yieldTokenDeployer = artifacts.require("YieldTokenDeployer");
 const ZCBamm = artifacts.require("ZCBamm");
 const YTamm = artifacts.require("YTamm");
+const FeeOracle = artifacts.require("FeeOracle");
 
 const helper = require("../helper/helper.js");
 const YT_U_math = require("../helper/YT-U-Math.js");
@@ -14,6 +15,11 @@ const BN = web3.utils.BN;
 const nullAddress = "0x0000000000000000000000000000000000000000";
 const _10To18BN = (new BN("10")).pow(new BN("18"));
 const secondsPerYear = 31556926;
+const AcceptableMarginOfError = Math.pow(10, -7);
+
+const MaxFee = "125000000"; //12.5% in super basis points
+const AnnualFeeRate = (new BN("2")).pow(new BN("64")).div(new BN("100")); //0.01 or 1% in 64.64 form
+const AnnualFeeRateNumber = 0.01;
 
 /*
 	Here we assume that there are no bugs in the ZCBamm contract which is used as a rate oracle for the YTamm contract
@@ -31,9 +37,10 @@ contract('YTamm', async function(accounts){
 		yieldTokenInstance = await yieldToken.at(await capitalHandlerInstance.yieldTokenAddress());
 		await ZCBamm.link("BigMath", BigMathInstance.address);
 		await YTamm.link("BigMath", BigMathInstance.address);
-		amm0 = await ZCBamm.new(capitalHandlerInstance.address);
+		feeOracleInstance = await FeeOracle.new(MaxFee, AnnualFeeRate);
+		amm0 = await ZCBamm.new(capitalHandlerInstance.address, feeOracleInstance.address);
 		YTtoLmultiplier = 50;
-		amm1 = await YTamm.new(amm0.address, YTtoLmultiplier);
+		amm1 = await YTamm.new(amm0.address, feeOracleInstance.address, YTtoLmultiplier);
 		anchor = (await amm0.anchor()).toNumber();
 
 		//simulate generation of 100% returns in money market
@@ -117,8 +124,11 @@ contract('YTamm', async function(accounts){
 		amtIn = toMint.div(new BN("100"));
 		rec = await amm1.SwapFromSpecificYT(amtIn);
 		let timestamp = (await web3.eth.getBlock(rec.receipt.blockNumber)).timestamp;
+		let yearsRemaining = (maturity - timestamp)/secondsPerYear;
+		let pctFee = 1 - Math.pow(1 - AnnualFeeRateNumber, yearsRemaining);
 		let r = (maturity-timestamp)/anchor;
-		let expectedUout = YT_U_math.Uout(parseInt(YTreserves.toString()), parseInt(totalSupply.div(new BN(YTtoLmultiplier)).toString()), r, OracleRate, parseInt(amtIn.toString()));
+		let nonFeeAdjustedExpectedUout = YT_U_math.Uout(parseInt(YTreserves.toString()), parseInt(totalSupply.div(new BN(YTtoLmultiplier)).toString()), r, OracleRate, parseInt(amtIn.toString()));
+		let expectedUout = nonFeeAdjustedExpectedUout * (1 - pctFee);
 		let prevZCBbalance = ZCBbalance;
 		ZCBbalance = await capitalHandlerInstance.balanceOf(accounts[0]);
 		let Uout = ZCBbalance.sub(prevZCBbalance);
@@ -137,8 +147,11 @@ contract('YTamm', async function(accounts){
 
 		rec = await amm1.SwapToSpecificYT(amtOut);
 		let timestamp = (await web3.eth.getBlock(rec.receipt.blockNumber)).timestamp;
+		let yearsRemaining = (maturity - timestamp)/secondsPerYear;
+		let pctFee = 1 - Math.pow(1 - AnnualFeeRateNumber, yearsRemaining);
 		let r = (maturity-timestamp)/anchor;
-		let expectedUin = YT_U_math.Uin(parseInt(YTreserves.toString()), parseInt(totalSupply.div(new BN(YTtoLmultiplier)).toString()), r, OracleRate, parseInt(amtOut.toString()));
+		let nonFeeAdjustedUin = YT_U_math.Uin(parseInt(YTreserves.toString()), parseInt(totalSupply.div(new BN(YTtoLmultiplier)).toString()), r, OracleRate, parseInt(amtOut.toString()));
+		let expectedUin = nonFeeAdjustedUin / (1 - pctFee);
 		let prevZCBbalance = ZCBbalance;
 		ZCBbalance = await capitalHandlerInstance.balanceOf(accounts[0]);
 		let Uin = prevZCBbalance.sub(ZCBbalance);

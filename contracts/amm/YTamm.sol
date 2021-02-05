@@ -6,6 +6,7 @@ import "../libraries/BigMath.sol";
 import "../interfaces/IYieldToken.sol";
 import "../interfaces/IERC20.sol";
 import "../helpers/IZCBamm.sol";
+import "../FeeOracle.sol";
 
 contract YTamm is IYTamm {
 
@@ -22,13 +23,19 @@ contract YTamm is IYTamm {
 	string public override name;
 	string public override symbol;
 
+	address FeeOracleAddress;
+
 	bytes32 quoteSignature;
 	int128 quotedAmountYT;
 	uint256 quotedAmountU;
 
 	uint32 YTtoLmultiplier;
 
-	constructor(address _ZCBammAddress, uint32 _YTtoLmultiplier) public {
+	constructor(
+		address _ZCBammAddress,
+		address _feeOracleAddress,
+		uint32 _YTtoLmultiplier
+	) public {
 		name = "aYT amm Liquidity Token";
 		symbol = "aYTLT";
 		address _ZCBaddress = IZCBamm(_ZCBammAddress).ZCBaddress();
@@ -38,6 +45,7 @@ contract YTamm is IYTamm {
 		maturity = _maturity;
 		anchor = IZCBamm(_ZCBammAddress).anchor();
 		ZCBammAddress = _ZCBammAddress;
+		FeeOracleAddress = _feeOracleAddress;
 		YTtoLmultiplier = _YTtoLmultiplier;
 		init(_ZCBaddress, _YTaddress);
 	}
@@ -163,7 +171,8 @@ contract YTamm is IYTamm {
 		require(_totalSupply > _YTtoLmultiplier);
 		uint _TimeRemaining = timeRemaining();
 		int128 OracleRate = IZCBamm(ZCBammAddress).getRateFromOracle();
-		uint Uout = uint(-BigMath.YT_U_reserve_change(YTreserves, _totalSupply / _YTtoLmultiplier, _TimeRemaining, OracleRate, _amount));
+		uint nonFeeAdjustedUout = uint(-BigMath.YT_U_reserve_change(YTreserves, _totalSupply / _YTtoLmultiplier, _TimeRemaining, OracleRate, _amount));
+		uint Uout = FeeOracle(FeeOracleAddress).feeAdjustedAmountOut(maturity, nonFeeAdjustedUout);
 
 		require(Ureserves > Uout);
 
@@ -186,7 +195,8 @@ contract YTamm is IYTamm {
 		require(_totalSupply > _YTtoLmultiplier);
 		uint _TimeRemaining = timeRemaining();
 		int128 OracleRate = IZCBamm(ZCBammAddress).getRateFromOracle();
-		uint Uin = uint(BigMath.YT_U_reserve_change(_YTreserves, _totalSupply / _YTtoLmultiplier, _TimeRemaining, OracleRate, -_amount));
+		uint nonFeeAdjustedUin = uint(BigMath.YT_U_reserve_change(_YTreserves, _totalSupply / _YTtoLmultiplier, _TimeRemaining, OracleRate, -_amount));
+		uint Uin = FeeOracle(FeeOracleAddress).feeAdjustedAmountIn(maturity, nonFeeAdjustedUin);
 
 		getU(Uin);
 		sendYT(uint(_amount));
@@ -218,7 +228,8 @@ contract YTamm is IYTamm {
 		uint _TimeRemaining = timeRemaining();
 		int128 OracleRate = IZCBamm(ZCBammAddress).getRateFromOracle();
 		uint _YTreserves = YTreserves;
-		uint Uout = uint(-BigMath.YT_U_reserve_change(_YTreserves, _totalSupply / _YTtoLmultiplier, _TimeRemaining, OracleRate, _amount));
+		uint nonFeeAdjustedUout = uint(-BigMath.YT_U_reserve_change(_YTreserves, _totalSupply / _YTtoLmultiplier, _TimeRemaining, OracleRate, _amount));
+		uint Uout = FeeOracle(FeeOracleAddress).feeAdjustedAmountOut(maturity, nonFeeAdjustedUout);
 		require(Ureserves > Uout);
 		writeQuoteSignature(true, _amount, Uout);
 		return Uout;
@@ -233,7 +244,8 @@ contract YTamm is IYTamm {
 		require(_totalSupply > _YTtoLmultiplier);
 		uint _TimeRemaining = timeRemaining();
 		int128 OracleRate = IZCBamm(ZCBammAddress).getRateFromOracle();
-		uint Uin = uint(BigMath.YT_U_reserve_change(_YTreserves, _totalSupply / _YTtoLmultiplier, _TimeRemaining, OracleRate, -_amount));
+		uint nonFeeAdjustedUin = uint(BigMath.YT_U_reserve_change(_YTreserves, _totalSupply / _YTtoLmultiplier, _TimeRemaining, OracleRate, -_amount));
+		uint Uin = FeeOracle(FeeOracleAddress).feeAdjustedAmountIn(maturity, nonFeeAdjustedUin);
 		writeQuoteSignature(false, _amount, Uin);
 		return Uin;
 	}

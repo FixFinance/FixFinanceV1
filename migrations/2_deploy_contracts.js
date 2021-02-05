@@ -9,6 +9,7 @@ const CapitalHandlerDeployer = artifacts.require('CapitalHandlerDeployer');
 const ZCBammDeployer = artifacts.require('ZCBammDeployer');
 const YTammDeployer = artifacts.require('YTammDeployer');
 const SwapRouterDeployer = artifacts.require('SwapRouterDeployer');
+const FeeOracle = artifacts.require("FeeOracle");
 const BigMath = artifacts.require("BigMath");
 
 
@@ -47,6 +48,7 @@ module.exports = async function(deployer) {
 	bondMinterInstance = await deployer.deploy(BondMinter, nullAddress);
 	capitalHandlerDeployerInstance = await deployer.deploy(CapitalHandlerDeployer);
 	swapRouterDeployerInstance = await deployer.deploy(SwapRouterDeployer);
+	feeOracleDeployer = await deployer.deploy(FeeOracle, "0", "0");
 	bigMathInstance = await deployer.deploy(BigMath);
 	await deployer.link(BigMath, [ZCBammDeployer, YTammDeployer]);
 	ZCBammDeployerInstance = await deployer.deploy(ZCBammDeployer);
@@ -58,7 +60,8 @@ module.exports = async function(deployer) {
 		capitalHandlerDeployerInstance.address,
 		ZCBammDeployerInstance.address,
 		YTammDeployerInstance.address,
-		swapRouterDeployerInstance.address
+		swapRouterDeployerInstance.address,
+		feeOracleDeployer.address
 	);
 	//await organizerInstance.DeploySwapRouter();
 	await organizerInstance.deployATokenWrapper(dummyATokenInstance.address);

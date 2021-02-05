@@ -8,6 +8,7 @@ import "./amm/YTammDeployer.sol";
 import "./CapitalHandlerDeployer.sol";
 import "./SwapRouterDeployer.sol";
 import "./SwapRouter.sol";
+import "./FeeOracle.sol";
 
 contract organizer {
 
@@ -31,6 +32,7 @@ contract organizer {
 	address public YTammDeployerAddress;
 	address internal SwapRouterDeployerAddress;
 	address public SwapRouterAddress;
+	address public FeeOracleAddress;
 
 	constructor (
 		address _yieldTokenDeployerAddress,
@@ -38,7 +40,8 @@ contract organizer {
 		address _CapitalhandlerDeployerAddress,
 		address _ZCBammDeployerAddress,
 		address _YTammDeployerAddress,
-		address _SwapRouterDeployerAddress
+		address _SwapRouterDeployerAddress,
+		address _feeOracleAddress
 		) public {
 		yieldTokenDeployerAddress = _yieldTokenDeployerAddress;	
 		bondMinterAddress = _bondMinterAddress;
@@ -46,6 +49,7 @@ contract organizer {
 		ZCBammDeployerAddress = _ZCBammDeployerAddress;
 		YTammDeployerAddress = _YTammDeployerAddress;
 		SwapRouterDeployerAddress = _SwapRouterDeployerAddress;
+		FeeOracleAddress = _feeOracleAddress;
 	}
 
 	function DeploySwapRouter() external {
@@ -80,14 +84,14 @@ contract organizer {
 	function deployZCBamm(address _capitalHandlerAddress) public {
 		require(ZCBamms[_capitalHandlerAddress] == address(0));
 		require(capitalHandlerToAToken[_capitalHandlerAddress] != address(0));
-		ZCBamms[_capitalHandlerAddress] = ZCBammDeployer(ZCBammDeployerAddress).deploy(_capitalHandlerAddress);
+		ZCBamms[_capitalHandlerAddress] = ZCBammDeployer(ZCBammDeployerAddress).deploy(_capitalHandlerAddress, FeeOracleAddress);
 	}
 
 	function deployYTamm(address _capitalHandlerAddress) public {
 		require(YTamms[_capitalHandlerAddress] == address(0));
 		address ZCBammAddress = ZCBamms[_capitalHandlerAddress];
 		require(ZCBammAddress != address(0));
-		YTamms[_capitalHandlerAddress] = YTammDeployer(YTammDeployerAddress).deploy(ZCBammAddress, YTtoLmultiplier);
+		YTamms[_capitalHandlerAddress] = YTammDeployer(YTammDeployerAddress).deploy(ZCBammAddress, FeeOracleAddress, YTtoLmultiplier);
 	}
 
 }

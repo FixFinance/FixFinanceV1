@@ -15,6 +15,7 @@ const ZCBammDeployer = artifacts.require('ZCBammDeployer');
 const YTammDeployer = artifacts.require('YTammDeployer');
 const SwapRouter = artifacts.require("SwapRouter");
 const SwapRouterDeployer = artifacts.require("SwapRouterDeployer");
+const FeeOracle = artifacts.require("FeeOracle");
 
 const helper = require("../helper/helper.js");
 
@@ -38,13 +39,15 @@ contract('SwapRouter', async function(accounts) {
 		YTammDeployerInstance = await YTammDeployer.new();
 		capitalHandlerDeployerInstance = await CapitalHandlerDeployer.new();
 		swapRouterDeployerInstance = await SwapRouterDeployer.new();
+		feeOracleInstance = await FeeOracle.new("0", "0");
 		organizerInstance = await organizer.new(
 			yieldTokenDeployerInstance.address,
 			bondMinterInstance.address,
 			capitalHandlerDeployerInstance.address,
 			ZCBammDeployerInstance.address,
 			YTammDeployerInstance.address,
-			swapRouterDeployerInstance.address
+			swapRouterDeployerInstance.address,
+			feeOracleInstance.address
 		);
 		await organizerInstance.DeploySwapRouter();
 		router = await SwapRouter.at(await organizerInstance.SwapRouterAddress());
@@ -186,7 +189,7 @@ contract('SwapRouter', async function(accounts) {
 		}
 	});
 
-	it('LiquidateSpecificToUnderlying()', async () => {
+	it('LiquidateSpecificToUnderlying(): more YT in', async () => {
 		//process.exit();
 		balanceATkn = await aTokenInstance.balanceOf(accounts[0]);
 		balanceZCB = await capitalHandlerInstance.balanceOf(accounts[0]);
@@ -194,7 +197,7 @@ contract('SwapRouter', async function(accounts) {
 
 		let amtYT = "1006";
 		let amtZCB = "900";
-		let minUtotal = "2";
+		let minUtotal = "901";
 		await capitalHandlerInstance.approve(router.address, amtZCB);
 		await yieldTokenInstance.approve_2(router.address, amtYT, true);
 		await router.LiquidateSpecificToUnderlying(capitalHandlerInstance.address, amtZCB, amtYT, minUtotal, true);
@@ -205,6 +208,33 @@ contract('SwapRouter', async function(accounts) {
 
 		if (balanceYT.sub(newBalanceYT).toString() !== amtYT) {
 			let acceptedAmtYT = "1005";
+			assert.equal(balanceYT.sub(newBalanceYT).toString(), acceptedAmtYT, "YT balance is in correct range");
+		}
+		assert.equal(balanceZCB.sub(newBalanceZCB).toString(), amtZCB, "ZCB balance is correct");
+		if (newBalanceATkn.sub(balanceATkn).cmp(new BN(minUtotal)) < 1) {
+			assert.fail("an amount of aTkn greater than or equal to _minUtotal ought to have been paid out by router");
+		}
+	});
+
+	it('LiquidateSpecificToUnderlying(): more ZCB in', async () => {
+		//process.exit();
+		balanceATkn = await aTokenInstance.balanceOf(accounts[0]);
+		balanceZCB = await capitalHandlerInstance.balanceOf(accounts[0]);
+		balanceYT = await yieldTokenInstance.balanceOf_2(accounts[0], false);
+
+		let amtYT = "900";
+		let amtZCB = "1006";
+		let minUtotal = "901";
+		await capitalHandlerInstance.approve(router.address, amtZCB);
+		await yieldTokenInstance.approve_2(router.address, amtYT, true);
+		await router.LiquidateSpecificToUnderlying(capitalHandlerInstance.address, amtZCB, amtYT, minUtotal, true);
+
+		newBalanceATkn = await aTokenInstance.balanceOf(accounts[0]);
+		newBalanceYT = await yieldTokenInstance.balanceOf_2(accounts[0], false);
+		newBalanceZCB = await capitalHandlerInstance.balanceOf(accounts[0]);
+
+		if (balanceYT.sub(newBalanceYT).toString() !== amtYT) {
+			let acceptedAmtYT = "899";
 			assert.equal(balanceYT.sub(newBalanceYT).toString(), acceptedAmtYT, "YT balance is in correct range");
 		}
 		assert.equal(balanceZCB.sub(newBalanceZCB).toString(), amtZCB, "ZCB balance is correct");

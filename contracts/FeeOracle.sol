@@ -8,11 +8,11 @@ contract FeeOracle is Ownable {
 	using ABDKMath64x64 for int128;
 	using SafeMath for uint256;
 
-	// 1.0 in basis points
-	uint16 constant totalBasisPoints = 10_000;
+	// 1.0 in super basis points
+	uint32 constant totalSuperBasisPoints = 1_000_000_000;
 
-	// 0.125 in basis points
-	uint16 constant MaxMaxFee = 1_250;
+	// 0.125 in super basis points
+	uint32 constant MaxMaxFee = 125_000_000;
 
 	uint public maxFee;
 
@@ -27,18 +27,18 @@ contract FeeOracle is Ownable {
 
 	uint private constant SecondsPerYear = 31556926;
 
-	constructor(uint16 _maxFee, int128 _annualRate) public {
+	constructor(uint32 _maxFee, int128 _annualRate) public {
 		setMaxFee(_maxFee);
 		setAnnualRate(_annualRate);
 	}
 
-	function setMaxFee(uint16 _maxFee) public {
+	function setMaxFee(uint32 _maxFee) public onlyOwner {
 		require(_maxFee >= 0, "Max Fee must not be negative");
 		require(_maxFee <= MaxMaxFee, "_maxFee parameter above upper limit");
 		maxFee = _maxFee;
 	}
 
-	function setAnnualRate(int128 _annualRate) public {
+	function setAnnualRate(int128 _annualRate) public onlyOwner {
 		require(_annualRate >= 0, "annual rate must not be negative");
 		require(_annualRate <= MaxAnnualRate, "_annualRate parameter above upper limit");
 		annualRate = _annualRate;
@@ -47,13 +47,14 @@ contract FeeOracle is Ownable {
 	/*
 		Returns the percentage fee to be charged by the AMM denominated in basis points
 	*/
-	function getFeePct(uint _maturity) public returns (uint16 feePct) {
+	function getFeePct(uint _maturity) internal view returns (uint32 feePct) {
 		require(_maturity > block.timestamp);
 		int128 _annualRate = annualRate;	//gas savings
-		if (_annualRate == 0) {
+		uint _maxFee = maxFee;	//gas savings
+		if (_annualRate == 0 || _maxFee == 0) {
 			return 0;
 		}
-		int128 yearsRemaining = int128(((block.timestamp - _maturity) << 64) / SecondsPerYear);
+		int128 yearsRemaining = int128(((_maturity - block.timestamp) << 64) / SecondsPerYear);
 		/*
 			(1-feePct) == (1 - annualRate)**yearsRemaining
 			feePct == 1 - (1 - annualRate)**yearsRemaining
@@ -67,26 +68,23 @@ contract FeeOracle is Ownable {
 		//due to checks we have done earlier we do not need to use .sub here
 		int128 innerTerm = ABDK_1 - _annualRate;
 		//due to checks we have done earlier we do not need to use .sub here and to know that converting to uint is safe
-		uint result = totalBasisPoints * uint(ABDK_1 - innerTerm.log_2().mul(yearsRemaining).exp_2()) >> 64;
-		uint _maxFee = maxFee;	//gas savings
-		return uint16(result > _maxFee ? _maxFee : result);
+		uint result = totalSuperBasisPoints * uint(ABDK_1 - innerTerm.log_2().mul(yearsRemaining).exp_2()) >> 64;
+		return uint32(result > _maxFee ? _maxFee : result);
 	}
-
-
 
 	/*
 		amountIn_preFee / (1 - getPctFee()) == amountIn_postFee
 	*/
-	function feeAdjustedAmtIn(uint _maturity, uint _amountIn_preFee) external returns (uint amountIn_postFee) {
-		amountIn_postFee = totalBasisPoints * _amountIn_preFee / (totalBasisPoints - getFeePct(_maturity));
+	function feeAdjustedAmountIn(uint _maturity, uint _amountIn_preFee) external view returns (uint amountIn_postFee) {
+		amountIn_postFee = totalSuperBasisPoints * _amountIn_preFee / (totalSuperBasisPoints - getFeePct(_maturity));
 	}
 
 
 	/*
-		amountOut_preFee / (1 - getPctFee()) == amountOut_postFee
+		amountOut_preFee * (1 - getPctFee()) == amountOut_postFee
 	*/
-	function feeAdjustedAmtOut(uint _maturity, uint _amountOut_preFee) external returns (uint amountOut_postFee) {
-		amountOut_postFee = totalBasisPoints * _amountOut_preFee / (totalBasisPoints - getFeePct(_maturity));
+	function feeAdjustedAmountOut(uint _maturity, uint _amountOut_preFee) external view returns (uint amountOut_postFee) {
+		amountOut_postFee = _amountOut_preFee * (totalSuperBasisPoints - getFeePct(_maturity)) / totalSuperBasisPoints;
 	}
 
 }

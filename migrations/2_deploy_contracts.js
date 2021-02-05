@@ -4,7 +4,6 @@ const dummyAToken = artifacts.require('dummyAToken');
 const organizer = artifacts.require('organizer');
 const yieldTokenDeployer = artifacts.require('YieldTokenDeployer');
 const BondMinter = artifacts.require("BondMinter");
-const UniswapV2Factory = artifacts.require('UniswapV2Factory');
 const CapitalHandlerDeployer = artifacts.require('CapitalHandlerDeployer');
 const ZCBammDeployer = artifacts.require('ZCBammDeployer');
 const YTammDeployer = artifacts.require('YTammDeployer');

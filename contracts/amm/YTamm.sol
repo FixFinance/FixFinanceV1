@@ -67,9 +67,17 @@ contract YTamm is IYTamm {
 		emit Burn(_from, _amount);
 	}
 
-	function getU(uint _amount) internal {
-		getZCB(_amount);
-		getYT(_amount);
+	function getYTsendU(uint _amountYT, uint _amountU)  internal {
+		sendZCB(_amountU);
+		if (_amountYT > _amountU) {
+			getYT(_amountYT - _amountU);
+		}
+	}
+
+	function sendYTgetU(uint _amountYT, uint _amountU) internal {
+		require(_amountYT > _amountU);
+		sendYT(_amountYT - _amountU);
+		getZCB(_amountU);
 	}
 
 	function getZCB(uint _amount) internal {
@@ -78,11 +86,6 @@ contract YTamm is IYTamm {
 
 	function getYT(uint _amount) internal {
 		IYieldToken(YTaddress).transferFrom_2(msg.sender, address(this), _amount, true);
-	}
-
-	function sendU(uint _amount) internal {
-		sendZCB(_amount);
-		sendYT(_amount);
 	}
 
 	function sendZCB(uint _amount) internal {
@@ -176,8 +179,7 @@ contract YTamm is IYTamm {
 
 		require(Ureserves > Uout);
 
-		getYT(uint(_amount));
-		sendU(Uout);
+		getYTsendU(uint(_amount), Uout);
 
 		YTreserves += uint(_amount);
 		Ureserves -= Uout;
@@ -198,8 +200,7 @@ contract YTamm is IYTamm {
 		uint nonFeeAdjustedUin = uint(BigMath.YT_U_reserve_change(_YTreserves, _totalSupply / _YTtoLmultiplier, _TimeRemaining, OracleRate, -_amount));
 		uint Uin = FeeOracle(FeeOracleAddress).feeAdjustedAmountIn(maturity, nonFeeAdjustedUin);
 
-		getU(Uin);
-		sendYT(uint(_amount));
+		sendYTgetU(uint(_amount), Uin);
 
 		YTreserves -= uint(_amount);
 		Ureserves += Uin;
@@ -253,14 +254,12 @@ contract YTamm is IYTamm {
 	function TakeQuote(uint _amountU, int128 _amountYT, bool _YTin) external override verifyQuote(_amountU, _amountYT, _YTin) {
 		if (_YTin) {
 			require(Ureserves > _amountU);
-			getYT(uint(_amountYT));
-			sendU(_amountU);
+			getYTsendU(uint(_amountYT), _amountU);
 			YTreserves += uint(_amountYT);
 			Ureserves -= _amountU;
 		} else {
 			require(YTreserves > uint(_amountYT));
-			getU(_amountU);
-			sendYT(uint(_amountYT));
+			sendYTgetU(uint(_amountYT), _amountU);
 			Ureserves += _amountU;
 			YTreserves -= uint(_amountYT);
 		}

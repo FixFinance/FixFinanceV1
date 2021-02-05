@@ -64,9 +64,17 @@ contract ZCBamm is IZCBamm {
 		emit Burn(_from, _amount);
 	}
 
-	function getU(uint _amount) internal {
-		getZCB(_amount);
-		getYT(_amount);
+	function getZCBsendU(uint _amountZCB, uint _amountU) internal {
+		sendYT(_amountU);
+		if (_amountZCB > _amountU) {
+			getZCB(_amountZCB - _amountU);
+		}
+	}
+
+	function sendZCBgetU(uint _amountZCB, uint _amountU) internal {
+		require(_amountZCB > _amountU);
+		sendZCB(_amountZCB - _amountU);
+		getYT(_amountU);
 	}
 
 	function getZCB(uint _amount) internal {
@@ -75,11 +83,6 @@ contract ZCBamm is IZCBamm {
 
 	function getYT(uint _amount) internal {
 		IYieldToken(YTaddress).transferFrom_2(msg.sender, address(this), _amount, true);
-	}
-
-	function sendU(uint _amount) internal {
-		sendZCB(_amount);
-		sendYT(_amount);
 	}
 
 	function sendZCB(uint _amount) internal {
@@ -178,8 +181,7 @@ contract ZCBamm is IZCBamm {
 
 			require(Ureserves > amountOut);
 
-			getZCB(uint(_amount));
-			sendU(amountOut);
+			getZCBsendU(uint(_amount), amountOut);
 
 			ZCBreserves += uint(_amount);
 			Ureserves -= amountOut;
@@ -197,8 +199,7 @@ contract ZCBamm is IZCBamm {
 
 			require(ZCBreserves > amountOut);
 
-			getU(uint(_amount));
-			sendZCB(amountOut);
+			sendZCBgetU(amountOut, uint(_amount));
 
 			Ureserves += uint(_amount);
 			ZCBreserves -= amountOut;
@@ -219,8 +220,7 @@ contract ZCBamm is IZCBamm {
 				amountIn = FeeOracle(FeeOracleAddress).feeAdjustedAmountIn(maturity, uint(temp));
 			}
 
-			getZCB(amountIn);
-			sendU(uint(_amount));
+			getZCBsendU(amountIn, uint(_amount));
 
 			ZCBreserves += amountIn;
 			Ureserves -= uint(_amount);
@@ -236,8 +236,7 @@ contract ZCBamm is IZCBamm {
 
 			require(uint(_amount) > amountIn, "cannot swap to ZCB at negative rate");
 
-			getU(amountIn);
-			sendZCB(uint(_amount));
+			sendZCBgetU(uint(_amount), amountIn);
 
 			Ureserves += amountIn;
 			ZCBreserves -= uint(_amount);
@@ -311,15 +310,13 @@ contract ZCBamm is IZCBamm {
 	function TakeQuote(uint _amountIn, uint _amountOut, bool _ZCBin) external override verifyQuote(_amountIn, _amountOut, _ZCBin) {
 		if (_ZCBin) {
 			require(Ureserves >= _amountOut);
-			getZCB(_amountIn);
-			sendU(_amountOut);
+			getZCBsendU(_amountIn, _amountOut);
 			ZCBreserves += _amountIn;
 			Ureserves -= _amountOut;
 			emit Swap(msg.sender, _amountIn, _amountOut, _ZCBin);
 		} else {
 			require(ZCBreserves >= _amountOut);
-			getU(_amountIn);
-			sendZCB(_amountOut);
+			sendZCBgetU(_amountOut, _amountIn);
 			Ureserves += _amountIn;
 			ZCBreserves -= _amountOut;
 			emit Swap(msg.sender, _amountOut, _amountIn, _ZCBin);

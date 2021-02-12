@@ -195,9 +195,9 @@ contract('SwapRouter', async function(accounts) {
 		balanceZCB = await capitalHandlerInstance.balanceOf(accounts[0]);
 		balanceYT = await yieldTokenInstance.balanceOf_2(accounts[0], false);
 
-		let amtYT = "1006";
-		let amtZCB = "900";
-		let minUtotal = "901";
+		let amtYT = "100006";
+		let amtZCB = "90000";
+		let minUtotal = "90001";
 		await capitalHandlerInstance.approve(router.address, amtZCB);
 		await yieldTokenInstance.approve_2(router.address, amtYT, true);
 		await router.LiquidateSpecificToUnderlying(capitalHandlerInstance.address, amtZCB, amtYT, minUtotal, true);
@@ -207,7 +207,7 @@ contract('SwapRouter', async function(accounts) {
 		newBalanceZCB = await capitalHandlerInstance.balanceOf(accounts[0]);
 
 		if (balanceYT.sub(newBalanceYT).toString() !== amtYT) {
-			let acceptedAmtYT = "1005";
+			let acceptedAmtYT = "100005";
 			assert.equal(balanceYT.sub(newBalanceYT).toString(), acceptedAmtYT, "YT balance is in correct range");
 		}
 		assert.equal(balanceZCB.sub(newBalanceZCB).toString(), amtZCB, "ZCB balance is correct");
@@ -217,14 +217,13 @@ contract('SwapRouter', async function(accounts) {
 	});
 
 	it('LiquidateSpecificToUnderlying(): more ZCB in', async () => {
-		//process.exit();
 		balanceATkn = await aTokenInstance.balanceOf(accounts[0]);
 		balanceZCB = await capitalHandlerInstance.balanceOf(accounts[0]);
 		balanceYT = await yieldTokenInstance.balanceOf_2(accounts[0], false);
 
-		let amtYT = "900";
-		let amtZCB = "1006";
-		let minUtotal = "901";
+		let amtYT = "90000";
+		let amtZCB = "100006";
+		let minUtotal = "90001";
 		await capitalHandlerInstance.approve(router.address, amtZCB);
 		await yieldTokenInstance.approve_2(router.address, amtYT, true);
 		await router.LiquidateSpecificToUnderlying(capitalHandlerInstance.address, amtZCB, amtYT, minUtotal, true);
@@ -234,10 +233,16 @@ contract('SwapRouter', async function(accounts) {
 		newBalanceZCB = await capitalHandlerInstance.balanceOf(accounts[0]);
 
 		if (balanceYT.sub(newBalanceYT).toString() !== amtYT) {
-			let acceptedAmtYT = "899";
-			assert.equal(balanceYT.sub(newBalanceYT).toString(), acceptedAmtYT, "YT balance is in correct range");
+			let acceptedAmtYT = "89999";
+			if (balanceYT.sub(newBalanceYT).toString() !== acceptedAmtYT) {
+				acceptedAmtYT = "89998";
+				assert.equal(balanceYT.sub(newBalanceYT).toString(), acceptedAmtYT, "YT balance is in correct range");
+			}
 		}
-		assert.equal(balanceZCB.sub(newBalanceZCB).toString(), amtZCB, "ZCB balance is correct");
+		if (balanceZCB.sub(newBalanceZCB).toString() !== amtZCB) {
+			let amtZCBAccepted = "100005";
+			assert.equal(balanceZCB.sub(newBalanceZCB).toString(), amtZCBAccepted, "ZCB balance is correct");
+		}
 		if (newBalanceATkn.sub(balanceATkn).cmp(new BN(minUtotal)) < 1) {
 			assert.fail("an amount of aTkn greater than or equal to _minUtotal ought to have been paid out by router");
 		}

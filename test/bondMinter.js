@@ -30,9 +30,9 @@ contract('BondMinter', async function(accounts) {
 
 	it('before each', async () => {
 		//borrow asset 0
-		asset0 = await dummyAToken.new();
+		asset0 = await dummyAToken.new("aCOIN");
 		//supply asset 1
-		asset1 = await dummyAToken.new();
+		asset1 = await dummyAToken.new("aTOKEN");
 		yieldTokenDeployerInstance = await yieldTokenDeployer.new();
 		vaultHealthInstance = await dummyVaultHealth.new();
 		bondMinterInstance = await BondMinter.new(vaultHealthInstance.address);
@@ -72,9 +72,6 @@ contract('BondMinter', async function(accounts) {
 
 		zcbAsset0 = await capitalHandler.at(await organizerInstance.capitalHandlerMapping(asset0.address, maturity));
 		zcbAsset1 = await capitalHandler.at(await organizerInstance.capitalHandlerMapping(asset1.address, maturity));
-
-		await bondMinterInstance.setCapitalHandler(zcbAsset0.address);
-		await bondMinterInstance.setCapitalHandler(zcbAsset1.address);
 
 		//mint assets to account 0
 		await asset1.mintTo(accounts[0], _10To18.mul(new BN("10")).toString());

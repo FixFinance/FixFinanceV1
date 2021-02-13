@@ -56,7 +56,7 @@ contract('SwapRouter', async function(accounts) {
 		//maturity is 11 days out
 		maturity = timestamp + 11*24*60*60;
 
-		aTokenInstance = await dummyAToken.new();
+		aTokenInstance = await dummyAToken.new("aCOIN");
 		await organizerInstance.deployATokenWrapper(aTokenInstance.address);
 		aaveWrapperInstance = await AaveWrapper.at(await organizerInstance.aTokenWrappers(aTokenInstance.address));
 		await organizerInstance.deployCapitalHandlerInstance(aTokenInstance.address, maturity);

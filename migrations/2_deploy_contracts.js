@@ -41,8 +41,8 @@ module.exports = async function(deployer) {
 	}
 	*/
 
-	dummyATokenInstance = await deployer.deploy(dummyAToken);
-	dummyATokenInstance = await deployer.deploy(dummyAToken);
+	dummyATokenInstance = await deployer.deploy(dummyAToken, "aETH");
+	dummyATokenInstance = await deployer.deploy(dummyAToken, "aUSDC");
 	yieldTokenDeployerInstance = await deployer.deploy(yieldTokenDeployer);
 	bondMinterInstance = await deployer.deploy(BondMinter, nullAddress);
 	capitalHandlerDeployerInstance = await deployer.deploy(CapitalHandlerDeployer);

@@ -61,8 +61,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 	address organizerAddress;
 	address oracleContainerAddress;
 
-	constructor(address _organizerAddress, address _oracleContainerAddress) public {
-		organizerAddress = _organizerAddress;
+	constructor(address _oracleContainerAddress) public {
 		oracleContainerAddress = _oracleContainerAddress;
 	}
 
@@ -185,20 +184,24 @@ contract VaultHealth is IVaultHealth, Ownable {
 	}
 
 
-	//-----------------------admin---------------------------
-	function setCollateralizationRatios(address _aTokenAddress, uint120 _upper, uint120 _middle, uint120 _lower) public onlyOwner {
+	//-----------------------a-d-m-i-n---o-p-e-r-a-t-i-o-n-s---------------------------
+	function setCollateralizationRatios(address _aTokenAddress, uint120 _upper, uint120 _middle, uint120 _lower) external onlyOwner {
 		require(_upper >= _middle && _middle >= _lower && _lower > ABDK_1);
 		UpperCollateralizationRatio[_aTokenAddress] = _upper;
 		MiddleCollateralizationRatio[_aTokenAddress] = _middle;
 		LowerCollateralizationRatio[_aTokenAddress] = _lower;
 	}
 
-	function setRateThresholds(address _aTokenAddress, uint120 _upper, uint120 _middle, uint120 _lower) public onlyOwner {
+	function setRateThresholds(address _aTokenAddress, uint120 _upper, uint120 _middle, uint120 _lower) external onlyOwner {
 		require(_upper >= _middle && _middle >= _lower && _lower > 0);
 		UpperRateThreshold[_aTokenAddress] = _upper;
 		MiddleRateThreshold[_aTokenAddress] = _middle;
 		LowerRateThreshold[_aTokenAddress] = _lower;
 	}
 
+	function setOrganizerAddress(address _organizerAddress) external onlyOwner {
+		require(organizerAddress == address(0));
+		organizerAddress = _organizerAddress;
+	}
 }
 

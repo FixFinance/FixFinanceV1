@@ -22,7 +22,7 @@ const DesiredDigitsAccurate = 7;
 
 contract('ZCBamm', async function(accounts){
 	it('before each', async () => {
-		aTokenInstance = await aToken.new();
+		aTokenInstance = await aToken.new("aCOIN");
 		aaveWrapperInstance = await aaveWrapper.new(aTokenInstance.address);
 		BigMathInstance = await BigMath.new();
 		yieldTokenDeployerInstance = await yieldTokenDeployer.new();

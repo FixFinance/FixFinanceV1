@@ -30,15 +30,14 @@ contract BondMinter is Ownable {
 	//asset => amount
 	mapping(address => uint) public revenue;
 
-	//asset => capitalHandler
-	mapping(address => address) public assetToCapitalHandler;
-
 	//user => vault index => vault
 	mapping(address => Vault[]) public vaults;
 
 	Liquidation[] public Liquidations;
 
 	IVaultHealth public vaultHealthContract;
+
+	address organizerAddress;
 
 	event OpenVault(
 		address assetSupplied,
@@ -97,21 +96,19 @@ contract BondMinter is Ownable {
 	//------------------------------------vault management-----------------------------------
 
 	function openVault(address _assetSupplied, address _assetBorrowed, uint _amountSupplied, uint _amountBorrowed) external {
-		address chBorrowAddress = assetToCapitalHandler[_assetBorrowed];
 		/*
 			users can only borrow ZCBs
 		*/
-		require(chBorrowAddress != address(0) && chBorrowAddress == _assetBorrowed);
+		require(_assetBorrowed != address(0));
 		/*
 			when chSupplyAddress == _assetSupplied
 			the supplied asset is a zcb
 		*/
-		address chSupplyAddress = assetToCapitalHandler[_assetSupplied];
-		require(chSupplyAddress != address(0));
+		require(_assetSupplied != address(0));
 		require(vaultHealthContract.upperLimitSuppliedAsset(_assetSupplied, _assetBorrowed, _amountSupplied, _amountBorrowed));
 
 		IERC20(_assetSupplied).transferFrom(msg.sender, address(this), _amountSupplied);
-		ICapitalHandler(chBorrowAddress).mintZCBTo(msg.sender, _amountBorrowed);
+		ICapitalHandler(_assetBorrowed).mintZCBTo(msg.sender, _amountBorrowed);
 
 		vaults[msg.sender].push(Vault(_assetSupplied, _assetBorrowed, _amountSupplied, _amountBorrowed));
 
@@ -201,7 +198,7 @@ contract BondMinter is Ownable {
 		require(vault.amountBorrowed <= _bid);
 		require(vault.amountSupplied >= _minOut);
 		if (vaultHealthContract.middleLimitSuppliedAsset(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied, vault.amountBorrowed)) {
-			uint maturity = ICapitalHandler(assetToCapitalHandler[vault.assetBorrowed]).maturity();
+			uint maturity = ICapitalHandler(vault.assetBorrowed).maturity();
 			require(maturity < block.timestamp + (7 days));
 		}
 		//burn borrowed ZCB
@@ -307,10 +304,12 @@ contract BondMinter is Ownable {
 	}
 	//--------------------------------------------management---------------------------------------------
 
-	function setCapitalHandler(address _capitalHandlerAddress) public onlyOwner {
-		assetToCapitalHandler[address(ICapitalHandler(_capitalHandlerAddress).aw())] = _capitalHandlerAddress;
-		assetToCapitalHandler[_capitalHandlerAddress] = _capitalHandlerAddress;
+/*
+	function setOrganizerAddress(address _organizerAddress) public onlyOwner {
+		require(organizerAddress == address(0));
+		organizerAddress = _organizerAddress;
 	}
+*/
 
 	function claimRevenue(address _asset, uint _amount) public onlyOwner {
 		require(revenue[_asset] >= _amount);

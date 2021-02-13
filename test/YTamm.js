@@ -26,7 +26,7 @@ const AnnualFeeRateNumber = 0.01;
 */
 contract('YTamm', async function(accounts){
 	it('before each', async () => {
-		aTokenInstance = await aToken.new();
+		aTokenInstance = await aToken.new("aCOIN");
 		aaveWrapperInstance = await aaveWrapper.new(aTokenInstance.address);
 		BigMathInstance = await BigMath.new();
 		yieldTokenDeployerInstance = await yieldTokenDeployer.new();

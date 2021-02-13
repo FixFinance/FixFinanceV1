@@ -7,7 +7,7 @@ const _10To18 = (new BN('10')).pow(new BN('18'));
 
 contract('aaveWrapper', async function(accounts){
 	it('before each', async () => {
-		dummyATokenInstance = await dummyAToken.new();
+		dummyATokenInstance = await dummyAToken.new("DMY");
 		aaveWrapperInstance = await aaveWrapper.new(dummyATokenInstance.address);
 		inflation = await dummyATokenInstance.inflation();
 		assert.equal(await aaveWrapperInstance.aToken(), dummyATokenInstance.address, 'correct address for aToken');

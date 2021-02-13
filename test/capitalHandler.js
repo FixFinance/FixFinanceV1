@@ -13,7 +13,7 @@ const _10To18 = (new BN('10')).pow(new BN('18'));
 
 contract('capitalHandler', async function(accounts){
 	it('before each', async () => {
-		dummyATokenInstance = await dummyAToken.new();
+		dummyATokenInstance = await dummyAToken.new("aCOIN");
 		aaveWrapperInstance = await aaveWrapper.new(dummyATokenInstance.address);
 		yieldTokenDeployerInstance = await yieldTokenDeployer.new();
 		timeNow = (await web3.eth.getBlock('latest')).timestamp;

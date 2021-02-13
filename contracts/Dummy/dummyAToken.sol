@@ -18,9 +18,10 @@ contract dummyAToken is IERC20 {
     uint public inflation = 1e18;
 
     string public override name = "dummyAToken";
-    string public override symbol = "aDMY";
+    string public override symbol;
 
-    constructor () public {
+    constructor (string memory _symbol) public {
+        symbol = _symbol;
     	balanceOfInternal[msg.sender] = totalSupply;
     }
 

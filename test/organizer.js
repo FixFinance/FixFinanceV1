@@ -48,7 +48,7 @@ contract('organizer', function(accounts) {
 
 		assert.notEqual(router.address, nullAddress, "SwapRouter is non null");
 		maturity = (await web3.eth.getBlock('latest')).timestamp + 1000000;
-		asset0 = await dummyAToken.new();
+		asset0 = await dummyAToken.new("aCOIN");
 	});
 
 	it('deploy aToken wrapper', async () => {

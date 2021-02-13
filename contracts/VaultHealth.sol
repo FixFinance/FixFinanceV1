@@ -37,11 +37,11 @@ contract VaultHealth is IVaultHealth, Ownable {
 	*/
 	int128 constant MIN_RATE_ADJUSTMENT = ABDK_1 / 100;
 
-	mapping(address => uint16) public LowerCollateralizationRatio;
+	mapping(address => uint120) public LowerCollateralizationRatio;
 
-	mapping(address => uint16) public MiddleCollateralizationRatio;
+	mapping(address => uint120) public MiddleCollateralizationRatio;
 
-	mapping(address => uint16) public UpperCollateralizationRatio;
+	mapping(address => uint120) public UpperCollateralizationRatio;
 
 
 	/*
@@ -52,11 +52,11 @@ contract VaultHealth is IVaultHealth, Ownable {
 		To calculate the rate for deposit calculations for that asset we would do the following
 		3% * (100% + 25%) == 3% * (125%) == 3% * 1.25 == 3.75%
 	*/
-	mapping(address => uint16) public LowerRateThreshold;
+	mapping(address => uint120) public LowerRateThreshold;
 
-	mapping(address => uint16) public MiddleRateThreshold;
+	mapping(address => uint120) public MiddleRateThreshold;
 
-	mapping(address => uint16) public UpperRateThreshold;
+	mapping(address => uint120) public UpperRateThreshold;
 
 	address organizerAddress;
 	address oracleContainerAddress;
@@ -103,6 +103,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 
 	function getRateMultiplier(address _capitalHandlerAddress, RateAdjuster _rateAdjuster) internal view returns (uint) {
 		IZCBamm amm = IZCBamm(organizer(organizerAddress).ZCBamms(_capitalHandlerAddress));
+		if (address(amm) == address(0)) return BONE;
 		int128 yearsRemaining = getYearsRemaining(_capitalHandlerAddress);
 		int128 apy = amm.getAPYFromOracle();
 		int128 adjApy = apy.sub(ABDK_1).mul(getRateThresholdMultiplier(_capitalHandlerAddress, _rateAdjuster)).add(ABDK_1);
@@ -157,15 +158,46 @@ contract VaultHealth is IVaultHealth, Ownable {
 
 	//return true if collateral is above upper limit
 	function upperLimitSuppliedAsset(address _assetSupplied, address _assetBorrowed, uint _amountSupplied, uint _amountBorrowed) external override view returns (bool) {
-
+		uint price = crossAssetPrice(_assetSupplied, _assetBorrowed);
+		uint RateMultiplierSupplied = getRateMultiplier(_assetSupplied, RateAdjuster.UPPER_DEPOSIT);
+		uint RateMultiplierBorrowed = getRateMultiplier(_assetBorrowed, RateAdjuster.UPPER_BORROW);
+		uint RequiredCollateralizationRatio = uint(UpperCollateralizationRatio[_assetSupplied]).mul(uint(UpperCollateralizationRatio[_assetBorrowed])).div(BONE);
+		//return price.mul(_amountBorrowed).mul(RateMultiplierBorrowed).mul(RequiredCollateralizationRatio).div(BONE**3) < _amountSupplied.mul(RateMultiplierSupplied).div(BONE);
+		return price.mul(_amountBorrowed).mul(RateMultiplierBorrowed).mul(RequiredCollateralizationRatio).div(BONE**2) < _amountSupplied.mul(RateMultiplierSupplied);
 	}
 	//return true if collateral is above middle limit
 	function middleLimitSuppliedAsset(address _assetSupplied, address _assetBorrowed, uint _amountSupplied, uint _amountBorrowed) external override view returns (bool) {
-
+		uint price = crossAssetPrice(_assetSupplied, _assetBorrowed);
+		uint RateMultiplierSupplied = getRateMultiplier(_assetSupplied, RateAdjuster.MID_DEPOSIT);
+		uint RateMultiplierBorrowed = getRateMultiplier(_assetBorrowed, RateAdjuster.MID_BORROW);
+		uint RequiredCollateralizationRatio = uint(MiddleCollateralizationRatio[_assetSupplied]).mul(uint(MiddleCollateralizationRatio[_assetBorrowed])).div(BONE);
+		//return price.mul(_amountBorrowed).mul(RateMultiplierBorrowed).mul(RequiredCollateralizationRatio).div(BONE**3) < _amountSupplied.mul(RateMultiplierSupplied).div(BONE);
+		return price.mul(_amountBorrowed).mul(RateMultiplierBorrowed).mul(RequiredCollateralizationRatio).div(BONE**2) < _amountSupplied.mul(RateMultiplierSupplied);
 	}
 	//return true if collateral is above lower limit
 	function lowerLimitSuppliedAsset(address _assetSupplied, address _assetBorrowed, uint _amountSupplied, uint _amountBorrowed) external override view returns (bool) {
+		uint price = crossAssetPrice(_assetSupplied, _assetBorrowed);
+		uint RateMultiplierSupplied = getRateMultiplier(_assetSupplied, RateAdjuster.LOW_DEPOSIT);
+		uint RateMultiplierBorrowed = getRateMultiplier(_assetBorrowed, RateAdjuster.LOW_BORROW);
+		uint RequiredCollateralizationRatio = uint(LowerCollateralizationRatio[_assetSupplied]).mul(uint(LowerCollateralizationRatio[_assetBorrowed])).div(BONE);
+		//return price.mul(_amountBorrowed).mul(RateMultiplierBorrowed).mul(RequiredCollateralizationRatio).div(BONE**3) < _amountSupplied.mul(RateMultiplierSupplied).div(BONE);
+		return price.mul(_amountBorrowed).mul(RateMultiplierBorrowed).mul(RequiredCollateralizationRatio).div(BONE**2) < _amountSupplied.mul(RateMultiplierSupplied);
+	}
 
+
+	//-----------------------admin---------------------------
+	function setCollateralizationRatios(address _aTokenAddress, uint120 _upper, uint120 _middle, uint120 _lower) public onlyOwner {
+		require(_upper >= _middle && _middle >= _lower && _lower > ABDK_1);
+		UpperCollateralizationRatio[_aTokenAddress] = _upper;
+		MiddleCollateralizationRatio[_aTokenAddress] = _middle;
+		LowerCollateralizationRatio[_aTokenAddress] = _lower;
+	}
+
+	function setRateThresholds(address _aTokenAddress, uint120 _upper, uint120 _middle, uint120 _lower) public onlyOwner {
+		require(_upper >= _middle && _middle >= _lower && _lower > 0);
+		UpperRateThreshold[_aTokenAddress] = _upper;
+		MiddleRateThreshold[_aTokenAddress] = _middle;
+		LowerRateThreshold[_aTokenAddress] = _lower;
 	}
 
 }

@@ -42,6 +42,7 @@ contract YTamm is IYTamm {
 		address _YTaddress = IZCBamm(_ZCBammAddress).YTaddress();
 		uint64 _maturity = IZCBamm(_ZCBammAddress).maturity();
 		require(_maturity > block.timestamp + 10 days);
+		require(IZCBamm(_ZCBammAddress).getRateFromOracle() > 0);
 		maturity = _maturity;
 		anchor = IZCBamm(_ZCBammAddress).anchor();
 		ZCBammAddress = _ZCBammAddress;

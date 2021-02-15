@@ -2,6 +2,7 @@ const dummyAToken = artifacts.require('dummyAToken');
 const dummyVaultHealth = artifacts.require('DummyVaultHealth');
 const AaveWrapper = artifacts.require('AaveWrapper');
 const CapitalHandler = artifacts.require('CapitalHandler');
+const YieldToken = artifacts.require('YieldToken');
 const yieldTokenDeployer = artifacts.require('YieldTokenDeployer');
 const organizer = artifacts.require('organizer');
 const BondMinter = artifacts.require('BondMinter');
@@ -16,7 +17,12 @@ const SwapRouterDeployer = artifacts.require('SwapRouterDeployer');
 const SwapRouter = artifacts.require("SwapRouter");
 const FeeOracle = artifacts.require("FeeOracle");
 
+const helper = require("../helper/helper.js");
+
+const BN = web3.utils.BN;
 const nullAddress = "0x0000000000000000000000000000000000000000";
+const _10To18BN = (new BN("10")).pow(new BN("18"));
+const LENGTH_RATE_SERIES = 31;
 
 contract('organizer', function(accounts) {
 
@@ -70,6 +76,7 @@ contract('organizer', function(accounts) {
 	it('deploy CapitalHandler', async () => {
 		await organizerInstance.deployCapitalHandlerInstance(asset0.address, maturity);
 		capitalHandlerInstance = await CapitalHandler.at(await organizerInstance.capitalHandlerMapping(asset0.address, maturity));
+		yieldTokenInstance = await YieldToken.at(await capitalHandlerInstance.yieldTokenAddress());
 		assert.notEqual(capitalHandlerInstance.address, nullAddress, "organizer::capitalHandlerMapping[asset0] must be non-null");
 	});
 
@@ -96,6 +103,32 @@ contract('organizer', function(accounts) {
 			caught = true
 		}
 		if (!caught) assert.fail('organizer::ZCBamms[capitalHandlerInstance] was overridden');
+
+
+		//set the rate in the ZCBamm so that they YT amm may be deployed
+		amm0 = await ZCBamm.at(await organizerInstance.ZCBamms(capitalHandlerInstance.address));
+
+		balance = _10To18BN;
+		await asset0.approve(wAsset0.address, balance);
+		await wAsset0.deposit(accounts[0], balance);
+		await wAsset0.approve(capitalHandlerInstance.address, balance);
+		await capitalHandlerInstance.depositWrappedToken(accounts[0], balance);
+		await capitalHandlerInstance.approve(amm0.address, balance);
+		await yieldTokenInstance.approve(amm0.address, balance);
+
+		Uin = balance.div(new BN("10"));
+		ZCBin = balance.div(new BN("300"));
+		rec = await amm0.firstMint(Uin, ZCBin);
+		/*
+			set rate in amm0
+		*/
+		for (let i = 0; i < LENGTH_RATE_SERIES; i++) {
+			await amm0.forceRateDataUpdate();
+			//advance 1 minuite
+			helper.advanceTime(61);
+		}
+		let OracleRateString = (await amm0.getImpliedRateData())._impliedRates[0].toString();
+		await amm0.setOracleRate(OracleRateString);
 	});
 
 	it('deploy YTamm', async () => {

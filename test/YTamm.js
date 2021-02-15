@@ -20,6 +20,7 @@ const AcceptableMarginOfError = Math.pow(10, -7);
 const MaxFee = "125000000"; //12.5% in super basis points
 const AnnualFeeRate = (new BN("2")).pow(new BN("64")).div(new BN("100")); //0.01 or 1% in 64.64 form
 const AnnualFeeRateNumber = 0.01;
+const LENGTH_RATE_SERIES = 31;
 
 /*
 	Here we assume that there are no bugs in the ZCBamm contract which is used as a rate oracle for the YTamm contract
@@ -39,9 +40,7 @@ contract('YTamm', async function(accounts){
 		await YTamm.link("BigMath", BigMathInstance.address);
 		feeOracleInstance = await FeeOracle.new(MaxFee, AnnualFeeRate);
 		amm0 = await ZCBamm.new(capitalHandlerInstance.address, feeOracleInstance.address);
-		YTtoLmultiplier = 50;
-		amm1 = await YTamm.new(amm0.address, feeOracleInstance.address, YTtoLmultiplier);
-		anchor = (await amm0.anchor()).toNumber();
+
 
 		//simulate generation of 100% returns in money market
 		await aTokenInstance.setInflation("2"+_10To18BN.toString().substring(1));
@@ -54,27 +53,35 @@ contract('YTamm', async function(accounts){
 		await capitalHandlerInstance.depositWrappedToken(accounts[0], balance);
 		await capitalHandlerInstance.approve(amm0.address, balance);
 		await yieldTokenInstance.approve(amm0.address, balance);
-		await capitalHandlerInstance.approve(amm1.address, balance);
-		await yieldTokenInstance.approve(amm1.address, balance);
+
 		/*
 			make first deposit in amm0
 		*/
 		Uin = balance.div(new BN("10"));
 		ZCBin = balance.div(new BN("300"));
-		rec = await amm0.firstMint(Uin, ZCBin);
+		await amm0.firstMint(Uin, ZCBin);
 		/*
-			now we mint liquidity tokens and then burn to hold rate constant in amm0 and build up to have 3 rate data points
+			set rate in amm0
 		*/
-		await amm0.mint(Uin, _10To18BN, _10To18BN);
-		await amm0.mint(Uin, _10To18BN, _10To18BN);
-		let results = await amm0.getReserves();
-		Ureserves = results._Ureserves.toString();
-		ZCBreserves = results._ZCBreserves.toString();
+		for (let i = 0; i < LENGTH_RATE_SERIES; i++) {
+			await amm0.forceRateDataUpdate();
+			//advance 1 minuite
+			helper.advanceTime(61);
+		}
+		let OracleRateString = (await amm0.getImpliedRateData())._impliedRates[0].toString();
+		await amm0.setOracleRate(OracleRateString);
+		//burn all our amm0 LP tokens
 		await amm0.burn(await amm0.balanceOf(accounts[0]));
-		OracleRate = parseInt((await amm0.getRateFromOracle()).toString()) * Math.pow(2, -64);
+
+		YTtoLmultiplier = 50;
+		amm1 = await YTamm.new(amm0.address, feeOracleInstance.address, YTtoLmultiplier);
+		anchor = (await amm0.anchor()).toNumber();
+
+		await capitalHandlerInstance.approve(amm1.address, balance);
+		await yieldTokenInstance.approve(amm1.address, balance);
+
+		OracleRate = parseInt(OracleRateString) * Math.pow(2, -64);
 		APYo = parseInt((await amm0.getAPYFromOracle()).toString()) * Math.pow(2, -64);
-		assert.equal((await capitalHandlerInstance.balanceOf(accounts[0])).toString(), balance.toString(), "correct balance ZCB");
-		assert.equal((await yieldTokenInstance.balanceOf_2(accounts[0], false)).toString(), balance.toString(), "correct balance YT");
 	});
 
 	it('First Liquidity Token Mint', async () => {

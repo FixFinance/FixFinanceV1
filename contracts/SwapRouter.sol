@@ -162,9 +162,6 @@ contract SwapRouter is ISwapRouter {
 		IZCBamm zAmm = IZCBamm(_org.ZCBamms(_capitalHandlerAddress));
 		IYTamm yAmm = IYTamm(_org.YTamms(_capitalHandlerAddress));
 
-		//force rate update so that rate is not updated upon zAmm call thus invalidating the quote in the yAmm
-		zAmm.forceRateDataUpdate();
-
 		uint _amtU = yAmm.ReserveQuoteToYT(int128(_amountYT+RoundingBuffer));
 		uint _amtZCB = zAmm.ReserveQuoteToSpecificTokens(int128(_amtU+RoundingBuffer), true);
 		require(_amtZCB <= _maxZCBin);

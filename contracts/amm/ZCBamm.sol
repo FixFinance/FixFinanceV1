@@ -12,6 +12,10 @@ contract ZCBamm is IZCBamm {
 
 	using ABDKMath64x64 for int128;
 
+	uint8 private constant LENGTH_RATE_SERIES = 31;
+	int128 private constant MAX = 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
+	uint private constant SecondsPerYear = 31556926;
+
 	uint64 public override maturity;
 	uint public override anchor;
 
@@ -27,12 +31,12 @@ contract ZCBamm is IZCBamm {
 	uint256 quotedAmountIn;
 	uint256 quotedAmountOut;
 
-	int128[3] impliedRates;
-	uint[3] heights;
+	uint8 toSet;
+	bool CanSetOracleRate;
+	int128 OracleRate;
+	int128[LENGTH_RATE_SERIES] impliedRates;
+	uint[LENGTH_RATE_SERIES] timestamps;
 
-	int128 private constant MAX = 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
-
-	uint private constant SecondsPerYear = 31556926;
 
 	constructor(address _ZCBaddress, address _feeOracleAddress) public {
 		name = "aZCB amm Liquidity Token";
@@ -348,11 +352,6 @@ contract ZCBamm is IZCBamm {
 	}
 
 	//------------------------e-n-a-b-l-e---p-o-o-l---t-o---a-c-t---a-s---r-a-t-e---o-r-a-c-l-e-----------------
-	function indexToSet() internal view returns (uint8) {
-		uint8 i = 2;
-		for (;i > 0 && heights[i] >= heights[i-1]; i--) {}
-		return i;
-	}
 
 	function setOracleRate(uint8 _index) internal {
 		/*
@@ -368,30 +367,52 @@ contract ZCBamm is IZCBamm {
 		uint rate = (_ZCBreserves << 64) / _Ureserves;
 		//rate must fit into 127 bits
 		if (rate >= 1 << 128) return;
-		heights[_index] = block.number;
+		timestamps[_index] = block.timestamp;
 		impliedRates[_index] = int128(rate);
+		if (_index+1 == LENGTH_RATE_SERIES) {
+			CanSetOracleRate = true;
+		}
+		else {
+			toSet++;
+		}
 	}
 
 	modifier setRateModifier() {
-		uint8 toSet = indexToSet();
-		uint8 mostRecent = (2+toSet)%3;
-		if (block.number != heights[mostRecent]) setOracleRate(toSet);
+		if (!CanSetOracleRate) {
+			uint8 _toSet = toSet;
+			uint8 mostRecent = (LENGTH_RATE_SERIES-1+_toSet)%LENGTH_RATE_SERIES;
+			if (block.timestamp >= timestamps[mostRecent] + (1 minutes)) setOracleRate(_toSet);
+		}
 		_;
 	}
 
 	//returns APY**(anchor/1 year)
-	function getRateFromOracle() public view override returns (int128 rate) {
-		require(heights[2] != 0);	//rate data must be non-null
+	function getRateFromOracle() external view override returns (int128 rate) {
+		rate = OracleRate;
+	}
 
-		int128 first = impliedRates[0];
-		int128 second = impliedRates[1];
-		int128 third = impliedRates[2];
+	function setOracleRate(int128 _rate) external {
+		require(CanSetOracleRate);
 
-        (first,second) = first > second ? (first, second) : (second,first);
-        (second,third) = second > third ? (second, third) : (third,second);
-        (first,second) = first > second ? (first, second) : (second,first);
+		uint8 numLarger;
+		uint8 numEqual;
+		for (uint8 i = 0; i < LENGTH_RATE_SERIES; i++) {
+			if (impliedRates[i] > _rate) {
+				numLarger++;
+			}
+			else if (impliedRates[i] == _rate) {
+				numEqual++;
+			}
+		}
+		//uint8 numSmaller = LENGTH_RATE_SERIES - numEqual - numLarger;
+		uint8 medianIndex = LENGTH_RATE_SERIES/2;
+		require(numLarger + numEqual >= medianIndex);
+		//require(numSmaller + numEqual >= medianIndex);
+		require(LENGTH_RATE_SERIES - numLarger >= medianIndex);
 
-        return second;
+		OracleRate = _rate;
+		CanSetOracleRate = false;
+		toSet = 0;
 	}
 
 	function getAPYFromOracle() external view override returns (int128 APY) {
@@ -400,25 +421,17 @@ contract ZCBamm is IZCBamm {
 			APY == exp2 ( log 2 ( getRateFromOracle()**(1 year / anchor)))
 			APY == exp2 ( (1 year / anchor) * log 2 ( getRateFromOracle()))
 		*/
-		APY = getRateFromOracle();
+		APY = OracleRate;
 		int128 _1overAnchor = int128((SecondsPerYear << 64) / anchor);
 		APY = APY.log_2().mul(_1overAnchor).exp_2();
 	}
 
 	function getImpliedRateData() external view override returns (
-		int128 impliedRate0,
-		int128 impliedRate1,
-		int128 impliedRate2,
-		uint height0,
-		uint height1,
-		uint height2
-	) {
-		impliedRate0 = impliedRates[0];
-		impliedRate1 = impliedRates[1];
-		impliedRate2 = impliedRates[2];
-		height0 = heights[0];
-		height1 = heights[1];
-		height2 = heights[2];
+		int128[LENGTH_RATE_SERIES] memory _impliedRates,
+		uint[LENGTH_RATE_SERIES] memory _timestamps
+		) {
+		_impliedRates = impliedRates;
+		_timestamps = timestamps;
 	}
 
 

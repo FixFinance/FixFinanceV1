@@ -20,6 +20,8 @@ abstract contract IZCBamm is doubleAssetYieldEnabledToken {
 		bool ZCBin
 	);
 
+	uint8 private constant LENGTH_RATE_SERIES = 31;
+
 	function forceRateDataUpdate() external virtual;
 	function maturity() external virtual view returns (uint64);
 	function anchor() external virtual view returns (uint);
@@ -36,11 +38,7 @@ abstract contract IZCBamm is doubleAssetYieldEnabledToken {
 	function getRateFromOracle() external virtual view returns (int128 rate);
 	function getAPYFromOracle() external virtual view returns (int128 APY);
 	function getImpliedRateData() external virtual view returns (
-		int128 impliedRate0,
-		int128 impliedRate1,
-		int128 impliedRate2,
-		uint height0,
-		uint height1,
-		uint height2
+		int128[LENGTH_RATE_SERIES] memory _impliedRates,
+		uint[LENGTH_RATE_SERIES] memory _timestamps
 	);
 }

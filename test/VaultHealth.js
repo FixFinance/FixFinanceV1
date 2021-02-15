@@ -31,6 +31,8 @@ const symbol1 = "aUSDT";
 const phrase = symbol0.substring(1)+" / "+symbol1.substring(1);
 const _80days = 80*24*60*60;
 
+const LENGTH_RATE_SERIES = 31;
+
 const TotalBasisPoints = 10000;
 
 const SecondsPerYear = 31556926;
@@ -110,7 +112,6 @@ contract('VaultHealth', async function(accounts) {
 		amm0 = await ZCBamm.at(await organizerInstance.ZCBamms(zcbAsset0.address));
 		amm1 = await ZCBamm.at(await organizerInstance.ZCBamms(zcbAsset1.address));
 
-
 		//mint asset0 assets to account 0
 		await asset0.mintTo(accounts[0], _10To19.mul(_10));
 		await asset0.approve(wAsset0.address, _10To19.mul(_10));
@@ -146,6 +147,20 @@ contract('VaultHealth', async function(accounts) {
 		let toSend = _10To18.div(_10).div(_10);
 		await amm0.firstMint(toSend, toSend.div(_10));
 		await amm1.firstMint(toSend, toSend.div(_10));
+
+		for (let i = 0; i < LENGTH_RATE_SERIES; i++) {
+			await amm0.forceRateDataUpdate();
+			await amm1.forceRateDataUpdate();
+			//advance 1 minuite
+			helper.advanceTime(61);
+		}
+
+		let OracleRate0String = (await amm0.getImpliedRateData())._impliedRates[0].toString();
+		await amm0.setOracleRate(OracleRate0String);
+
+		let OracleRate1String = (await amm1.getImpliedRateData())._impliedRates[0].toString();
+		await amm1.setOracleRate(OracleRate1String);
+
 		//mint a few more times such that we have 3 records of the pool apys
 		await amm0.mint(_10, _10To18, _10To18);
 		await amm0.mint(_10, _10To18, _10To18);

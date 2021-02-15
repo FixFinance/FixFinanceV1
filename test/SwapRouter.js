@@ -25,6 +25,7 @@ const _10To18BN = (new BN("10")).pow(new BN("18"));
 const secondsPerYear = 31556926;
 const _0BalanceString = "0";
 const roundingBuffer = new BN(0x10);
+const LENGTH_RATE_SERIES = 31;
 
 contract('SwapRouter', async function(accounts) {
 
@@ -63,10 +64,7 @@ contract('SwapRouter', async function(accounts) {
 		capitalHandlerInstance = await CapitalHandler.at(await organizerInstance.capitalHandlerMapping(aTokenInstance.address, maturity));
 		yieldTokenInstance = await YieldToken.at(await capitalHandlerInstance.yieldTokenAddress());
 		await organizerInstance.deployZCBamm(capitalHandlerInstance.address);
-		await organizerInstance.deployYTamm(capitalHandlerInstance.address);
 		amm0 = await ZCBamm.at(await organizerInstance.ZCBamms(capitalHandlerInstance.address));
-		amm1 = await YTamm.at(await organizerInstance.YTamms(capitalHandlerInstance.address));
-		//router = await SwapRouter.at(await organizerInstance.SwapRouterAddress());
 
 		//simulate generation of 100% returns in money market
 		await aTokenInstance.setInflation("2"+_10To18BN.toString().substring(1));
@@ -79,8 +77,7 @@ contract('SwapRouter', async function(accounts) {
 		await capitalHandlerInstance.depositWrappedToken(accounts[0], balance);
 		await capitalHandlerInstance.approve(amm0.address, balance);
 		await yieldTokenInstance.approve(amm0.address, balance);
-		await capitalHandlerInstance.approve(amm1.address, balance);
-		await yieldTokenInstance.approve(amm1.address, balance);
+
 		/*
 			make first deposit in amm0
 		*/
@@ -88,11 +85,26 @@ contract('SwapRouter', async function(accounts) {
 		ZCBin = balance.div(new BN("300"));
 		rec = await amm0.firstMint(Uin, ZCBin);
 		/*
+			set rate in amm0
+		*/
+		for (let i = 0; i < LENGTH_RATE_SERIES; i++) {
+			await amm0.forceRateDataUpdate();
+			//advance 1 minuite
+			helper.advanceTime(61);
+		}
+		let OracleRateString = (await amm0.getImpliedRateData())._impliedRates[0].toString();
+		await amm0.setOracleRate(OracleRateString);
+
+
+		await organizerInstance.deployYTamm(capitalHandlerInstance.address);
+		amm1 = await YTamm.at(await organizerInstance.YTamms(capitalHandlerInstance.address));
+		//router = await SwapRouter.at(await organizerInstance.SwapRouterAddress());
+
+		await capitalHandlerInstance.approve(amm1.address, balance);
+		await yieldTokenInstance.approve(amm1.address, balance);
+		/*
 			now we mint liquidity tokens and then burn to hold rate constant in amm0 and build up to have 3 rate data points
 		*/
-		await amm0.mint(Uin, _10To18BN, _10To18BN);
-		await amm0.mint(Uin, _10To18BN, _10To18BN);
-		await amm0.mint(Uin, _10To18BN, _10To18BN);
 		let results = await amm0.getReserves();
 		Ureserves = results._Ureserves.toString();
 		ZCBreserves = results._ZCBreserves.toString();

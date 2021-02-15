@@ -105,7 +105,7 @@ contract BondMinter is Ownable {
 			the supplied asset is a zcb
 		*/
 		require(_assetSupplied != address(0));
-		require(vaultHealthContract.upperLimitSuppliedAsset(_assetSupplied, _assetBorrowed, _amountSupplied, _amountBorrowed));
+		require(vaultHealthContract.satisfiesUpperLimit(_assetSupplied, _assetBorrowed, _amountSupplied, _amountBorrowed));
 
 		IERC20(_assetSupplied).transferFrom(msg.sender, address(this), _amountSupplied);
 		ICapitalHandler(_assetBorrowed).mintZCBTo(msg.sender, _amountBorrowed);
@@ -138,7 +138,7 @@ contract BondMinter is Ownable {
 		Vault memory vault = vaults[msg.sender][_index];
 
 		require(vault.amountSupplied >= _amount);
-		require(vaultHealthContract.upperLimitSuppliedAsset(
+		require(vaultHealthContract.satisfiesUpperLimit(
 			vault.assetSupplied,
 			vault.assetBorrowed,
 			vault.amountSupplied - _amount,
@@ -164,7 +164,7 @@ contract BondMinter is Ownable {
 		require(vaults[msg.sender].length > _index);
 		Vault memory vault = vaults[msg.sender][_index];
 
-		require(vaultHealthContract.upperLimitSuppliedAsset(
+		require(vaultHealthContract.satisfiesUpperLimit(
 			vault.assetSupplied,
 			vault.assetBorrowed,
 			vault.amountSupplied,
@@ -197,7 +197,7 @@ contract BondMinter is Ownable {
 		require(vault.assetSupplied == _assetSupplied);
 		require(vault.amountBorrowed <= _bid);
 		require(vault.amountSupplied >= _minOut);
-		if (vaultHealthContract.middleLimitSuppliedAsset(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied, vault.amountBorrowed)) {
+		if (vaultHealthContract.satisfiesMiddleLimit(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied, vault.amountBorrowed)) {
 			uint maturity = ICapitalHandler(vault.assetBorrowed).maturity();
 			require(maturity < block.timestamp + (7 days));
 		}
@@ -255,7 +255,7 @@ contract BondMinter is Ownable {
 		require(vault.amountBorrowed <= _maxBid);
 		require(vault.amountSupplied >= _minOut);
 		require(ICapitalHandler(_assetBorrowed).maturity() < block.timestamp + (1 days) || 
-			!vaultHealthContract.lowerLimitSuppliedAsset(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied, vault.amountBorrowed));
+			!vaultHealthContract.satisfiesLowerLimit(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied, vault.amountBorrowed));
 
 		//burn borrowed ZCB
 		IERC20(_assetBorrowed).transferFrom(msg.sender, address(0), vault.amountBorrowed);
@@ -273,7 +273,7 @@ contract BondMinter is Ownable {
 		require(vault.amountSupplied >= amtOut);
 		require(amtOut >= _minOut);
 		require(ICapitalHandler(_assetBorrowed).maturity() < block.timestamp + (1 days) || 
-			!vaultHealthContract.lowerLimitSuppliedAsset(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied, vault.amountBorrowed));
+			!vaultHealthContract.satisfiesLowerLimit(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied, vault.amountBorrowed));
 
 		//burn borrowed ZCB
 		IERC20(_assetBorrowed).transferFrom(msg.sender, address(0), _in);
@@ -293,7 +293,7 @@ contract BondMinter is Ownable {
 		amtIn = amtIn/vault.amountSupplied + (amtIn%vault.amountSupplied == 0 ? 0 : 1);
 		require(amtIn <= _maxIn);
 		require(ICapitalHandler(_assetBorrowed).maturity() < block.timestamp + (1 days) || 
-			!vaultHealthContract.lowerLimitSuppliedAsset(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied, vault.amountBorrowed));
+			!vaultHealthContract.satisfiesLowerLimit(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied, vault.amountBorrowed));
 
 		//burn borrowed ZCB
 		IERC20(_assetBorrowed).transferFrom(msg.sender, address(0), amtIn);

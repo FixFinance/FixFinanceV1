@@ -16,7 +16,7 @@ contract DummyVaultHealth is IVaultHealth {
 	mapping(address => mapping(address => uint)) public lowerRatio;
 
 	//collateral above return value of this function may be withdrawn from vault
-	function upperLimitSuppliedAsset(
+	function satisfiesUpperLimit(
 		address _assetSupplied,
 		address _assetBorrowed,
 		uint _amountSupplied,
@@ -26,7 +26,7 @@ contract DummyVaultHealth is IVaultHealth {
 		return upperRatio[_assetSupplied][_assetBorrowed] * _amountBorrowed / 1e18 < IAaveWrapper(_assetSupplied).WrappedTokenToAToken_RoundDown(_amountSupplied);
 	}
 	//collateral above return value of this function may be withdrawn from vault
-	function middleLimitSuppliedAsset(
+	function satisfiesMiddleLimit(
 		address _assetSupplied,
 		address _assetBorrowed,
 		uint _amountSupplied,
@@ -36,7 +36,7 @@ contract DummyVaultHealth is IVaultHealth {
 		return middleRatio[_assetSupplied][_assetBorrowed] * _amountBorrowed / 1e18 < IAaveWrapper(_assetSupplied).WrappedTokenToAToken_RoundDown(_amountSupplied);
 	}
 	//collateral must be greater than or equal to the return value to avoid liquidation
-	function lowerLimitSuppliedAsset(
+	function satisfiesLowerLimit(
 		address _assetSupplied,
 		address _assetBorrowed,
 		uint _amountSupplied,
@@ -45,6 +45,58 @@ contract DummyVaultHealth is IVaultHealth {
 
 		return lowerRatio[_assetSupplied][_assetBorrowed] * _amountBorrowed / 1e18 < IAaveWrapper(_assetSupplied).WrappedTokenToAToken_RoundDown(_amountSupplied);
 	}
+
+	function amountSuppliedAtUpperLimit(address _assetSupplied, address _assetBorrowed, uint _amountBorrowed) external view override returns (uint) {
+		return IAaveWrapper(_assetSupplied).ATokenToWrappedToken_RoundUp(upperRatio[_assetSupplied][_assetBorrowed] * _amountBorrowed / 1e18);
+	}
+	function amountSuppliedAtMiddleLimit(address _assetSupplied, address _assetBorrowed, uint _amountBorrowed) external view override returns (uint) {
+		return IAaveWrapper(_assetSupplied).ATokenToWrappedToken_RoundUp(middleRatio[_assetSupplied][_assetBorrowed] * _amountBorrowed / 1e18);
+	}
+	function amountSuppliedAtLowerLimit(address _assetSupplied, address _assetBorrowed, uint _amountBorrowed) external view override returns (uint) {
+		return IAaveWrapper(_assetSupplied).ATokenToWrappedToken_RoundUp(lowerRatio[_assetSupplied][_assetBorrowed] * _amountBorrowed / 1e18);
+	}
+
+	function amountBorrowedAtUpperLimit(address _assetSupplied, address _assetBorrowed, uint _amountSupplied) external view override returns (uint) {
+		return IAaveWrapper(_assetSupplied).WrappedTokenToAToken_RoundDown(_amountSupplied) * 1e18 / upperRatio[_assetSupplied][_assetBorrowed];
+	}
+	function amountBorrowedAtMiddleLimit(address _assetSupplied, address _assetBorrowed, uint _amountSupplied) external view override returns (uint) {
+		return IAaveWrapper(_assetSupplied).WrappedTokenToAToken_RoundDown(_amountSupplied) * 1e18 / middleRatio[_assetSupplied][_assetBorrowed];
+	}
+	function amountBorrowedAtLowerLimit(address _assetSupplied, address _assetBorrowed, uint _amountSupplied) external view override returns (uint) {
+		return IAaveWrapper(_assetSupplied).WrappedTokenToAToken_RoundDown(_amountSupplied) * 1e18 / lowerRatio[_assetSupplied][_assetBorrowed];
+	}
+
+
+	/*
+		This is a dummy contract and we don't plan on calling the function below ever so
+		we just return false/true without really looking into if it is doing the right thing
+		this way this dummy contract implements the IVaultHealth interface
+	*/
+	function vaultWithstandsChange(
+		address _assetSupplied,
+		address _assetBorrowed,
+		uint _amountSupplied,
+		uint _amountBorrowed,
+		uint _pctPriceChange,
+		int128 _suppliedRateChange,
+		int128 _borrowRateChange
+		) external view override returns (bool) {
+		/*
+			silence warnings about not using parameters
+		*/
+		if (
+			_assetSupplied == address(0) ||
+			_assetBorrowed == address(0) ||
+			_amountSupplied == 0 ||
+			_amountBorrowed == 0 ||
+			_pctPriceChange == 0 ||
+			_suppliedRateChange == 0 ||
+			_borrowRateChange == 0
+			)
+			return false;
+		return true;
+	}
+
 
 	function setUpper(
 		address _assetSupplied,

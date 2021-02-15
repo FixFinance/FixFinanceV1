@@ -19,6 +19,11 @@ const _2To64BN = (new BN("2")).pow(new BN("64"));
 const AnnualFeeRateBN = _2To64BN.div(new BN("100")); //0.01 or 1% in 64.64 form
 const AnnualFeeRateNumber = 0.01;
 const DesiredDigitsAccurate = 7;
+const ErrorRange = Math.pow(10,-7);
+
+function AmountError(actual, expected) {
+	return Math.abs(actual-expected)/expected;
+}
 
 contract('ZCBamm', async function(accounts){
 	it('before each', async () => {
@@ -58,15 +63,14 @@ contract('ZCBamm', async function(accounts){
 		let r = (maturity-timestamp)/anchor;
 		let k = 2 * Math.pow(parseInt(Uin.toString()), 1-r);
 		let Uout = parseInt(Uin.toString()) - (k - Math.pow(parseInt(ZCBin.toString()) + parseInt(Uin.toString()), 1-r))**(1/(1-r));
-		let Uexpected = (parseInt(Uin.toString()) - Uout).toString();
-		let ZCBexpected = parseInt(ZCBin.toString()).toString();
+		let Uexpected = (parseInt(Uin.toString()) - Uout);
+		let ZCBexpected = parseInt(ZCBin.toString());
 		let results = await amm.getReserves();
 		Ureserves = results._Ureserves.toString();
 		ZCBreserves = results._ZCBreserves.toString();
-		assert.equal(Ureserves.length, Uexpected.length, "correct length of Ureserves");
-		assert.equal(Ureserves.substring(0, DesiredDigitsAccurate), Uexpected.substring(0, DesiredDigitsAccurate), "Ureserves is accurate to within 7 digits");
-		assert.equal(ZCBreserves.length, ZCBexpected.length, "correct length of ZCBreserves");
-		assert.equal(ZCBreserves.substring(0, DesiredDigitsAccurate), ZCBexpected.substring(0, DesiredDigitsAccurate), "ZCBreserves is accurate to within 7 digits");
+
+		assert.isBelow(AmountError(parseInt(Ureserves), Uexpected), ErrorRange, "Ureserves within error range");
+		assert.isBelow(AmountError(parseInt(ZCBreserves), ZCBexpected), ErrorRange, "Ureserves within error range");
 
 		balanceLT = await amm.balanceOf(accounts[0]);
 		balanceYT = await yieldTokenInstance.balanceOf_2(accounts[0], false);
@@ -91,18 +95,16 @@ contract('ZCBamm', async function(accounts){
 		assert.equal(rateData.impliedRate0.toString(), expectedNewRate.toString(), "correct rate stored");
 		assert.equal(rateData.height0.toString(), rec.receipt.blockNumber.toString(), "correct height stored")
 
-		let Uexpected = (new BN(Ureserves)).mul(new BN(2)).toString();
-		let ZCBexpected = (new BN(ZCBreserves)).mul(new BN(2)).toString();
+		let Uexpected = parseInt((new BN(Ureserves)).mul(new BN(2)).toString());
+		let ZCBexpected = parseInt((new BN(ZCBreserves)).mul(new BN(2)).toString());
 
 		let results = await amm.getReserves();
 
 		Ureserves = results._Ureserves.toString();
 		ZCBreserves = results._ZCBreserves.toString();
 
-		assert.equal(Ureserves.length, Uexpected.length, "correct length of Ureserves");
-		assert.equal(Ureserves.substring(0, DesiredDigitsAccurate), Uexpected.substring(0, DesiredDigitsAccurate), "Ureserves is accurate to within 7 digits");
-		assert.equal(ZCBreserves.length, ZCBexpected.length, "correct length of ZCBreserves");
-		assert.equal(ZCBreserves.substring(0, DesiredDigitsAccurate), ZCBexpected.substring(0, DesiredDigitsAccurate), "ZCBreserves is accurate to within 7 digits");
+		assert.isBelow(AmountError(parseInt(Ureserves), Uexpected), ErrorRange, "Ureserves within error range");
+		assert.isBelow(AmountError(parseInt(ZCBreserves), ZCBexpected), ErrorRange, "Ureserves within error range");
 
 		balanceLT = await amm.balanceOf(accounts[0]);
 		balanceYT = await yieldTokenInstance.balanceOf_2(accounts[0], false);
@@ -130,18 +132,16 @@ contract('ZCBamm', async function(accounts){
 		assert.equal(newRateData.height2.toString(), rateData.height2.toString(), "correct height");
 		rateData = newRateData;
 
-		let Uexpected = (new BN(Ureserves)).div(new BN(2)).toString();
-		let ZCBexpected = (new BN(ZCBreserves)).div(new BN(2)).toString();
+		let Uexpected = parseInt((new BN(Ureserves)).div(new BN(2)).toString());
+		let ZCBexpected = parseInt((new BN(ZCBreserves)).div(new BN(2)).toString());
 
 		let results = await amm.getReserves();
 
 		Ureserves = results._Ureserves.toString();
 		ZCBreserves = results._ZCBreserves.toString();
 
-		assert.equal(Ureserves.length, Uexpected.length, "correct length of Ureserves");
-		assert.equal(Ureserves.substring(0, DesiredDigitsAccurate), Uexpected.substring(0, DesiredDigitsAccurate), "Ureserves is accurate to within 10 digits");
-		assert.equal(ZCBreserves.length, ZCBexpected.length, "correct length of ZCBreserves");
-		assert.equal(ZCBreserves.substring(0, DesiredDigitsAccurate), ZCBexpected.substring(0, DesiredDigitsAccurate), "ZCBreserves is accurate to within 10 digits");
+		assert.isBelow(AmountError(parseInt(Ureserves), Uexpected), ErrorRange, "Ureserves within error range");
+		assert.isBelow(AmountError(parseInt(ZCBreserves), ZCBexpected), ErrorRange, "Ureserves within error range");
 
 		balanceLT = await amm.balanceOf(accounts[0]);
 		balanceYT = await yieldTokenInstance.balanceOf_2(accounts[0], false);
@@ -176,18 +176,16 @@ contract('ZCBamm', async function(accounts){
 		let yearsRemaining = (maturity - timestamp)/secondsPerYear;
 		let pctFee = 1 - Math.pow(1 - AnnualFeeRateNumber, yearsRemaining);
 		let UoutFeeAdjusted = Uout * (1 - pctFee);
-		let Uexpected = (parseInt(Ureserves) - UoutFeeAdjusted).toString();
-		let ZCBexpected = (parseInt(ZCBreserves) + parseInt(amtIn.toString())).toString();
+		let Uexpected = parseInt(Ureserves) - UoutFeeAdjusted;
+		let ZCBexpected = parseInt(ZCBreserves) + parseInt(amtIn.toString());
 
 		let results = await amm.getReserves();
 
 		Ureserves = results._Ureserves.toString();
 		ZCBreserves = results._ZCBreserves.toString();
 
-		assert.equal(Ureserves.length, Uexpected.length, "correct length of Ureserves");
-		assert.equal(Ureserves.substring(0, DesiredDigitsAccurate), Uexpected.substring(0, DesiredDigitsAccurate), "Ureserves is accurate to within 7 digits");
-		assert.equal(ZCBreserves.length, ZCBexpected.length, "correct length of ZCBreserves");
-		assert.equal(ZCBreserves.substring(0, DesiredDigitsAccurate), ZCBexpected.substring(0, DesiredDigitsAccurate), "ZCBreserves is accurate to within 7 digits");
+		assert.isBelow(AmountError(parseInt(Ureserves), Uexpected), ErrorRange, "Ureserves within error range");
+		assert.isBelow(AmountError(parseInt(ZCBreserves), ZCBexpected), ErrorRange, "Ureserves within error range");
 
 		balanceYT = await yieldTokenInstance.balanceOf_2(accounts[0], false);
 		balanceZCB = await capitalHandlerInstance.balanceOf(accounts[0]);
@@ -219,18 +217,16 @@ contract('ZCBamm', async function(accounts){
 		let yearsRemaining = (maturity - timestamp)/secondsPerYear;
 		let pctFee = 1 - Math.pow(1 - AnnualFeeRateNumber, yearsRemaining);
 		let ZCBoutFeeAdjusted = ZCBout * (1 - pctFee);
-		let Uexpected = amtIn.add(new BN(Ureserves)).toString();
-		let ZCBexpected = (parseInt(ZCBreserves) - ZCBoutFeeAdjusted).toString();
+		let Uexpected = parseInt(amtIn.add(new BN(Ureserves)).toString());
+		let ZCBexpected = parseInt(ZCBreserves) - ZCBoutFeeAdjusted;
 
 		let results = await amm.getReserves();
 
 		Ureserves = results._Ureserves.toString();
 		ZCBreserves = results._ZCBreserves.toString();
 
-		assert.equal(Ureserves.length, Uexpected.length, "correct length of Ureserves");
-		assert.equal(Ureserves.substring(0, DesiredDigitsAccurate), Uexpected.substring(0, DesiredDigitsAccurate), "Ureserves is accurate to within 10 digits");
-		assert.equal(ZCBreserves.length, ZCBexpected.length, "correct length of ZCBreserves");
-		assert.equal(ZCBreserves.substring(0, DesiredDigitsAccurate), ZCBexpected.substring(0, DesiredDigitsAccurate), "ZCBreserves is accurate to within 10 digits");
+		assert.isBelow(AmountError(parseInt(Ureserves), Uexpected), ErrorRange, "Ureserves within error range");
+		assert.isBelow(AmountError(parseInt(ZCBreserves), ZCBexpected), ErrorRange, "Ureserves within error range");
 
 		balanceYT = await yieldTokenInstance.balanceOf_2(accounts[0], false);
 		balanceZCB = await capitalHandlerInstance.balanceOf(accounts[0]);
@@ -261,18 +257,16 @@ contract('ZCBamm', async function(accounts){
 		let yearsRemaining = (maturity - timestamp)/secondsPerYear;
 		let pctFee = 1 - Math.pow(1 - AnnualFeeRateNumber, yearsRemaining);
 		let UinFeeAdjusted = Uin / (1 - pctFee);
-		let Uexpected = (parseInt(Ureserves) + UinFeeAdjusted).toString()
-		let ZCBexpected = (parseInt(ZCBreserves) - parseInt(amtOut.toString())).toString();
+		let Uexpected = parseInt(Ureserves) + UinFeeAdjusted;
+		let ZCBexpected = parseInt(ZCBreserves) - parseInt(amtOut.toString());
 
 		let results = await amm.getReserves();
 
 		Ureserves = results._Ureserves.toString();
 		ZCBreserves = results._ZCBreserves.toString();
 
-		assert.equal(Ureserves.length, Uexpected.length, "correct length of Ureserves");
-		assert.equal(Ureserves.substring(0, DesiredDigitsAccurate), Uexpected.substring(0, DesiredDigitsAccurate), "Ureserves is accurate to within 10 digits");
-		assert.equal(ZCBreserves.length, ZCBexpected.length, "correct length of ZCBreserves");
-		assert.equal(ZCBreserves.substring(0, DesiredDigitsAccurate), ZCBexpected.substring(0, DesiredDigitsAccurate), "ZCBreserves is accurate to within 10 digits");
+		assert.isBelow(AmountError(parseInt(Ureserves), Uexpected), ErrorRange, "Ureserves within error range");
+		assert.isBelow(AmountError(parseInt(ZCBreserves), ZCBexpected), ErrorRange, "Ureserves within error range");
 
 		balanceYT = await yieldTokenInstance.balanceOf_2(accounts[0], false);
 		balanceZCB = await capitalHandlerInstance.balanceOf(accounts[0]);
@@ -303,18 +297,16 @@ contract('ZCBamm', async function(accounts){
 		let yearsRemaining = (maturity - timestamp)/secondsPerYear;
 		let pctFee = 1 - Math.pow(1 - AnnualFeeRateNumber, yearsRemaining);
 		let ZCBinFeeAdjusted = ZCBin / (1 - pctFee);
-		let ZCBexpected = (parseInt(ZCBreserves) + ZCBinFeeAdjusted).toString();
-		let Uexpected = (parseInt(Ureserves) - parseInt(amtOut.toString())).toString();
+		let ZCBexpected = parseInt(ZCBreserves) + ZCBinFeeAdjusted;
+		let Uexpected = parseInt(Ureserves) - parseInt(amtOut.toString());
 
 		let results = await amm.getReserves();
 
 		Ureserves = results._Ureserves.toString();
 		ZCBreserves = results._ZCBreserves.toString();
 
-		assert.equal(Ureserves.length, Uexpected.length, "correct length of Ureserves");
-		assert.equal(Ureserves.substring(0, DesiredDigitsAccurate), Uexpected.substring(0, DesiredDigitsAccurate), "Ureserves is accurate to within 10 digits");
-		assert.equal(ZCBreserves.length, ZCBexpected.length, "correct length of ZCBreserves");
-		assert.equal(ZCBreserves.substring(0, DesiredDigitsAccurate), ZCBexpected.substring(0, DesiredDigitsAccurate), "ZCBreserves is accurate to within 10 digits");
+		assert.isBelow(AmountError(parseInt(Ureserves), Uexpected), ErrorRange, "Ureserves within error range");
+		assert.isBelow(AmountError(parseInt(ZCBreserves), ZCBexpected), ErrorRange, "Ureserves within error range");
 
 		balanceYT = await yieldTokenInstance.balanceOf_2(accounts[0], false);
 		balanceZCB = await capitalHandlerInstance.balanceOf(accounts[0]);

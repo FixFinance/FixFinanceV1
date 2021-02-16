@@ -6,7 +6,7 @@ import "./YieldToken.sol";
 contract YieldTokenDeployer {
 	address public addr;
 
-	function deploy(address _aToken) public {
-		addr = address(new YieldToken(_aToken, msg.sender));
+	function deploy(address _wrapperAddress) public {
+		addr = address(new YieldToken(_wrapperAddress, msg.sender));
 	}
 }

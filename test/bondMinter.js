@@ -56,13 +56,13 @@ contract('BondMinter', async function(accounts) {
 
 		maturity = ((await web3.eth.getBlock('latest')).timestamp + _8days).toString();
 
-		await organizerInstance.deployATokenWrapper(asset0.address);
-		await organizerInstance.deployATokenWrapper(asset1.address);
+		await organizerInstance.deployAssetWrapper(asset0.address);
+		await organizerInstance.deployAssetWrapper(asset1.address);
 		await organizerInstance.deployCapitalHandlerInstance(asset0.address, maturity);
 		await organizerInstance.deployCapitalHandlerInstance(asset1.address, maturity);
 
-		wAsset0 = await aaveWrapper.at(await organizerInstance.aTokenWrappers(asset0.address));
-		wAsset1 = await aaveWrapper.at(await organizerInstance.aTokenWrappers(asset1.address));
+		wAsset0 = await aaveWrapper.at(await organizerInstance.assetWrappers(asset0.address));
+		wAsset1 = await aaveWrapper.at(await organizerInstance.assetWrappers(asset1.address));
 
 		await asset0.approve(wAsset0.address, _10To18.toString());
 		await asset1.approve(wAsset1.address, _10To18.toString());

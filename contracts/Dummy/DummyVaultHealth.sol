@@ -23,7 +23,7 @@ contract DummyVaultHealth is IVaultHealth {
 		uint _amountBorrowed
 		) external view override returns (bool) {
 
-		return upperRatio[_assetSupplied][_assetBorrowed] * _amountBorrowed / 1e18 < IWrapper(_assetSupplied).WrappedTokenToAToken_RoundDown(_amountSupplied);
+		return upperRatio[_assetSupplied][_assetBorrowed] * _amountBorrowed / 1e18 < IWrapper(_assetSupplied).WrappedAmtToUnitAmt_RoundDown(_amountSupplied);
 	}
 	//collateral above return value of this function may be withdrawn from vault
 	function satisfiesMiddleLimit(
@@ -33,7 +33,7 @@ contract DummyVaultHealth is IVaultHealth {
 		uint _amountBorrowed
 		) external view override returns (bool) {
 
-		return middleRatio[_assetSupplied][_assetBorrowed] * _amountBorrowed / 1e18 < IWrapper(_assetSupplied).WrappedTokenToAToken_RoundDown(_amountSupplied);
+		return middleRatio[_assetSupplied][_assetBorrowed] * _amountBorrowed / 1e18 < IWrapper(_assetSupplied).WrappedAmtToUnitAmt_RoundDown(_amountSupplied);
 	}
 	//collateral must be greater than or equal to the return value to avoid liquidation
 	function satisfiesLowerLimit(
@@ -43,27 +43,27 @@ contract DummyVaultHealth is IVaultHealth {
 		uint _amountBorrowed
 		) external view override returns (bool) {
 
-		return lowerRatio[_assetSupplied][_assetBorrowed] * _amountBorrowed / 1e18 < IWrapper(_assetSupplied).WrappedTokenToAToken_RoundDown(_amountSupplied);
+		return lowerRatio[_assetSupplied][_assetBorrowed] * _amountBorrowed / 1e18 < IWrapper(_assetSupplied).WrappedAmtToUnitAmt_RoundDown(_amountSupplied);
 	}
 
 	function amountSuppliedAtUpperLimit(address _assetSupplied, address _assetBorrowed, uint _amountBorrowed) external view override returns (uint) {
-		return IWrapper(_assetSupplied).ATokenToWrappedToken_RoundUp(upperRatio[_assetSupplied][_assetBorrowed] * _amountBorrowed / 1e18);
+		return IWrapper(_assetSupplied).UnitAmtToWrappedAmt_RoundUp(upperRatio[_assetSupplied][_assetBorrowed] * _amountBorrowed / 1e18);
 	}
 	function amountSuppliedAtMiddleLimit(address _assetSupplied, address _assetBorrowed, uint _amountBorrowed) external view override returns (uint) {
-		return IWrapper(_assetSupplied).ATokenToWrappedToken_RoundUp(middleRatio[_assetSupplied][_assetBorrowed] * _amountBorrowed / 1e18);
+		return IWrapper(_assetSupplied).UnitAmtToWrappedAmt_RoundUp(middleRatio[_assetSupplied][_assetBorrowed] * _amountBorrowed / 1e18);
 	}
 	function amountSuppliedAtLowerLimit(address _assetSupplied, address _assetBorrowed, uint _amountBorrowed) external view override returns (uint) {
-		return IWrapper(_assetSupplied).ATokenToWrappedToken_RoundUp(lowerRatio[_assetSupplied][_assetBorrowed] * _amountBorrowed / 1e18);
+		return IWrapper(_assetSupplied).UnitAmtToWrappedAmt_RoundUp(lowerRatio[_assetSupplied][_assetBorrowed] * _amountBorrowed / 1e18);
 	}
 
 	function amountBorrowedAtUpperLimit(address _assetSupplied, address _assetBorrowed, uint _amountSupplied) external view override returns (uint) {
-		return IWrapper(_assetSupplied).WrappedTokenToAToken_RoundDown(_amountSupplied) * 1e18 / upperRatio[_assetSupplied][_assetBorrowed];
+		return IWrapper(_assetSupplied).WrappedAmtToUnitAmt_RoundDown(_amountSupplied) * 1e18 / upperRatio[_assetSupplied][_assetBorrowed];
 	}
 	function amountBorrowedAtMiddleLimit(address _assetSupplied, address _assetBorrowed, uint _amountSupplied) external view override returns (uint) {
-		return IWrapper(_assetSupplied).WrappedTokenToAToken_RoundDown(_amountSupplied) * 1e18 / middleRatio[_assetSupplied][_assetBorrowed];
+		return IWrapper(_assetSupplied).WrappedAmtToUnitAmt_RoundDown(_amountSupplied) * 1e18 / middleRatio[_assetSupplied][_assetBorrowed];
 	}
 	function amountBorrowedAtLowerLimit(address _assetSupplied, address _assetBorrowed, uint _amountSupplied) external view override returns (uint) {
-		return IWrapper(_assetSupplied).WrappedTokenToAToken_RoundDown(_amountSupplied) * 1e18 / lowerRatio[_assetSupplied][_assetBorrowed];
+		return IWrapper(_assetSupplied).WrappedAmtToUnitAmt_RoundDown(_amountSupplied) * 1e18 / lowerRatio[_assetSupplied][_assetBorrowed];
 	}
 
 

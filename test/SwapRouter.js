@@ -58,8 +58,8 @@ contract('SwapRouter', async function(accounts) {
 		maturity = timestamp + 11*24*60*60;
 
 		aTokenInstance = await dummyAToken.new("aCOIN");
-		await organizerInstance.deployATokenWrapper(aTokenInstance.address);
-		aaveWrapperInstance = await AaveWrapper.at(await organizerInstance.aTokenWrappers(aTokenInstance.address));
+		await organizerInstance.deployAssetWrapper(aTokenInstance.address);
+		aaveWrapperInstance = await AaveWrapper.at(await organizerInstance.assetWrappers(aTokenInstance.address));
 		await organizerInstance.deployCapitalHandlerInstance(aTokenInstance.address, maturity);
 		capitalHandlerInstance = await CapitalHandler.at(await organizerInstance.capitalHandlerMapping(aTokenInstance.address, maturity));
 		yieldTokenInstance = await YieldToken.at(await capitalHandlerInstance.yieldTokenAddress());
@@ -124,7 +124,7 @@ contract('SwapRouter', async function(accounts) {
 		let amt = "100000";
 		let minZCB = "100001";
 		await aTokenInstance.approve(router.address, amt);
-		await router.ATknToZCB(capitalHandlerInstance.address, amt, minZCB);
+		await router.UnitToZCB(capitalHandlerInstance.address, amt, minZCB);
 
 		newBalanceATkn = await aTokenInstance.balanceOf(accounts[0]);
 		newBalanceYT = await yieldTokenInstance.balanceOf(accounts[0]);
@@ -146,7 +146,7 @@ contract('SwapRouter', async function(accounts) {
 		let maxATkn = "100000";
 		//let maxATkn = "99999";
 		await aTokenInstance.approve(router.address, maxATkn);
-		await router.ATknToYT(capitalHandlerInstance.address, amtYT, maxATkn);
+		await router.UnitToYT(capitalHandlerInstance.address, amtYT, maxATkn);
 
 		newBalanceATkn = await aTokenInstance.balanceOf(accounts[0]);
 		newBalanceYT = await yieldTokenInstance.balanceOf(accounts[0]);

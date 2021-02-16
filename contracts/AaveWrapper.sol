@@ -50,7 +50,7 @@ contract AaveWrapper is IWrapper {
 		return deposit(_to, _amount);
 	}
 	function depositWrappedAmount(address _to, uint _amount) external override returns (uint _amountUnit) {
-		_amountUnit = WrappedTokenToAToken_RoundUp(_amount);
+		_amountUnit = WrappedAmtToUnitAmt_RoundUp(_amount);
 		deposit(_to, _amountUnit);
 	}
 
@@ -77,7 +77,7 @@ contract AaveWrapper is IWrapper {
 		_aToken.transfer(_to, _amountAToken);
 	}
 
-	function ATokenToWrappedToken_RoundDown(uint _amountAToken) public view override returns (uint _amountWrappedToken) {
+	function UnitAmtToWrappedAmt_RoundDown(uint _amountAToken) public view override returns (uint _amountWrappedToken) {
 		IERC20 _aToken = IERC20(underlyingAssetAddress);
 		uint contractBalance = _aToken.balanceOf(address(this));
 		uint _totalSupply = totalSupply;
@@ -88,7 +88,7 @@ contract AaveWrapper is IWrapper {
 		_amountWrappedToken = _totalSupply*_amountAToken/contractBalance;
 	}
 
-	function ATokenToWrappedToken_RoundUp(uint _amountAToken) public view override returns (uint _amountWrappedToken) {
+	function UnitAmtToWrappedAmt_RoundUp(uint _amountAToken) public view override returns (uint _amountWrappedToken) {
 		IERC20 _aToken = IERC20(underlyingAssetAddress);
 		uint contractBalance = _aToken.balanceOf(address(this));
 		uint _totalSupply = totalSupply;
@@ -100,14 +100,14 @@ contract AaveWrapper is IWrapper {
 		_amountWrappedToken = (_amountWrappedToken%contractBalance == 0 ? 0 : 1) + _amountWrappedToken/contractBalance;
 	}
 
-	function WrappedTokenToAToken_RoundDown(uint _amountWrappedToken) public view override returns (uint _amountAToken) {
+	function WrappedAmtToUnitAmt_RoundDown(uint _amountWrappedToken) public view override returns (uint _amountAToken) {
 		IERC20 _aToken = IERC20(underlyingAssetAddress);
 		uint contractBalance = _aToken.balanceOf(address(this));
 		uint _totalSupply = totalSupply;
 		_amountAToken = _totalSupply == 0 ? _amountWrappedToken : contractBalance*_amountWrappedToken/_totalSupply;
 	}
 
-	function WrappedTokenToAToken_RoundUp(uint _amountWrappedToken) public view override returns (uint _amountAToken) {
+	function WrappedAmtToUnitAmt_RoundUp(uint _amountWrappedToken) public view override returns (uint _amountAToken) {
 		IERC20 _aToken = IERC20(underlyingAssetAddress);
 		uint contractBalance = _aToken.balanceOf(address(this));
 		uint _totalSupply = totalSupply;

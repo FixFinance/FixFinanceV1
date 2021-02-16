@@ -16,11 +16,11 @@ contract organizer {
 
 	address[] public capitalHandlerInstances;
 
-	mapping(address => address) public aTokenWrappers;
+	mapping(address => address) public assetWrappers;
 
-	//aToken => maturity of bond => capitalHandler
+	//underlyingAsset => maturity of bond => capitalHandler
 	mapping(address => mapping(uint64 => address)) public capitalHandlerMapping;
-	mapping(address => address) public capitalHandlerToAToken;
+	mapping(address => address) public capitalHandlerToUnderlyingAsset;
 
 	mapping(address => address) public YTamms;
 	mapping(address => address) public ZCBamms;
@@ -65,25 +65,25 @@ contract organizer {
 		return capitalHandlerInstances;
 	}
 
-	function deployATokenWrapper(address _aTokenAddress) public {
-		require(aTokenWrappers[_aTokenAddress] == address(0), "can only make a wrapper if none currently exists");
-		aTokenWrappers[_aTokenAddress] = address(new AaveWrapper(_aTokenAddress));
+	function deployAssetWrapper(address _assetAddress) public {
+		require(assetWrappers[_assetAddress] == address(0), "can only make a wrapper if none currently exists");
+		assetWrappers[_assetAddress] = address(new AaveWrapper(_assetAddress));
 	}
 
 	function deployCapitalHandlerInstance(address _aTokenAddress, uint64 _maturity) public {
 		require(_maturity > block.timestamp+(1 weeks), "maturity must be at least 1 weeks away");
 		require(capitalHandlerMapping[_aTokenAddress][_maturity] == address(0), "capital handler with these parameters already exists");
-		address aaveWrapperAddress = aTokenWrappers[_aTokenAddress];
+		address aaveWrapperAddress = assetWrappers[_aTokenAddress];
 		require(aaveWrapperAddress != address(0), "deploy a wrapper for this aToken first");
 		address capitalHandlerAddress = CapitalHandlerDeployer(CapitalHandlerDeployerAddress).deploy(aaveWrapperAddress, _maturity, yieldTokenDeployerAddress, bondMinterAddress);
 		capitalHandlerInstances.push(capitalHandlerAddress);
 		capitalHandlerMapping[_aTokenAddress][_maturity] = capitalHandlerAddress;
-		capitalHandlerToAToken[capitalHandlerAddress] = _aTokenAddress;
+		capitalHandlerToUnderlyingAsset[capitalHandlerAddress] = _aTokenAddress;
 	}
 
 	function deployZCBamm(address _capitalHandlerAddress) public {
 		require(ZCBamms[_capitalHandlerAddress] == address(0));
-		require(capitalHandlerToAToken[_capitalHandlerAddress] != address(0));
+		require(capitalHandlerToUnderlyingAsset[_capitalHandlerAddress] != address(0));
 		ZCBamms[_capitalHandlerAddress] = ZCBammDeployer(ZCBammDeployerAddress).deploy(_capitalHandlerAddress, FeeOracleAddress);
 	}
 

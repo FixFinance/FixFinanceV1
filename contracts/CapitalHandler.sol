@@ -15,7 +15,7 @@ contract CapitalHandler is ICapitalHandler {
 
 	uint64 public override maturity;
 
-	//1e18 * aToken / wrappedToken
+	//1e18 * amountUnit / wrappedToken
 	uint public override maturityConversionRate;
 
 	IWrapper public override wrapper;
@@ -69,7 +69,7 @@ contract CapitalHandler is ICapitalHandler {
 				wrappedTknFree = wrappedTknFree.sub(toSub);
 			}
 			else
-				wrappedTknFree = wrappedTknFree.sub(wrapper.ATokenToWrappedToken_RoundUp(uint(-bondBal)));
+				wrappedTknFree = wrappedTknFree.sub(wrapper.UnitAmtToWrappedAmt_RoundUp(uint(-bondBal)));
 		}
 	}
 
@@ -106,14 +106,14 @@ contract CapitalHandler is ICapitalHandler {
 	function enterPayoutPhase() external override {
 		require(!inPayoutPhase && block.timestamp >= maturity);
 		inPayoutPhase = true;
-		maturityConversionRate = wrapper.WrappedTokenToAToken_RoundDown(1e18);
+		maturityConversionRate = wrapper.WrappedAmtToUnitAmt_RoundDown(1e18);
 	}
 
-	function minimumATokensAtMaturity(address _owner) internal view returns (uint balance) {
+	function minimumUnitAmountAtMaturity(address _owner) internal view returns (uint balance) {
 		if (inPayoutPhase)
 			balance = balanceYield[_owner]*maturityConversionRate/1e18;
 		else
-			balance = wrapper.WrappedTokenToAToken_RoundDown(balanceYield[_owner]);
+			balance = wrapper.WrappedAmtToUnitAmt_RoundDown(balanceYield[_owner]);
 		int bondBal = balanceBonds[_owner];
 		if (bondBal > 0)
 			balance = balance.add(uint(bondBal));
@@ -132,7 +132,7 @@ contract CapitalHandler is ICapitalHandler {
 
 
 	function balanceOf(address _owner) public view override returns (uint balance) {
-		balance = minimumATokensAtMaturity(_owner);
+		balance = minimumUnitAmountAtMaturity(_owner);
 	}
 
     function transfer(address _to, uint256 _value) public override returns (bool success) {
@@ -140,7 +140,7 @@ contract CapitalHandler is ICapitalHandler {
         balanceBonds[msg.sender] -= int(_value);
         balanceBonds[_to] += int(_value);
 
-        minimumATokensAtMaturity(msg.sender);
+        minimumUnitAmountAtMaturity(msg.sender);
 
         emit Transfer(msg.sender, _to, _value);
 
@@ -161,7 +161,7 @@ contract CapitalHandler is ICapitalHandler {
     	balanceBonds[_from] -= int(_value);
     	balanceBonds[_to] += int(_value);
 
-        minimumATokensAtMaturity(_from);
+        minimumUnitAmountAtMaturity(_from);
 
         allowance[_from][msg.sender] -= _value;
 
@@ -171,7 +171,7 @@ contract CapitalHandler is ICapitalHandler {
     }
 
     function totalSupply() public view override returns (uint _supply) {
-    	_supply = wrapper.WrappedTokenToAToken_RoundDown(wrapper.balanceOf(address(this)));
+    	_supply = wrapper.WrappedAmtToUnitAmt_RoundDown(wrapper.balanceOf(address(this)));
     }
 
 //---------Yield Token--------------------
@@ -179,7 +179,7 @@ contract CapitalHandler is ICapitalHandler {
 	function transferYield(address _from, address _to, uint _amount) external override {
 		require(msg.sender == yieldTokenAddress);
 		require(balanceYield[_from] >= _amount);
-		uint _amountATkn = inPayoutPhase ? _amount.mul(maturityConversionRate)/1e18 : wrapper.WrappedTokenToAToken_RoundDown(_amount);
+		uint _amountATkn = inPayoutPhase ? _amount.mul(maturityConversionRate)/1e18 : wrapper.WrappedAmtToUnitAmt_RoundDown(_amount);
 		balanceYield[_from] -= _amount;
 		balanceYield[_to] += _amount;
 		balanceBonds[_from] += int(_amountATkn);
@@ -187,9 +187,9 @@ contract CapitalHandler is ICapitalHandler {
 		//ensure that _from address's position may be cashed out to a positive amount of wrappedToken
 		//int bonds = balanceBonds[_from];
 		//if (bonds >= 0) return;
-		//uint bondsToWrappedToken = inPayoutPhase ? uint(-bonds).mul(maturityConversionRate)/1e18 : wrapper.ATokenToWrappedToken_RoundUp(uint(-bonds));
+		//uint bondsToWrappedToken = inPayoutPhase ? uint(-bonds).mul(maturityConversionRate)/1e18 : wrapper.UnitAmtToWrappedAmt_RoundUp(uint(-bonds));
 		//require(balanceYield[_from] >= bondsToWrappedToken);
-		minimumATokensAtMaturity(_from);
+		minimumUnitAmountAtMaturity(_from);
 	}
 
 

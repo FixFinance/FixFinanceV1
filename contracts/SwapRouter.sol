@@ -21,17 +21,17 @@ contract SwapRouter is ISwapRouter {
 		org = organizer(_organizerAddress);
 	}
 
-	function ATknToZCB(address _capitalHandlerAddress, uint _amount, uint _minZCBout) external override {
+	function UnitToZCB(address _capitalHandlerAddress, uint _amount, uint _minZCBout) external override {
 		ICapitalHandler ch = ICapitalHandler(_capitalHandlerAddress);
 		organizer _org = org;
-		IERC20 underlyingAsset = IERC20(_org.capitalHandlerToAToken(_capitalHandlerAddress));
-		IWrapper wrapper = IWrapper(_org.aTokenWrappers(address(underlyingAsset)));
+		IERC20 underlyingAsset = IERC20(_org.capitalHandlerToUnderlyingAsset(_capitalHandlerAddress));
+		IWrapper wrapper = IWrapper(_org.assetWrappers(address(underlyingAsset)));
 		IZCBamm amm = IZCBamm(_org.ZCBamms(_capitalHandlerAddress));
 		IYieldToken yt = IYieldToken(ch.yieldTokenAddress());
 
 		uint _amountWrapped;
 		if (wrapper.underlyingIsWrapped()) {
-			_amountWrapped = wrapper.ATokenToWrappedToken_RoundUp(_amount);
+			_amountWrapped = wrapper.UnitAmtToWrappedAmt_RoundUp(_amount);
 			underlyingAsset.transferFrom(msg.sender, address(this), _amountWrapped);
 			underlyingAsset.approve(address(wrapper), _amountWrapped);
 			wrapper.depositWrappedAmount(address(this), _amountWrapped);
@@ -45,19 +45,19 @@ contract SwapRouter is ISwapRouter {
 		ch.depositWrappedToken(address(this), _amountWrapped);
 		ch.approve(address(amm), _amount);
 		yt.approve(address(amm), _amountWrapped);
-		uint _amountToSwap = wrapper.WrappedTokenToAToken_RoundUp(_amountWrapped);
+		uint _amountToSwap = wrapper.WrappedAmtToUnitAmt_RoundUp(_amountWrapped);
 		require(_amountToSwap <= uint(MAX));
 		uint _out = amm.SwapFromSpecificTokensWithLimit(int128(_amountToSwap), false, _minZCBout);
 		ch.transfer(msg.sender, _out);
 	}
 
-	function ATknToYT(address _capitalHandlerAddress, int128 _amountYT, uint _maxUnitAmount) external override {
+	function UnitToYT(address _capitalHandlerAddress, int128 _amountYT, uint _maxUnitAmount) external override {
 		_amountYT++;	//account for rounding error when transfering funds out of YTamm
 		require(_amountYT > 0);
 		ICapitalHandler ch = ICapitalHandler(_capitalHandlerAddress);
 		organizer _org = org;
-		IERC20 underlyingAsset = IERC20(_org.capitalHandlerToAToken(_capitalHandlerAddress));
-		IWrapper wrapper = IWrapper(_org.aTokenWrappers(address(underlyingAsset)));
+		IERC20 underlyingAsset = IERC20(_org.capitalHandlerToUnderlyingAsset(_capitalHandlerAddress));
+		IWrapper wrapper = IWrapper(_org.assetWrappers(address(underlyingAsset)));
 		IYTamm amm = IYTamm(_org.YTamms(_capitalHandlerAddress));
 		IYieldToken yt = IYieldToken(ch.yieldTokenAddress());
 
@@ -67,7 +67,7 @@ contract SwapRouter is ISwapRouter {
 		require(_amtTransfer <= _maxUnitAmount, "Required AToken in is Greater than _maxUnitAmount");
 		uint _amountWrapped;
 		if (wrapper.underlyingIsWrapped()) {
-			_amountWrapped = wrapper.ATokenToWrappedToken_RoundUp(_amtTransfer);
+			_amountWrapped = wrapper.UnitAmtToWrappedAmt_RoundUp(_amtTransfer);
 			underlyingAsset.transferFrom(msg.sender, address(this), _amountWrapped);
 			underlyingAsset.approve(address(wrapper), _amountWrapped);
 			wrapper.depositWrappedAmount(address(this), _amountWrapped);

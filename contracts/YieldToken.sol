@@ -16,8 +16,8 @@ contract YieldToken is IYieldToken {
 
     mapping(address => mapping(address => uint256)) public override allowance;
 
-	constructor(address _underlyingAssetAddress, address _capitalHandler) public {
-		IWrapper _wrapper = IWrapper(_underlyingAssetAddress);
+	constructor(address _wrapperAddress, address _capitalHandler) public {
+		IWrapper _wrapper = IWrapper(_wrapperAddress);
 		decimals = _wrapper.decimals();
 		symbol = string(abi.encodePacked(_wrapper.symbol(),'yt'));
 		name = string(abi.encodePacked(_wrapper.name(),' yield token'));
@@ -62,22 +62,22 @@ contract YieldToken is IYieldToken {
     }
 
     function balanceOf_2(address _owner, bool _roundUp) external view override returns (uint) {
-        return _roundUp ? wrapper.WrappedTokenToAToken_RoundUp(balanceOf(_owner)) : wrapper.WrappedTokenToAToken_RoundDown(balanceOf(_owner));
+        return _roundUp ? wrapper.WrappedAmtToUnitAmt_RoundUp(balanceOf(_owner)) : wrapper.WrappedAmtToUnitAmt_RoundDown(balanceOf(_owner));
     }
 
     //_value denominated in unit not in wrapped
     function transfer_2(address _to, uint256 _value, bool _roundUp) external override {
-        transfer(_to, _roundUp ? wrapper.ATokenToWrappedToken_RoundUp(_value) : wrapper.ATokenToWrappedToken_RoundDown(_value));
+        transfer(_to, _roundUp ? wrapper.UnitAmtToWrappedAmt_RoundUp(_value) : wrapper.UnitAmtToWrappedAmt_RoundDown(_value));
     }
 
     //_value denominated in unit not in wrapped
     function approve_2(address _spender, uint256 _value, bool _roundUp) external override {
-        approve(_spender, _roundUp ? wrapper.ATokenToWrappedToken_RoundUp(_value) : wrapper.ATokenToWrappedToken_RoundDown(_value));        
+        approve(_spender, _roundUp ? wrapper.UnitAmtToWrappedAmt_RoundUp(_value) : wrapper.UnitAmtToWrappedAmt_RoundDown(_value));        
     }
 
     //_value denominated in unit not in wrapped
     function transferFrom_2(address _from, address _to, uint256 _value, bool _roundUp) external override {
-        transferFrom(_from, _to, _roundUp ? wrapper.ATokenToWrappedToken_RoundUp(_value) : wrapper.ATokenToWrappedToken_RoundDown(_value));
+        transferFrom(_from, _to, _roundUp ? wrapper.UnitAmtToWrappedAmt_RoundUp(_value) : wrapper.UnitAmtToWrappedAmt_RoundDown(_value));
     }
 
 }

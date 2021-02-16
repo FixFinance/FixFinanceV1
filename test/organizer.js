@@ -58,19 +58,19 @@ contract('organizer', function(accounts) {
 	});
 
 	it('deploy aToken wrapper', async () => {
-		await organizerInstance.deployATokenWrapper(asset0.address);
-		wAsset0 = await AaveWrapper.at(await organizerInstance.aTokenWrappers(asset0.address));
-		assert.notEqual(wAsset0.address, nullAddress, "organizer::aTokenWrappers[asset0] must be non-null");
+		await organizerInstance.deployAssetWrapper(asset0.address);
+		wAsset0 = await AaveWrapper.at(await organizerInstance.assetWrappers(asset0.address));
+		assert.notEqual(wAsset0.address, nullAddress, "organizer::assetWrappers[asset0] must be non-null");
 	});
 
 	it('cannot override aToken wrapper deployment', async () => {
 		let caught = false;
 		try {
-			await organizerInstance.deployATokenWrapper(asset0.address);
+			await organizerInstance.deployAssetWrapper(asset0.address);
 		} catch (err) {
 			caught = true
 		}
-		if (!caught) assert.fail('organizer::aTokenWrappers[asset0] was overridden');
+		if (!caught) assert.fail('organizer::assetWrappers[asset0] was overridden');
 	});
 
 	it('deploy CapitalHandler', async () => {
@@ -87,7 +87,7 @@ contract('organizer', function(accounts) {
 		} catch (err) {
 			caught = true
 		}
-		if (!caught) assert.fail('organizer::aTokenWrappers[asset0] was overridden');
+		if (!caught) assert.fail('capital handler deployment was overridden');
 	});
 
 	it('deploy ZCBamm', async () => {

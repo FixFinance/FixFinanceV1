@@ -63,7 +63,7 @@ module.exports = async function(deployer) {
 		feeOracleDeployer.address
 	);
 	//await organizerInstance.DeploySwapRouter();
-	await organizerInstance.deployATokenWrapper(dummyATokenInstance.address);
+	await organizerInstance.deployAssetWrapper(dummyATokenInstance.address);
 	await organizerInstance.deployCapitalHandlerInstance(dummyATokenInstance.address, start2026);
 
 };

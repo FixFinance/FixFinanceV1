@@ -10,6 +10,7 @@ interface ICapitalHandler is IERC20 {
 	function claimBondPayout(address _to) external;
 	function enterPayoutPhase() external;
 	function mintZCBTo(address _owner, uint _amount) external;
+	function burnZCBFrom(address _owner, uint _amount) external;
 	function transferYield(address _from, address _to, uint _amount) external;
 	function inPayoutPhase() external view returns (bool);
 	function maturity() external view returns(uint64);

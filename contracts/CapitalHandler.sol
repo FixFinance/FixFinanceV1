@@ -123,8 +123,13 @@ contract CapitalHandler is ICapitalHandler {
 
 	function mintZCBTo(address _owner, uint _amount) external override {
 		require(msg.sender == bondMinterAddress);
-
 		balanceBonds[_owner] += int(_amount);
+	}
+
+	function burnZCBFrom(address _owner, uint _amount) external override {
+		require(msg.sender == bondMinterAddress);
+		require(minimumUnitAmountAtMaturity(_owner) >= _amount);
+		balanceBonds[_owner] -= int(_amount);
 	}
 
 

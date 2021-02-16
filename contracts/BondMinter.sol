@@ -122,7 +122,7 @@ contract BondMinter is Ownable {
 
 		//burn borrowed ZCB
 		if (vault.amountBorrowed > 0)
-			IERC20(vault.assetBorrowed).transferFrom(msg.sender, address(0), vault.amountBorrowed);
+			ICapitalHandler(vault.assetBorrowed).burnZCBFrom(msg.sender, vault.amountBorrowed);
 		if (vault.amountSupplied > 0)
 			IERC20(vault.assetSupplied).transfer(_to, vault.amountSupplied);
 
@@ -181,8 +181,7 @@ contract BondMinter is Ownable {
 	function repay(address _owner, uint _index, uint _amount) external {
 		require(vaults[_owner].length > _index);
 		require(vaults[_owner][_index].amountBorrowed >= _amount);
-		//burn borrowed ZCB
-		IERC20(vaults[_owner][_index].assetBorrowed).transferFrom(msg.sender, address(0), _amount);
+		ICapitalHandler(vaults[_owner][_index].assetBorrowed).burnZCBFrom(msg.sender, _amount);
 		vaults[_owner][_index].amountBorrowed -= _amount;
 
 		emit Repay(_owner, _index, _amount);

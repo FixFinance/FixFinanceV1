@@ -798,4 +798,22 @@ contract('VaultHealth', async function(accounts) {
 		res = await vaultHealthInstance.vaultWithstandsChange(zcbAsset1.address, zcbAsset0.address, amountSupplied, actualBN, priceChange+1, rateChange1Str, rateChange0Str);
 		assert.equal(res, false, "correct value returned by vaultWithstandsChange");
 	});
+
+	it('set maximum short interest', async () => {
+		let setTo = '23123123123';
+
+		let caught = false;
+		try {
+			await vaultHealthInstance.setMaximumShortInterest(asset0.address, setTo, {from: accounts[1]});
+		} catch (err) {
+			caught = true;
+		}
+		if (!caught) {
+			assert.fail('setMaximumShortInterest() should be onlyOwner');
+		}
+
+		await vaultHealthInstance.setMaximumShortInterest(asset0.address, setTo);
+
+		assert.equal((await vaultHealthInstance.maximumShortInterest(asset0.address)).toString(), setTo, "correct value for maximum short interest");
+	});
 });

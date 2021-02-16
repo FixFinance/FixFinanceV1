@@ -108,8 +108,21 @@ contract('BondMinter', async function(accounts) {
 
 	it('opens vault', async () => {
 		//set amount borrowed to 1 over the upper limit
-		amountBorrowed = _10To18.mul(_10To18).div(new BN(upperRatio)).add(new BN('1')).toString();
+		amountBorrowed = _10To18.mul(_10To18).div(new BN(upperRatio)).toString();
 		let caught = false;
+		try {
+			await bondMinterInstance.openVault(wAsset1.address, zcbAsset0.address, _10To18.toString(), amountBorrowed);
+		} catch (err) {
+			caught = true;
+		}
+		if (!caught) assert.fail('borrowing must be limited by the short interest cap');
+
+		//set max short interest super high so that we will not need to worry about it later in our tests
+		maxShortInterest0 = _10To18.mul(_10To18).toString();
+		await vaultHealthInstance.setMaximumShortInterest(asset0.address, maxShortInterest0);
+
+		//set amount borrowed to 1 over the upper limit
+		amountBorrowed = (new BN(amountBorrowed)).add(new BN('1')).toString();
 		try {
 			await bondMinterInstance.openVault(wAsset1.address, zcbAsset0.address, _10To18.toString(), amountBorrowed);
 		} catch (err) {

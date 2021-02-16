@@ -70,6 +70,12 @@ contract VaultHealth is IVaultHealth, Ownable {
 
 	mapping(address => uint120) public UpperRateThreshold;
 
+	/*
+		Set by contract owner this mapping shows the maximum amount of any underlying asset (at all durations combined)
+		that may be shorted via the BoneMinter contract
+	*/
+	mapping(address => uint) public override maximumShortInterest;
+
 	address organizerAddress;
 	address oracleContainerAddress;
 
@@ -287,11 +293,6 @@ contract VaultHealth is IVaultHealth, Ownable {
 			.div(crossCollateralizationRatio(_baseSupplied, _baseBorrowed, Safety.LOW));
 	}
 
-	uint public test0;
-	uint public test1;
-
-	uint public test2;
-
 	function vaultWithstandsChange(
 		address _assetSupplied,
 		address _assetBorrowed,
@@ -341,6 +342,10 @@ contract VaultHealth is IVaultHealth, Ownable {
 	function setOrganizerAddress(address _organizerAddress) external onlyOwner {
 		require(organizerAddress == address(0));
 		organizerAddress = _organizerAddress;
+	}
+
+	function setMaximumShortInterest(address _underlyingAssetAddress, uint _maximumShortInterest) external onlyOwner {
+		maximumShortInterest[_underlyingAssetAddress] = _maximumShortInterest;
 	}
 }
 

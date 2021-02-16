@@ -10,6 +10,9 @@ contract DummyVaultHealth is IVaultHealth {
 		all assets being borrowed are zcbs
 	*/
 
+	//underlyingAsset => maximum amount of short interest *all duations combined*
+	mapping(address => uint) public override maximumShortInterest;
+
 	//asset supplied => asset borrowed => ratio
 	mapping(address => mapping(address => uint)) public upperRatio;
 	mapping(address => mapping(address => uint)) public middleRatio;
@@ -126,5 +129,9 @@ contract DummyVaultHealth is IVaultHealth {
 
 		lowerRatio[_assetSupplied][_assetBorrowed] = _ratio;
 
+	}
+
+	function setMaximumShortInterest(address _underlyingAssetAddress, uint _maximumShortInterest) external {
+		maximumShortInterest[_underlyingAssetAddress] = _maximumShortInterest;
 	}
 }

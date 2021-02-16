@@ -1,12 +1,14 @@
 pragma experimental ABIEncoderV2;
 pragma solidity >=0.6.5 <0.7.0;
 
+import "./libraries/SafeMath.sol";
 import "./interfaces/ICapitalHandler.sol";
 import "./interfaces/IVaultHealth.sol";
 import "./interfaces/IERC20.sol";
 import "./helpers/Ownable.sol";
 
 contract BondMinter is Ownable {
+	using SafeMath for uint;
 
 	struct Vault {
 		address assetSupplied;
@@ -26,6 +28,9 @@ contract BondMinter is Ownable {
 		uint bidAmount;
 		uint bidTimestamp;
 	}
+
+	//underlying asset => short interest
+	mapping(address => uint) public shortInterestAllDurations;
 
 	//asset => amount
 	mapping(address => uint) public revenue;
@@ -93,6 +98,20 @@ contract BondMinter is Ownable {
 		return Liquidations.length;
 	}
 
+	//-------------------------------------internal------------------------------------------
+
+	function raiseShortInterest(address _capitalHandlerAddress, uint _amount) internal {
+		address underlyingAssetAddress = ICapitalHandler(_capitalHandlerAddress).underlyingAssetAddress();
+		uint temp = shortInterestAllDurations[underlyingAssetAddress].add(_amount);
+		require(vaultHealthContract.maximumShortInterest(underlyingAssetAddress) >= temp);
+		shortInterestAllDurations[underlyingAssetAddress] = temp;
+	}
+
+	function lowerShortInterest(address _capitalHandlerAddress, uint _amount) internal {
+		address underlyingAssetAddress = ICapitalHandler(_capitalHandlerAddress).underlyingAssetAddress();
+		shortInterestAllDurations[underlyingAssetAddress] = shortInterestAllDurations[underlyingAssetAddress].sub(_amount);
+	}
+
 	//------------------------------------vault management-----------------------------------
 
 	function openVault(address _assetSupplied, address _assetBorrowed, uint _amountSupplied, uint _amountBorrowed) external {
@@ -109,6 +128,7 @@ contract BondMinter is Ownable {
 
 		IERC20(_assetSupplied).transferFrom(msg.sender, address(this), _amountSupplied);
 		ICapitalHandler(_assetBorrowed).mintZCBTo(msg.sender, _amountBorrowed);
+		raiseShortInterest(_assetBorrowed, _amountBorrowed);
 
 		vaults[msg.sender].push(Vault(_assetSupplied, _assetBorrowed, _amountSupplied, _amountBorrowed));
 
@@ -121,8 +141,10 @@ contract BondMinter is Ownable {
 		Vault memory vault = vaults[msg.sender][_index];
 
 		//burn borrowed ZCB
-		if (vault.amountBorrowed > 0)
+		if (vault.amountBorrowed > 0) {
 			ICapitalHandler(vault.assetBorrowed).burnZCBFrom(msg.sender, vault.amountBorrowed);
+			lowerShortInterest(vault.assetBorrowed, vault.amountBorrowed);
+		}
 		if (vault.amountSupplied > 0)
 			IERC20(vault.assetSupplied).transfer(_to, vault.amountSupplied);
 
@@ -174,6 +196,7 @@ contract BondMinter is Ownable {
 		vaults[msg.sender][_index].amountBorrowed += _amount;
 
 		ICapitalHandler(vault.assetBorrowed).mintZCBTo(_to, _amount);
+		raiseShortInterest(vault.assetBorrowed, _amount);
 
 		emit Borrow(msg.sender, _index, _amount);
 	}
@@ -181,7 +204,9 @@ contract BondMinter is Ownable {
 	function repay(address _owner, uint _index, uint _amount) external {
 		require(vaults[_owner].length > _index);
 		require(vaults[_owner][_index].amountBorrowed >= _amount);
-		ICapitalHandler(vaults[_owner][_index].assetBorrowed).burnZCBFrom(msg.sender, _amount);
+		address assetBorrowed = vaults[_owner][_index].assetBorrowed;
+		ICapitalHandler(assetBorrowed).burnZCBFrom(msg.sender, _amount);
+		lowerShortInterest(assetBorrowed, _amount);
 		vaults[_owner][_index].amountBorrowed -= _amount;
 
 		emit Repay(_owner, _index, _amount);
@@ -201,7 +226,8 @@ contract BondMinter is Ownable {
 			require(maturity < block.timestamp + (7 days));
 		}
 		//burn borrowed ZCB
-		IERC20(vault.assetBorrowed).transferFrom(msg.sender, address(0), vault.amountBorrowed);
+		ICapitalHandler(vault.assetBorrowed).burnZCBFrom(msg.sender, vault.amountBorrowed);
+		lowerShortInterest(vault.assetBorrowed, vault.amountBorrowed);
 		//any surplus in the bid may be added as revenue
 		if (_bid > vault.amountBorrowed){
 			IERC20(vault.assetBorrowed).transferFrom(msg.sender, address(this), _bid - vault.amountBorrowed);
@@ -223,9 +249,11 @@ contract BondMinter is Ownable {
 		require(Liquidations.length > _index);
 		Liquidation memory liquidation = Liquidations[_index];
 		require(_bid > liquidation.bidAmount);
-		require(block.timestamp - liquidation.bidTimestamp < 30 minutes);
-		IERC20(liquidation.assetBorrowed).transferFrom(msg.sender, address(this), _bid);
-		IERC20(liquidation.assetBorrowed).transfer(liquidation.bidder, liquidation.bidAmount);
+
+		ICapitalHandler(liquidation.assetBorrowed).burnZCBFrom(msg.sender, _bid);
+		ICapitalHandler(liquidation.assetBorrowed).mintZCBTo(liquidation.bidder, liquidation.bidAmount);
+		ICapitalHandler(liquidation.assetBorrowed).mintZCBTo(address(this), _bid - liquidation.bidAmount);
+
 		revenue[liquidation.assetBorrowed] += _bid - liquidation.bidAmount;
 		Liquidations[_index].bidAmount = _bid;
 		Liquidations[_index].bidder = msg.sender;
@@ -236,7 +264,7 @@ contract BondMinter is Ownable {
 		require(Liquidations.length > _index);
 		Liquidation memory liquidation = Liquidations[_index];
 		require(msg.sender == liquidation.bidder);
-		require(liquidation.bidTimestamp - block.timestamp >= 30 minutes);
+		require(block.timestamp - liquidation.bidTimestamp >= 10 minutes);
 
 		delete Liquidations[_index];
 
@@ -257,8 +285,10 @@ contract BondMinter is Ownable {
 			!vaultHealthContract.satisfiesLowerLimit(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied, vault.amountBorrowed));
 
 		//burn borrowed ZCB
-		IERC20(_assetBorrowed).transferFrom(msg.sender, address(0), vault.amountBorrowed);
+		ICapitalHandler(_assetBorrowed).burnZCBFrom(_to, vault.amountBorrowed);
+		lowerShortInterest(_assetBorrowed, vault.amountBorrowed);
 		IERC20(_assetSupplied).transfer(_to, vault.amountSupplied);
+
 		delete vaults[_owner][_index];
 	}
 
@@ -275,7 +305,9 @@ contract BondMinter is Ownable {
 			!vaultHealthContract.satisfiesLowerLimit(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied, vault.amountBorrowed));
 
 		//burn borrowed ZCB
-		IERC20(_assetBorrowed).transferFrom(msg.sender, address(0), _in);
+
+		ICapitalHandler(_assetBorrowed).burnZCBFrom(_to, _in);
+		lowerShortInterest(_assetBorrowed, _in);
 		IERC20(_assetSupplied).transfer(_to, amtOut);
 
 		vaults[_owner][_index].amountBorrowed -= _in;

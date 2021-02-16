@@ -4,6 +4,7 @@ pragma solidity >=0.6.5 <0.7.0;
 import "./libraries/SafeMath.sol";
 import "./interfaces/ICapitalHandler.sol";
 import "./interfaces/IVaultHealth.sol";
+import "./interfaces/IWrapper.sol";
 import "./interfaces/IERC20.sol";
 import "./helpers/Ownable.sol";
 
@@ -29,6 +30,10 @@ contract BondMinter is Ownable {
 		uint bidTimestamp;
 	}
 
+	//acts as a wrapper whitelist
+	//wrapper => underlying asset
+	mapping(address => address) public wrapperToUnderlyingAsset;
+
 	//underlying asset => short interest
 	mapping(address => uint) public shortInterestAllDurations;
 
@@ -41,8 +46,6 @@ contract BondMinter is Ownable {
 	Liquidation[] public Liquidations;
 
 	IVaultHealth public vaultHealthContract;
-
-	address organizerAddress;
 
 	event OpenVault(
 		address assetSupplied,
@@ -112,6 +115,34 @@ contract BondMinter is Ownable {
 		shortInterestAllDurations[underlyingAssetAddress] = shortInterestAllDurations[underlyingAssetAddress].sub(_amount);
 	}
 
+	function passInfoTorVaultManager(address _suppliedAsset, uint _suppliedAmount) internal view returns (address addr, uint amt) {
+		addr = wrapperToUnderlyingAsset[_suppliedAsset];
+		if (addr == address(0)) {
+			addr = _suppliedAsset;
+			amt = _suppliedAmount;
+		}
+		else {
+			amt = IWrapper(_suppliedAsset).WrappedAmtToUnitAmt_RoundDown(_suppliedAmount);
+		}
+	}
+
+	function satisfiesLimit(
+		address _assetSupplied,
+		address _assetBorrowed,
+		uint _amountSupplied,
+		uint _amountBorrowed,
+		bool _upper
+		) internal view returns (bool) {
+
+		(address _suppliedAddrToPass, uint _suppliedAmtToPass) = passInfoTorVaultManager(_assetSupplied, _amountSupplied);
+
+		return (_upper ?
+				vaultHealthContract.satisfiesUpperLimit(_suppliedAddrToPass, _assetBorrowed, _suppliedAmtToPass, _amountBorrowed)
+			:
+				vaultHealthContract.satisfiesLowerLimit(_suppliedAddrToPass, _assetBorrowed, _suppliedAmtToPass, _amountBorrowed)
+			);
+	}
+
 	//------------------------------------vault management-----------------------------------
 
 	function openVault(address _assetSupplied, address _assetBorrowed, uint _amountSupplied, uint _amountBorrowed) external {
@@ -124,7 +155,7 @@ contract BondMinter is Ownable {
 			the supplied asset is a zcb
 		*/
 		require(_assetSupplied != address(0));
-		require(vaultHealthContract.satisfiesUpperLimit(_assetSupplied, _assetBorrowed, _amountSupplied, _amountBorrowed));
+		require(satisfiesLimit(_assetSupplied, _assetBorrowed, _amountSupplied, _amountBorrowed, true));
 
 		IERC20(_assetSupplied).transferFrom(msg.sender, address(this), _amountSupplied);
 		ICapitalHandler(_assetBorrowed).mintZCBTo(msg.sender, _amountBorrowed);
@@ -160,12 +191,7 @@ contract BondMinter is Ownable {
 		Vault memory vault = vaults[msg.sender][_index];
 
 		require(vault.amountSupplied >= _amount);
-		require(vaultHealthContract.satisfiesUpperLimit(
-			vault.assetSupplied,
-			vault.assetBorrowed,
-			vault.amountSupplied - _amount,
-			vault.amountBorrowed
-		));
+		require(satisfiesLimit(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied - _amount, vault.amountBorrowed, true));
 
 		vaults[msg.sender][_index].amountSupplied -= _amount;
 
@@ -186,12 +212,7 @@ contract BondMinter is Ownable {
 		require(vaults[msg.sender].length > _index);
 		Vault memory vault = vaults[msg.sender][_index];
 
-		require(vaultHealthContract.satisfiesUpperLimit(
-			vault.assetSupplied,
-			vault.assetBorrowed,
-			vault.amountSupplied,
-			vault.amountBorrowed + _amount
-		));
+		require(satisfiesLimit(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied, vault.amountBorrowed + _amount, true));
 
 		vaults[msg.sender][_index].amountBorrowed += _amount;
 
@@ -221,7 +242,7 @@ contract BondMinter is Ownable {
 		require(vault.assetSupplied == _assetSupplied);
 		require(vault.amountBorrowed <= _bid);
 		require(vault.amountSupplied >= _minOut);
-		if (vaultHealthContract.satisfiesMiddleLimit(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied, vault.amountBorrowed)) {
+		if (satisfiesLimit(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied, vault.amountBorrowed, true)) {
 			uint maturity = ICapitalHandler(vault.assetBorrowed).maturity();
 			require(maturity < block.timestamp + (7 days));
 		}
@@ -282,7 +303,7 @@ contract BondMinter is Ownable {
 		require(vault.amountBorrowed <= _maxBid);
 		require(vault.amountSupplied >= _minOut);
 		require(ICapitalHandler(_assetBorrowed).maturity() < block.timestamp + (1 days) || 
-			!vaultHealthContract.satisfiesLowerLimit(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied, vault.amountBorrowed));
+			!satisfiesLimit(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied, vault.amountBorrowed, false));
 
 		//burn borrowed ZCB
 		ICapitalHandler(_assetBorrowed).burnZCBFrom(_to, vault.amountBorrowed);
@@ -302,7 +323,7 @@ contract BondMinter is Ownable {
 		require(vault.amountSupplied >= amtOut);
 		require(amtOut >= _minOut);
 		require(ICapitalHandler(_assetBorrowed).maturity() < block.timestamp + (1 days) || 
-			!vaultHealthContract.satisfiesLowerLimit(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied, vault.amountBorrowed));
+			!satisfiesLimit(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied, vault.amountBorrowed, false));
 
 		//burn borrowed ZCB
 
@@ -324,7 +345,7 @@ contract BondMinter is Ownable {
 		amtIn = amtIn/vault.amountSupplied + (amtIn%vault.amountSupplied == 0 ? 0 : 1);
 		require(amtIn <= _maxIn);
 		require(ICapitalHandler(_assetBorrowed).maturity() < block.timestamp + (1 days) || 
-			!vaultHealthContract.satisfiesLowerLimit(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied, vault.amountBorrowed));
+			!satisfiesLimit(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied, vault.amountBorrowed, false));
 
 		//burn borrowed ZCB
 		IERC20(_assetBorrowed).transferFrom(msg.sender, address(0), amtIn);
@@ -335,14 +356,11 @@ contract BondMinter is Ownable {
 	}
 	//--------------------------------------------management---------------------------------------------
 
-/*
-	function setOrganizerAddress(address _organizerAddress) public onlyOwner {
-		require(organizerAddress == address(0));
-		organizerAddress = _organizerAddress;
+	function whitelistWrapper(address _wrapeprAddress) external onlyOwner {
+		wrapperToUnderlyingAsset[_wrapeprAddress] = IWrapper(_wrapeprAddress).underlyingAssetAddress();
 	}
-*/
 
-	function claimRevenue(address _asset, uint _amount) public onlyOwner {
+	function claimRevenue(address _asset, uint _amount) external onlyOwner {
 		require(revenue[_asset] >= _amount);
 		IERC20(_asset).transfer(msg.sender, _amount);
 		revenue[_asset] -= _amount;

@@ -73,6 +73,8 @@ contract('BondMinter', async function(accounts) {
 		zcbAsset0 = await capitalHandler.at(await organizerInstance.capitalHandlerMapping(asset0.address, maturity));
 		zcbAsset1 = await capitalHandler.at(await organizerInstance.capitalHandlerMapping(asset1.address, maturity));
 
+		await bondMinterInstance.whitelistWrapper(wAsset1.address);
+
 		//mint assets to account 0
 		await asset1.mintTo(accounts[0], _10To18.mul(new BN("10")).toString());
 		await asset1.approve(wAsset1.address, _10To18.mul(new BN("10")).toString());
@@ -95,15 +97,11 @@ contract('BondMinter', async function(accounts) {
 		// asset0 Borrowed * ratio = asset1 Supplied
 		// 1.4 * 10**18
 		upperRatio = "14" + _10To18.toString().substring(2);
-		await vaultHealthInstance.setUpper(wAsset1.address, zcbAsset0.address, upperRatio);
-
-		// 1.2 * 10**18
-		middleRatio = "12" + _10To18.toString().substring(2);
-		await vaultHealthInstance.setMiddle(wAsset1.address, zcbAsset0.address, middleRatio);
+		await vaultHealthInstance.setUpper(asset1.address, zcbAsset0.address, upperRatio);
 
 		// 1.1 * 10**18
 		lowerRatio = "11" + _10To18.toString().substring(2);
-		await vaultHealthInstance.setLower(wAsset1.address, zcbAsset0.address, lowerRatio);
+		await vaultHealthInstance.setLower(asset1.address, zcbAsset0.address, lowerRatio);
 	});
 
 	it('opens vault', async () => {
@@ -150,6 +148,7 @@ contract('BondMinter', async function(accounts) {
 	});
 
 	it('deposits into vault', async () => {
+		//process.exit();
 		var prevBalanceW1 = await wAsset1.balanceOf(accounts[0]);
 		prevSupplied = new BN(vaults[0].amountSupplied);
 		await bondMinterInstance.deposit(accounts[0], 0, _10To18.toString());
@@ -210,21 +209,9 @@ contract('BondMinter', async function(accounts) {
 		/*
 			increase collateralisation ratio limits such that the open vault will be sent to liquidation
 		*/
-		// 1.8 * 10**18
-		upperRatio = "18" + _10To18.toString().substring(2);
-		await vaultHealthInstance.setUpper(wAsset1.address, zcbAsset0.address, upperRatio);
-
-		let caught = false;
-		try {
-			await bondMinterInstance.auctionLiquidation(accounts[0], 0, zcbAsset0.address, wAsset1.address, currentBorrowed.toString(), currentSupplied.toString(), {from: accounts[1]});
-		} catch (err) {
-			caught = true;
-		}
-		if (!caught) assert.fail("liquidations should be dependant on middle ratio not upper ratio");
-
 		// 1.6 * 10**18
-		middleRatio = "16" + _10To18.toString().substring(2);
-		await vaultHealthInstance.setMiddle(wAsset1.address, zcbAsset0.address, middleRatio);
+		upperRatio = "16" + _10To18.toString().substring(2);
+		await vaultHealthInstance.setUpper(asset1.address, zcbAsset0.address, upperRatio);
 
 		bid = currentBorrowed.sub(new BN("1"));
 
@@ -234,7 +221,7 @@ contract('BondMinter', async function(accounts) {
 		} catch (err) {
 			caught = true;
 		}
-		if (!caught) assert.fail("liquidation was triggered despite vault health being above middle limit");
+		if (!caught) assert.fail("liquidation was triggered despite vault health being above upper limit");
 
 		//get back to original bid value
 		bid = bid.add(new BN("1"));
@@ -314,12 +301,12 @@ contract('BondMinter', async function(accounts) {
 		/*
 			first open vaults
 		*/
-		amountBorrowed = _10To18.mul(_10To18).div(new BN(upperRatio)).toString();
+		amountBorrowed = _10To18.mul(_10To18).div(new BN(upperRatio)).sub(new BN(1)).toString();
 		await bondMinterInstance.openVault(wAsset1.address, zcbAsset0.address, _10To18.toString(), amountBorrowed);
 		await bondMinterInstance.openVault(wAsset1.address, zcbAsset0.address, _10To18.toString(), amountBorrowed);
 
 		lowerRatio =  _10To18.mul(_10To18).div(new BN(amountBorrowed)).add(new BN(10000)).toString();
-		await vaultHealthInstance.setLower(wAsset1.address, zcbAsset0.address, lowerRatio);
+		await vaultHealthInstance.setLower(asset1.address, zcbAsset0.address, lowerRatio);
 
 		vaultIndex = (await bondMinterInstance.vaultsLength(accounts[0])).toNumber() - 2;
 
@@ -373,7 +360,7 @@ contract('BondMinter', async function(accounts) {
 		} catch (err) {
 			caught = true;
 		}
-		if (!caught) assert.fail("vault was liquidated while above middle and upper health limit and before time liquidation period");
+		if (!caught) assert.fail("vault was liquidated while above upper health limit before time liquidation period");
 
 
 		/*
@@ -410,7 +397,7 @@ contract('BondMinter', async function(accounts) {
 
 		//change lower ratio so that vault is safe
 		lowerRatio =  _10To18.mul(_10To18).div(new BN(amountBorrowed)).toString();
-		await vaultHealthInstance.setLower(wAsset1.address, zcbAsset0.address, lowerRatio);
+		await vaultHealthInstance.setLower(asset1.address, zcbAsset0.address, lowerRatio);
 
 		try {
 			await bondMinterInstance.instantLiquidation(accounts[0], vaultIndex, zcbAsset0.address, wAsset1.address, amountBorrowed.toString(), _10To18.toString(), accounts[1], {from: accounts[1]});

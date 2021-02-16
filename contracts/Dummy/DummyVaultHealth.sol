@@ -26,17 +26,7 @@ contract DummyVaultHealth is IVaultHealth {
 		uint _amountBorrowed
 		) external view override returns (bool) {
 
-		return upperRatio[_assetSupplied][_assetBorrowed] * _amountBorrowed / 1e18 < IWrapper(_assetSupplied).WrappedAmtToUnitAmt_RoundDown(_amountSupplied);
-	}
-	//collateral above return value of this function may be withdrawn from vault
-	function satisfiesMiddleLimit(
-		address _assetSupplied,
-		address _assetBorrowed,
-		uint _amountSupplied,
-		uint _amountBorrowed
-		) external view override returns (bool) {
-
-		return middleRatio[_assetSupplied][_assetBorrowed] * _amountBorrowed / 1e18 < IWrapper(_assetSupplied).WrappedAmtToUnitAmt_RoundDown(_amountSupplied);
+		return upperRatio[_assetSupplied][_assetBorrowed] * _amountBorrowed / 1e18 < _amountSupplied;
 	}
 	//collateral must be greater than or equal to the return value to avoid liquidation
 	function satisfiesLowerLimit(
@@ -46,30 +36,28 @@ contract DummyVaultHealth is IVaultHealth {
 		uint _amountBorrowed
 		) external view override returns (bool) {
 
-		return lowerRatio[_assetSupplied][_assetBorrowed] * _amountBorrowed / 1e18 < IWrapper(_assetSupplied).WrappedAmtToUnitAmt_RoundDown(_amountSupplied);
+		return lowerRatio[_assetSupplied][_assetBorrowed] * _amountBorrowed / 1e18 < _amountSupplied;
 	}
 
 	function amountSuppliedAtUpperLimit(address _assetSupplied, address _assetBorrowed, uint _amountBorrowed) external view override returns (uint) {
-		return IWrapper(_assetSupplied).UnitAmtToWrappedAmt_RoundUp(upperRatio[_assetSupplied][_assetBorrowed] * _amountBorrowed / 1e18);
-	}
-	function amountSuppliedAtMiddleLimit(address _assetSupplied, address _assetBorrowed, uint _amountBorrowed) external view override returns (uint) {
-		return IWrapper(_assetSupplied).UnitAmtToWrappedAmt_RoundUp(middleRatio[_assetSupplied][_assetBorrowed] * _amountBorrowed / 1e18);
+		return upperRatio[_assetSupplied][_assetBorrowed] * _amountBorrowed / 1e18;
 	}
 	function amountSuppliedAtLowerLimit(address _assetSupplied, address _assetBorrowed, uint _amountBorrowed) external view override returns (uint) {
-		return IWrapper(_assetSupplied).UnitAmtToWrappedAmt_RoundUp(lowerRatio[_assetSupplied][_assetBorrowed] * _amountBorrowed / 1e18);
+		return lowerRatio[_assetSupplied][_assetBorrowed] * _amountBorrowed / 1e18;
 	}
 
 	function amountBorrowedAtUpperLimit(address _assetSupplied, address _assetBorrowed, uint _amountSupplied) external view override returns (uint) {
-		return IWrapper(_assetSupplied).WrappedAmtToUnitAmt_RoundDown(_amountSupplied) * 1e18 / upperRatio[_assetSupplied][_assetBorrowed];
-	}
-	function amountBorrowedAtMiddleLimit(address _assetSupplied, address _assetBorrowed, uint _amountSupplied) external view override returns (uint) {
-		return IWrapper(_assetSupplied).WrappedAmtToUnitAmt_RoundDown(_amountSupplied) * 1e18 / middleRatio[_assetSupplied][_assetBorrowed];
+		return _amountSupplied * 1e18 / upperRatio[_assetSupplied][_assetBorrowed];
 	}
 	function amountBorrowedAtLowerLimit(address _assetSupplied, address _assetBorrowed, uint _amountSupplied) external view override returns (uint) {
-		return IWrapper(_assetSupplied).WrappedAmtToUnitAmt_RoundDown(_amountSupplied) * 1e18 / lowerRatio[_assetSupplied][_assetBorrowed];
+		return _amountSupplied * 1e18 / lowerRatio[_assetSupplied][_assetBorrowed];
 	}
 
 
+	bool toReturn;
+	function setToReturn(bool _toReturn) external {
+		toReturn = _toReturn;
+	}
 	/*
 		This is a dummy contract and we don't plan on calling the function below ever so
 		we just return false/true without really looking into if it is doing the right thing
@@ -96,8 +84,8 @@ contract DummyVaultHealth is IVaultHealth {
 			_suppliedRateChange == 0 ||
 			_borrowRateChange == 0
 			)
-			return false;
-		return true;
+			return false || toReturn;
+		return true && toReturn;
 	}
 
 

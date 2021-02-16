@@ -23,17 +23,14 @@ contract VaultHealth is IVaultHealth, Ownable {
 
 	enum RateAdjuster {
 		UPPER_DEPOSIT,
-		MID_DEPOSIT,
 		LOW_DEPOSIT,
 		BASE,
 		LOW_BORROW,
-		MID_BORROW,
 		UPPER_BORROW
 	}
 
 	enum Safety {
 		UPPER,
-		MID,
 		LOW
 	}
 
@@ -46,8 +43,6 @@ contract VaultHealth is IVaultHealth, Ownable {
 	int128 constant MIN_RATE_ADJUSTMENT = ABDK_1 / 100;
 
 	mapping(address => uint120) public LowerCollateralizationRatio;
-
-	mapping(address => uint120) public MiddleCollateralizationRatio;
 
 	mapping(address => uint120) public UpperCollateralizationRatio;
 
@@ -65,8 +60,6 @@ contract VaultHealth is IVaultHealth, Ownable {
 		3% * 1.25 == 3.75%
 	*/
 	mapping(address => uint120) public LowerRateThreshold;
-
-	mapping(address => uint120) public MiddleRateThreshold;
 
 	mapping(address => uint120) public UpperRateThreshold;
 
@@ -88,28 +81,22 @@ contract VaultHealth is IVaultHealth, Ownable {
 	}
 
 	function isDeposited(RateAdjuster ra) internal pure returns(bool) {
-		return ra == RateAdjuster.UPPER_DEPOSIT || ra == RateAdjuster.MID_DEPOSIT || ra == RateAdjuster.LOW_DEPOSIT;
+		return ra == RateAdjuster.UPPER_DEPOSIT  || ra == RateAdjuster.LOW_DEPOSIT;
 	}
 
 	function isBorrowed(RateAdjuster ra) internal pure returns(bool) {
-		return ra == RateAdjuster.UPPER_BORROW || ra == RateAdjuster.MID_BORROW || ra == RateAdjuster.LOW_BORROW;
+		return ra == RateAdjuster.UPPER_BORROW || ra == RateAdjuster.LOW_BORROW;
 	}
 
 	function getRateThresholdMultiplier(address _underlyingAssetAddress, RateAdjuster _rateAdjuster) internal view returns (int128 multiplier) {
 		if (_rateAdjuster == RateAdjuster.UPPER_BORROW) {
 			multiplier = ABDK_1.div(int128(UpperRateThreshold[_underlyingAssetAddress]));
 		}
-		else if (_rateAdjuster == RateAdjuster.MID_BORROW) {
-			multiplier = ABDK_1.div(int128(MiddleRateThreshold[_underlyingAssetAddress]));
-		}
 		else if (_rateAdjuster == RateAdjuster.LOW_BORROW) {
 			multiplier = ABDK_1.div(int128(LowerRateThreshold[_underlyingAssetAddress]));
 		}
 		else if (_rateAdjuster == RateAdjuster.UPPER_DEPOSIT) {
 			multiplier = ABDK_1.mul(int128(UpperRateThreshold[_underlyingAssetAddress]));
-		}
-		else if (_rateAdjuster == RateAdjuster.MID_DEPOSIT) {
-			multiplier = ABDK_1.mul(int128(MiddleRateThreshold[_underlyingAssetAddress]));
 		}
 		else if (_rateAdjuster == RateAdjuster.LOW_DEPOSIT) {
 			multiplier = ABDK_1.mul(int128(LowerRateThreshold[_underlyingAssetAddress]));
@@ -176,9 +163,6 @@ contract VaultHealth is IVaultHealth, Ownable {
 		if (_safety == Safety.UPPER) {
 			return uint(int128(UpperCollateralizationRatio[_deposited]).mul(int128(UpperCollateralizationRatio[_borrowed]))).mul(BONE) >> 64;
 		}
-		else if (_safety == Safety.MID) {
-			return uint(int128(MiddleCollateralizationRatio[_deposited]).mul(int128(MiddleCollateralizationRatio[_borrowed]))).mul(BONE) >> 64;
-		}
 		return uint(int128(LowerCollateralizationRatio[_deposited]).mul(int128(LowerCollateralizationRatio[_borrowed]))).mul(BONE) >> 64;
 	}
 
@@ -201,17 +185,6 @@ contract VaultHealth is IVaultHealth, Ownable {
 			.div(BONE);
 	}
 
-	function _amountSuppliedAtMiddleLimit(address _assetSupplied, address _assetBorrowed, uint _amountBorrowed) internal view returns (uint) {
-		(address _baseSupplied, address _baseBorrowed) = baseAssetAddresses(_assetSupplied, _assetBorrowed);
-
-		return _amountBorrowed
-			.mul(crossAssetPrice(_baseSupplied, _baseBorrowed))
-			.mul(getRateMultiplier_BaseRate(_assetBorrowed, _baseBorrowed, RateAdjuster.MID_BORROW))
-			.div(BONE)
-			.mul(crossCollateralizationRatio(_baseSupplied, _baseBorrowed, Safety.MID))
-			.div(_assetSupplied == _baseSupplied ? BONE : getRateMultiplier_BaseRate(_assetSupplied, _baseSupplied, RateAdjuster.MID_DEPOSIT))
-			.div(BONE);
-	}
 
 	function _amountSuppliedAtLowerLimit(address _assetSupplied, address _assetBorrowed, uint _amountBorrowed) internal view returns (uint) {
 		(address _baseSupplied, address _baseBorrowed) = baseAssetAddresses(_assetSupplied, _assetBorrowed);
@@ -229,25 +202,17 @@ contract VaultHealth is IVaultHealth, Ownable {
 
 	//-----------------------i-m-p-l-e-m-e-n-t---I-V-a-u-l-t-H-e-a-l-t-h--------------------------
 
-	//return true if collateral is above upper limit
+
 	function satisfiesUpperLimit(address _assetSupplied, address _assetBorrowed, uint _amountSupplied, uint _amountBorrowed) external override view returns (bool) {
 		return _amountSupplied > _amountSuppliedAtUpperLimit(_assetSupplied, _assetBorrowed, _amountBorrowed);
 	}
-	//return true if collateral is above middle limit
-	function satisfiesMiddleLimit(address _assetSupplied, address _assetBorrowed, uint _amountSupplied, uint _amountBorrowed) external override view returns (bool) {
-		return _amountSupplied > _amountSuppliedAtMiddleLimit(_assetSupplied, _assetBorrowed, _amountBorrowed);
-	}
-	//return true if collateral is above lower limit
+
 	function satisfiesLowerLimit(address _assetSupplied, address _assetBorrowed, uint _amountSupplied, uint _amountBorrowed) external override view returns (bool) {
 		return _amountSupplied > _amountSuppliedAtLowerLimit(_assetSupplied, _assetBorrowed, _amountBorrowed);
 	}
 
 	function amountSuppliedAtUpperLimit(address _assetSupplied, address _assetBorrowed, uint _amountBorrowed) public override view returns (uint) {
 		return _amountSuppliedAtUpperLimit(_assetSupplied, _assetBorrowed, _amountBorrowed);
-	}
-
-	function amountSuppliedAtMiddleLimit(address _assetSupplied, address _assetBorrowed, uint _amountBorrowed) external override view returns (uint) {
-		return _amountSuppliedAtMiddleLimit(_assetSupplied, _assetBorrowed, _amountBorrowed);
 	}
 
 	function amountSuppliedAtLowerLimit(address _assetSupplied, address _assetBorrowed, uint _amountBorrowed) external override view returns (uint) {
@@ -265,19 +230,6 @@ contract VaultHealth is IVaultHealth, Ownable {
 			.mul(BONE)
 			.div(getRateMultiplier_BaseRate(_assetBorrowed, _baseBorrowed, RateAdjuster.UPPER_BORROW))
 			.div(crossCollateralizationRatio(_baseSupplied, _baseBorrowed, Safety.UPPER));
-	}
-
-	function amountBorrowedAtMiddleLimit(address _assetSupplied, address _assetBorrowed, uint _amountSupplied) external override view returns (uint) {
-		(address _baseSupplied, address _baseBorrowed) = baseAssetAddresses(_assetSupplied, _assetBorrowed);
-
-		uint term1 = _amountSupplied
-			.mul(_assetSupplied == _baseSupplied ? BONE : getRateMultiplier_BaseRate(_assetSupplied, _baseSupplied, RateAdjuster.MID_DEPOSIT));
-		return term1
-			.mul(BONE)
-			.div(crossAssetPrice(_baseSupplied, _baseBorrowed))
-			.mul(BONE)
-			.div(getRateMultiplier_BaseRate(_assetBorrowed, _baseBorrowed, RateAdjuster.MID_BORROW))
-			.div(crossCollateralizationRatio(_baseSupplied, _baseBorrowed, Safety.MID));
 	}
 
 	function amountBorrowedAtLowerLimit(address _assetSupplied, address _assetBorrowed, uint _amountSupplied) external override view returns (uint) {
@@ -309,11 +261,11 @@ contract VaultHealth is IVaultHealth, Ownable {
 		_amountBorrowed = _amountBorrowed
 			.mul(crossAssetPrice(_baseSupplied, _baseBorrowed));
 		_amountBorrowed = _amountBorrowed
-			.mul(getRateMultiplier_Changed(_assetBorrowed, _baseBorrowed, RateAdjuster.MID_BORROW, _borrowRateChange))
+			.mul(getRateMultiplier_Changed(_assetBorrowed, _baseBorrowed, RateAdjuster.UPPER_BORROW, _borrowRateChange))
 			.div(BONE);
 		_amountBorrowed = _amountBorrowed
-			.mul(crossCollateralizationRatio(_baseSupplied, _baseBorrowed, Safety.MID))
-			.div(_assetSupplied == _baseSupplied ? BONE : getRateMultiplier_Changed(_assetSupplied, _baseSupplied, RateAdjuster.MID_DEPOSIT, _suppliedRateChange))
+			.mul(crossCollateralizationRatio(_baseSupplied, _baseBorrowed, Safety.UPPER))
+			.div(_assetSupplied == _baseSupplied ? BONE : getRateMultiplier_Changed(_assetSupplied, _baseSupplied, RateAdjuster.UPPER_DEPOSIT, _suppliedRateChange))
 			.mul(_priceMultiplier)
 			.div(BONE*TOTAL_BASIS_POINTS);
 
@@ -321,21 +273,19 @@ contract VaultHealth is IVaultHealth, Ownable {
 	}
 
 	//-----------------------a-d-m-i-n---o-p-e-r-a-t-i-o-n-s---------------------------
-	function setCollateralizationRatios(address _underlyingAssetAddress, uint120 _upper, uint120 _middle, uint120 _lower) external onlyOwner {
-		require(_upper >= _middle && _middle >= _lower && _lower > ABDK_1);
+	function setCollateralizationRatios(address _underlyingAssetAddress, uint120 _upper, uint120 _lower) external onlyOwner {
+		require(_upper >= _lower && _lower > ABDK_1);
 		//ensure that the contract at _underlyingAssetAddress is not a capital handler contract
 		require(organizer(organizerAddress).capitalHandlerToUnderlyingAsset(_underlyingAssetAddress) == address(0));
 		UpperCollateralizationRatio[_underlyingAssetAddress] = _upper;
-		MiddleCollateralizationRatio[_underlyingAssetAddress] = _middle;
 		LowerCollateralizationRatio[_underlyingAssetAddress] = _lower;
 	}
 
-	function setRateThresholds(address _underlyingAssetAddress, uint120 _upper, uint120 _middle, uint120 _lower) external onlyOwner {
-		require(_upper >= _middle && _middle >= _lower && _lower > ABDK_1);
+	function setRateThresholds(address _underlyingAssetAddress, uint120 _upper, uint120 _lower) external onlyOwner {
+		require(_upper >= _lower && _lower > ABDK_1);
 		//ensure that the contract at _underlyingAssetAddress is not a capital handler contract
 		require(organizer(organizerAddress).capitalHandlerToUnderlyingAsset(_underlyingAssetAddress) == address(0));
 		UpperRateThreshold[_underlyingAssetAddress] = _upper;
-		MiddleRateThreshold[_underlyingAssetAddress] = _middle;
 		LowerRateThreshold[_underlyingAssetAddress] = _lower;
 	}
 

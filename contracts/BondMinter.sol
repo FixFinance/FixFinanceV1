@@ -11,6 +11,10 @@ import "./helpers/Ownable.sol";
 contract BondMinter is Ownable {
 	using SafeMath for uint;
 
+	uint private constant TOTAL_BASIS_POINTS = 10_000;
+
+	int128 private constant ABDK_1 = 1<<64;
+
 	struct Vault {
 		address assetSupplied;
 		address assetBorrowed;
@@ -126,36 +130,62 @@ contract BondMinter is Ownable {
 		}
 	}
 
+	function vaultWithstandsChange(
+		address _assetSupplied,
+		address _assetBorrowed,
+		uint _amountSupplied,
+		uint _amountBorrowed,
+		uint _priceMultiplier,
+		int128 _suppliedRateChange,
+		int128 _borrowRateChange
+		) internal view returns (bool) {
+
+		require(_priceMultiplier >= TOTAL_BASIS_POINTS);
+		require(_suppliedRateChange >= ABDK_1);
+		require(_borrowRateChange <= ABDK_1);
+
+		(address _suppliedAddrToPass, uint _suppliedAmtToPass) = passInfoTorVaultManager(_assetSupplied, _amountSupplied);
+
+		return vaultHealthContract.vaultWithstandsChange(
+			_suppliedAddrToPass,
+			_assetBorrowed,
+			_suppliedAmtToPass,
+			_amountBorrowed,
+			_priceMultiplier,
+			_suppliedRateChange,
+			_borrowRateChange
+		);
+	}
+
 	function satisfiesLimit(
 		address _assetSupplied,
 		address _assetBorrowed,
 		uint _amountSupplied,
 		uint _amountBorrowed,
-		bool _upper
+		bool upper
 		) internal view returns (bool) {
 
 		(address _suppliedAddrToPass, uint _suppliedAmtToPass) = passInfoTorVaultManager(_assetSupplied, _amountSupplied);
 
-		return (_upper ?
-				vaultHealthContract.satisfiesUpperLimit(_suppliedAddrToPass, _assetBorrowed, _suppliedAmtToPass, _amountBorrowed)
-			:
-				vaultHealthContract.satisfiesLowerLimit(_suppliedAddrToPass, _assetBorrowed, _suppliedAmtToPass, _amountBorrowed)
+		return ( upper ?
+			vaultHealthContract.satisfiesUpperLimit(_suppliedAddrToPass, _assetBorrowed, _suppliedAmtToPass, _amountBorrowed)
+				:
+			vaultHealthContract.satisfiesLowerLimit(_suppliedAddrToPass, _assetBorrowed, _suppliedAmtToPass, _amountBorrowed)
 			);
 	}
 
 	//------------------------------------vault management-----------------------------------
 
-	function openVault(address _assetSupplied, address _assetBorrowed, uint _amountSupplied, uint _amountBorrowed) external {
-		/*
-			users can only borrow ZCBs
-		*/
-		require(_assetBorrowed != address(0));
-		/*
-			when chSupplyAddress == _assetSupplied
-			the supplied asset is a zcb
-		*/
-		require(_assetSupplied != address(0));
-		require(satisfiesLimit(_assetSupplied, _assetBorrowed, _amountSupplied, _amountBorrowed, true));
+	function openVault(
+		address _assetSupplied,
+		address _assetBorrowed,
+		uint _amountSupplied,
+		uint _amountBorrowed,
+		uint _priceMultiplier,
+		int128 _suppliedRateChange,
+		int128 _borrowRateChange
+		) external {
+		require(vaultWithstandsChange(_assetSupplied, _assetBorrowed, _amountSupplied, _amountBorrowed, _priceMultiplier, _suppliedRateChange, _borrowRateChange));
 
 		IERC20(_assetSupplied).transferFrom(msg.sender, address(this), _amountSupplied);
 		ICapitalHandler(_assetBorrowed).mintZCBTo(msg.sender, _amountBorrowed);
@@ -186,12 +216,27 @@ contract BondMinter is Ownable {
 		emit CloseVault(msg.sender, _index);
 	}
 
-	function remove(uint _index, uint _amount, address _to) external {
+	function remove(
+		uint _index,
+		uint _amount,
+		address _to,
+		uint _priceMultiplier,
+		int128 _suppliedRateChange,
+		int128 _borrowRateChange
+		) external {
 		require(vaults[msg.sender].length > _index);
 		Vault memory vault = vaults[msg.sender][_index];
 
 		require(vault.amountSupplied >= _amount);
-		require(satisfiesLimit(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied - _amount, vault.amountBorrowed, true));
+		require(vaultWithstandsChange(
+			vault.assetSupplied,
+			vault.assetBorrowed,
+			vault.amountSupplied - _amount,
+			vault.amountBorrowed,
+			_priceMultiplier,
+			_suppliedRateChange,
+			_borrowRateChange
+		));
 
 		vaults[msg.sender][_index].amountSupplied -= _amount;
 
@@ -208,11 +253,26 @@ contract BondMinter is Ownable {
 		emit Deposit(_owner, _index, _amount);
 	}
 
-	function borrow(uint _index, uint _amount, address _to) external {
+	function borrow(
+		uint _index,
+		uint _amount,
+		address _to,
+		uint _priceMultiplier,
+		int128 _suppliedRateChange,
+		int128 _borrowRateChange
+		) external {
 		require(vaults[msg.sender].length > _index);
 		Vault memory vault = vaults[msg.sender][_index];
 
-		require(satisfiesLimit(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied, vault.amountBorrowed + _amount, true));
+		require(vaultWithstandsChange(
+			vault.assetSupplied,
+			vault.assetBorrowed,
+			vault.amountSupplied,
+			vault.amountBorrowed + _amount,
+			_priceMultiplier,
+			_suppliedRateChange,
+			_borrowRateChange
+		));
 
 		vaults[msg.sender][_index].amountBorrowed += _amount;
 

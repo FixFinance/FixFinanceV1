@@ -17,9 +17,18 @@ const helper = require("../helper/helper.js");
 
 const nullAddress = "0x0000000000000000000000000000000000000000";
 const BN = web3.utils.BN;
-const _10To18 = (new BN('10')).pow(new BN('18'));
+const _10 = new BN(10)
+const _10To18 = _10.pow(new BN('18'));
 
 const _8days = 8*24*60*60;
+
+const TOTAL_BASIS_POINTS = 10000;
+
+function basisPointsToABDKString(bips) {
+	return (new BN(bips)).mul((new BN(2)).pow(new BN(64))).div(_10.pow(new BN(4))).toString();
+}
+
+const ABDK_1 = basisPointsToABDKString(TOTAL_BASIS_POINTS);
 
 contract('BondMinter', async function(accounts) {
 
@@ -105,11 +114,12 @@ contract('BondMinter', async function(accounts) {
 	});
 
 	it('opens vault', async () => {
-		//set amount borrowed to 1 over the upper limit
 		amountBorrowed = _10To18.mul(_10To18).div(new BN(upperRatio)).toString();
 		let caught = false;
+		//we are usign a dummy vault health contract, we need to set the value which it will return on vaultWithstandsChange() call
+		await vaultHealthInstance.setToReturn(true);
 		try {
-			await bondMinterInstance.openVault(wAsset1.address, zcbAsset0.address, _10To18.toString(), amountBorrowed);
+			await bondMinterInstance.openVault(wAsset1.address, zcbAsset0.address, _10To18.toString(), amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
 		} catch (err) {
 			caught = true;
 		}
@@ -119,19 +129,46 @@ contract('BondMinter', async function(accounts) {
 		maxShortInterest0 = _10To18.mul(_10To18).toString();
 		await vaultHealthInstance.setMaximumShortInterest(asset0.address, maxShortInterest0);
 
-		//set amount borrowed to 1 over the upper limit
-		amountBorrowed = (new BN(amountBorrowed)).add(new BN('1')).toString();
+		await vaultHealthInstance.setToReturn(false);
+		caught = false;
 		try {
-			await bondMinterInstance.openVault(wAsset1.address, zcbAsset0.address, _10To18.toString(), amountBorrowed);
+			await bondMinterInstance.openVault(wAsset1.address, zcbAsset0.address, _10To18.toString(), amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
 		} catch (err) {
 			caught = true;
 		}
-		if (!caught) assert.fail('borrowing must be limited by the upperRatio');
+		if (!caught) assert.fail('open vault fails when vaultWithstandsChange() returns false');
+
+		await vaultHealthInstance.setToReturn(true);
+		caught = false;
+		try {
+			await bondMinterInstance.openVault(wAsset1.address, zcbAsset0.address, _10To18.toString(), amountBorrowed, TOTAL_BASIS_POINTS-1, ABDK_1, ABDK_1);
+		} catch (err) {
+			caught = true;
+		}
+		if (!caught) assert.fail('for call to openVault(), remove(), or borrow() to be sucessful priceChange parameter must be >= TOTAL_BASIS_POINTS');
+
+		caught = false;
+		try {
+			const sub1ABDK = (new BN(ABDK_1)).sub(new BN(1));
+			await bondMinterInstance.openVault(wAsset1.address, zcbAsset0.address, _10To18.toString(), amountBorrowed, TOTAL_BASIS_POINTS, sub1ABDK, ABDK_1);
+		} catch (err) {
+			caught = true;
+		}
+		if (!caught) assert.fail('for call to openVault(), remove(), or borrow() to be sucessful suppliedRateChange parameter must be >= ABDK_1');
+
+		caught = false;
+		try {
+			const over1ABDK = (new BN(ABDK_1)).add(new BN(1));
+			await bondMinterInstance.openVault(wAsset1.address, zcbAsset0.address, _10To18.toString(), amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, over1ABDK);
+		} catch (err) {
+			caught = true;
+		}
+		if (!caught) assert.fail('for call to openVault(), remove(), or borrow() to be sucessful borrowedRateChange parameter must be <= ABDK_1');
 
 		amountBorrowed = (new BN(amountBorrowed)).sub(new BN('1')).toString();
 		var prevBalanceW1 = await wAsset1.balanceOf(accounts[0]);
 
-		await bondMinterInstance.openVault(wAsset1.address, zcbAsset0.address, _10To18.toString(), amountBorrowed);
+		await bondMinterInstance.openVault(wAsset1.address, zcbAsset0.address, _10To18.toString(), amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
 
 		assert.equal((await zcbAsset0.balanceOf(accounts[0])).toString(), amountBorrowed, "correct amount of zcb credited to vault owner");
 		assert.equal((await wAsset1.balanceOf(accounts[0])).toString(), prevBalanceW1.sub(_10To18), "correct amount of wAsset1 supplied");
@@ -148,7 +185,6 @@ contract('BondMinter', async function(accounts) {
 	});
 
 	it('deposits into vault', async () => {
-		//process.exit();
 		var prevBalanceW1 = await wAsset1.balanceOf(accounts[0]);
 		prevSupplied = new BN(vaults[0].amountSupplied);
 		await bondMinterInstance.deposit(accounts[0], 0, _10To18.toString());
@@ -163,16 +199,18 @@ contract('BondMinter', async function(accounts) {
 		var prevBalanceW1 = await wAsset1.balanceOf(accounts[0]);
 		prevSupplied = currentSupplied;
 
+		await vaultHealthInstance.setToReturn(false);
 		let caught = false;
 		try {
-			await bondMinterInstance.remove(0, toRemove.add(new BN('1')).toString(), accounts[0]);
+			await bondMinterInstance.remove(0, toRemove.toString(), accounts[0], TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
 		} catch (err) {
 			caught = true;
 		}
-		if (!caught) assert.fail("collateral removal must be limited by the upperRatio");
+		if (!caught) assert.fail("call to remove() should fail when vaultWithstandsChange() returns false");
 
+		await vaultHealthInstance.setToReturn(true);
 
-		await bondMinterInstance.remove(0, toRemove.toString(), accounts[0]);
+		await bondMinterInstance.remove(0, toRemove.toString(), accounts[0], TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
 
 		currentSupplied = new BN((await bondMinterInstance.vaults(accounts[0], 0)).amountSupplied);
 		assert.equal((await wAsset1.balanceOf(accounts[0])).toString(), prevBalanceW1.add(toRemove), "correct amount of wAsset1 supplied");
@@ -197,7 +235,7 @@ contract('BondMinter', async function(accounts) {
 		toBorrow = toRepay;
 		var prevBalanceZCB = await zcbAsset0.balanceOf(accounts[0]);
 		var prevBorrowed = new BN((await bondMinterInstance.vaults(accounts[0], 0)).amountBorrowed);
-		await bondMinterInstance.borrow(0, toBorrow.toString(), accounts[0]);
+		await bondMinterInstance.borrow(0, toBorrow.toString(), accounts[0], TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
 
 		var currentBalanceZCB = await zcbAsset0.balanceOf(accounts[0]);
 		currentBorrowed = new BN((await bondMinterInstance.vaults(accounts[0], 0)).amountBorrowed);
@@ -302,8 +340,8 @@ contract('BondMinter', async function(accounts) {
 			first open vaults
 		*/
 		amountBorrowed = _10To18.mul(_10To18).div(new BN(upperRatio)).sub(new BN(1)).toString();
-		await bondMinterInstance.openVault(wAsset1.address, zcbAsset0.address, _10To18.toString(), amountBorrowed);
-		await bondMinterInstance.openVault(wAsset1.address, zcbAsset0.address, _10To18.toString(), amountBorrowed);
+		await bondMinterInstance.openVault(wAsset1.address, zcbAsset0.address, _10To18.toString(), amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
+		await bondMinterInstance.openVault(wAsset1.address, zcbAsset0.address, _10To18.toString(), amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
 
 		lowerRatio =  _10To18.mul(_10To18).div(new BN(amountBorrowed)).add(new BN(10000)).toString();
 		await vaultHealthInstance.setLower(asset1.address, zcbAsset0.address, lowerRatio);
@@ -347,8 +385,8 @@ contract('BondMinter', async function(accounts) {
 	});
 
 	it('liquidates vaults due to time', async () => {
-		await bondMinterInstance.openVault(wAsset1.address, zcbAsset0.address, _10To18.toString(), amountBorrowed);
-		await bondMinterInstance.openVault(wAsset1.address, zcbAsset0.address, _10To18.toString(), amountBorrowed);
+		await bondMinterInstance.openVault(wAsset1.address, zcbAsset0.address, _10To18.toString(), amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
+		await bondMinterInstance.openVault(wAsset1.address, zcbAsset0.address, _10To18.toString(), amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
 
 		vaultIndex = (await bondMinterInstance.vaultsLength(accounts[0])).toNumber() - 2;
 

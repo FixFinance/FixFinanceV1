@@ -32,8 +32,10 @@ contract OracleContainer is Ownable, IOracleContainer {
 		}
 	}
 
-	function AddAToken(address _aTokenAddress) external onlyOwner {
-		Phrases[_aTokenAddress] = removeFirstCharacter(IERC20(_aTokenAddress).symbol());
+	function AddAToken(address _aTokenAddress, uint8 start, uint8 stop, string calldata claim) external onlyOwner {
+		require(abi.encodePacked(Phrases[_aTokenAddress]).length == 0);
+		require(stringEquals(substring(IERC20(_aTokenAddress).symbol(), start, stop),claim));
+		Phrases[_aTokenAddress] = claim;
 	}
 
 	function BaseAggregatorAddress(string calldata _phrase) external view override returns (address addr) {
@@ -75,6 +77,14 @@ contract OracleContainer is Ownable, IOracleContainer {
 		require(length > 1);
 		return substring(str, 1, length);
 	}
+
+	function stringEquals(string memory a, string memory b) internal pure returns (bool) {
+		if(bytes(a).length != bytes(b).length) {
+			return false;
+		} else {
+			return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));
+		}
+   	}
 
 	function substring(string memory str, uint startIndex, uint endIndex) internal pure returns (string memory) {
 	    bytes memory strBytes = bytes(str);

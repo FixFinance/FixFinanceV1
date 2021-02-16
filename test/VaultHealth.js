@@ -59,8 +59,8 @@ contract('VaultHealth', async function(accounts) {
 		price = 0;
 		OracleContainerInstance = await OracleContainer.new(nullAddress);
 		await OracleContainerInstance.addAggregators([aggregator0.address, aggregator1.address]);
-		await OracleContainerInstance.AddAToken(asset0.address);
-		await OracleContainerInstance.AddAToken(asset1.address);
+		await OracleContainerInstance.AddAToken(asset0.address, 1, 4, symbol0.substring(1));
+		await OracleContainerInstance.AddAToken(asset1.address, 1, 5, symbol1.substring(1));
 
 		yieldTokenDeployerInstance = await yieldTokenDeployer.new();
 		vaultHealthInstance = await VaultHealth.new(OracleContainerInstance.address);

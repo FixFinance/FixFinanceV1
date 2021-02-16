@@ -1,5 +1,5 @@
 pragma solidity >=0.6.0;
-import "./IAaveWrapper.sol";
+import "./IWrapper.sol";
 import "./IERC20.sol";
 
 interface ICapitalHandler is IERC20 {
@@ -14,10 +14,10 @@ interface ICapitalHandler is IERC20 {
 	function inPayoutPhase() external view returns (bool);
 	function maturity() external view returns(uint64);
 	function maturityConversionRate() external view returns(uint);
-	function aToken() external view returns(address);
+	function underlyingAssetAddress() external view returns(address);
 	function balanceBonds(address _owner) external view returns(int);
 	function balanceYield(address _owner) external view returns(uint);
 	function yieldTokenAddress() external view returns(address);
 	function bondMinterAddress() external view returns(address);
-	function aw() external view returns(IAaveWrapper);
+	function wrapper() external view returns(IWrapper);
 }

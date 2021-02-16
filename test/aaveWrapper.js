@@ -10,14 +10,14 @@ contract('aaveWrapper', async function(accounts){
 		dummyATokenInstance = await dummyAToken.new("DMY");
 		aaveWrapperInstance = await aaveWrapper.new(dummyATokenInstance.address);
 		inflation = await dummyATokenInstance.inflation();
-		assert.equal(await aaveWrapperInstance.aToken(), dummyATokenInstance.address, 'correct address for aToken');
+		assert.equal(await aaveWrapperInstance.underlyingAssetAddress(), dummyATokenInstance.address, 'correct address for aToken');
 		assert.equal((await aaveWrapperInstance.totalSupply()).toString(), "0", "correct total supply");
 	});
 
 	it('executes 1st deposit', async () => {
 		amount = '10000';
 		await dummyATokenInstance.approve(aaveWrapperInstance.address, amount);
-		await aaveWrapperInstance.deposit(accounts[0], amount);
+		await aaveWrapperInstance.depositUnitAmount(accounts[0], amount);
 		totalSupply = await aaveWrapperInstance.totalSupply();
 		assert.equal(totalSupply.toString(), amount, "correct total supply after 1st deposit");
 		assert.equal((await aaveWrapperInstance.balanceOf(accounts[0])).toString(), amount, "correct balance of account 0 after 1st deposit");
@@ -27,7 +27,7 @@ contract('aaveWrapper', async function(accounts){
 		inflation = inflation.mul(new BN(2));
 		await dummyATokenInstance.setInflation(inflation.toString());
 		await dummyATokenInstance.approve(aaveWrapperInstance.address, amount);
-		await aaveWrapperInstance.deposit(accounts[1], amount);
+		await aaveWrapperInstance.depositUnitAmount(accounts[1], amount);
 		expectedBalanceIncrease = (new BN(amount)).div(new BN(2));
 		prevTotalSupply = totalSupply;
 		totalSupply = await aaveWrapperInstance.totalSupply();
@@ -39,7 +39,7 @@ contract('aaveWrapper', async function(accounts){
 		inflation = inflation.mul(new BN(3));
 		await dummyATokenInstance.setInflation(inflation.toString());
 		toWithdraw = (new BN(amount)).div(new BN(2));
-		await aaveWrapperInstance.withdrawWrappedToken(accounts[1], toWithdraw.toString());
+		await aaveWrapperInstance.withdrawWrappedAmount(accounts[1], toWithdraw.toString());
 		prevTotalSupply = totalSupply;
 		totalSupply = await aaveWrapperInstance.totalSupply();
 		wrappedBalanceAct0 = await aaveWrapperInstance.balanceOf(accounts[0]);
@@ -50,7 +50,7 @@ contract('aaveWrapper', async function(accounts){
 
 	it('executes withdrawAToken', async () => {
 		toWithdraw = new BN(amount);
-		await aaveWrapperInstance.withdrawAToken(accounts[2], toWithdraw.toString());
+		await aaveWrapperInstance.withdrawUnitAmount(accounts[2], toWithdraw.toString());
 		expectedWrappedTokenDecrease = toWithdraw.mul(_10To18);
 		expectedWrappedTokenDecrease = expectedWrappedTokenDecrease.div(inflation).add(new BN(expectedWrappedTokenDecrease.mod(inflation).toString() == "0" ? 0 : 1));
 		prevTotalSupply = totalSupply;

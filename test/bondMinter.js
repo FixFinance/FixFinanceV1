@@ -7,7 +7,7 @@ const organizer = artifacts.require('organizer');
 const BondMinter = artifacts.require('BondMinter');
 const IERC20 = artifacts.require("IERC20");
 const BigMath = artifacts.require("BigMath");
-const DeployCapitalHandler = artifacts.require('DeployCapitalHandler');
+const CapitalHandlerDeployer = artifacts.require('CapitalHandlerDeployer');
 const ZCBammDeployer = artifacts.require('ZCBammDeployer');
 const YTammDeployer = artifacts.require('YTammDeployer');
 const SwapRouterDeployer = artifacts.require('SwapRouterDeployer');
@@ -41,7 +41,7 @@ contract('BondMinter', async function(accounts) {
 		await YTammDeployer.link("BigMath", BigMathInstance.address);
 		ZCBammDeployerInstance = await ZCBammDeployer.new();
 		YTammDeployerInstance = await YTammDeployer.new();
-		DeployCapitalHandlerInstance = await DeployCapitalHandler.new();
+		DeployCapitalHandlerInstance = await CapitalHandlerDeployer.new();
 		swapRouterDeployerInstance = await SwapRouterDeployer.new();
 		feeOracleInstance = await FeeOracle.new("0", "0");
 		organizerInstance = await organizer.new(
@@ -67,8 +67,8 @@ contract('BondMinter', async function(accounts) {
 		await asset0.approve(wAsset0.address, _10To18.toString());
 		await asset1.approve(wAsset1.address, _10To18.toString());
 
-		await wAsset0.deposit(accounts[0], _10To18.toString());
-		await wAsset1.deposit(accounts[0], _10To18.toString());
+		await wAsset0.depositUnitAmount(accounts[0], _10To18.toString());
+		await wAsset1.depositUnitAmount(accounts[0], _10To18.toString());
 
 		zcbAsset0 = await capitalHandler.at(await organizerInstance.capitalHandlerMapping(asset0.address, maturity));
 		zcbAsset1 = await capitalHandler.at(await organizerInstance.capitalHandlerMapping(asset1.address, maturity));
@@ -76,14 +76,14 @@ contract('BondMinter', async function(accounts) {
 		//mint assets to account 0
 		await asset1.mintTo(accounts[0], _10To18.mul(new BN("10")).toString());
 		await asset1.approve(wAsset1.address, _10To18.mul(new BN("10")).toString());
-		await wAsset1.deposit(accounts[0], _10To18.mul(new BN("10")).toString());
+		await wAsset1.depositUnitAmount(accounts[0], _10To18.mul(new BN("10")).toString());
 		await wAsset1.approve(bondMinterInstance.address, _10To18.mul(new BN("10")).toString());
 		await zcbAsset0.approve(bondMinterInstance.address, _10To18.mul(new BN("10")).toString());
 
 		//mint assets to account 1
 		await asset0.mintTo(accounts[1], _10To18.mul(new BN("10")).toString());
 		await asset0.approve(wAsset0.address, _10To18.mul(new BN("10")).toString(), {from: accounts[1]});
-		await wAsset0.deposit(accounts[1], _10To18.mul(new BN("10")).toString(), {from: accounts[1]});
+		await wAsset0.depositUnitAmount(accounts[1], _10To18.mul(new BN("10")).toString(), {from: accounts[1]});
 		await wAsset0.approve(zcbAsset0.address, _10To18.mul(new BN("10")).toString(), {from: accounts[1]});
 		await zcbAsset0.depositWrappedToken(accounts[1], _10To18.mul(new BN("10")).toString(), {from: accounts[1]});
 		await zcbAsset0.approve(bondMinterInstance.address, _10To18.mul(new BN("10")).toString(), {from: accounts[1]});

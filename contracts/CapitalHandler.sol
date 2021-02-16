@@ -1,6 +1,6 @@
 pragma solidity >=0.6.5 <0.7.0;
 import "./interfaces/ICapitalHandler.sol";
-import "./interfaces/IAaveWrapper.sol";
+import "./interfaces/IWrapper.sol";
 import "./interfaces/IERC20.sol";
 import "./ERC20.sol";
 import "./YieldTokenDeployer.sol";
@@ -18,9 +18,9 @@ contract CapitalHandler is ICapitalHandler {
 	//1e18 * aToken / wrappedToken
 	uint public override maturityConversionRate;
 
-	IAaveWrapper public override aw;
+	IWrapper public override wrapper;
 
-	address public override aToken;
+	address public override underlyingAssetAddress;
 
 	mapping(address => int) public override balanceBonds;
 
@@ -29,8 +29,6 @@ contract CapitalHandler is ICapitalHandler {
 	address public override yieldTokenAddress;
 
 	address public override bondMinterAddress;
-
-	uint private constant BIGUNIT = 1e18;
 
 //--------ERC 20 Storage---------------
 
@@ -42,20 +40,20 @@ contract CapitalHandler is ICapitalHandler {
 //--------------functionality----------
 
 	constructor(
-		address _aw,
+		address _wrapper,
 		uint64 _maturity,
 		address _yieldTokenDeployer,
 		address _bondMinterAddress
 		) public {
-		IAaveWrapper temp = IAaveWrapper(_aw);
-		aw = temp;
+		IWrapper temp = IWrapper(_wrapper);
+		wrapper = temp;
 		decimals = temp.decimals();
-		IERC20 temp2 = IERC20(temp.aToken());
-		aToken = address(temp2);
+		IERC20 temp2 = IERC20(temp.underlyingAssetAddress());
+		underlyingAssetAddress = address(temp2);
 		name = string(abi.encodePacked(temp2.name(),' zero coupon bond'));
 		symbol = string(abi.encodePacked(temp2.symbol(), 'zcb'));
 		maturity = _maturity;
-		(bool success , ) = _yieldTokenDeployer.call(abi.encodeWithSignature("deploy(address)", _aw));
+		(bool success , ) = _yieldTokenDeployer.call(abi.encodeWithSignature("deploy(address)", _wrapper));
 		require(success);
 		yieldTokenAddress = YieldTokenDeployer(_yieldTokenDeployer).addr();
 		bondMinterAddress = _bondMinterAddress;
@@ -71,12 +69,12 @@ contract CapitalHandler is ICapitalHandler {
 				wrappedTknFree = wrappedTknFree.sub(toSub);
 			}
 			else
-				wrappedTknFree = wrappedTknFree.sub(aw.ATokenToWrappedToken_RoundUp(uint(-bondBal)));
+				wrappedTknFree = wrappedTknFree.sub(wrapper.ATokenToWrappedToken_RoundUp(uint(-bondBal)));
 		}
 	}
 
 	function depositWrappedToken(address _to, uint _amountWrappedTkn) external override {
-		aw.transferFrom(msg.sender, address(this), _amountWrappedTkn);
+		wrapper.transferFrom(msg.sender, address(this), _amountWrappedTkn);
 		balanceYield[_to] += _amountWrappedTkn;
 	}
 
@@ -84,38 +82,38 @@ contract CapitalHandler is ICapitalHandler {
 		require(wrappedTokenFree(msg.sender) >= _amountWrappedTkn);
 		balanceYield[msg.sender] -= _amountWrappedTkn;
 		if (_unwrap)
-			aw.withdrawWrappedToken(_to, _amountWrappedTkn);
+			wrapper.withdrawWrappedAmount(_to, _amountWrappedTkn);
 		else
-			aw.transfer(_to, _amountWrappedTkn);
+			wrapper.transfer(_to, _amountWrappedTkn);
 	}
 
 	function withdrawAll(address _to, bool _unwrap) external override {
 		uint freeToMove = wrappedTokenFree(msg.sender);
 		balanceYield[msg.sender] -= freeToMove;
 		if (_unwrap)
-			aw.withdrawWrappedToken(_to, freeToMove);
+			wrapper.withdrawWrappedAmount(_to, freeToMove);
 		else
-			aw.transfer(_to, freeToMove);
+			wrapper.transfer(_to, freeToMove);
 	}
 
 	function claimBondPayout(address _to) external override {
 		int bondBal = balanceBonds[msg.sender];
 		require(block.timestamp >= maturity && bondBal > 0);
-		aw.withdrawWrappedToken(_to, uint(bondBal)*1e18/maturityConversionRate);
+		wrapper.withdrawWrappedAmount(_to, uint(bondBal)*1e18/maturityConversionRate);
 		balanceBonds[msg.sender] = 0;
 	}
 
 	function enterPayoutPhase() external override {
 		require(!inPayoutPhase && block.timestamp >= maturity);
 		inPayoutPhase = true;
-		maturityConversionRate = aw.WrappedTokenToAToken_RoundDown(1e18);
+		maturityConversionRate = wrapper.WrappedTokenToAToken_RoundDown(1e18);
 	}
 
 	function minimumATokensAtMaturity(address _owner) internal view returns (uint balance) {
 		if (inPayoutPhase)
 			balance = balanceYield[_owner]*maturityConversionRate/1e18;
 		else
-			balance = aw.WrappedTokenToAToken_RoundDown(balanceYield[_owner]);
+			balance = wrapper.WrappedTokenToAToken_RoundDown(balanceYield[_owner]);
 		int bondBal = balanceBonds[_owner];
 		if (bondBal > 0)
 			balance = balance.add(uint(bondBal));
@@ -173,7 +171,7 @@ contract CapitalHandler is ICapitalHandler {
     }
 
     function totalSupply() public view override returns (uint _supply) {
-    	_supply = aw.WrappedTokenToAToken_RoundDown(aw.balanceOf(address(this)));
+    	_supply = wrapper.WrappedTokenToAToken_RoundDown(wrapper.balanceOf(address(this)));
     }
 
 //---------Yield Token--------------------
@@ -181,7 +179,7 @@ contract CapitalHandler is ICapitalHandler {
 	function transferYield(address _from, address _to, uint _amount) external override {
 		require(msg.sender == yieldTokenAddress);
 		require(balanceYield[_from] >= _amount);
-		uint _amountATkn = inPayoutPhase ? _amount.mul(maturityConversionRate)/1e18 : aw.WrappedTokenToAToken_RoundDown(_amount);
+		uint _amountATkn = inPayoutPhase ? _amount.mul(maturityConversionRate)/1e18 : wrapper.WrappedTokenToAToken_RoundDown(_amount);
 		balanceYield[_from] -= _amount;
 		balanceYield[_to] += _amount;
 		balanceBonds[_from] += int(_amountATkn);
@@ -189,7 +187,7 @@ contract CapitalHandler is ICapitalHandler {
 		//ensure that _from address's position may be cashed out to a positive amount of wrappedToken
 		//int bonds = balanceBonds[_from];
 		//if (bonds >= 0) return;
-		//uint bondsToWrappedToken = inPayoutPhase ? uint(-bonds).mul(maturityConversionRate)/1e18 : aw.ATokenToWrappedToken_RoundUp(uint(-bonds));
+		//uint bondsToWrappedToken = inPayoutPhase ? uint(-bonds).mul(maturityConversionRate)/1e18 : wrapper.ATokenToWrappedToken_RoundUp(uint(-bonds));
 		//require(balanceYield[_from] >= bondsToWrappedToken);
 		minimumATokensAtMaturity(_from);
 	}

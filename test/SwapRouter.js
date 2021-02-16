@@ -72,7 +72,7 @@ contract('SwapRouter', async function(accounts) {
 		//mint funds to accounts[0]
 		balance = _10To18BN;
 		await aTokenInstance.approve(aaveWrapperInstance.address, balance);
-		await aaveWrapperInstance.deposit(accounts[0], balance);
+		await aaveWrapperInstance.depositUnitAmount(accounts[0], balance);
 		await aaveWrapperInstance.approve(capitalHandlerInstance.address, balance);
 		await capitalHandlerInstance.depositWrappedToken(accounts[0], balance);
 		await capitalHandlerInstance.approve(amm0.address, balance);

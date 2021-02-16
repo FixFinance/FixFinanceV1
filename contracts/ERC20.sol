@@ -3,7 +3,7 @@ import "./interfaces/IERC20.sol";
 
 
 contract ERC20 is IERC20 {
-	uint8 public override decimals = 18;
+	uint8 public override decimals;
 
 	uint public override totalSupply;
 

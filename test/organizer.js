@@ -110,7 +110,7 @@ contract('organizer', function(accounts) {
 
 		balance = _10To18BN;
 		await asset0.approve(wAsset0.address, balance);
-		await wAsset0.deposit(accounts[0], balance);
+		await wAsset0.depositUnitAmount(accounts[0], balance);
 		await wAsset0.approve(capitalHandlerInstance.address, balance);
 		await capitalHandlerInstance.depositWrappedToken(accounts[0], balance);
 		await capitalHandlerInstance.approve(amm0.address, balance);

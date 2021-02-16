@@ -2,7 +2,7 @@ pragma solidity >=0.6.0;
 import "./CapitalHandler.sol";
 
 contract CapitalHandlerDeployer {
-	//address public addr;
+	address public addr;
 
 	function deploy(
 		address _aw,

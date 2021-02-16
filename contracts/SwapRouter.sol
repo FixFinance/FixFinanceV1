@@ -3,7 +3,7 @@ import "./helpers/IZCBamm.sol";
 import "./helpers/IYTamm.sol";
 import "./interfaces/ICapitalHandler.sol";
 import "./interfaces/IYieldToken.sol";
-import "./interfaces/IAaveWrapper.sol";
+import "./interfaces/IWrapper.sol";
 import "./interfaces/ISwapRouter.sol";
 import "./interfaces/IERC20.sol";
 import "./organizer.sol";
@@ -24,43 +24,60 @@ contract SwapRouter is ISwapRouter {
 	function ATknToZCB(address _capitalHandlerAddress, uint _amount, uint _minZCBout) external override {
 		ICapitalHandler ch = ICapitalHandler(_capitalHandlerAddress);
 		organizer _org = org;
-		IERC20 aToken = IERC20(_org.capitalHandlerToAToken(_capitalHandlerAddress));
-		IAaveWrapper aw = IAaveWrapper(_org.aTokenWrappers(address(aToken)));
+		IERC20 underlyingAsset = IERC20(_org.capitalHandlerToAToken(_capitalHandlerAddress));
+		IWrapper wrapper = IWrapper(_org.aTokenWrappers(address(underlyingAsset)));
 		IZCBamm amm = IZCBamm(_org.ZCBamms(_capitalHandlerAddress));
 		IYieldToken yt = IYieldToken(ch.yieldTokenAddress());
 
-		aToken.transferFrom(msg.sender, address(this), _amount);
-		aToken.approve(address(aw), _amount);
-		uint _amountWrapped = aw.deposit(address(this), _amount);
-		aw.approve(_capitalHandlerAddress, _amountWrapped);
+		uint _amountWrapped;
+		if (wrapper.underlyingIsWrapped()) {
+			_amountWrapped = wrapper.ATokenToWrappedToken_RoundUp(_amount);
+			underlyingAsset.transferFrom(msg.sender, address(this), _amountWrapped);
+			underlyingAsset.approve(address(wrapper), _amountWrapped);
+			wrapper.depositWrappedAmount(address(this), _amountWrapped);
+		}
+		else {
+			underlyingAsset.transferFrom(msg.sender, address(this), _amount);
+			underlyingAsset.approve(address(wrapper), _amount);
+			_amountWrapped = wrapper.depositUnitAmount(address(this), _amount);
+		}
+		wrapper.approve(_capitalHandlerAddress, _amountWrapped);
 		ch.depositWrappedToken(address(this), _amountWrapped);
 		ch.approve(address(amm), _amount);
 		yt.approve(address(amm), _amountWrapped);
-		uint _amountToSwap = aw.WrappedTokenToAToken_RoundUp(_amountWrapped);
+		uint _amountToSwap = wrapper.WrappedTokenToAToken_RoundUp(_amountWrapped);
 		require(_amountToSwap <= uint(MAX));
 		uint _out = amm.SwapFromSpecificTokensWithLimit(int128(_amountToSwap), false, _minZCBout);
 		ch.transfer(msg.sender, _out);
 	}
 
-	function ATknToYT(address _capitalHandlerAddress, int128 _amountYT, uint _maxATkn) external override {
+	function ATknToYT(address _capitalHandlerAddress, int128 _amountYT, uint _maxUnitAmount) external override {
 		_amountYT++;	//account for rounding error when transfering funds out of YTamm
 		require(_amountYT > 0);
 		ICapitalHandler ch = ICapitalHandler(_capitalHandlerAddress);
 		organizer _org = org;
-		IERC20 aToken = IERC20(_org.capitalHandlerToAToken(_capitalHandlerAddress));
-		IAaveWrapper aw = IAaveWrapper(_org.aTokenWrappers(address(aToken)));
+		IERC20 underlyingAsset = IERC20(_org.capitalHandlerToAToken(_capitalHandlerAddress));
+		IWrapper wrapper = IWrapper(_org.aTokenWrappers(address(underlyingAsset)));
 		IYTamm amm = IYTamm(_org.YTamms(_capitalHandlerAddress));
 		IYieldToken yt = IYieldToken(ch.yieldTokenAddress());
 
 		uint _amtATkn = amm.ReserveQuoteToYT(_amountYT);
 		//remove possibility for problems due to rounding error
 		uint _amtTransfer = _amtATkn + RoundingBuffer;
-		require(_amtTransfer <= _maxATkn, "Required AToken in is Greater than _maxATkn");
-
-		aToken.transferFrom(msg.sender, address(this), _amtTransfer);
-		aToken.approve(address(aw), _amtTransfer);
-		uint _amountWrapped = aw.deposit(address(this), _amtTransfer);
-		aw.approve(_capitalHandlerAddress, _amountWrapped);
+		require(_amtTransfer <= _maxUnitAmount, "Required AToken in is Greater than _maxUnitAmount");
+		uint _amountWrapped;
+		if (wrapper.underlyingIsWrapped()) {
+			_amountWrapped = wrapper.ATokenToWrappedToken_RoundUp(_amtTransfer);
+			underlyingAsset.transferFrom(msg.sender, address(this), _amountWrapped);
+			underlyingAsset.approve(address(wrapper), _amountWrapped);
+			wrapper.depositWrappedAmount(address(this), _amountWrapped);
+		}
+		else {
+			underlyingAsset.transferFrom(msg.sender, address(this), _amtTransfer);
+			underlyingAsset.approve(address(wrapper), _amtTransfer);
+			_amountWrapped = wrapper.depositUnitAmount(address(this), _amtTransfer);
+		}
+		wrapper.approve(_capitalHandlerAddress, _amountWrapped);
 		ch.depositWrappedToken(address(this), _amountWrapped);
 		ch.approve(address(amm), _amtTransfer);
 		yt.approve(address(amm), _amountWrapped);

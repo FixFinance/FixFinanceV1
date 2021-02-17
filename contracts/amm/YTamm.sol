@@ -291,7 +291,7 @@ contract YTamm is IYTamm {
 
 	//------------------------------v-i-e-w-s-----------------------------------------------
 
-	function getReserves() external view returns (uint _Ureserves, uint _YTreserves, uint _TimeRemaining) {
+	function getReserves() external view override returns (uint _Ureserves, uint _YTreserves, uint _TimeRemaining) {
 		_Ureserves = Ureserves;
 		_YTreserves = YTreserves;
 		_TimeRemaining = timeRemaining();

@@ -2,10 +2,12 @@ pragma solidity >=0.5.0;
 
 import "./ABDKMath64x64.sol";
 import "./SignedSafeMath.sol";
+import "./SafeMath.sol";
 
 library BigMath {
   using ABDKMath64x64 for int128;
   using SignedSafeMath for int256;
+  using SafeMath for uint256;
 
   /*
     we keep error bound here such that we won't exceed 35 iterations in the power series 
@@ -17,6 +19,11 @@ library BigMath {
 
   int128 private constant MAX = 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
 
+  int128 private constant ABDK_1 = 1<<64;
+
+  uint private constant BONE = 1 ether;
+  
+  uint private constant SecondsPerYear = 31556926;
 
   function addition_series_data(uint8 _index) public pure returns (int256) {
       /*
@@ -391,7 +398,7 @@ library BigMath {
     return exponent.mul( int128( U ).log_2() ).exp_2().add(  exponent.mul( int128( Z ).log_2() ).exp_2()  );
   }
 
-  function ZCB_U_reserve_change(uint reserve0, uint reserve1, uint r, int128 changeReserve0) external pure returns (int128 changeReserve1) {
+  function ZCB_U_reserve_change(uint reserve0, uint reserve1, uint r, int128 changeReserve0) public pure returns (int128 changeReserve1) {
     int128 K = ZCB_U_PoolConstant(reserve0, reserve1, r);
     /*
       K == U**(1-r) + Z**(1-r)
@@ -407,7 +414,7 @@ library BigMath {
 
       changeReserve1 == (K - exp_2((1-r)*log_2(reserve0 + changeReserve0))   )**(1/(1-r)) - reserve1
     */
-    int128 exponent = int128(1<<64).sub(int128( r ));
+    int128 exponent = ABDK_1.sub(int128( r ));
 
     //base == K - exp_2((1-r)*log_2(reserve0 + changeReserve0))
     int128 base = K.sub( (exponent.mul( (int128(reserve0) + changeReserve0).log_2())).exp_2() );
@@ -417,7 +424,23 @@ library BigMath {
       changeReserve1 == exp_2(log_2(base**(1/exponent))) - reserve1
       changeReserve1 == exp_2((1/exponent)*log_2(base)) - reserve1
     */
-    changeReserve1 = (int128(1<<64).div(exponent)).mul( base.log_2() ).exp_2().sub(int128(reserve1));
+    changeReserve1 = (ABDK_1.div(exponent)).mul( base.log_2() ).exp_2().sub(int128(reserve1));
+  }
+
+  int128 private constant MAX_ANNUAL_ERROR = ABDK_1 / 10000;
+  function ZCB_U_recalibration(uint timeRemaining, uint rate, uint Z, uint L, uint anchor) external pure returns (uint U) {
+    require(Z < uint(MAX));
+    U = L.sub(uint(-ZCB_U_reserve_change(L, L, timeRemaining,int128(Z))));
+    uint newRate = (Z+L).mul(BONE).div(U);
+    uint error = uint( (int128(rate.sub(BONE).mul(BONE).div(newRate.sub(BONE))).sub(int128(BONE))).abs() );
+    /*
+      1-MaxError == (1-MaxAnnualError)**(anchor * 1 years)
+      MaxError == 1 - (1-MaxAnnualError)**(anchor * 1 years)
+      MaxError == 1 - exp_2(log_2((1-MaxAnnualError)**(anchor * 1 years)))
+      MaxError == 1 - exp_2( (anchor * 1 years) * log_2(1-MaxAnnualError) )
+    */
+    uint MaxError = uint(ABDK_1.sub( (ABDK_1 - MAX_ANNUAL_ERROR).log_2().mul(int128(anchor)).exp_2() )).mul(BONE) >> 64;
+    require(error < MaxError);
   }
 
 }

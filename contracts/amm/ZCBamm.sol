@@ -11,6 +11,7 @@ import "../FeeOracle.sol";
 contract ZCBamm is IZCBamm {
 
 	using ABDKMath64x64 for int128;
+	using SafeMath for uint256;
 
 	uint8 private constant LENGTH_RATE_SERIES = 31;
 	int128 private constant MAX = 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
@@ -31,6 +32,9 @@ contract ZCBamm is IZCBamm {
 	uint256 quotedAmountIn;
 	uint256 quotedAmountOut;
 
+	uint lastRecalibration;
+	uint LPTokenInflation;
+
 	uint8 toSet;
 	bool CanSetOracleRate;
 	int128 OracleRate;
@@ -48,6 +52,8 @@ contract ZCBamm is IZCBamm {
 		//we want time remaining / anchor to be less than 1, thus make anchor greater than time remaining
 		anchor = 10 * (maturity - block.timestamp) / 9;
 		FeeOracleAddress = _feeOracleAddress;
+		lastRecalibration = block.timestamp;
+		LPTokenInflation = 1 ether;
 		init(_ZCBaddress, _YTaddress);
 	}
 
@@ -103,6 +109,10 @@ contract ZCBamm is IZCBamm {
 
 	function getQuoteSignature(bool _ZCBin) internal view returns (bytes32) {
 		return keccak256(abi.encodePacked(totalSupply, ZCBreserves, Ureserves, _ZCBin, block.number));
+	}
+
+	function _inflatedTotalSupply() internal view returns (uint) {
+		return totalSupply.mul(LPTokenInflation).div(1 ether);
 	}
 
 	function writeQuoteSignature(bool _ZCBin, uint _amountIn, uint _amountOut) internal returns (bytes32) {
@@ -178,7 +188,7 @@ contract ZCBamm is IZCBamm {
 
 		if (_ZCBin) {
 			{
-				int temp = -int(BigMath.ZCB_U_reserve_change(ZCBreserves+totalSupply, Ureserves, r, _amount));
+				int temp = -int(BigMath.ZCB_U_reserve_change(ZCBreserves+_inflatedTotalSupply(), Ureserves, r, _amount));
 				require(temp > 0);
 				amountOut = FeeOracle(FeeOracleAddress).feeAdjustedAmountOut(maturity, uint(temp));
 			}
@@ -194,7 +204,7 @@ contract ZCBamm is IZCBamm {
 
 		} else {
 			{
-				int temp = -int(BigMath.ZCB_U_reserve_change(Ureserves, ZCBreserves+totalSupply, r, _amount));
+				int temp = -int(BigMath.ZCB_U_reserve_change(Ureserves, ZCBreserves+_inflatedTotalSupply(), r, _amount));
 				require(temp > 0);
 				amountOut = FeeOracle(FeeOracleAddress).feeAdjustedAmountOut(maturity, uint(temp));
 			}
@@ -219,7 +229,7 @@ contract ZCBamm is IZCBamm {
 		if (_ZCBin) {
 			require(Ureserves >= uint(_amount));
 			{
-				int temp = int(BigMath.ZCB_U_reserve_change(Ureserves, ZCBreserves+totalSupply, r, -_amount));
+				int temp = int(BigMath.ZCB_U_reserve_change(Ureserves, ZCBreserves+_inflatedTotalSupply(), r, -_amount));
 				require(temp > 0);
 				amountIn = FeeOracle(FeeOracleAddress).feeAdjustedAmountIn(maturity, uint(temp));
 			}
@@ -233,7 +243,7 @@ contract ZCBamm is IZCBamm {
 		} else {
 			require(ZCBreserves >= uint(_amount));
 			{
-				int temp = int(BigMath.ZCB_U_reserve_change(ZCBreserves+totalSupply, Ureserves, r, -_amount));
+				int temp = int(BigMath.ZCB_U_reserve_change(ZCBreserves+_inflatedTotalSupply(), Ureserves, r, -_amount));
 				require(temp > 0);
 				amountIn = FeeOracle(FeeOracleAddress).feeAdjustedAmountIn(maturity, uint(temp));
 			}
@@ -265,7 +275,7 @@ contract ZCBamm is IZCBamm {
 
 		if (_ZCBin) {
 			{
-				int temp = -int(BigMath.ZCB_U_reserve_change(ZCBreserves+totalSupply, Ureserves, r, _amount));
+				int temp = -int(BigMath.ZCB_U_reserve_change(ZCBreserves+_inflatedTotalSupply(), Ureserves, r, _amount));
 				require(temp > 0);
 				amountOut = FeeOracle(FeeOracleAddress).feeAdjustedAmountOut(maturity, uint(temp));
 			}
@@ -274,7 +284,7 @@ contract ZCBamm is IZCBamm {
 
 		} else {
 			{
-				int temp = -int(BigMath.ZCB_U_reserve_change(Ureserves, ZCBreserves+totalSupply, r, _amount));
+				int temp = -int(BigMath.ZCB_U_reserve_change(Ureserves, ZCBreserves+_inflatedTotalSupply(), r, _amount));
 				require(temp > 0);
 				amountOut = FeeOracle(FeeOracleAddress).feeAdjustedAmountOut(maturity, uint(temp));
 			}
@@ -293,7 +303,7 @@ contract ZCBamm is IZCBamm {
 		if (_ZCBin) {
 			require(Ureserves >= uint(_amount));
 			{
-				int temp = int(BigMath.ZCB_U_reserve_change(Ureserves, ZCBreserves+totalSupply, r, -_amount));
+				int temp = int(BigMath.ZCB_U_reserve_change(Ureserves, ZCBreserves+_inflatedTotalSupply(), r, -_amount));
 				require(temp > 0);
 				amountIn = FeeOracle(FeeOracleAddress).feeAdjustedAmountIn(maturity, uint(temp));
 			}
@@ -301,7 +311,7 @@ contract ZCBamm is IZCBamm {
 		} else {
 			require(ZCBreserves >= uint(_amount));
 			{
-				int temp = int(BigMath.ZCB_U_reserve_change(ZCBreserves+totalSupply, Ureserves, r, -_amount));
+				int temp = int(BigMath.ZCB_U_reserve_change(ZCBreserves+_inflatedTotalSupply(), Ureserves, r, -_amount));
 				require(temp > 0);
 				amountIn = FeeOracle(FeeOracleAddress).feeAdjustedAmountIn(maturity, uint(temp));
 			}
@@ -353,7 +363,7 @@ contract ZCBamm is IZCBamm {
 
 	//------------------------e-n-a-b-l-e---p-o-o-l---t-o---a-c-t---a-s---r-a-t-e---o-r-a-c-l-e-----------------
 
-	function setOracleRate(uint8 _index) internal {
+	function internalSetOracleRate(uint8 _index) internal {
 		/*
 			APY**(anchor/1 year) == ZCBreserves/Ureserves
 			APY == (ZCBreserves/Ureserves)**(1 year/anchor)
@@ -361,7 +371,7 @@ contract ZCBamm is IZCBamm {
 			the main function of our rate oracle is to feed info to the YTamm which knows the anchor so we are good with storing ZCBreserves/Ureserves here
 		*/
 		uint _Ureserves = Ureserves;
-		uint _ZCBreserves = totalSupply + ZCBreserves;
+		uint _ZCBreserves = _inflatedTotalSupply() + ZCBreserves;
 		//only record when rate is a positive real number, also _ZCB reserves must fit into 192 bits
 		if (Ureserves == 0 || _ZCBreserves >> 192 != 0  || _ZCBreserves <= _Ureserves) return;
 		uint rate = (_ZCBreserves << 64) / _Ureserves;
@@ -381,7 +391,7 @@ contract ZCBamm is IZCBamm {
 		if (!CanSetOracleRate) {
 			uint8 _toSet = toSet;
 			uint8 mostRecent = (LENGTH_RATE_SERIES-1+_toSet)%LENGTH_RATE_SERIES;
-			if (block.timestamp >= timestamps[mostRecent] + (1 minutes)) setOracleRate(_toSet);
+			if (block.timestamp >= timestamps[mostRecent] + (1 minutes)) internalSetOracleRate(_toSet);
 		}
 		_;
 	}
@@ -434,15 +444,44 @@ contract ZCBamm is IZCBamm {
 		_timestamps = timestamps;
 	}
 
+	uint private constant BONE = 1 ether;
+	function recalibrate(uint _Z) external override {
+		require(block.timestamp > 4 weeks + lastRecalibration);
+		uint _totalSupply = _inflatedTotalSupply();
+		uint _Ureserves = Ureserves;
+		uint _ZCBreserves = ZCBreserves + _totalSupply;
+
+		if (Ureserves == 0 || _ZCBreserves >> 192 != 0  || _ZCBreserves <= _Ureserves) return;
+
+		uint rate = _ZCBreserves.mul(1 ether).div(_Ureserves);
+		uint U = BigMath.ZCB_U_recalibration(timeRemaining(), rate, _Z, _totalSupply, (anchor << 64)/SecondsPerYear);
+
+		uint ZpctRemaining = _ZCBreserves.mul(1 ether).div(_Z);
+		uint UpctRemaining = _Ureserves.mul(1 ether).div(U);
+
+		if (ZpctRemaining < UpctRemaining) {
+			LPTokenInflation = LPTokenInflation.mul(ZpctRemaining).div(1 ether);
+			Ureserves = U.mul(ZpctRemaining).div(1 ether);
+		}
+		else {
+			LPTokenInflation = LPTokenInflation.mul(UpctRemaining).div(1 ether);
+			ZCBreserves = _Z.mul(UpctRemaining).div(1 ether);
+		}
+		lastRecalibration = block.timestamp;
+		//non utilized reserves will be paid out as dividends to LPs
+	}
 
 	//-----------------------o-t-h-e-r---v-i-e-w-s-----------------------------------------------
 
-	function getReserves() external view returns (uint _Ureserves, uint _ZCBreserves, uint _TimeRemaining) {
+	function getReserves() external view override returns (uint _Ureserves, uint _ZCBreserves, uint _TimeRemaining) {
 		_Ureserves = Ureserves;
 		_ZCBreserves = ZCBreserves;
 		_TimeRemaining = timeRemaining();
 	}
 
+	function inflatedTotalSupply() external view override returns (uint) {
+		return _inflatedTotalSupply();
+	}
 
 
 }

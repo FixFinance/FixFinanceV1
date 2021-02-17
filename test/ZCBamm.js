@@ -32,8 +32,8 @@ contract('ZCBamm', async function(accounts){
 		BigMathInstance = await BigMath.new();
 		yieldTokenDeployerInstance = await yieldTokenDeployer.new();
 		let timestamp = (await web3.eth.getBlock('latest')).timestamp;
-		//maturity is 11 days out
-		maturity = timestamp + 11*24*60*60;
+		//maturity is 110 days out
+		maturity = timestamp + 110*24*60*60;
 		capitalHandlerInstance = await capitalHandler.new(aaveWrapperInstance.address, maturity, yieldTokenDeployerInstance.address, nullAddress);
 		yieldTokenInstance = await yieldToken.at(await capitalHandlerInstance.yieldTokenAddress());
 		await ZCBamm.link("BigMath", BigMathInstance.address);
@@ -159,7 +159,77 @@ contract('ZCBamm', async function(accounts){
 		assert.equal(totalSupplyLT.toString(), balanceLT.toString(), "correct total supply of liquidity tokens");
 	});
 
+	it('recalibrate curve', async () => {
+		//advance time 6 weeks so that we may recalibrate
+		const _6weeks = 6 * 7 * 24 * 60 * 60;
+		await helper.advanceTimeAndBlock(_6weeks);
+		/*
+			When time passes there is a gradual drift in the curve such that some liquidity
+			provision is at negative rates thus we need to be able to recalibrate to amm to
+			fix this
+		*/
+		inflatedTotalSupplyLP = await amm.inflatedTotalSupply();
+
+		let L = parseInt(inflatedTotalSupplyLP.toString());
+		let reserves = await amm.getReserves();
+		let t = parseInt(reserves._TimeRemaining.toString()) * 2**-64;
+		let rate = (parseInt(ZCBreserves)+L) / (parseInt(Ureserves));
+		/*
+			the parameter _Z which we pass to recalibrate must be *close* to satisfying the
+			equation below though it does not have to be perfect
+	
+			L = totalSupplyLT
+			0 == (2*L**(1-t) - (Z+L)**(1-t))**(1/(1-t)) - (Z+L)/rate
+		*/
+		let exp = 1.0-t;
+		let UpperBound = L * 100;
+		let LowerBound = 0;
+		let Z = UpperBound/2;
+		let step = UpperBound/4;
+		let K = 2*Math.pow(L, exp);
+		for (let i = 0; i < 100; i++) {
+			let inner = K - Math.pow(Z+L, exp);
+			let impliedRate = rate+1;
+			let U;
+			if (inner >= 0) {
+				U = Math.pow(inner, 1/exp);
+				impliedRate = (Z+L)/U;
+			}
+			if (rate > impliedRate) {
+				Z += step;
+			}
+			else if (rate < impliedRate) {
+				Z -= step;
+			}
+			else {
+				break;
+			}
+			step /= 2;
+		}
+		let inner = 2*Math.pow(L, exp) - Math.pow(Z+L, exp);
+		let res = Math.pow(inner, 1/exp) - (Z+L)/rate;
+
+		let Zstr = Math.floor(Z).toString();
+		await amm.recalibrate(Zstr);
+
+		let results = await amm.getReserves();
+
+		YTrevenueOnRecalibrate = (new BN(Ureserves)).sub(results._Ureserves);
+		ZCBrevenueOnRecalibrate = (new BN(ZCBreserves)).sub(results._ZCBreserves).add(YTrevenueOnRecalibrate);
+
+		Ureserves = results._Ureserves.toString();
+		ZCBreserves = results._ZCBreserves.toString();
+
+		inflatedTotalSupplyLP = await amm.inflatedTotalSupply();
+	});
+
+
 	it('SwapFromSpecificTokens _ZCBin:true', async () => {
+		let results = await amm.getReserves();
+
+		Ureserves = results._Ureserves.toString();
+		ZCBreserves = results._ZCBreserves.toString();
+
 		await helper.advanceTime(61);
 
 		amtIn = balance.div(new BN(100));
@@ -170,22 +240,22 @@ contract('ZCBamm', async function(accounts){
 
 		let timestamp = (await web3.eth.getBlock(rec.receipt.blockNumber)).timestamp;
 
-		expectedNewRate = (new BN(ZCBreserves)).add(totalSupplyLT).mul( (new BN(2)).pow(new BN(64)) ).div(new BN(Ureserves));
+		expectedNewRate = (new BN(ZCBreserves)).add(inflatedTotalSupplyLP).mul( (new BN(2)).pow(new BN(64)) ).div(new BN(Ureserves));
 		assert.equal(newRateData._impliedRates[2].toString(), expectedNewRate.toString(), "correct rate stored");
 		assert.equal(newRateData._timestamps[2].toString(), timestamp.toString(), "correct height stored")
 
 		rateData = newRateData;
 
 		let r = (maturity-timestamp)/anchor;
-		let k = Math.pow(parseInt(Ureserves), 1-r) + Math.pow(parseInt(totalSupplyLT.add(new BN(ZCBreserves)).toString()), 1-r);
-		let Uout = parseInt(Ureserves) - (k - Math.pow(parseInt(totalSupplyLT.add(new BN(ZCBreserves)).add(amtIn).toString()), 1-r))**(1/(1-r));
+		let k = Math.pow(parseInt(Ureserves), 1-r) + Math.pow(parseInt(inflatedTotalSupplyLP.add(new BN(ZCBreserves)).toString()), 1-r);
+		let Uout = parseInt(Ureserves) - (k - Math.pow(parseInt(inflatedTotalSupplyLP.add(new BN(ZCBreserves)).add(amtIn).toString()), 1-r))**(1/(1-r));
 		let yearsRemaining = (maturity - timestamp)/secondsPerYear;
 		let pctFee = 1 - Math.pow(1 - AnnualFeeRateNumber, yearsRemaining);
 		let UoutFeeAdjusted = Uout * (1 - pctFee);
 		let Uexpected = parseInt(Ureserves) - UoutFeeAdjusted;
 		let ZCBexpected = parseInt(ZCBreserves) + parseInt(amtIn.toString());
 
-		let results = await amm.getReserves();
+		results = await amm.getReserves();
 
 		Ureserves = results._Ureserves.toString();
 		ZCBreserves = results._ZCBreserves.toString();
@@ -196,9 +266,11 @@ contract('ZCBamm', async function(accounts){
 		balanceYT = await yieldTokenInstance.balanceOf_2(accounts[0], false);
 		balanceZCB = await capitalHandlerInstance.balanceOf(accounts[0]);
 
+		let expectedBalanceYT = balance.sub(new BN(Ureserves)).sub(YTrevenueOnRecalibrate).toString();
+		let expectedBalanceZCB = balance.sub((new BN(ZCBreserves)).add(new BN(Ureserves))).sub(ZCBrevenueOnRecalibrate).toString()
 		assert.equal(balanceLT.toString(), Uin.toString());
-		assert.equal(balanceYT.toString(), balance.sub(new BN(Ureserves)).toString(), "correct balance YT");
-		assert.equal(balanceZCB.toString(), balance.sub((new BN(ZCBreserves)).add(new BN(Ureserves))).toString(), "correct balance ZCB");
+		assert.equal(balanceYT.toString(), expectedBalanceYT, "correct balance YT");
+		assert.equal(balanceZCB.toString(), expectedBalanceZCB, "correct balance ZCB");
 	});
 
 	it('SwapFromSpecificTokens _ZCBin:false', async () => {
@@ -212,14 +284,14 @@ contract('ZCBamm', async function(accounts){
 
 		let timestamp = (await web3.eth.getBlock(rec.receipt.blockNumber)).timestamp;
 
-		expectedNewRate = (new BN(ZCBreserves)).add(totalSupplyLT).mul( (new BN(2)).pow(new BN(64)) ).div(new BN(Ureserves));
+		expectedNewRate = (new BN(ZCBreserves)).add(inflatedTotalSupplyLP).mul( (new BN(2)).pow(new BN(64)) ).div(new BN(Ureserves));
 		assert.equal(newRateData._impliedRates[3].toString(), expectedNewRate.toString(), "correct rate stored");
 		assert.equal(newRateData._timestamps[3].toString(), timestamp.toString(), "correct height stored")
 		rateData = newRateData;
 
 		let r = (maturity-timestamp)/anchor;
-		let k = Math.pow(parseInt(Ureserves), 1-r) + Math.pow(parseInt(totalSupplyLT.add(new BN(ZCBreserves)).toString()), 1-r);
-		let ZCBout = parseInt(totalSupplyLT.add(new BN(ZCBreserves)).toString()) - (k - Math.pow( (new BN(Ureserves)).add(amtIn).toString() , 1-r))**(1/(1-r));
+		let k = Math.pow(parseInt(Ureserves), 1-r) + Math.pow(parseInt(inflatedTotalSupplyLP.add(new BN(ZCBreserves)).toString()), 1-r);
+		let ZCBout = parseInt(inflatedTotalSupplyLP.add(new BN(ZCBreserves)).toString()) - (k - Math.pow( (new BN(Ureserves)).add(amtIn).toString() , 1-r))**(1/(1-r));
 		let yearsRemaining = (maturity - timestamp)/secondsPerYear;
 		let pctFee = 1 - Math.pow(1 - AnnualFeeRateNumber, yearsRemaining);
 		let ZCBoutFeeAdjusted = ZCBout * (1 - pctFee);
@@ -237,8 +309,10 @@ contract('ZCBamm', async function(accounts){
 		balanceYT = await yieldTokenInstance.balanceOf_2(accounts[0], false);
 		balanceZCB = await capitalHandlerInstance.balanceOf(accounts[0]);
 
-		assert.equal(balanceYT.toString(), balance.sub(new BN(Ureserves)).toString(), "correct balance YT");
-		assert.equal(balanceZCB.toString(), balance.sub((new BN(ZCBreserves)).add(new BN(Ureserves))).toString(), "correct balance ZCB");
+		let expectedBalanceYT = balance.sub(new BN(Ureserves)).sub(YTrevenueOnRecalibrate).toString();
+		let expectedBalanceZCB = balance.sub((new BN(ZCBreserves)).add(new BN(Ureserves))).sub(ZCBrevenueOnRecalibrate).toString();
+		assert.equal(balanceYT.toString(), expectedBalanceYT, "correct balance YT");
+		assert.equal(balanceZCB.toString(), expectedBalanceZCB, "correct balance ZCB");
 	});
 
 	it('SwapToSpecificTokens _ZCBin:false', async () => {
@@ -252,14 +326,14 @@ contract('ZCBamm', async function(accounts){
 
 		let timestamp = (await web3.eth.getBlock(rec.receipt.blockNumber)).timestamp;
 
-		expectedNewRate = (new BN(ZCBreserves)).add(totalSupplyLT).mul( (new BN(2)).pow(new BN(64)) ).div(new BN(Ureserves));
+		expectedNewRate = (new BN(ZCBreserves)).add(inflatedTotalSupplyLP).mul( (new BN(2)).pow(new BN(64)) ).div(new BN(Ureserves));
 		assert.equal(newRateData._impliedRates[4].toString(), expectedNewRate.toString(), "correct rate stored");
 		assert.equal(newRateData._timestamps[4].toString(), timestamp.toString(), "correct height stored")
 		rateData = newRateData;
 
 		let r = (maturity-timestamp)/anchor;
-		let k = Math.pow(parseInt(Ureserves), 1-r) + Math.pow(parseInt(totalSupplyLT.add(new BN(ZCBreserves)).toString()), 1-r);
-		let Uin = (k - Math.pow(parseInt(totalSupplyLT.add(new BN(ZCBreserves)).sub(amtOut).toString()), 1-r))**(1/(1-r)) - parseInt(Ureserves);
+		let k = Math.pow(parseInt(Ureserves), 1-r) + Math.pow(parseInt(inflatedTotalSupplyLP.add(new BN(ZCBreserves)).toString()), 1-r);
+		let Uin = (k - Math.pow(parseInt(inflatedTotalSupplyLP.add(new BN(ZCBreserves)).sub(amtOut).toString()), 1-r))**(1/(1-r)) - parseInt(Ureserves);
 		let yearsRemaining = (maturity - timestamp)/secondsPerYear;
 		let pctFee = 1 - Math.pow(1 - AnnualFeeRateNumber, yearsRemaining);
 		let UinFeeAdjusted = Uin / (1 - pctFee);
@@ -277,8 +351,10 @@ contract('ZCBamm', async function(accounts){
 		balanceYT = await yieldTokenInstance.balanceOf_2(accounts[0], false);
 		balanceZCB = await capitalHandlerInstance.balanceOf(accounts[0]);
 
-		assert.equal(balanceYT.toString(), balance.sub(new BN(Ureserves)).toString(), "correct balance YT");
-		assert.equal(balanceZCB.toString(), balance.sub((new BN(ZCBreserves)).add(new BN(Ureserves))).toString(), "correct balance ZCB");
+		let expectedBalanceYT = balance.sub(new BN(Ureserves)).sub(YTrevenueOnRecalibrate).toString();
+		let expectedBalanceZCB = balance.sub((new BN(ZCBreserves)).add(new BN(Ureserves))).sub(ZCBrevenueOnRecalibrate).toString();
+		assert.equal(balanceYT.toString(), expectedBalanceYT, "correct balance YT");
+		assert.equal(balanceZCB.toString(), expectedBalanceZCB, "correct balance ZCB");
 	});
 
 	it('SwapToSpecificTokens _ZCBin:true', async () => {
@@ -292,14 +368,14 @@ contract('ZCBamm', async function(accounts){
 
 		let timestamp = (await web3.eth.getBlock(rec.receipt.blockNumber)).timestamp;
 
-		expectedNewRate = (new BN(ZCBreserves)).add(totalSupplyLT).mul( (new BN(2)).pow(new BN(64)) ).div(new BN(Ureserves));
+		expectedNewRate = (new BN(ZCBreserves)).add(inflatedTotalSupplyLP).mul( (new BN(2)).pow(new BN(64)) ).div(new BN(Ureserves));
 		assert.equal(newRateData._impliedRates[5].toString(), expectedNewRate.toString(), "correct rate stored");
 		assert.equal(newRateData._timestamps[5].toString(), timestamp.toString(), "correct height stored");
 		rateData = newRateData;
 
 		let r = (maturity-timestamp)/anchor;
-		let k = Math.pow(parseInt(Ureserves), 1-r) + Math.pow(parseInt(totalSupplyLT.add(new BN(ZCBreserves)).toString()), 1-r);
-		let ZCBin = (k - Math.pow( (new BN(Ureserves)).sub(amtOut).toString() , 1-r))**(1/(1-r)) - parseInt(totalSupplyLT.add(new BN(ZCBreserves)).toString());
+		let k = Math.pow(parseInt(Ureserves), 1-r) + Math.pow(parseInt(inflatedTotalSupplyLP.add(new BN(ZCBreserves)).toString()), 1-r);
+		let ZCBin = (k - Math.pow( (new BN(Ureserves)).sub(amtOut).toString() , 1-r))**(1/(1-r)) - parseInt(inflatedTotalSupplyLP.add(new BN(ZCBreserves)).toString());
 		let yearsRemaining = (maturity - timestamp)/secondsPerYear;
 		let pctFee = 1 - Math.pow(1 - AnnualFeeRateNumber, yearsRemaining);
 		let ZCBinFeeAdjusted = ZCBin / (1 - pctFee);
@@ -317,8 +393,10 @@ contract('ZCBamm', async function(accounts){
 		balanceYT = await yieldTokenInstance.balanceOf_2(accounts[0], false);
 		balanceZCB = await capitalHandlerInstance.balanceOf(accounts[0]);
 
-		assert.equal(balanceYT.toString(), balance.sub(new BN(Ureserves)).toString(), "correct balance YT");
-		assert.equal(balanceZCB.toString(), balance.sub((new BN(ZCBreserves)).add(new BN(Ureserves))).toString(), "correct balance ZCB");
+		let expectedBalanceYT = balance.sub(new BN(Ureserves)).sub(YTrevenueOnRecalibrate).toString();
+		let expectedBalanceZCB = balance.sub((new BN(ZCBreserves)).add(new BN(Ureserves))).sub(ZCBrevenueOnRecalibrate).toString();
+		assert.equal(balanceYT.toString(), expectedBalanceYT, "correct balance YT");
+		assert.equal(balanceZCB.toString(), expectedBalanceZCB, "correct balance ZCB");
 	});
 
 	it('Force Update Rate Data', async () => {
@@ -329,7 +407,7 @@ contract('ZCBamm', async function(accounts){
 
 		let timestamp = (await web3.eth.getBlock(rec.receipt.blockNumber)).timestamp;
 
-		expectedNewRate = (new BN(ZCBreserves)).add(totalSupplyLT).mul( (new BN(2)).pow(new BN(64)) ).div(new BN(Ureserves));
+		expectedNewRate = (new BN(ZCBreserves)).add(inflatedTotalSupplyLP).mul( (new BN(2)).pow(new BN(64)) ).div(new BN(Ureserves));
 		assert.equal(newRateData._impliedRates[6].toString(), expectedNewRate.toString(), "correct rate stored");
 		assert.equal(newRateData._timestamps[6].toString(), timestamp.toString(), "correct height stored")
 
@@ -402,11 +480,11 @@ contract('ZCBamm', async function(accounts){
 	});
 
 	it('Valid reserves', async () => {
-		//process.exit();
-		let balZCB = await capitalHandlerInstance.balanceOf(amm.address);
-		let balYT = await yieldTokenInstance.balanceOf_2(amm.address, false);
-		assert.equal(Ureserves, balYT.toString(), "valid Ureserves");
-		assert.equal(ZCBreserves, balZCB.sub(balYT).toString(), "valid ZCBreserves");
+		//subtract out revenue which may be claimed on call of contractClaimDividend()
+		let expectedZCB = (await capitalHandlerInstance.balanceOf(amm.address)).sub(ZCBrevenueOnRecalibrate);
+		let expectedYT = (await yieldTokenInstance.balanceOf_2(amm.address, false)).sub(YTrevenueOnRecalibrate);
+		assert.equal(ZCBreserves, expectedZCB.sub(expectedYT).toString(), "valid ZCBreserves");
+		assert.equal(Ureserves, expectedYT.toString(), "valid Ureserves");
 	});
 
 	it('Yield Generation does not affect pool reserves before contract claim dividend', async () => {
@@ -415,6 +493,8 @@ contract('ZCBamm', async function(accounts){
 		amtYT = balance.div(new BN(500));
 		await capitalHandlerInstance.transfer(amm.address, amtZCB);
 		await yieldTokenInstance.transfer_2(amm.address, amtYT, true);
+		amtZCB = amtZCB.add(ZCBrevenueOnRecalibrate);
+		amtYT = amtYT.add(YTrevenueOnRecalibrate);
 
 		let results = await amm.getReserves();
 		assert.equal(results._Ureserves.toString(), Ureserves, "U reserves not affected by yield generation");
@@ -427,7 +507,7 @@ contract('ZCBamm', async function(accounts){
 		assert.equal((await amm.length()).toString(), "2");
 		assert.equal((await amm.contractBalanceAsset1(1)).toString(), amtZCB.toString());
 		assert.equal((await amm.contractBalanceAsset2(1)).toString(), amtYT.toString());
-	})
+	});
 
 	it('Yield Generation does not affect pool reserves after contract claim dividend', async () => {
 		let results = await amm.getReserves();

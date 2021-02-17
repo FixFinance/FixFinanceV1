@@ -35,10 +35,17 @@ abstract contract IZCBamm is doubleAssetYieldEnabledToken {
 	function ReserveQuoteFromSpecificTokens(int128 _amount, bool _ZCBin) external virtual returns(uint _out);
 	function ReserveQuoteToSpecificTokens(int128 _amount, bool _ZCBin) external virtual returns(uint _out);
 	function TakeQuote(uint _amountIn, uint _amountOut, bool _ZCBin) external virtual;
+	function recalibrate(uint _Z) external virtual;
+	function inflatedTotalSupply() external virtual view returns (uint);
 	function getRateFromOracle() external virtual view returns (int128 rate);
 	function getAPYFromOracle() external virtual view returns (int128 APY);
 	function getImpliedRateData() external virtual view returns (
 		int128[LENGTH_RATE_SERIES] memory _impliedRates,
 		uint[LENGTH_RATE_SERIES] memory _timestamps
+	);
+	function getReserves() external virtual view returns (
+		uint _Ureserves,
+		uint _ZCBreserves,
+		uint _TimeRemaining
 	);
 }

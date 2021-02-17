@@ -12,7 +12,7 @@ import "./FeeOracle.sol";
 
 contract organizer {
 
-	uint32 private constant YTtoLmultiplier = 40;
+	uint private constant YTtoLmultiplier = 40 ether;
 
 	address[] public capitalHandlerInstances;
 

@@ -74,7 +74,8 @@ contract('YTamm', async function(accounts){
 		await amm0.burn(await amm0.balanceOf(accounts[0]));
 
 		YTtoLmultiplier = 50;
-		amm1 = await YTamm.new(amm0.address, feeOracleInstance.address, YTtoLmultiplier);
+		YTtoLmultiplierBN = _10To18BN.mul(new BN(YTtoLmultiplier));
+		amm1 = await YTamm.new(amm0.address, feeOracleInstance.address, YTtoLmultiplierBN);
 		anchor = (await amm0.anchor()).toNumber();
 
 		await capitalHandlerInstance.approve(amm1.address, balance);

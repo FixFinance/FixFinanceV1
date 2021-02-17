@@ -2,15 +2,18 @@ pragma solidity >=0.6.0;
 
 import "../helpers/IYTamm.sol";
 import "../libraries/ABDKMath64x64.sol";
+import "../libraries/SafeMath.sol";
 import "../libraries/BigMath.sol";
 import "../interfaces/IYieldToken.sol";
 import "../interfaces/IERC20.sol";
 import "../helpers/IZCBamm.sol";
 import "../FeeOracle.sol";
 
+
 contract YTamm is IYTamm {
 
 	using ABDKMath64x64 for int128;
+	using SafeMath for uint256;
 
 	address public override ZCBammAddress;
 
@@ -36,6 +39,7 @@ contract YTamm is IYTamm {
 		address _feeOracleAddress,
 		uint _YTtoLmultiplier
 	) public {
+		require(_YTtoLmultiplier != 0);
 		name = "aYT amm Liquidity Token";
 		symbol = "aYTLT";
 		address _ZCBaddress = IZCBamm(_ZCBammAddress).ZCBaddress();
@@ -102,7 +106,7 @@ contract YTamm is IYTamm {
 	}
 
 	function effectiveTotalSupply() internal view returns (uint ret) {
-		ret = totalSupply / YTtoLmultiplier;
+		ret = totalSupply.mul(1 ether) / YTtoLmultiplier;
 		require(ret > 0);
 	}
 
@@ -129,7 +133,7 @@ contract YTamm is IYTamm {
 	*/
 	function firstMint(uint128 _Uin) external override {
 		require(totalSupply == 0);
-		uint YTin = YTtoLmultiplier * _Uin;
+		uint YTin = YTtoLmultiplier.mul(_Uin) / (1 ether);
 
 		getYT(_Uin + YTin);
 		getZCB(_Uin);

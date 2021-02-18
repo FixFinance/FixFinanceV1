@@ -22,6 +22,26 @@ const AnnualFeeRate = (new BN("2")).pow(new BN("64")).div(new BN("100")); //0.01
 const AnnualFeeRateNumber = 0.01;
 const LENGTH_RATE_SERIES = 31;
 
+async function setRate(amm, rate, account) {
+	let amt = (await amm.balanceOf(account)).toString();
+	if (amt != "0") {
+		await amm.burn(amt);
+	}
+	/*
+		(ZCBreserves+totalSupply)/ Ureserves == rate
+		ZCBreserves+totalSupply == rate * Ureserves
+		ZCBreserves == rate * Ureserves - totalSupply
+	*/
+	let Ureserves = 1000000;
+	let ZCBreserves = Math.floor(rate*Ureserves - Ureserves).toString();
+	await amm.firstMint(Ureserves.toString(), ZCBreserves);
+	for (let i = 0; i < LENGTH_RATE_SERIES; i++) {
+		await helper.advanceTime(61);
+		await amm.forceRateDataUpdate();
+	}
+	await amm.setOracleRate((await amm.getImpliedRateData())._impliedRates[30].toString());
+}
+
 /*
 	Here we assume that there are no bugs in the ZCBamm contract which is used as a rate oracle for the YTamm contract
 */
@@ -32,8 +52,8 @@ contract('YTamm', async function(accounts){
 		BigMathInstance = await BigMath.new();
 		yieldTokenDeployerInstance = await yieldTokenDeployer.new();
 		let timestamp = (await web3.eth.getBlock('latest')).timestamp;
-		//maturity is 11 days out
-		maturity = timestamp + 11*24*60*60;
+		//maturity is 110 days out
+		maturity = timestamp + 110*24*60*60;
 		capitalHandlerInstance = await capitalHandler.new(aaveWrapperInstance.address, maturity, yieldTokenDeployerInstance.address, nullAddress);
 		yieldTokenInstance = await yieldToken.at(await capitalHandlerInstance.yieldTokenAddress());
 		await ZCBamm.link("BigMath", BigMathInstance.address);
@@ -170,14 +190,130 @@ contract('YTamm', async function(accounts){
 		assert.equal(YTbalance.sub(prevYTbalance.sub(Uin)).toString(), amtOut.toString(), "correct amount U out");
 	});
 
+	it('SwapToSpecificYT() push effective APY over APYo', async () => {
+		amtOut = amtIn;
+		let results = await amm1.getReserves();
+		Ureserves = results._Ureserves;
+		YTreserves = results._YTreserves;
+
+		rec = await amm1.SwapToSpecificYT(amtOut);
+		let timestamp = (await web3.eth.getBlock(rec.receipt.blockNumber)).timestamp;
+		let yearsRemaining = (maturity - timestamp)/secondsPerYear;
+		let pctFee = 1 - Math.pow(1 - AnnualFeeRateNumber, yearsRemaining);
+		let r = (maturity-timestamp)/anchor;
+		let nonFeeAdjustedUin = YT_U_math.Uin(parseInt(YTreserves.toString()), parseInt(totalSupply.div(new BN(YTtoLmultiplier)).toString()), r, OracleRate, parseInt(amtOut.toString()));
+		let expectedUin = nonFeeAdjustedUin / (1 - pctFee);
+		let prevZCBbalance = ZCBbalance;
+		ZCBbalance = await capitalHandlerInstance.balanceOf(accounts[0]);
+		let Uin = prevZCBbalance.sub(ZCBbalance);
+		let error = Math.abs(parseInt(Uin.toString())/expectedUin - 1);
+		assert.isBelow(error, 0.000001, "acceptable margin of error")
+		let prevYTbalance = YTbalance;
+		YTbalance = await yieldTokenInstance.balanceOf_2(accounts[0], false);
+		assert.equal(YTbalance.sub(prevYTbalance.sub(Uin)).toString(), amtOut.toString(), "correct amount U out");
+	});
+
+	it('recalibrate() on being stuck at high APY', async () => {
+		//first the amm must encur losses
+		amt = toMint.mul(new BN(YTtoLmultiplier*4/5));
+		//buy YT, (amm sells YT)
+		await amm1.SwapToSpecificYT(amt);
+		OracleRate = 35.0;
+		await setRate(amm0, OracleRate, accounts[0]);
+		//sell YT, (amm buys YT)
+		await amm1.SwapFromSpecificYT(amt);
+		OracleRate = 1.000001;
+
+		//encur more losses
+		await setRate(amm0, OracleRate, accounts[0]);
+		//buy YT, (amm sells YT)
+		await amm1.SwapToSpecificYT(amt);
+		OracleRate = 35.0;
+		await setRate(amm0, OracleRate, accounts[0]);
+		//sell YT, (amm buys YT)
+		await amm1.SwapFromSpecificYT(amt);
+
+		let results = await amm1.getReserves();
+		Ureserves = results._Ureserves;
+		YTreserves = results._YTreserves;
+
+		let r = parseInt(results._TimeRemaining.toString()) * 2**-64;
+		let UpperBound = parseInt(YTreserves.toString());
+		while (parseInt(Ureserves.toString()) > 
+			YT_U_math.Uout(parseInt( YTreserves.toString()), parseInt(totalSupply.div(new BN(YTtoLmultiplier)).toString()), r, OracleRate, UpperBound) ) {
+			UpperBound *= 10;
+		}
+
+		let LowerBound = 0;
+		let MaxYin = UpperBound/2;
+		let step = UpperBound/4;
+		for (let i = 0; i < 100; i++) {
+			let Uout = YT_U_math.Uout(parseInt(
+				YTreserves.toString()),
+				parseInt(totalSupply.div(new BN(YTtoLmultiplier)).toString()),
+				r,
+				OracleRate,
+				MaxYin
+			);
+			if (Uout > parseInt(Ureserves.toString())) {
+				MaxYin -= step;
+			}
+			else if (Uout < parseInt(Ureserves.toString())) {
+				MaxYin += step;
+			}
+			else {
+				break;
+			}
+			step /= 2;
+		}
+		MaxYin -= step*2 + 1;
+		let MaxYinStr = Math.floor(MaxYin).toString();
+
+		let prevReserves = await amm1.getReserves();
+
+		await amm1.recalibrate(MaxYinStr);
+
+		let reserves = await amm1.getReserves();
+
+		amtUrevenue = prevReserves._Ureserves.sub(reserves._Ureserves);
+		amtYTrevenue = prevReserves._YTreserves.sub(reserves._YTreserves);
+	});
+
+	it('recalibrate() on time', async () => {
+		let caught = false;
+		try {
+			await amm1.recalibrate(0);
+		}
+		catch (err) {
+			caught = true;
+		}
+		if (!caught) {
+			assert.fail("what on earth do you mean");
+		}
+
+		const _5weeks = 5 * 7 * 24 * 60 * 60;
+		await helper.advanceTime(_5weeks);
+
+		let prevReserves = await amm1.getReserves();
+
+		await amm1.recalibrate(0);
+
+		let reserves = await amm1.getReserves();
+
+		amtUrevenue = prevReserves._Ureserves.sub(reserves._Ureserves).add(amtUrevenue);
+		amtYTrevenue = prevReserves._YTreserves.sub(reserves._YTreserves).add(amtYTrevenue);
+	});
+
 	it('Valid reserves', async () => {
 		let results = await amm1.getReserves();
 		Ureserves = results._Ureserves.toString();
 		YTreserves = results._YTreserves.toString();
 		let balZCB = await capitalHandlerInstance.balanceOf(amm1.address);
 		let balYT = await yieldTokenInstance.balanceOf_2(amm1.address, false);
-		assert.equal(Ureserves, balZCB.toString(), "valid Ureserves");
-		assert.equal(YTreserves, balYT.sub(balZCB).toString(), "valid ZCBreserves");
+		let expectedUreserves = balZCB.sub(amtUrevenue).toString();
+		let expectedYTreserves = balYT.sub(balZCB).sub(amtYTrevenue).toString();
+		assert.equal(Ureserves, expectedUreserves, "valid Ureserves");
+		assert.equal(YTreserves, expectedYTreserves, "valid ZCBreserves");
 	});
 
 	it('Yield Generation does not affect pool reserves before contract claim dividend', async () => {
@@ -186,6 +322,8 @@ contract('YTamm', async function(accounts){
 		amtYT = balance.div(new BN(500));
 		await capitalHandlerInstance.transfer(amm1.address, amtZCB);
 		await yieldTokenInstance.transfer_2(amm1.address, amtYT, true);
+		amtZCB = amtZCB.add(amtUrevenue);
+		amtYT = amtYT.add(amtYTrevenue).add(amtUrevenue);
 
 		let results = await amm1.getReserves();
 		assert.equal(results._Ureserves.toString(), Ureserves, "U reserves not affected by yield generation");

@@ -32,6 +32,7 @@ contract YTamm is IYTamm {
 	int128 quotedAmountYT;
 	uint256 quotedAmountU;
 
+	uint public lastRecalibration;
 	uint public YTtoLmultiplier;
 
 	constructor(
@@ -142,6 +143,80 @@ contract YTamm is IYTamm {
 
 		Ureserves = _Uin;
 		YTreserves = YTin;
+	}
+
+	function isOutOfSync(int128 _approxYTin) internal view returns (bool) {
+		uint _YTreserves = YTreserves;
+		require(_approxYTin > 0);
+		uint _effectiveTotalSupply = effectiveTotalSupply();
+		uint Uchange = uint(-BigMath.YT_U_reserve_change(
+			_YTreserves,
+			_effectiveTotalSupply,
+			timeRemaining(),
+			IZCBamm(ZCBammAddress).getRateFromOracle(),
+			_approxYTin
+		));
+		if (Uchange >= Ureserves) {
+			return false;
+		}
+		uint _MaxYTreserves = _YTreserves + uint(_approxYTin);
+		/*
+			L = effectiveTotalSupply
+
+			L/_YTreservesAtAPYo == 1
+			_YTreservesAtAPYo == L
+	
+			Thus effectiveTotalSupply == YTLiquidityAboveAPYo
+		*/
+
+		//if APYo does not exist along the amm curve
+		if (_MaxYTreserves >= _effectiveTotalSupply) {
+			return true;
+		}
+		uint YTliquidityUnderAPYo = _MaxYTreserves - _effectiveTotalSupply;
+		if (YTliquidityUnderAPYo < 2*_effectiveTotalSupply) {
+			return true;
+		}
+		return false;
+	}
+
+	function recalibrate(int128 _approxYTin) external override {
+		require(block.timestamp > lastRecalibration + 4 weeks || isOutOfSync(_approxYTin));
+		/*
+			Ureserves == (1 - APYo**(-timeRemaining)) * YTreserves
+
+			APYeff == APYo**(L/YTreserves)
+			APYerr == APYo
+			L/YTreserves == 1
+			L == YTreserves
+		*/
+		uint _YTreserves = YTreserves;
+		uint impliedUreserves;
+		{
+			int128 OracleRate = IZCBamm(ZCBammAddress).getRateFromOracle();
+			int128 _TimeRemaining = int128(timeRemaining());
+			// term == OracleRate**(-_TimeRemaining)
+			int128 term = OracleRate.log_2().mul(_TimeRemaining).neg().exp_2();
+			int128 multiplier = BigMath.ABDK_1.sub(term);
+			impliedUreserves = YTreserves.mul(uint(multiplier)) >> 64;
+		}
+		uint _Ureserves = Ureserves;
+		if (_Ureserves > impliedUreserves) {
+			Ureserves = impliedUreserves;
+		}
+		else {
+			_YTreserves = _YTreserves.mul(_Ureserves).div(impliedUreserves);
+			YTreserves = _YTreserves;
+		}
+		/*
+			L == totalSupply / YTtoLmultiplier
+			L/YTreserves == 1
+			L == YTreserves
+			YTreserves == totalSupply / YTtoLmultiplier
+			YTtoLmultiplier == totalSupply / YTreserves
+		*/
+		YTtoLmultiplier = totalSupply.mul(1 ether) / _YTreserves;
+		lastRecalibration = block.timestamp;
 	}
 
 	function mint(uint _amount, uint _maxUin, uint _maxYTin) external override {

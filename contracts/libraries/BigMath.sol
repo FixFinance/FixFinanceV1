@@ -19,7 +19,7 @@ library BigMath {
 
   int128 private constant MAX = 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
 
-  int128 private constant ABDK_1 = 1<<64;
+  int128 public constant ABDK_1 = 1<<64;
 
   uint private constant BONE = 1 ether;
   

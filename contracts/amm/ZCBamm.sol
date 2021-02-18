@@ -444,7 +444,6 @@ contract ZCBamm is IZCBamm {
 		_timestamps = timestamps;
 	}
 
-	uint private constant BONE = 1 ether;
 	function recalibrate(uint _Z) external override {
 		require(block.timestamp > 4 weeks + lastRecalibration);
 		uint _totalSupply = _inflatedTotalSupply();

@@ -33,6 +33,7 @@ abstract contract IYTamm is doubleAssetYieldEnabledToken {
 	function ReserveQuoteFromYT(int128 _amount) external virtual returns (uint);
 	function ReserveQuoteToYT(int128 _amount) external virtual returns (uint);
 	function TakeQuote(uint _amountU, int128 _amountYT, bool _YTin) external virtual;
+	function recalibrate(int128 _approxYTin) external virtual;
 	function getReserves() external virtual view returns (
 		uint _Ureserves,
 		uint _YTreserves,

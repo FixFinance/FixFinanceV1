@@ -266,7 +266,7 @@ contract('YTamm', async function(accounts){
 			}
 			step /= 2;
 		}
-		MaxYin -= step*2 + 1;
+		MaxYin += step*2 + 1;
 		let MaxYinStr = Math.floor(MaxYin).toString();
 
 		let prevReserves = await amm1.getReserves();
@@ -331,17 +331,57 @@ contract('YTamm', async function(accounts){
 	});
 
 	it('Contract Claim Dividend', async () => {
+		prevInflatedTotalSupply = await amm1.inflatedTotalSupply();
+
 		await amm1.contractClaimDividend();
+
+		let UreservesBN = new BN(Ureserves);
+		let YTreservesBN = new BN(YTreserves);
+		let CombinedYTBN = UreservesBN.add(YTreservesBN);
+
+		let ZCBUtilizationOverReserves = amtZCB.mul(_10To18BN).div(UreservesBN);
+		let YTUtilizationOverReserves = amtYT.mul(_10To18BN).div(CombinedYTBN);
+
+		expectedUreserves = new BN(0);
+		expectedYTreserves = new BN(0);
+		scaleMultiplier = new BN(0);
+		if (ZCBUtilizationOverReserves.cmp(YTUtilizationOverReserves) === 1) {
+			scaleMultiplier = YTUtilizationOverReserves.add(_10To18BN);
+			let scaledAmtZCB = amtZCB.mul(YTUtilizationOverReserves).div(ZCBUtilizationOverReserves);
+			expectedUreserves = (new BN(Ureserves)).add(scaledAmtZCB);
+			expectedYTreserves = (new BN(YTreserves)).add(amtYT).sub(scaledAmtZCB);
+
+			amtZCB = amtZCB.sub(scaledAmtZCB);
+			amtYT = new BN(0);
+		}
+		else {
+			scaleMultiplier = ZCBUtilizationOverReserves.add(_10To18BN);
+			let scaledAmtYT = amtYT.mul(ZCBUtilizationOverReserves).div(YTUtilizationOverReserves);
+			expectedUreserves = (new BN(Ureserves)).add(amtZCB);
+			expectedYTreserves = (new BN(YTreserves)).add(scaledAmtYT).sub(amtZCB);
+
+			amtZCB = new BN(0);
+			amtYT = amtYT.sub(scaledAmtYT);
+		}
 
 		assert.equal((await amm1.length()).toString(), "2");
 		assert.equal((await amm1.contractBalanceAsset1(1)).toString(), amtZCB.toString());
 		assert.equal((await amm1.contractBalanceAsset2(1)).toString(), amtYT.toString());
 	})
 
-	it('Yield Generation does not affect pool reserves after contract claim dividend', async () => {
+	it('Yield Generation does not correctly changes pool reserves after contractClaimDividend()', async () => {
 		let results = await amm1.getReserves();
-		assert.equal(results._Ureserves.toString(), Ureserves, "U reserves not affected by yield generation");
-		assert.equal(results._YTreserves.toString(), YTreserves, "U reserves not affected by yield generation");
+		assert.equal(results._Ureserves.toString(), expectedUreserves, "U reserves correctly changed by yield generation");
+		assert.equal(results._YTreserves.toString(), expectedYTreserves, "YT reserves correctly changed by yield generation");
+	});
+
+	it('inflatedTotalSupply() changes on contractClaimDividend', async () => {
+		let expectedInflatedTotalSupply = prevInflatedTotalSupply.mul(scaleMultiplier).div(_10To18BN);
+		let inflatedTotalSupply = await amm1.inflatedTotalSupply();
+		let expectedNum = parseInt(expectedInflatedTotalSupply.toString());
+		let actualNum = parseInt(inflatedTotalSupply.toString());
+		let error = Math.abs(actualNum - expectedNum)/actualNum;
+		assert.isBelow(error, AcceptableMarginOfError, "inflatedTotalSupply is within acceptable margin of error");
 	});
 
 	it('User Claims Generated Yield', async () => {
@@ -353,24 +393,61 @@ contract('YTamm', async function(accounts){
 		assert.equal(event._amtYT.toString(), amtYT.toString());
 	});
 
+	it('Valid reserves', async () => {
+		let results = await amm1.getReserves();
+		Ureserves = results._Ureserves.toString();
+		YTreserves = results._YTreserves.toString();
+		let balZCB = await capitalHandlerInstance.balanceOf(amm1.address);
+		let balYT = await yieldTokenInstance.balanceOf_2(amm1.address, false);
+		let expectedUreserves = balZCB.toString();
+		let expectedYTreserves = balYT.sub(balZCB).toString();
+		assert.equal(Ureserves, expectedUreserves, "valid Ureserves");
+		assert.equal(YTreserves, expectedYTreserves, "valid ZCBreserves");
+	});
+
 	it('ClaimContract Dividend After Dividend Payouts', async () => {
 		//advance 1 day and 1 second
 		await helper.advanceTime(1 + 24*60*60);
 
-		amtZCB2 = amtZCB.div(new BN(2));
-		amtYT2 = amtYT.div(new BN(5));
+		amtZCB2 = _10To18BN.div(new BN(1000));
+		amtYT2 = _10To18BN.div(new BN(1000));
 
 		await capitalHandlerInstance.transfer(amm1.address, amtZCB2);
 		await yieldTokenInstance.transfer_2(amm1.address, amtYT2, true);
 
 		await amm1.contractClaimDividend();
 
+		let UreservesBN = new BN(Ureserves);
+		let YTreservesBN = new BN(YTreserves);
+		let CombinedYTBN = UreservesBN.add(YTreservesBN);
+
+		let ZCBUtilizationOverReserves = amtZCB2.mul(_10To18BN).div(UreservesBN);
+		let YTUtilizationOverReserves = amtYT2.mul(_10To18BN).div(CombinedYTBN);
+
+		if (ZCBUtilizationOverReserves.cmp(YTUtilizationOverReserves) === 1) {
+			let scaledAmtZCB = amtZCB2.mul(YTUtilizationOverReserves).div(ZCBUtilizationOverReserves);
+			expectedUreserves = (new BN(Ureserves)).add(scaledAmtZCB);
+			expectedYTreserves = (new BN(YTreserves)).add(amtYT2).sub(scaledAmtZCB);
+
+			amtZCB2 = amtZCB2.sub(scaledAmtZCB);
+			amtYT2 = new BN(0);
+		}
+		else {
+			let scaledAmtYT = amtYT2.mul(ZCBUtilizationOverReserves).div(YTUtilizationOverReserves);
+			expectedUreserves = (new BN(Ureserves)).add(amtZCB2);
+			expectedYTreserves = (new BN(YTreserves)).add(scaledAmtYT).sub(amtZCB2);
+
+			amtZCB2 = new BN(0);
+			amtYT2 = amtYT2.sub(scaledAmtYT);
+		}
+
+
 		assert.equal((await amm1.length()).toString(), "3");
 		assert.equal((await amm1.contractBalanceAsset1(2)).toString(), amtZCB.add(amtZCB2).toString());
 		assert.equal((await amm1.contractBalanceAsset2(2)).toString(), amtYT.add(amtYT2).toString());
 	});
 
-	it('ClaimContract Dividend After Dividend Payouts', async () => {
+	it('Cannot call contractClaimDividend() with no yield generation', async () => {
 		//advance 1 day and 1 second
 		await helper.advanceTime(1 + 24*60*60);
 		let caught = false;
@@ -403,12 +480,44 @@ contract('YTamm', async function(accounts){
 
 	it('Claims Dividend on transferFrom() call', async () => {
 		//generate yield for LPs
+		amtZCB = _10To18BN.div(new BN(1000));
+		amtYT = _10To18BN.div(new BN(5000));
 		await capitalHandlerInstance.transfer(amm1.address, amtZCB);
 		await yieldTokenInstance.transfer_2(amm1.address, amtYT, true);
+
 		await amm1.contractClaimDividend();
 
 		await amm1.approve(accounts[0], amount, {from: accounts[1]});
 		rec = await amm1.transferFrom(accounts[1], accounts[0], amount);
+
+		let results = await amm1.getReserves();
+		Ureserves = results._Ureserves.toString();
+		YTreserves = results._YTreserves.toString();
+		let UreservesBN = new BN(Ureserves);
+		let YTreservesBN = new BN(YTreserves);
+		let CombinedYTBN = UreservesBN.add(YTreservesBN);
+
+		let ZCBUtilizationOverReserves = amtZCB.mul(_10To18BN).div(UreservesBN);
+		let YTUtilizationOverReserves = amtYT.mul(_10To18BN).div(CombinedYTBN);
+
+		expectedUreserves = new BN(0);
+		expectedYTreserves = new BN(0);
+		if (ZCBUtilizationOverReserves.cmp(YTUtilizationOverReserves) === 1) {
+			let scaledAmtZCB = amtZCB.mul(YTUtilizationOverReserves).div(ZCBUtilizationOverReserves);
+			expectedUreserves = (new BN(Ureserves)).add(scaledAmtZCB);
+			expectedYTreserves = (new BN(YTreserves)).add(amtYT).sub(scaledAmtZCB);
+
+			amtZCB = amtZCB.sub(scaledAmtZCB);
+			amtYT = new BN(0);
+		}
+		else {
+			let scaledAmtYT = amtYT.mul(ZCBUtilizationOverReserves).div(YTUtilizationOverReserves);
+			expectedUreserves = (new BN(Ureserves)).add(amtZCB);
+			expectedYTreserves = (new BN(YTreserves)).add(scaledAmtYT).sub(amtZCB);
+
+			amtZCB = new BN(0);
+			amtYT = amtYT.sub(scaledAmtYT);
+		}
 
 		let event = rec.logs[2].args;
 		assert.equal(event._claimer.toString(), accounts[1]);

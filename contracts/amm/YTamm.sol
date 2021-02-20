@@ -106,7 +106,7 @@ contract YTamm is IYTamm {
 		return uint(int128((maturity-block.timestamp)<<64).div(int128(anchor<<64)));
 	}
 
-	function effectiveTotalSupply() internal view returns (uint ret) {
+	function _inflatedTotalSupply() internal view returns (uint ret) {
 		ret = totalSupply.mul(1 ether) / YTtoLmultiplier;
 		require(ret > 0);
 	}
@@ -148,15 +148,16 @@ contract YTamm is IYTamm {
 	function isOutOfSync(int128 _approxYTin) internal view returns (bool) {
 		uint _YTreserves = YTreserves;
 		require(_approxYTin > 0);
-		uint _effectiveTotalSupply = effectiveTotalSupply();
+		uint effectiveTotalSupply = _inflatedTotalSupply();
 		uint Uchange = uint(-BigMath.YT_U_reserve_change(
 			_YTreserves,
-			_effectiveTotalSupply,
+			effectiveTotalSupply,
 			timeRemaining(),
 			IZCBamm(ZCBammAddress).getRateFromOracle(),
 			_approxYTin
 		));
-		if (Uchange >= Ureserves) {
+		if (Uchange < Ureserves) {
+			// in this case _approxYTin is of no use to us as an upper bound 
 			return false;
 		}
 		uint _MaxYTreserves = _YTreserves + uint(_approxYTin);
@@ -169,12 +170,12 @@ contract YTamm is IYTamm {
 			Thus effectiveTotalSupply == YTLiquidityAboveAPYo
 		*/
 
-		//if APYo does not exist along the amm curve
-		if (_MaxYTreserves >= _effectiveTotalSupply) {
+		//if APYo does not exist along the amm curve return out of sync
+		if (_MaxYTreserves >= effectiveTotalSupply) {
 			return true;
 		}
-		uint YTliquidityUnderAPYo = _MaxYTreserves - _effectiveTotalSupply;
-		if (YTliquidityUnderAPYo < 2*_effectiveTotalSupply) {
+		uint YTliquidityUnderAPYo = _MaxYTreserves - effectiveTotalSupply;
+		if (YTliquidityUnderAPYo < 2*effectiveTotalSupply) {
 			return true;
 		}
 		return false;
@@ -256,7 +257,7 @@ contract YTamm is IYTamm {
 		require(_amount > 0);
 		uint _TimeRemaining = timeRemaining();
 		int128 OracleRate = IZCBamm(ZCBammAddress).getRateFromOracle();
-		uint nonFeeAdjustedUout = uint(-BigMath.YT_U_reserve_change(YTreserves, effectiveTotalSupply(), _TimeRemaining, OracleRate, _amount));
+		uint nonFeeAdjustedUout = uint(-BigMath.YT_U_reserve_change(YTreserves, _inflatedTotalSupply(), _TimeRemaining, OracleRate, _amount));
 		uint Uout = FeeOracle(FeeOracleAddress).feeAdjustedAmountOut(maturity, nonFeeAdjustedUout);
 
 		require(Ureserves > Uout);
@@ -276,7 +277,7 @@ contract YTamm is IYTamm {
 		require(_YTreserves > uint(_amount));
 		uint _TimeRemaining = timeRemaining();
 		int128 OracleRate = IZCBamm(ZCBammAddress).getRateFromOracle();
-		uint nonFeeAdjustedUin = uint(BigMath.YT_U_reserve_change(_YTreserves, effectiveTotalSupply(), _TimeRemaining, OracleRate, -_amount));
+		uint nonFeeAdjustedUin = uint(BigMath.YT_U_reserve_change(_YTreserves, _inflatedTotalSupply(), _TimeRemaining, OracleRate, -_amount));
 		uint Uin = FeeOracle(FeeOracleAddress).feeAdjustedAmountIn(maturity, nonFeeAdjustedUin);
 
 		sendYTgetU(uint(_amount), Uin);
@@ -305,7 +306,7 @@ contract YTamm is IYTamm {
 		uint _TimeRemaining = timeRemaining();
 		int128 OracleRate = IZCBamm(ZCBammAddress).getRateFromOracle();
 		uint _YTreserves = YTreserves;
-		uint nonFeeAdjustedUout = uint(-BigMath.YT_U_reserve_change(_YTreserves, effectiveTotalSupply(), _TimeRemaining, OracleRate, _amount));
+		uint nonFeeAdjustedUout = uint(-BigMath.YT_U_reserve_change(_YTreserves, _inflatedTotalSupply(), _TimeRemaining, OracleRate, _amount));
 		uint Uout = FeeOracle(FeeOracleAddress).feeAdjustedAmountOut(maturity, nonFeeAdjustedUout);
 		require(Ureserves > Uout);
 		writeQuoteSignature(true, _amount, Uout);
@@ -318,7 +319,7 @@ contract YTamm is IYTamm {
 		require(_YTreserves > uint(_amount));
 		uint _TimeRemaining = timeRemaining();
 		int128 OracleRate = IZCBamm(ZCBammAddress).getRateFromOracle();
-		uint nonFeeAdjustedUin = uint(BigMath.YT_U_reserve_change(_YTreserves, effectiveTotalSupply(), _TimeRemaining, OracleRate, -_amount));
+		uint nonFeeAdjustedUin = uint(BigMath.YT_U_reserve_change(_YTreserves, _inflatedTotalSupply(), _TimeRemaining, OracleRate, -_amount));
 		uint Uin = FeeOracle(FeeOracleAddress).feeAdjustedAmountIn(maturity, nonFeeAdjustedUin);
 		writeQuoteSignature(false, _amount, Uin);
 		return Uin;
@@ -343,22 +344,76 @@ contract YTamm is IYTamm {
 
 	//-------------------------implement double asset yield enabled token-------------------------------
 	function contractClaimDividend() external override {
-		require(lastWithdraw < block.timestamp - 86400, "this function can only be called once every 24 hours");
+		require(lastWithdraw + 1 days < block.timestamp, "this function can only be called once every 24 hours");
 
 		uint _YTreserves = YTreserves;	//gas savings
 		uint _Ureserves = Ureserves;	//gas savings
+		uint _YT_Ur = _Ureserves + _YTreserves;
 
-		uint amount = IERC20(ZCBaddress).balanceOf(address(this));
-		require(amount > _Ureserves);
-		amount = amount - _Ureserves + ZCBdividendOut;
-		require(amount > contractBalanceAsset1[contractBalanceAsset1.length-1]);
-		contractBalanceAsset1.push(amount);
+		uint amtZCB = IERC20(ZCBaddress).balanceOf(address(this));
+		uint amtYT = IYieldToken(YTaddress).balanceOf_2(address(this), false);
+		require(amtZCB > _Ureserves);
+		require(amtYT > _YT_Ur);
+		amtZCB = amtZCB - _Ureserves + ZCBdividendOut;
+		amtYT = amtYT - _YT_Ur + YTdividendOut;
 
-		amount = IYieldToken(YTaddress).balanceOf_2(address(this), false);
-		require(amount > _Ureserves + _YTreserves);
-		amount = amount - _Ureserves - _YTreserves + YTdividendOut;
-		require(amount > contractBalanceAsset2[contractBalanceAsset2.length-1]);
-		contractBalanceAsset2.push(amount);
+		uint prevAsset1 = contractBalanceAsset1[contractBalanceAsset1.length-1];
+		uint prevAsset2 = contractBalanceAsset2[contractBalanceAsset2.length-1];
+
+		require(amtZCB > prevAsset1);
+		require(amtYT > prevAsset2);
+
+		{
+			uint ZCBoverReserves = amtZCB - prevAsset1;
+			uint YToverReserves = amtYT - prevAsset2;
+
+			uint ZCBoverutilization = ZCBoverReserves.mul(1 ether).div(_Ureserves);
+			uint YToverutilization = YToverReserves.mul(1 ether).div(_YT_Ur);
+
+			/*
+				Scale up reserves and effective total supply as much as possible
+			*/
+			if (ZCBoverutilization > YToverutilization) {
+				uint scaledZCBoverReserves = ZCBoverReserves.mul(YToverutilization).div(ZCBoverutilization);
+
+				amtZCB = ZCBoverReserves.sub(scaledZCBoverReserves).add(prevAsset1);
+				amtYT = prevAsset2;
+
+				YTreserves += YToverReserves.sub(scaledZCBoverReserves);
+				Ureserves += scaledZCBoverReserves;
+
+				/*
+					L == effectiveTotalSupply == totalSupply / YTtoLmultiplier
+					
+					L * (1 + YToverutilization) == totalSupply / (YTtoLmultiplier / (1 + YToverutilization) )
+
+					to increase L by YToverutilization do:
+					YTtoLmultiplier /= 1 + YToverutilization
+				*/
+				YTtoLmultiplier = YTtoLmultiplier.mul(1 ether).div((YToverutilization).add(1 ether));
+			}
+			else {
+				uint scaledYToverReserves = YToverReserves.mul(ZCBoverutilization).div(YToverutilization);
+
+				amtZCB = prevAsset1;
+				amtYT = YToverReserves.sub(scaledYToverReserves).add(prevAsset2);
+
+				YTreserves += scaledYToverReserves.sub(ZCBoverReserves);
+				Ureserves += ZCBoverReserves;
+				/*
+					L == effectiveTotalSupply == totalSupply / YTtoLmultiplier
+					
+					L * (1 + ZCBoverutilization) == totalSupply / (YTtoLmultiplier / (1 + ZCBoverutilization) )
+
+					to increase L by ZCBoverutilization do:
+					YTtoLmultiplier /= 1 + ZCBoverutilization
+				*/
+				YTtoLmultiplier = YTtoLmultiplier.mul(1 ether).div((ZCBoverutilization).add(1 ether));
+			}
+		}
+
+		contractBalanceAsset1.push(amtZCB);
+		contractBalanceAsset2.push(amtYT);
 
 		lastWithdraw = block.timestamp;
 	}
@@ -370,6 +425,10 @@ contract YTamm is IYTamm {
 		_Ureserves = Ureserves;
 		_YTreserves = YTreserves;
 		_TimeRemaining = timeRemaining();
+	}
+
+	function inflatedTotalSupply() external override view returns (uint) {
+		return _inflatedTotalSupply();
 	}
 
 }

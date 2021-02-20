@@ -502,7 +502,39 @@ contract('ZCBamm', async function(accounts){
 	});
 
 	it('Contract Claim Dividend', async () => {
+		prevInflatedTotalSupply = await amm.inflatedTotalSupply();
+
 		await amm.contractClaimDividend();
+
+		let UreservesBN = new BN(Ureserves);
+		let ZCBreservesBN = new BN(ZCBreserves);
+		let CombinedZCBBN = UreservesBN.add(ZCBreservesBN);
+
+		let ZCBUtilizationOverReserves = amtZCB.mul(_10To18BN).div(CombinedZCBBN);
+		let YTUtilizationOverReserves = amtYT.mul(_10To18BN).div(UreservesBN);
+
+		expectedUreserves = new BN(0);
+		expectedZCBreserves = new BN(0);
+		scaleMultiplier = new BN(0);
+		if (ZCBUtilizationOverReserves.cmp(YTUtilizationOverReserves) === 1) {
+			scaleMultiplier = YTUtilizationOverReserves.add(_10To18BN);
+			let scaledAmtZCB = amtZCB.mul(YTUtilizationOverReserves).div(ZCBUtilizationOverReserves);
+			expectedUreserves = UreservesBN.add(amtYT);
+			expectedZCBreserves = ZCBreservesBN.add(scaledAmtZCB).sub(amtYT);
+
+			amtZCB = amtZCB.sub(scaledAmtZCB);
+			amtYT = new BN(0);
+		}
+		else {
+			scaleMultiplier = ZCBUtilizationOverReserves.add(_10To18BN);
+			let scaledAmtYT = amtYT.mul(ZCBUtilizationOverReserves).div(YTUtilizationOverReserves);
+			expectedUreserves = UreservesBN.add(scaledAmtYT);
+			expectedZCBreserves = ZCBreservesBN.add(amtZCB).sub(scaledAmtYT);
+
+			amtZCB = new BN(0);
+			amtYT = amtYT.sub(scaledAmtYT);
+		}
+
 
 		assert.equal((await amm.length()).toString(), "2");
 		assert.equal((await amm.contractBalanceAsset1(1)).toString(), amtZCB.toString());
@@ -511,8 +543,19 @@ contract('ZCBamm', async function(accounts){
 
 	it('Yield Generation does not affect pool reserves after contract claim dividend', async () => {
 		let results = await amm.getReserves();
-		assert.equal(results._Ureserves.toString(), Ureserves, "U reserves not affected by yield generation");
-		assert.equal(results._ZCBreserves.toString(), ZCBreserves, "U reserves not affected by yield generation");
+
+		//expected reserves calculated a different way, ensure they are the same
+		let expectedUreserves2 = parseInt((new BN(Ureserves)).mul(scaleMultiplier).div(_10To18BN).toString());
+		let expectedZCBreserves2 = parseInt((new BN(ZCBreserves)).mul(scaleMultiplier).div(_10To18BN).toString());
+
+		Ureserves = results._Ureserves.toString();
+		ZCBreserves = results._ZCBreserves.toString();
+
+		assert.isBelow(AmountError(parseInt(Ureserves), expectedUreserves2), ErrorRange, "Ureserves within error range");
+		assert.isBelow(AmountError(parseInt(ZCBreserves), expectedZCBreserves2), ErrorRange, "ZCBreserves within error range");
+
+		assert.equal(Ureserves, expectedUreserves.toString(), "U reserves not affected by yield generation");
+		assert.equal(ZCBreserves, expectedZCBreserves.toString(), "ZCB reserves not affected by yield generation");
 	});
 
 	it('User Claims Generated Yield', async () => {
@@ -528,11 +571,41 @@ contract('ZCBamm', async function(accounts){
 		//advance 1 day and 1 second
 		await helper.advanceTime(1 + 24*60*60);
 
-		amtZCB2 = amtZCB.div(new BN(2));
-		amtYT2 = amtYT.div(new BN(5));
+		let UreservesBN = new BN(Ureserves);
+		let ZCBreservesBN = new BN(ZCBreserves);
+		let CombinedZCBBN = UreservesBN.add(ZCBreservesBN);
 
-		await capitalHandlerInstance.transfer(amm.address, amtZCB2);
-		await yieldTokenInstance.transfer_2(amm.address, amtYT2, true);
+
+
+		let zcbToSend = CombinedZCBBN.div(new BN(2));;
+		let ytToSend = UreservesBN.div(new BN(5));
+		amtZCB2 = zcbToSend;
+		amtYT2 = ytToSend;
+
+		let ZCBUtilizationOverReserves = amtZCB2.mul(_10To18BN).div(CombinedZCBBN);
+		let YTUtilizationOverReserves = amtYT2.mul(_10To18BN).div(UreservesBN);
+
+		if (ZCBUtilizationOverReserves.cmp(YTUtilizationOverReserves) === 1) {
+			scaleMultiplier = YTUtilizationOverReserves.add(_10To18BN);
+			let scaledAmtZCB = amtZCB2.mul(YTUtilizationOverReserves).div(ZCBUtilizationOverReserves);
+			expectedUreserves = UreservesBN.add(amtYT2);
+			expectedZCBreserves = ZCBreservesBN.add(scaledAmtZCB).sub(amtYT2);
+
+			amtZCB2 = amtZCB2.sub(scaledAmtZCB);
+			amtYT2 = new BN(0);
+		}
+		else {
+			scaleMultiplier = ZCBUtilizationOverReserves.add(_10To18BN);
+			let scaledAmtYT = amtYT.mul(ZCBUtilizationOverReserves).div(YTUtilizationOverReserves);
+			expectedUreserves = UreservesBN.add(scaledAmtYT);
+			expectedZCBreserves = ZCBreservesBN.add(amtZCB2).sub(scaledAmtYT);
+
+			amtZCB2 = new BN(0);
+			amtYT2 = amtYT2.sub(scaledAmtYT);
+		}
+
+		await capitalHandlerInstance.transfer(amm.address, zcbToSend);
+		await yieldTokenInstance.transfer_2(amm.address, ytToSend, true);
 
 		await amm.contractClaimDividend();
 
@@ -574,8 +647,10 @@ contract('ZCBamm', async function(accounts){
 
 	it('Claims Dividend on transferFrom() call', async () => {
 		//generate yield for LPs
-		await capitalHandlerInstance.transfer(amm.address, amtZCB);
-		await yieldTokenInstance.transfer_2(amm.address, amtYT, true);
+		let zcbToSend = "1";
+		let ytToSend = (new BN(Ureserves)).div(new BN(100));
+		await capitalHandlerInstance.transfer(amm.address, zcbToSend);
+		await yieldTokenInstance.transfer_2(amm.address, ytToSend, true);
 		await amm.contractClaimDividend();
 
 		await amm.approve(accounts[0], amount, {from: accounts[1]});
@@ -584,13 +659,13 @@ contract('ZCBamm', async function(accounts){
 		let event = rec.logs[2].args;
 		assert.equal(event._claimer.toString(), accounts[1]);
 		assert.equal(event._to.toString(), accounts[1]);
-		assert.equal(event._amtZCB.toString(), amtZCB.div(new BN(2)).toString());
-		assert.equal(event._amtYT.toString(), amtYT.div(new BN(2)).toString());
+		assert.equal(event._amtZCB.toString(), "0");
+		assert.equal(event._amtYT.toString(), ytToSend.div(new BN(2)).toString());
 
 		event = rec.logs[5].args;
 		assert.equal(event._claimer.toString(), accounts[0]);
 		assert.equal(event._to.toString(), accounts[0]);
-		assert.equal(event._amtZCB.toString(), amtZCB.div(new BN(2)).toString());
-		assert.equal(event._amtYT.toString(), amtYT.div(new BN(2)).toString());
+		assert.equal(event._amtZCB.toString(), "0");
+		assert.equal(event._amtYT.toString(), ytToSend.div(new BN(2)).toString());
 	});
 });

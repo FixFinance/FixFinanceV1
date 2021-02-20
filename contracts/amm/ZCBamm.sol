@@ -341,22 +341,60 @@ contract ZCBamm is IZCBamm {
 
 	//-------------------------implement double asset yield enabled token-------------------------------
 	function contractClaimDividend() external override {
-		require(lastWithdraw < block.timestamp - 86400, "this function can only be called once every 24 hours");
+		require(lastWithdraw + 1 days < block.timestamp, "this function can only be called once every 24 hours");
 
 		uint _ZCBreserves = ZCBreserves;	//gas savings
 		uint _Ureserves = Ureserves;	//gas savings
+		uint _ZCB_Ur = _Ureserves + _ZCBreserves;
 
-		uint amount = ICapitalHandler(ZCBaddress).balanceOf(address(this));
-		require(amount > _ZCBreserves + _Ureserves);
-		amount = amount - _ZCBreserves - _Ureserves + ZCBdividendOut;
-		require(amount > contractBalanceAsset1[contractBalanceAsset1.length-1]);
-		contractBalanceAsset1.push(amount);
+		uint amtZCB = IERC20(ZCBaddress).balanceOf(address(this));
+		uint amtYT = IYieldToken(YTaddress).balanceOf_2(address(this), false);
 
-		amount = IYieldToken(YTaddress).balanceOf_2(address(this), false);
-		require(amount > _Ureserves);
-		amount = amount - _Ureserves + YTdividendOut;
-		require(amount > contractBalanceAsset2[contractBalanceAsset2.length-1]);
-		contractBalanceAsset2.push(amount);
+		amtZCB = amtZCB.sub(_ZCB_Ur).add(ZCBdividendOut);
+		amtYT = amtYT.sub(_Ureserves).add(YTdividendOut);
+
+		uint prevAsset1 = contractBalanceAsset1[contractBalanceAsset1.length-1];
+		uint prevAsset2 = contractBalanceAsset2[contractBalanceAsset2.length-1];
+
+		require(amtZCB > prevAsset1);
+		require(amtYT > prevAsset2);
+
+		{
+			uint ZCBoverReserves = amtZCB - prevAsset1;
+			uint YToverReserves = amtYT - prevAsset2;
+
+			uint ZCBoverutilization = ZCBoverReserves.mul(1 ether).div(_ZCB_Ur);
+			uint YToverutilization = YToverReserves.mul(1 ether).div(_Ureserves);
+
+			/*
+				Scale up reserves and effective total supply as much as possible
+			*/
+			if (ZCBoverutilization > YToverutilization) {
+				uint scaledZCBoverReserves = ZCBoverReserves.mul(YToverutilization).div(ZCBoverutilization);
+
+				amtZCB = ZCBoverReserves.sub(scaledZCBoverReserves).add(prevAsset1);
+				amtYT = prevAsset2;
+
+				ZCBreserves += scaledZCBoverReserves.sub(YToverReserves);
+				Ureserves += YToverReserves;
+
+				LPTokenInflation = LPTokenInflation.mul((YToverutilization).add(1 ether)).div(1 ether);
+			}
+			else {
+				uint scaledYToverReserves = YToverReserves.mul(ZCBoverutilization).div(YToverutilization);
+
+				amtZCB = prevAsset1;
+				amtYT = YToverReserves.sub(scaledYToverReserves).add(prevAsset2);
+
+				ZCBreserves += ZCBoverReserves.sub(scaledYToverReserves);
+				Ureserves += scaledYToverReserves;
+
+				LPTokenInflation = LPTokenInflation.mul((ZCBoverutilization).add(1 ether)).div(1 ether);
+			}
+		}
+
+		contractBalanceAsset1.push(amtZCB);
+		contractBalanceAsset2.push(amtYT);
 
 		lastWithdraw = block.timestamp;
 	}

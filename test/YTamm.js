@@ -22,6 +22,10 @@ const AnnualFeeRate = (new BN("2")).pow(new BN("64")).div(new BN("100")); //0.01
 const AnnualFeeRateNumber = 0.01;
 const LENGTH_RATE_SERIES = 31;
 
+function AmountError(actual, expected) {
+	return Math.abs(actual-expected)/expected;
+}
+
 async function setRate(amm, rate, account) {
 	let amt = (await amm.balanceOf(account)).toString();
 	if (amt != "0") {
@@ -348,8 +352,8 @@ contract('YTamm', async function(accounts){
 		if (ZCBUtilizationOverReserves.cmp(YTUtilizationOverReserves) === 1) {
 			scaleMultiplier = YTUtilizationOverReserves.add(_10To18BN);
 			let scaledAmtZCB = amtZCB.mul(YTUtilizationOverReserves).div(ZCBUtilizationOverReserves);
-			expectedUreserves = (new BN(Ureserves)).add(scaledAmtZCB);
-			expectedYTreserves = (new BN(YTreserves)).add(amtYT).sub(scaledAmtZCB);
+			expectedUreserves = UreservesBN.add(scaledAmtZCB);
+			expectedYTreserves = YTreservesBN.add(amtYT).sub(scaledAmtZCB);
 
 			amtZCB = amtZCB.sub(scaledAmtZCB);
 			amtYT = new BN(0);
@@ -357,8 +361,8 @@ contract('YTamm', async function(accounts){
 		else {
 			scaleMultiplier = ZCBUtilizationOverReserves.add(_10To18BN);
 			let scaledAmtYT = amtYT.mul(ZCBUtilizationOverReserves).div(YTUtilizationOverReserves);
-			expectedUreserves = (new BN(Ureserves)).add(amtZCB);
-			expectedYTreserves = (new BN(YTreserves)).add(scaledAmtYT).sub(amtZCB);
+			expectedUreserves = UreservesBN.add(amtZCB);
+			expectedYTreserves = YTreservesBN.add(scaledAmtYT).sub(amtZCB);
 
 			amtZCB = new BN(0);
 			amtYT = amtYT.sub(scaledAmtYT);
@@ -371,8 +375,18 @@ contract('YTamm', async function(accounts){
 
 	it('Yield Generation does not correctly changes pool reserves after contractClaimDividend()', async () => {
 		let results = await amm1.getReserves();
-		assert.equal(results._Ureserves.toString(), expectedUreserves, "U reserves correctly changed by yield generation");
-		assert.equal(results._YTreserves.toString(), expectedYTreserves, "YT reserves correctly changed by yield generation");
+
+		let expectedUreserves2 = parseInt((new BN(Ureserves)).mul(scaleMultiplier).div(_10To18BN).toString());
+		let expectedYTreserves2 = parseInt((new BN(YTreserves)).mul(scaleMultiplier).div(_10To18BN).toString());
+
+		Ureserves = results._Ureserves.toString();
+		YTreserves = results._YTreserves.toString();
+
+		assert.isBelow(AmountError(parseInt(Ureserves), expectedUreserves2), AcceptableMarginOfError, "Ureserves within error range");
+		assert.isBelow(AmountError(parseInt(YTreserves), expectedYTreserves2), AcceptableMarginOfError, "ZCBreserves within error range");
+
+		assert.equal(Ureserves, expectedUreserves, "U reserves correctly changed by yield generation");
+		assert.equal(YTreserves, expectedYTreserves, "YT reserves correctly changed by yield generation");
 	});
 
 	it('inflatedTotalSupply() changes on contractClaimDividend', async () => {

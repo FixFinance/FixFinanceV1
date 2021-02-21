@@ -160,6 +160,14 @@ contract('ZCBamm', async function(accounts){
 	});
 
 	it('recalibrate curve', async () => {
+		/*
+			Send some ZCB and some YT to the contract to see if recalibration can fit reserves to match balances
+		*/
+		let zcbToSend = (new BN(ZCBreserves)).div(new BN(15));
+		let ytToSend = (new BN(Ureserves)).div(new BN(34));
+		await capitalHandlerInstance.transfer(amm.address, zcbToSend);
+		await yieldTokenInstance.transfer(amm.address, ytToSend);
+
 		//advance time 6 weeks so that we may recalibrate
 		const _6weeks = 6 * 7 * 24 * 60 * 60;
 		await helper.advanceTimeAndBlock(_6weeks);
@@ -170,59 +178,67 @@ contract('ZCBamm', async function(accounts){
 		*/
 		inflatedTotalSupplyLP = await amm.inflatedTotalSupply();
 
-		let L = parseInt(inflatedTotalSupplyLP.toString());
+		let timestamp = (await web3.eth.getBlock('latest')).timestamp;
 		let reserves = await amm.getReserves();
-		let t = parseInt(reserves._TimeRemaining.toString()) * 2**-64;
-		let rate = (parseInt(ZCBreserves)+L) / (parseInt(Ureserves));
-		/*
-			the parameter _Z which we pass to recalibrate must be *close* to satisfying the
-			equation below though it does not have to be perfect
-	
-			L = totalSupplyLT
-			0 == (2*L**(1-t) - (Z+L)**(1-t))**(1/(1-t)) - (Z+L)/rate
-		*/
-		let exp = 1.0-t;
-		let UpperBound = L * 100;
-		let LowerBound = 0;
-		let Z = UpperBound/2;
-		let step = UpperBound/4;
-		let K = 2*Math.pow(L, exp);
+		let balZCB = parseInt((await capitalHandlerInstance.balanceOf(amm.address)).toString()) * 2**-64;
+		let balYT = parseInt((await yieldTokenInstance.balanceOf_2(amm.address, false)).toString()) * 2**-64;
+		let U = balYT;
+		let Z = balZCB - balYT;
+		//let U = parseInt(reserves._Ureserves.toString()) * 2**-64;
+		//let Z = parseInt(reserves._ZCBreserves.toString()) * 2**-64;
+		let effectiveL = parseInt((await amm.inflatedTotalSupply()).toString());
+		let yearsRemaining = (maturity - timestamp) / secondsPerYear;
+		let rate = (parseInt(ZCBreserves)+effectiveL) / (parseInt(Ureserves));
+		let impliedYield = Math.pow(rate, anchor/secondsPerYear);
+		let UpperBound = anchor*10 / secondsPerYear;
+		let LowerBound = yearsRemaining;
+		let a = (UpperBound+LowerBound) / 2;
+		let step = (UpperBound-LowerBound) / 4;
 		for (let i = 0; i < 100; i++) {
-			let inner = K - Math.pow(Z+L, exp);
-			let impliedRate = rate+1;
-			let U;
-			if (inner >= 0) {
-				U = Math.pow(inner, 1/exp);
-				impliedRate = (Z+L)/U;
+			let t = yearsRemaining / a;
+			let exp = 1.0-t;
+			let L = U * Math.pow(impliedYield,1/a) - Z;
+			let G = 2*Math.pow(L, exp) - Math.pow(Z+L, exp) - Math.pow(U, exp);
+			if (G > 0) {
+				LowerBound = a;
+				a += step;
 			}
-			if (rate > impliedRate) {
-				Z += step;
-			}
-			else if (rate < impliedRate) {
-				Z -= step;
+			else if (L < 0 || G < 0) {
+				UpperBound = a;
+				a -= step;
 			}
 			else {
-				break;
+				if (a === UpperBound) {
+					a -= step;
+				}
+				else {
+					a += step;
+				}
 			}
 			step /= 2;
 		}
-		let inner = 2*Math.pow(L, exp) - Math.pow(Z+L, exp);
-		let res = Math.pow(inner, 1/exp) - (Z+L)/rate;
-
-		let Zstr = Math.floor(Z).toString();
-		await amm.recalibrate(Zstr);
-
-		let results = await amm.getReserves();
-
-		YTrevenueOnRecalibrate = (new BN(Ureserves)).sub(results._Ureserves);
-		ZCBrevenueOnRecalibrate = (new BN(ZCBreserves)).sub(results._ZCBreserves).add(YTrevenueOnRecalibrate);
-
-		Ureserves = results._Ureserves.toString();
-		ZCBreserves = results._ZCBreserves.toString();
+		let L = U * Math.pow(impliedYield,1/a) - Z;
+		let t = yearsRemaining / a;
+		let exp = 1.0-t;
+		let lowerAnchor = Math.floor(LowerBound * secondsPerYear - 1).toString();
+		let upperAnchor = Math.ceil(UpperBound * secondsPerYear + 1).toString();
+		await amm.recalibrate(lowerAnchor, upperAnchor);
 
 		inflatedTotalSupplyLP = await amm.inflatedTotalSupply();
+		anchor = (await amm.anchor()).toNumber();
+		assert.isBelow(anchor, parseInt(upperAnchor)+1, "anchor is below upper bound");
+		assert.isAbove(anchor, parseInt(lowerAnchor)-1, "anchor is above lower bound");
 	});
 
+	it('Valid reserves', async () => {
+		let results = await amm.getReserves();
+		Ureserves = results._Ureserves.toString();
+		ZCBreserves = results._ZCBreserves.toString();
+		let expectedZCB = (await capitalHandlerInstance.balanceOf(amm.address));
+		let expectedYT = (await yieldTokenInstance.balanceOf_2(amm.address, false));
+		assert.equal(ZCBreserves, expectedZCB.sub(expectedYT).toString(), "valid ZCBreserves");
+		assert.equal(Ureserves, expectedYT.toString(), "valid Ureserves");
+	});
 
 	it('SwapFromSpecificTokens _ZCBin:true', async () => {
 		let results = await amm.getReserves();
@@ -266,8 +282,8 @@ contract('ZCBamm', async function(accounts){
 		balanceYT = await yieldTokenInstance.balanceOf_2(accounts[0], false);
 		balanceZCB = await capitalHandlerInstance.balanceOf(accounts[0]);
 
-		let expectedBalanceYT = balance.sub(new BN(Ureserves)).sub(YTrevenueOnRecalibrate).toString();
-		let expectedBalanceZCB = balance.sub((new BN(ZCBreserves)).add(new BN(Ureserves))).sub(ZCBrevenueOnRecalibrate).toString()
+		let expectedBalanceYT = balance.sub(new BN(Ureserves)).toString();
+		let expectedBalanceZCB = balance.sub((new BN(ZCBreserves)).add(new BN(Ureserves))).toString()
 		assert.equal(balanceLT.toString(), Uin.toString());
 		assert.equal(balanceYT.toString(), expectedBalanceYT, "correct balance YT");
 		assert.equal(balanceZCB.toString(), expectedBalanceZCB, "correct balance ZCB");
@@ -309,8 +325,8 @@ contract('ZCBamm', async function(accounts){
 		balanceYT = await yieldTokenInstance.balanceOf_2(accounts[0], false);
 		balanceZCB = await capitalHandlerInstance.balanceOf(accounts[0]);
 
-		let expectedBalanceYT = balance.sub(new BN(Ureserves)).sub(YTrevenueOnRecalibrate).toString();
-		let expectedBalanceZCB = balance.sub((new BN(ZCBreserves)).add(new BN(Ureserves))).sub(ZCBrevenueOnRecalibrate).toString();
+		let expectedBalanceYT = balance.sub(new BN(Ureserves)).toString();
+		let expectedBalanceZCB = balance.sub((new BN(ZCBreserves)).add(new BN(Ureserves))).toString();
 		assert.equal(balanceYT.toString(), expectedBalanceYT, "correct balance YT");
 		assert.equal(balanceZCB.toString(), expectedBalanceZCB, "correct balance ZCB");
 	});
@@ -351,8 +367,8 @@ contract('ZCBamm', async function(accounts){
 		balanceYT = await yieldTokenInstance.balanceOf_2(accounts[0], false);
 		balanceZCB = await capitalHandlerInstance.balanceOf(accounts[0]);
 
-		let expectedBalanceYT = balance.sub(new BN(Ureserves)).sub(YTrevenueOnRecalibrate).toString();
-		let expectedBalanceZCB = balance.sub((new BN(ZCBreserves)).add(new BN(Ureserves))).sub(ZCBrevenueOnRecalibrate).toString();
+		let expectedBalanceYT = balance.sub(new BN(Ureserves)).toString();
+		let expectedBalanceZCB = balance.sub((new BN(ZCBreserves)).add(new BN(Ureserves))).toString();
 		assert.equal(balanceYT.toString(), expectedBalanceYT, "correct balance YT");
 		assert.equal(balanceZCB.toString(), expectedBalanceZCB, "correct balance ZCB");
 	});
@@ -393,8 +409,8 @@ contract('ZCBamm', async function(accounts){
 		balanceYT = await yieldTokenInstance.balanceOf_2(accounts[0], false);
 		balanceZCB = await capitalHandlerInstance.balanceOf(accounts[0]);
 
-		let expectedBalanceYT = balance.sub(new BN(Ureserves)).sub(YTrevenueOnRecalibrate).toString();
-		let expectedBalanceZCB = balance.sub((new BN(ZCBreserves)).add(new BN(Ureserves))).sub(ZCBrevenueOnRecalibrate).toString();
+		let expectedBalanceYT = balance.sub(new BN(Ureserves)).toString();
+		let expectedBalanceZCB = balance.sub((new BN(ZCBreserves)).add(new BN(Ureserves))).toString();
 		assert.equal(balanceYT.toString(), expectedBalanceYT, "correct balance YT");
 		assert.equal(balanceZCB.toString(), expectedBalanceZCB, "correct balance ZCB");
 	});
@@ -480,192 +496,22 @@ contract('ZCBamm', async function(accounts){
 	});
 
 	it('Valid reserves', async () => {
-		//subtract out revenue which may be claimed on call of contractClaimDividend()
-		let expectedZCB = (await capitalHandlerInstance.balanceOf(amm.address)).sub(ZCBrevenueOnRecalibrate);
-		let expectedYT = (await yieldTokenInstance.balanceOf_2(amm.address, false)).sub(YTrevenueOnRecalibrate);
+		let expectedZCB = (await capitalHandlerInstance.balanceOf(amm.address));
+		let expectedYT = (await yieldTokenInstance.balanceOf_2(amm.address, false));
 		assert.equal(ZCBreserves, expectedZCB.sub(expectedYT).toString(), "valid ZCBreserves");
 		assert.equal(Ureserves, expectedYT.toString(), "valid Ureserves");
 	});
 
-	it('Yield Generation does not affect pool reserves before contract claim dividend', async () => {
+	it('Yield Generation does not affect pool reserves', async () => {
 		//simulate generation of yield by sending funds directly to pool address
 		amtZCB = balance.div(new BN(1000));
 		amtYT = balance.div(new BN(500));
 		await capitalHandlerInstance.transfer(amm.address, amtZCB);
 		await yieldTokenInstance.transfer_2(amm.address, amtYT, true);
-		amtZCB = amtZCB.add(ZCBrevenueOnRecalibrate);
-		amtYT = amtYT.add(YTrevenueOnRecalibrate);
 
 		let results = await amm.getReserves();
 		assert.equal(results._Ureserves.toString(), Ureserves, "U reserves not affected by yield generation");
 		assert.equal(results._ZCBreserves.toString(), ZCBreserves, "U reserves not affected by yield generation");
 	});
 
-	it('Contract Claim Dividend', async () => {
-		prevInflatedTotalSupply = await amm.inflatedTotalSupply();
-
-		await amm.contractClaimDividend();
-
-		let UreservesBN = new BN(Ureserves);
-		let ZCBreservesBN = new BN(ZCBreserves);
-		let CombinedZCBBN = UreservesBN.add(ZCBreservesBN);
-
-		let ZCBUtilizationOverReserves = amtZCB.mul(_10To18BN).div(CombinedZCBBN);
-		let YTUtilizationOverReserves = amtYT.mul(_10To18BN).div(UreservesBN);
-
-		expectedUreserves = new BN(0);
-		expectedZCBreserves = new BN(0);
-		scaleMultiplier = new BN(0);
-		if (ZCBUtilizationOverReserves.cmp(YTUtilizationOverReserves) === 1) {
-			scaleMultiplier = YTUtilizationOverReserves.add(_10To18BN);
-			let scaledAmtZCB = amtZCB.mul(YTUtilizationOverReserves).div(ZCBUtilizationOverReserves);
-			expectedUreserves = UreservesBN.add(amtYT);
-			expectedZCBreserves = ZCBreservesBN.add(scaledAmtZCB).sub(amtYT);
-
-			amtZCB = amtZCB.sub(scaledAmtZCB);
-			amtYT = new BN(0);
-		}
-		else {
-			scaleMultiplier = ZCBUtilizationOverReserves.add(_10To18BN);
-			let scaledAmtYT = amtYT.mul(ZCBUtilizationOverReserves).div(YTUtilizationOverReserves);
-			expectedUreserves = UreservesBN.add(scaledAmtYT);
-			expectedZCBreserves = ZCBreservesBN.add(amtZCB).sub(scaledAmtYT);
-
-			amtZCB = new BN(0);
-			amtYT = amtYT.sub(scaledAmtYT);
-		}
-
-
-		assert.equal((await amm.length()).toString(), "2");
-		assert.equal((await amm.contractBalanceAsset1(1)).toString(), amtZCB.toString());
-		assert.equal((await amm.contractBalanceAsset2(1)).toString(), amtYT.toString());
-	});
-
-	it('Yield Generation does not affect pool reserves after contract claim dividend', async () => {
-		let results = await amm.getReserves();
-
-		//expected reserves calculated a different way, ensure they are the same
-		let expectedUreserves2 = parseInt((new BN(Ureserves)).mul(scaleMultiplier).div(_10To18BN).toString());
-		let expectedZCBreserves2 = parseInt((new BN(ZCBreserves)).mul(scaleMultiplier).div(_10To18BN).toString());
-
-		Ureserves = results._Ureserves.toString();
-		ZCBreserves = results._ZCBreserves.toString();
-
-		assert.isBelow(AmountError(parseInt(Ureserves), expectedUreserves2), ErrorRange, "Ureserves within error range");
-		assert.isBelow(AmountError(parseInt(ZCBreserves), expectedZCBreserves2), ErrorRange, "ZCBreserves within error range");
-
-		assert.equal(Ureserves, expectedUreserves.toString(), "U reserves not affected by yield generation");
-		assert.equal(ZCBreserves, expectedZCBreserves.toString(), "ZCB reserves not affected by yield generation");
-	});
-
-	it('User Claims Generated Yield', async () => {
-		rec = await amm.claimDividend(accounts[1]);
-		let event = rec.logs[2].args;
-		assert.equal(event._claimer.toString(), accounts[0]);
-		assert.equal(event._to.toString(), accounts[1]);
-		assert.equal(event._amtZCB.toString(), amtZCB.toString());
-		assert.equal(event._amtYT.toString(), amtYT.toString());
-	});
-
-	it('ClaimContract Dividend After Dividend Payouts', async () => {
-		//advance 1 day and 1 second
-		await helper.advanceTime(1 + 24*60*60);
-
-		let UreservesBN = new BN(Ureserves);
-		let ZCBreservesBN = new BN(ZCBreserves);
-		let CombinedZCBBN = UreservesBN.add(ZCBreservesBN);
-
-
-
-		let zcbToSend = CombinedZCBBN.div(new BN(2));;
-		let ytToSend = UreservesBN.div(new BN(5));
-		amtZCB2 = zcbToSend;
-		amtYT2 = ytToSend;
-
-		let ZCBUtilizationOverReserves = amtZCB2.mul(_10To18BN).div(CombinedZCBBN);
-		let YTUtilizationOverReserves = amtYT2.mul(_10To18BN).div(UreservesBN);
-
-		if (ZCBUtilizationOverReserves.cmp(YTUtilizationOverReserves) === 1) {
-			scaleMultiplier = YTUtilizationOverReserves.add(_10To18BN);
-			let scaledAmtZCB = amtZCB2.mul(YTUtilizationOverReserves).div(ZCBUtilizationOverReserves);
-			expectedUreserves = UreservesBN.add(amtYT2);
-			expectedZCBreserves = ZCBreservesBN.add(scaledAmtZCB).sub(amtYT2);
-
-			amtZCB2 = amtZCB2.sub(scaledAmtZCB);
-			amtYT2 = new BN(0);
-		}
-		else {
-			scaleMultiplier = ZCBUtilizationOverReserves.add(_10To18BN);
-			let scaledAmtYT = amtYT.mul(ZCBUtilizationOverReserves).div(YTUtilizationOverReserves);
-			expectedUreserves = UreservesBN.add(scaledAmtYT);
-			expectedZCBreserves = ZCBreservesBN.add(amtZCB2).sub(scaledAmtYT);
-
-			amtZCB2 = new BN(0);
-			amtYT2 = amtYT2.sub(scaledAmtYT);
-		}
-
-		await capitalHandlerInstance.transfer(amm.address, zcbToSend);
-		await yieldTokenInstance.transfer_2(amm.address, ytToSend, true);
-
-		await amm.contractClaimDividend();
-
-		assert.equal((await amm.length()).toString(), "3");
-		assert.equal((await amm.contractBalanceAsset1(2)).toString(), amtZCB.add(amtZCB2).toString());
-		assert.equal((await amm.contractBalanceAsset2(2)).toString(), amtYT.add(amtYT2).toString());
-	});
-
-	it('ClaimContract Dividend After Dividend Payouts', async () => {
-		//advance 1 day and 1 second
-		await helper.advanceTime(1 + 24*60*60);
-		let caught = false;
-		try {
-			await amm.contractClaimDividend();
-		} catch (err) {
-			caught = true;
-		}
-		if (!caught) assert.fail('Cannot Call claimContractDividend() when no yield has been generated');
-	});
-
-
-	it('Claims Dividend On transfer() call', async () => {
-		balance = await amm.balanceOf(accounts[0]);
-		amount = balance.div(new BN(2))
-		rec = await amm.transfer(accounts[1], amount);
-		/*
-			first event is ZCB dividend transfer
-			second event is YT dividend transfer
-			third event is what we want
-			fourth event is transfer of LP tokens
-		*/
-		let event = rec.logs[2].args;
-
-		assert.equal(event._claimer.toString(), accounts[0]);
-		assert.equal(event._to.toString(), accounts[0]);
-		assert.equal(event._amtZCB.toString(), amtZCB2.toString());
-		assert.equal(event._amtYT.toString(), amtYT2.toString());
-	});
-
-	it('Claims Dividend on transferFrom() call', async () => {
-		//generate yield for LPs
-		let zcbToSend = "1";
-		let ytToSend = (new BN(Ureserves)).div(new BN(100));
-		await capitalHandlerInstance.transfer(amm.address, zcbToSend);
-		await yieldTokenInstance.transfer_2(amm.address, ytToSend, true);
-		await amm.contractClaimDividend();
-
-		await amm.approve(accounts[0], amount, {from: accounts[1]});
-		rec = await amm.transferFrom(accounts[1], accounts[0], amount);
-
-		let event = rec.logs[2].args;
-		assert.equal(event._claimer.toString(), accounts[1]);
-		assert.equal(event._to.toString(), accounts[1]);
-		assert.equal(event._amtZCB.toString(), "0");
-		assert.equal(event._amtYT.toString(), ytToSend.div(new BN(2)).toString());
-
-		event = rec.logs[5].args;
-		assert.equal(event._claimer.toString(), accounts[0]);
-		assert.equal(event._to.toString(), accounts[0]);
-		assert.equal(event._amtZCB.toString(), "0");
-		assert.equal(event._amtYT.toString(), ytToSend.div(new BN(2)).toString());
-	});
 });

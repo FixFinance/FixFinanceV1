@@ -1,8 +1,8 @@
 pragma solidity >=0.6.0;
 
-import "./doubleAssetYieldEnabledToken.sol";
+import "../interfaces/IERC20.sol";
 
-abstract contract IZCBamm is doubleAssetYieldEnabledToken {
+abstract contract IZCBamm is IERC20 {
 	event Mint(
 		address user,
 		uint amount
@@ -35,7 +35,7 @@ abstract contract IZCBamm is doubleAssetYieldEnabledToken {
 	function ReserveQuoteFromSpecificTokens(int128 _amount, bool _ZCBin) external virtual returns(uint _out);
 	function ReserveQuoteToSpecificTokens(int128 _amount, bool _ZCBin) external virtual returns(uint _out);
 	function TakeQuote(uint _amountIn, uint _amountOut, bool _ZCBin) external virtual;
-	function recalibrate(uint _Z) external virtual;
+	function recalibrate(uint lowerBoundAnchor, uint upperBoundAnchor) external virtual;
 	function inflatedTotalSupply() external virtual view returns (uint);
 	function getRateFromOracle() external virtual view returns (int128 rate);
 	function getAPYFromOracle() external virtual view returns (int128 APY);
@@ -48,4 +48,55 @@ abstract contract IZCBamm is doubleAssetYieldEnabledToken {
 		uint _ZCBreserves,
 		uint _TimeRemaining
 	);
+
+
+	//---------------------f-o-r---I-E_R_C-2-0-----------------------
+	address public ZCBaddress;
+	address public YTaddress;
+
+	//total amount of smallest denomination units of coin in this smart contract
+	uint public override totalSupply;
+	//10 ** decimals == the amount of sub units in a whole coin
+	uint8 public override decimals = 18;
+	//each user's balance of coins
+	mapping(address => uint) public override balanceOf;
+	//the amount of funds each address has allowed other addresses to spend on the first address's behalf
+	//holderOfFunds => spender => amountOfFundsAllowed
+	mapping(address => mapping(address => uint)) public override allowance;
+
+
+    function transfer(address _to, uint256 _value) public override returns (bool success) {
+        require(_value <= balanceOf[msg.sender]);
+
+        balanceOf[msg.sender] -= _value;
+        balanceOf[_to] += _value;
+
+        emit Transfer(msg.sender, _to, _value);
+
+        return true;
+    }
+
+    function approve(address _spender, uint256 _value) public override returns (bool success) {
+        allowance[msg.sender][_spender] = _value;
+
+        emit Approval(msg.sender, _spender, _value);
+
+        return true;
+    }
+
+    function transferFrom(address _from, address _to, uint256 _value) public override returns (bool success) {
+        require(_value <= allowance[_from][msg.sender]);
+    	require(_value <= balanceOf[_from]);
+
+    	balanceOf[_from] -= _value;
+    	balanceOf[_to] += _value;
+
+        allowance[_from][msg.sender] -= _value;
+
+        emit Transfer(_from, _to, _value);
+
+        return true;
+    }
+
+
 }

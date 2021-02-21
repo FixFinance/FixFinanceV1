@@ -427,20 +427,89 @@ library BigMath {
     changeReserve1 = (ABDK_1.div(exponent)).mul( base.log_2() ).exp_2().sub(int128(reserve1));
   }
 
-  int128 private constant MAX_ANNUAL_ERROR = ABDK_1 / 10000;
-  function ZCB_U_recalibration(uint timeRemaining, uint rate, uint Z, uint L, uint anchor) external pure returns (uint U) {
-    require(Z < uint(MAX));
-    U = L.sub(uint(-ZCB_U_reserve_change(L, L, timeRemaining,int128(Z))));
-    uint newRate = (Z+L).mul(BONE).div(U);
-    uint error = uint( (int128(rate.sub(BONE).mul(BONE).div(newRate.sub(BONE))).sub(int128(BONE))).abs() );
+  int128 private constant MAX_ANNUAL_ERROR = ABDK_1 / 100000;
+  uint private constant MaxAnchor = 1000 * SecondsPerYear;
+  function ZCB_U_recalibration(
+    uint prevRatio,
+    int128 prevAnchor_years,
+    int128 yearsRemaining,
+    uint upperBoundAnchor,
+    uint lowerBoundAnchor,
+    uint ZCBreserves,
+    uint Ureserves
+    ) external pure returns (uint) {
+    
+    require(upperBoundAnchor > lowerBoundAnchor && upperBoundAnchor < lowerBoundAnchor + 30 seconds && lowerBoundAnchor > (uint(yearsRemaining) * SecondsPerYear) >> 64);
+    require(upperBoundAnchor < MaxAnchor);
+    require(int(ZCBreserves) <= MAX && int(ZCBreserves) > 0);
+    require(int(Ureserves) <= MAX && int(Ureserves) > 0);
+    int128 prevYield;
+    {
+      uint base = (prevRatio << 64) / (1 ether);
+      require(int(base) <= MAX && int(base) > 0);
+      prevYield = Exp(int128(base), prevAnchor_years);
+    }
+
     /*
-      1-MaxError == (1-MaxAnnualError)**(anchor * 1 years)
-      MaxError == 1 - (1-MaxAnnualError)**(anchor * 1 years)
-      MaxError == 1 - exp_2(log_2((1-MaxAnnualError)**(anchor * 1 years)))
-      MaxError == 1 - exp_2( (anchor * 1 years) * log_2(1-MaxAnnualError) )
+      For the solution to be valid the following must be approximately true
+
+      0 ~= 2 * L**(1-t) - (Z + L)**(1-t) - U**(1-t)
+      Where
+      prevYield == ((Z+L)/U)**anchor
+      anchor == yearsRemaining / t
     */
-    uint MaxError = uint(ABDK_1.sub( (ABDK_1 - MAX_ANNUAL_ERROR).log_2().mul(int128(anchor)).exp_2() )).mul(BONE) >> 64;
-    require(error < MaxError);
+
+    /*
+      For any given value of anchor we can find the expected value of L with some algebra
+      
+      prevYield == ( (Z+L)/U )**(anchor)
+      prevYield**(1/anchor) == (Z+L)/U
+      U * prevYield**(1/anchor) == Z+L
+      L == U * prevYield**(1/anchor) - Z
+
+      Next we need to check if this fits with our other equation
+
+      An increase in anchor results in a decrease in L thus we expect
+      LowerBoundL > UpperBoundL because LowerBoundL is derived from a
+      higher anchor
+    */
+    int128 LowerBoundL;
+    int128 UpperBoundL;
+    int128 lowAnchorG;
+    int128 highAnchorG;
+    {
+      int128 ABDKAnchor = int128((lowerBoundAnchor << 64) / SecondsPerYear);
+      LowerBoundL = Exp(prevYield, ABDK_1.div(ABDKAnchor)).mul(int128(Ureserves)).sub(int128(ZCBreserves));
+      int128 t = yearsRemaining.div(ABDKAnchor);
+      lowAnchorG = approxG(LowerBoundL, int128(ZCBreserves), int128(Ureserves), t);
+
+      ABDKAnchor = int128((upperBoundAnchor << 64) / SecondsPerYear);
+      UpperBoundL = Exp(prevYield, ABDK_1.div(ABDKAnchor)).mul(int128(Ureserves)).sub(int128(ZCBreserves));
+      t = yearsRemaining.div(ABDKAnchor);
+      highAnchorG = approxG(UpperBoundL, int128(ZCBreserves), int128(Ureserves), t);
+    }
+    require(lowAnchorG >= 0 && highAnchorG <= 0);
+
+    int128 ret = LowerBoundL.avg(UpperBoundL);
+    require(ret > 0);
+    return uint(ret);
+  }
+
+  function approxG(int128 L, int128 Z, int128 U, int128 t) internal pure returns (int128) {
+    int128 exp = ABDK_1.sub(t);
+    int128 term0 = (2 * ABDK_1).mul(Exp(L, exp));
+    int128 term1 = Exp(L.add(Z), exp);
+    int128 term2 = Exp(U, exp);
+    return term0.sub(term1).sub(term2);
+  }
+
+  function Exp(int128 base, int128 exponent) internal pure returns (int128) {
+    /*
+      base**exponent ==
+      2**(log_2(base**exponent))
+      2**(exponent * log_2(base))
+    */
+    return base.log_2().mul(exponent).exp_2();
   }
 
 }

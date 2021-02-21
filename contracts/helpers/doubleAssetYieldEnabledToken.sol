@@ -10,7 +10,6 @@ abstract contract doubleAssetYieldEnabledToken is IERC20, IYieldEnabled {
 	address public ZCBaddress;
 	address public YTaddress;
 
-	//timestamp of last time this smart contract called optionContract.withdrawFunds()
 	uint public lastWithdraw;
 	//total amount of smallest denomination units of coin in this smart contract
 	uint public override totalSupply;

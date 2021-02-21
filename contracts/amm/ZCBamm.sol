@@ -54,11 +54,11 @@ contract ZCBamm is IZCBamm {
 		FeeOracleAddress = _feeOracleAddress;
 		lastRecalibration = block.timestamp;
 		LPTokenInflation = 1 ether;
-		init(_ZCBaddress, _YTaddress);
+		ZCBaddress = _ZCBaddress;
+		YTaddress = _YTaddress;
 	}
 
 	function _mint(address _to, uint _amount) internal {
-        claimDividendInternal(_to, _to);
 		balanceOf[_to] += _amount;
 		totalSupply += _amount;
 
@@ -67,7 +67,6 @@ contract ZCBamm is IZCBamm {
 
 	function _burn(address _from, uint _amount) internal {
 		require(balanceOf[_from] >= _amount);
-        claimDividendInternal(_from, _from);
 		balanceOf[_from] -= _amount;
 		totalSupply -= _amount;
 
@@ -337,69 +336,9 @@ contract ZCBamm is IZCBamm {
 		}
 	}
 
-	function forceRateDataUpdate() external override setRateModifier {}
-
-	//-------------------------implement double asset yield enabled token-------------------------------
-	function contractClaimDividend() external override {
-		require(lastWithdraw + 1 days < block.timestamp, "this function can only be called once every 24 hours");
-
-		uint _ZCBreserves = ZCBreserves;	//gas savings
-		uint _Ureserves = Ureserves;	//gas savings
-		uint _ZCB_Ur = _Ureserves + _ZCBreserves;
-
-		uint amtZCB = IERC20(ZCBaddress).balanceOf(address(this));
-		uint amtYT = IYieldToken(YTaddress).balanceOf_2(address(this), false);
-
-		amtZCB = amtZCB.sub(_ZCB_Ur).add(ZCBdividendOut);
-		amtYT = amtYT.sub(_Ureserves).add(YTdividendOut);
-
-		uint prevAsset1 = contractBalanceAsset1[contractBalanceAsset1.length-1];
-		uint prevAsset2 = contractBalanceAsset2[contractBalanceAsset2.length-1];
-
-		require(amtZCB > prevAsset1);
-		require(amtYT > prevAsset2);
-
-		{
-			uint ZCBoverReserves = amtZCB - prevAsset1;
-			uint YToverReserves = amtYT - prevAsset2;
-
-			uint ZCBoverutilization = ZCBoverReserves.mul(1 ether).div(_ZCB_Ur);
-			uint YToverutilization = YToverReserves.mul(1 ether).div(_Ureserves);
-
-			/*
-				Scale up reserves and effective total supply as much as possible
-			*/
-			if (ZCBoverutilization > YToverutilization) {
-				uint scaledZCBoverReserves = ZCBoverReserves.mul(YToverutilization).div(ZCBoverutilization);
-
-				amtZCB = ZCBoverReserves.sub(scaledZCBoverReserves).add(prevAsset1);
-				amtYT = prevAsset2;
-
-				ZCBreserves += scaledZCBoverReserves.sub(YToverReserves);
-				Ureserves += YToverReserves;
-
-				LPTokenInflation = LPTokenInflation.mul((YToverutilization).add(1 ether)).div(1 ether);
-			}
-			else {
-				uint scaledYToverReserves = YToverReserves.mul(ZCBoverutilization).div(YToverutilization);
-
-				amtZCB = prevAsset1;
-				amtYT = YToverReserves.sub(scaledYToverReserves).add(prevAsset2);
-
-				ZCBreserves += ZCBoverReserves.sub(scaledYToverReserves);
-				Ureserves += scaledYToverReserves;
-
-				LPTokenInflation = LPTokenInflation.mul((ZCBoverutilization).add(1 ether)).div(1 ether);
-			}
-		}
-
-		contractBalanceAsset1.push(amtZCB);
-		contractBalanceAsset2.push(amtYT);
-
-		lastWithdraw = block.timestamp;
-	}
-
 	//------------------------e-n-a-b-l-e---p-o-o-l---t-o---a-c-t---a-s---r-a-t-e---o-r-a-c-l-e-----------------
+
+	function forceRateDataUpdate() external override setRateModifier {}
 
 	function internalSetOracleRate(uint8 _index) internal {
 		/*
@@ -482,28 +421,53 @@ contract ZCBamm is IZCBamm {
 		_timestamps = timestamps;
 	}
 
-	function recalibrate(uint _Z) external override {
+	function recalibrate(uint lowerBoundAnchor, uint upperBoundAnchor) external override {
 		require(block.timestamp > 4 weeks + lastRecalibration);
-		uint _totalSupply = _inflatedTotalSupply();
+
+		uint _ZCBreserves = ZCBreserves;
 		uint _Ureserves = Ureserves;
-		uint _ZCBreserves = ZCBreserves + _totalSupply;
 
-		if (Ureserves == 0 || _ZCBreserves >> 192 != 0  || _ZCBreserves <= _Ureserves) return;
+		uint prevRatio = _ZCBreserves.add(_inflatedTotalSupply()).mul(1 ether).div(_Ureserves);
 
-		uint rate = _ZCBreserves.mul(1 ether).div(_Ureserves);
-		uint U = BigMath.ZCB_U_recalibration(timeRemaining(), rate, _Z, _totalSupply, (anchor << 64)/SecondsPerYear);
+		int128 prevAnchor_years = int128((anchor << 64) / SecondsPerYear);
+		int128 yearsRemaining = int128((( maturity - block.timestamp ) << 64) / SecondsPerYear);
+		uint newZCBreserves;
+		uint newUreserves;
+		{
+			uint amtZCB = IERC20(ZCBaddress).balanceOf(address(this));
+			uint amtYT = IYieldToken(YTaddress).balanceOf_2(address(this), false);
 
-		uint ZpctRemaining = _ZCBreserves.mul(1 ether).div(_Z);
-		uint UpctRemaining = _Ureserves.mul(1 ether).div(U);
+			uint incZCB = amtZCB.sub(_ZCBreserves).sub(_Ureserves);
+			uint incYT = amtYT.sub(_Ureserves);
 
-		if (ZpctRemaining < UpctRemaining) {
-			LPTokenInflation = LPTokenInflation.mul(ZpctRemaining).div(1 ether);
-			Ureserves = U.mul(ZpctRemaining).div(1 ether);
+			if (incYT > incZCB) {
+				//transfer excess YT growth to contract owner
+				//this will only happen if someone makes a direct transfer to this contract
+				//todo replace address(0) with contract owner address
+				IYieldToken(YTaddress).transfer_2(address(0), incYT-incZCB, false);
+				amtYT -= incYT - incZCB;
+			}
+			newUreserves = amtYT;
+			newZCBreserves = amtZCB.sub(amtYT);
 		}
-		else {
-			LPTokenInflation = LPTokenInflation.mul(UpctRemaining).div(1 ether);
-			ZCBreserves = _Z.mul(UpctRemaining).div(1 ether);
-		}
+		require(newUreserves != 0 && newZCBreserves >> 192 == 0);
+		uint effectiveTotalSupply = BigMath.ZCB_U_recalibration(
+			prevRatio,
+			prevAnchor_years,
+			yearsRemaining,
+			upperBoundAnchor,
+			lowerBoundAnchor,
+			newZCBreserves,
+			newUreserves
+		);
+		/*
+			effectiveTotalSupply == totalSupply * LPTokenInflation
+			LPTokenInflation == totalSupply / effectiveTotalSupply
+		*/
+		LPTokenInflation = totalSupply.mul(1 ether).div(effectiveTotalSupply);
+		ZCBreserves = newZCBreserves;
+		Ureserves = newUreserves;
+		anchor = lowerBoundAnchor.add(upperBoundAnchor) >> 1;
 		lastRecalibration = block.timestamp;
 		//non utilized reserves will be paid out as dividends to LPs
 	}

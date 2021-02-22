@@ -204,7 +204,7 @@ contract ZCBamm is IZCBamm {
 			{
 				int temp = -int(BigMath.ZCB_U_reserve_change(ZCBreserves+_inflatedTotalSupply(), Ureserves, r, _amount));
 				require(temp > 0);
-				amountOut = FeeOracle(FeeOracleAddress).feeAdjustedAmountOut(maturity, uint(temp));
+				(amountOut, , ) = FeeOracle(FeeOracleAddress).feeAdjustedAmountOut(maturity, uint(temp));
 			}
 
 			require(Ureserves > amountOut);
@@ -220,7 +220,7 @@ contract ZCBamm is IZCBamm {
 			{
 				int temp = -int(BigMath.ZCB_U_reserve_change(Ureserves, ZCBreserves+_inflatedTotalSupply(), r, _amount));
 				require(temp > 0);
-				amountOut = FeeOracle(FeeOracleAddress).feeAdjustedAmountOut(maturity, uint(temp));
+				(amountOut, , ) = FeeOracle(FeeOracleAddress).feeAdjustedAmountOut(maturity, uint(temp));
 			}
 
 			require(uint(_amount) < amountOut, "cannot swap to ZCB at negative rate");
@@ -245,7 +245,7 @@ contract ZCBamm is IZCBamm {
 			{
 				int temp = int(BigMath.ZCB_U_reserve_change(Ureserves, ZCBreserves+_inflatedTotalSupply(), r, -_amount));
 				require(temp > 0);
-				amountIn = FeeOracle(FeeOracleAddress).feeAdjustedAmountIn(maturity, uint(temp));
+				(amountIn, , ) = FeeOracle(FeeOracleAddress).feeAdjustedAmountIn(maturity, uint(temp));
 			}
 
 			getZCBsendU(amountIn, uint(_amount));
@@ -259,7 +259,7 @@ contract ZCBamm is IZCBamm {
 			{
 				int temp = int(BigMath.ZCB_U_reserve_change(ZCBreserves+_inflatedTotalSupply(), Ureserves, r, -_amount));
 				require(temp > 0);
-				amountIn = FeeOracle(FeeOracleAddress).feeAdjustedAmountIn(maturity, uint(temp));
+				(amountIn, , ) = FeeOracle(FeeOracleAddress).feeAdjustedAmountIn(maturity, uint(temp));
 			}
 
 			require(uint(_amount) > amountIn, "cannot swap to ZCB at negative rate");
@@ -291,7 +291,7 @@ contract ZCBamm is IZCBamm {
 			{
 				int temp = -int(BigMath.ZCB_U_reserve_change(ZCBreserves+_inflatedTotalSupply(), Ureserves, r, _amount));
 				require(temp > 0);
-				amountOut = FeeOracle(FeeOracleAddress).feeAdjustedAmountOut(maturity, uint(temp));
+				(amountOut, , ) = FeeOracle(FeeOracleAddress).feeAdjustedAmountOut(maturity, uint(temp));
 			}
 
 			require(Ureserves > amountOut);
@@ -300,7 +300,7 @@ contract ZCBamm is IZCBamm {
 			{
 				int temp = -int(BigMath.ZCB_U_reserve_change(Ureserves, ZCBreserves+_inflatedTotalSupply(), r, _amount));
 				require(temp > 0);
-				amountOut = FeeOracle(FeeOracleAddress).feeAdjustedAmountOut(maturity, uint(temp));
+				(amountOut, , ) = FeeOracle(FeeOracleAddress).feeAdjustedAmountOut(maturity, uint(temp));
 			}
 
 			require(uint(_amount) < amountOut, "cannot swap to ZCB at negative rate");
@@ -319,7 +319,7 @@ contract ZCBamm is IZCBamm {
 			{
 				int temp = int(BigMath.ZCB_U_reserve_change(Ureserves, ZCBreserves+_inflatedTotalSupply(), r, -_amount));
 				require(temp > 0);
-				amountIn = FeeOracle(FeeOracleAddress).feeAdjustedAmountIn(maturity, uint(temp));
+				(amountIn, , ) = FeeOracle(FeeOracleAddress).feeAdjustedAmountIn(maturity, uint(temp));
 			}
 
 		} else {
@@ -327,7 +327,7 @@ contract ZCBamm is IZCBamm {
 			{
 				int temp = int(BigMath.ZCB_U_reserve_change(ZCBreserves+_inflatedTotalSupply(), Ureserves, r, -_amount));
 				require(temp > 0);
-				amountIn = FeeOracle(FeeOracleAddress).feeAdjustedAmountIn(maturity, uint(temp));
+				(amountIn, , ) = FeeOracle(FeeOracleAddress).feeAdjustedAmountIn(maturity, uint(temp));
 			}
 
 			require(uint(_amount) > amountIn, "cannot swap to ZCB at negative rate");

@@ -35,8 +35,6 @@ contract('BondMinter', async function(accounts) {
 	/* 
 		for simplicity of testing in this contract we assume that 1 unit of each asset is equal in vaulue to 1 unit of any other asset
 	*/
-
-
 	it('before each', async () => {
 		//borrow asset 0
 		asset0 = await dummyAToken.new("aCOIN");
@@ -52,7 +50,7 @@ contract('BondMinter', async function(accounts) {
 		YTammDeployerInstance = await YTammDeployer.new();
 		DeployCapitalHandlerInstance = await CapitalHandlerDeployer.new();
 		swapRouterDeployerInstance = await SwapRouterDeployer.new();
-		feeOracleInstance = await FeeOracle.new("0", "0");
+		feeOracleInstance = await FeeOracle.new("0", "0", "0", nullAddress);
 		organizerInstance = await organizer.new(
 			yieldTokenDeployerInstance.address,
 			bondMinterInstance.address,

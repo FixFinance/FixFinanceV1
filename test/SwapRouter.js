@@ -40,7 +40,7 @@ contract('SwapRouter', async function(accounts) {
 		YTammDeployerInstance = await YTammDeployer.new();
 		capitalHandlerDeployerInstance = await CapitalHandlerDeployer.new();
 		swapRouterDeployerInstance = await SwapRouterDeployer.new();
-		feeOracleInstance = await FeeOracle.new("0", "0");
+		feeOracleInstance = await FeeOracle.new("0", "0", "0", nullAddress);
 		organizerInstance = await organizer.new(
 			yieldTokenDeployerInstance.address,
 			bondMinterInstance.address,

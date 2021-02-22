@@ -47,7 +47,7 @@ module.exports = async function(deployer) {
 	bondMinterInstance = await deployer.deploy(BondMinter, nullAddress);
 	capitalHandlerDeployerInstance = await deployer.deploy(CapitalHandlerDeployer);
 	swapRouterDeployerInstance = await deployer.deploy(SwapRouterDeployer);
-	feeOracleDeployer = await deployer.deploy(FeeOracle, "0", "0");
+	feeOracleDeployer = await deployer.deploy(FeeOracle, "0", "0", "0", nullAddress);
 	bigMathInstance = await deployer.deploy(BigMath);
 	await deployer.link(BigMath, [ZCBammDeployer, YTammDeployer]);
 	ZCBammDeployerInstance = await deployer.deploy(ZCBammDeployer);

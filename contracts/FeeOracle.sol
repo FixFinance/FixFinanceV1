@@ -11,25 +11,41 @@ contract FeeOracle is Ownable {
 	// 1.0 in super basis points
 	uint32 constant totalSuperBasisPoints = 1_000_000_000;
 
-	// 0.125 in super basis points
-	uint32 constant MaxMaxFee = 125_000_000;
+	uint16 constant totalBasisPoints = 10_000;
 
-	uint public maxFee;
+	uint private constant SecondsPerYear = 31556926;
 
 	// 1.0 in 64.64 format
-	int128 ABDK_1 = 1<<64;
+	int128 private constant ABDK_1 = 1<<64;
 
 	// 0.03125 in 64.64 format
-	int128 constant MaxAnnualRate = 1<<59;
+	int128 private constant MaxAnnualRate = 1<<59;
+
+	// 0.125 in super basis points
+	uint32 private constant MaxMaxFee = 125_000_000;
+
+	uint public maxFee;
 
 	//pct fee paid on swap with 1 year to maturity
 	int128 public annualRate;
 
-	uint private constant SecondsPerYear = 31556926;
+	uint8 public bipsToTreasury;
 
-	constructor(uint32 _maxFee, int128 _annualRate) public {
+	address public sendTo;
+
+	constructor(uint32 _maxFee, int128 _annualRate, uint8 _bipsToTreasury, address _sendTo) public {
 		setMaxFee(_maxFee);
 		setAnnualRate(_annualRate);
+		bipsToTreasury = _bipsToTreasury;
+		sendTo = _sendTo;
+	}
+
+	function setToTreasuryFee(uint8 _bipsToTreasury) external onlyOwner {
+		bipsToTreasury = _bipsToTreasury;
+	}
+
+	function setSendTo(address _sendTo) external onlyOwner {
+		sendTo = _sendTo;
 	}
 
 	function setMaxFee(uint32 _maxFee) public onlyOwner {
@@ -75,16 +91,24 @@ contract FeeOracle is Ownable {
 	/*
 		amountIn_preFee / (1 - getPctFee()) == amountIn_postFee
 	*/
-	function feeAdjustedAmountIn(uint _maturity, uint _amountIn_preFee) external view returns (uint amountIn_postFee) {
+	function feeAdjustedAmountIn(uint _maturity, uint _amountIn_preFee) external view returns (uint amountIn_postFee, uint toTreasury, address _sendTo) {
 		amountIn_postFee = totalSuperBasisPoints * _amountIn_preFee / (totalSuperBasisPoints - getFeePct(_maturity));
+		uint totalFee = amountIn_postFee - _amountIn_preFee;
+		uint fee_plusToTreasury = totalBasisPoints * totalFee / (totalBasisPoints - bipsToTreasury);
+		toTreasury = totalFee - fee_plusToTreasury;
+		_sendTo = sendTo;
 	}
 
 
 	/*
 		amountOut_preFee * (1 - getPctFee()) == amountOut_postFee
 	*/
-	function feeAdjustedAmountOut(uint _maturity, uint _amountOut_preFee) external view returns (uint amountOut_postFee) {
+	function feeAdjustedAmountOut(uint _maturity, uint _amountOut_preFee) external view returns (uint amountOut_postFee, uint toTreasury, address _sendTo) {
 		amountOut_postFee = _amountOut_preFee * (totalSuperBasisPoints - getFeePct(_maturity)) / totalSuperBasisPoints;
+		uint totalFee = _amountOut_preFee - amountOut_postFee;
+		uint fee_minusToTreasury = totalFee * (totalBasisPoints - bipsToTreasury) / totalBasisPoints;
+		toTreasury = totalFee - fee_minusToTreasury;
+		_sendTo = sendTo;
 	}
 
 }

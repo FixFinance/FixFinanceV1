@@ -62,7 +62,7 @@ contract('YTamm', async function(accounts){
 		yieldTokenInstance = await yieldToken.at(await capitalHandlerInstance.yieldTokenAddress());
 		await ZCBamm.link("BigMath", BigMathInstance.address);
 		await YTamm.link("BigMath", BigMathInstance.address);
-		feeOracleInstance = await FeeOracle.new(MaxFee, AnnualFeeRate);
+		feeOracleInstance = await FeeOracle.new(MaxFee, AnnualFeeRate, "0", nullAddress);
 		amm0 = await ZCBamm.new(capitalHandlerInstance.address, feeOracleInstance.address);
 
 

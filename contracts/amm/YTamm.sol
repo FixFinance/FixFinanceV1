@@ -261,7 +261,7 @@ contract YTamm is IYTamm {
 		uint _TimeRemaining = timeRemaining();
 		int128 OracleRate = IZCBamm(ZCBammAddress).getAPYFromOracle();
 		uint nonFeeAdjustedUout = uint(-BigMath.YT_U_reserve_change(YTreserves, _inflatedTotalSupply(), _TimeRemaining, OracleRate, _amount));
-		uint Uout = FeeOracle(FeeOracleAddress).feeAdjustedAmountOut(maturity, nonFeeAdjustedUout);
+		(uint Uout, , ) = FeeOracle(FeeOracleAddress).feeAdjustedAmountOut(maturity, nonFeeAdjustedUout);
 
 		require(Ureserves > Uout);
 
@@ -281,7 +281,7 @@ contract YTamm is IYTamm {
 		uint _TimeRemaining = timeRemaining();
 		int128 OracleRate = IZCBamm(ZCBammAddress).getAPYFromOracle();
 		uint nonFeeAdjustedUin = uint(BigMath.YT_U_reserve_change(_YTreserves, _inflatedTotalSupply(), _TimeRemaining, OracleRate, -_amount));
-		uint Uin = FeeOracle(FeeOracleAddress).feeAdjustedAmountIn(maturity, nonFeeAdjustedUin);
+		(uint Uin, , ) = FeeOracle(FeeOracleAddress).feeAdjustedAmountIn(maturity, nonFeeAdjustedUin);
 
 		sendYTgetU(uint(_amount), Uin);
 
@@ -310,7 +310,7 @@ contract YTamm is IYTamm {
 		int128 OracleRate = IZCBamm(ZCBammAddress).getAPYFromOracle();
 		uint _YTreserves = YTreserves;
 		uint nonFeeAdjustedUout = uint(-BigMath.YT_U_reserve_change(_YTreserves, _inflatedTotalSupply(), _TimeRemaining, OracleRate, _amount));
-		uint Uout = FeeOracle(FeeOracleAddress).feeAdjustedAmountOut(maturity, nonFeeAdjustedUout);
+		(uint Uout, , ) = FeeOracle(FeeOracleAddress).feeAdjustedAmountOut(maturity, nonFeeAdjustedUout);
 		require(Ureserves > Uout);
 		writeQuoteSignature(true, _amount, Uout);
 		return Uout;
@@ -323,7 +323,7 @@ contract YTamm is IYTamm {
 		uint _TimeRemaining = timeRemaining();
 		int128 OracleRate = IZCBamm(ZCBammAddress).getAPYFromOracle();
 		uint nonFeeAdjustedUin = uint(BigMath.YT_U_reserve_change(_YTreserves, _inflatedTotalSupply(), _TimeRemaining, OracleRate, -_amount));
-		uint Uin = FeeOracle(FeeOracleAddress).feeAdjustedAmountIn(maturity, nonFeeAdjustedUin);
+		(uint Uin, , ) = FeeOracle(FeeOracleAddress).feeAdjustedAmountIn(maturity, nonFeeAdjustedUin);
 		writeQuoteSignature(false, _amount, Uin);
 		return Uin;
 	}

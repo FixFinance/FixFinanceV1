@@ -12,8 +12,6 @@ import "./FeeOracle.sol";
 
 contract organizer {
 
-	uint private constant YTtoLmultiplier = 40 ether;
-
 	address[] public capitalHandlerInstances;
 
 	mapping(address => address) public assetWrappers;
@@ -91,7 +89,7 @@ contract organizer {
 		require(YTamms[_capitalHandlerAddress] == address(0));
 		address ZCBammAddress = ZCBamms[_capitalHandlerAddress];
 		require(ZCBammAddress != address(0));
-		YTamms[_capitalHandlerAddress] = YTammDeployer(YTammDeployerAddress).deploy(ZCBammAddress, FeeOracleAddress, YTtoLmultiplier);
+		YTamms[_capitalHandlerAddress] = YTammDeployer(YTammDeployerAddress).deploy(ZCBammAddress, FeeOracleAddress);
 	}
 
 }

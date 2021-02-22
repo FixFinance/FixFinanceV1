@@ -82,7 +82,7 @@ contract('YTamm', async function(accounts){
 			make first deposit in amm0
 		*/
 		Uin = balance.div(new BN("10"));
-		ZCBin = balance.div(new BN("300"));
+		ZCBin = balance.div(new BN("30"));
 		await amm0.firstMint(Uin, ZCBin);
 		/*
 			set rate in amm0
@@ -97,9 +97,10 @@ contract('YTamm', async function(accounts){
 		//burn all our amm0 LP tokens
 		await amm0.burn(await amm0.balanceOf(accounts[0]));
 
-		YTtoLmultiplier = 50;
-		YTtoLmultiplierBN = _10To18BN.mul(new BN(YTtoLmultiplier));
-		amm1 = await YTamm.new(amm0.address, feeOracleInstance.address, YTtoLmultiplierBN);
+		amm1 = await YTamm.new(amm0.address, feeOracleInstance.address);
+		YTtoLmultiplierBN = await amm1.YTtoLmultiplier();
+		YTtoLmultiplierBN_p1 = YTtoLmultiplierBN.add(_10To18BN);
+		YTtoLmultiplier = parseInt(YTtoLmultiplierBN.toString()) * Math.pow(10, -18);
 		anchor = (await amm0.anchor()).toNumber();
 
 		await capitalHandlerInstance.approve(amm1.address, balance);
@@ -110,46 +111,71 @@ contract('YTamm', async function(accounts){
 	});
 
 	it('First Liquidity Token Mint', async () => {
-		toMint = balance.div((new BN("1000")));
+		toMint = balance.div((new BN("10")));
 		await amm1.firstMint(toMint);
 		assert.equal((await amm1.balanceOf(accounts[0])).toString(), toMint.toString(), "correct balance of YTamm liquidity tokens");
-		assert.equal((await capitalHandlerInstance.balanceOf(accounts[0])).toString(), balance.sub(toMint).toString(), "correct balance ZCB");
-		assert.equal((await yieldTokenInstance.balanceOf_2(accounts[0], false)).toString(), balance.sub(toMint.mul(new BN(YTtoLmultiplier+1))).toString(), "correct balance YT");
+		expectedZCBbalance = balance.sub(toMint).toString();
+		expectedYTbalance = balance.sub(toMint.mul(YTtoLmultiplierBN_p1).div(_10To18BN)).toString();
+		assert.equal((await capitalHandlerInstance.balanceOf(accounts[0])).toString(), expectedZCBbalance, "correct balance ZCB");
+		assert.equal((await yieldTokenInstance.balanceOf_2(accounts[0], false)).toString(), expectedYTbalance, "correct balance YT");
 		let results = await amm1.getReserves();
-		assert.equal(results._Ureserves.toString(), toMint.toString(), "correct value of Ureserves");
-		assert.equal(results._YTreserves.toString(), toMint.mul(new BN(YTtoLmultiplier)).toString(), "correct value of Ureserves");
-
-		assert.equal((await amm1.totalSupply()).toString(), toMint.toString(), "correct balance of YTamm liquidity tokens");
+		Ureserves = results._Ureserves.toString();
+		YTreserves = results._YTreserves.toString();
+		assert.equal(Ureserves, toMint.toString(), "correct value of Ureserves");
+		assert.equal(YTreserves, toMint.mul(YTtoLmultiplierBN).div(_10To18BN).toString(), "correct value of Ureserves");
+		totalSupply = await amm1.totalSupply();
+		assert.equal(totalSupply.toString(), toMint.toString(), "correct balance of YTamm liquidity tokens");
 	});
 
 	it('Mint Liquidity Tokens', async () => {
-		await amm1.mint(toMint, toMint, toMint.mul(new BN(YTtoLmultiplier)));
-		assert.equal((await amm1.balanceOf(accounts[0])).toString(), toMint.mul(new BN(2)).toString(), "correct balance of YTamm liquidity tokens");
-		assert.equal((await capitalHandlerInstance.balanceOf(accounts[0])).toString(), balance.sub(toMint.mul(new BN(2))).toString(), "correct balance ZCB");
-		assert.equal((await yieldTokenInstance.balanceOf_2(accounts[0], false)).toString(), balance.sub(toMint.mul(new BN(2*YTtoLmultiplier+2))).toString(), "correct balance YT");
-		let results = await amm1.getReserves();
-		assert.equal(results._Ureserves.toString(), toMint.mul(new BN(2)).toString(), "correct value of Ureserves");
-		assert.equal(results._YTreserves.toString(), toMint.mul(new BN(2*YTtoLmultiplier)).toString(), "correct value of Ureserves");
+		await amm1.mint(toMint, toMint, toMint.mul(YTtoLmultiplierBN).div(_10To18BN));
 
-		assert.equal((await amm1.totalSupply()).toString(), toMint.mul(new BN(2)).toString(), "correct balance of YTamm liquidity tokens");
+		let expectedYTin = toMint.mul(new BN(YTreserves));
+		expectedYTin = expectedYTin.div(totalSupply).add( new BN(expectedYTin.mod(totalSupply).toString() === "0" ? 0 : 1) );
+		let expectedUin = toMint;
+
+		expectedZCBbalance = (new BN(expectedZCBbalance)).sub(expectedUin).toString();
+		expectedYTbalance = (new BN(expectedYTbalance)).sub(expectedUin).sub(expectedYTin).toString();
+		assert.equal((await amm1.balanceOf(accounts[0])).toString(), toMint.mul(new BN(2)).toString(), "correct balance of YTamm liquidity tokens");
+		assert.equal((await capitalHandlerInstance.balanceOf(accounts[0])).toString(), expectedZCBbalance, "correct balance ZCB");
+		assert.equal((await yieldTokenInstance.balanceOf_2(accounts[0], false)).toString(), expectedYTbalance, "correct balance YT");
+		let expectedUreserves = (new BN(Ureserves)).add(expectedUin).toString();
+		let expectedYTreserves = (new BN(YTreserves)).add(expectedYTin).toString();
+
+		let results = await amm1.getReserves();
+		Ureserves = results._Ureserves.toString();
+		YTreserves = results._YTreserves.toString();
+		assert.equal(Ureserves, expectedUreserves, "correct value of Ureserves");
+		assert.equal(YTreserves, expectedYTreserves, "correct value of Ureserves");
+		totalSupply = await amm1.totalSupply();
+		assert.equal(totalSupply.toString(), toMint.mul(new BN(2)).toString(), "correct balance of YTamm liquidity tokens");
 	});
 
 	it('Burn Liquidity Tokens', async () => {
 		await amm1.burn(toMint);
+
+		let expectedUout = toMint.mul(new BN(Ureserves)).div(totalSupply);
+		let expectedYTout = toMint.mul(new BN(YTreserves)).div(totalSupply);
+
+		expectedZCBbalance = (new BN(expectedZCBbalance)).add(expectedUout).toString();
+		expectedYTbalance = (new BN(expectedYTbalance)).add(expectedUout).add(expectedYTout).toString();
+
 		amm1balance = await amm1.balanceOf(accounts[0]);
 		ZCBbalance = await capitalHandlerInstance.balanceOf(accounts[0]);
 		YTbalance = await yieldTokenInstance.balanceOf_2(accounts[0], false);
 		assert.equal(amm1balance.toString(), toMint, "correct balance of YTamm liquidity tokens");
-		assert.equal(ZCBbalance.toString(), balance.sub(toMint).toString(), "correct balance ZCB");
-		assert.equal(YTbalance.toString(), balance.sub(toMint.mul(new BN(YTtoLmultiplier+1))).toString(), "correct balance YT");
-		let results = await amm1.getReserves();
-		Ureserves = results._Ureserves;
-		YTreserves = results._YTreserves;
-		assert.equal(Ureserves.toString(), toMint.toString(), "correct value of Ureserves");
-		assert.equal(YTreserves.toString(), toMint.mul(new BN(YTtoLmultiplier)).toString(), "correct value of Ureserves");
+		assert.equal(ZCBbalance.toString(), expectedZCBbalance, "correct balance ZCB");
+		assert.equal(YTbalance.toString(), expectedYTbalance, "correct balance YT");
 
-		assert.equal((await amm1.totalSupply()).toString(), amm1balance.toString(), "correct YTamm totalSupply");
-		totalSupply = amm1balance
+		let expectedUreserves = (new BN(Ureserves)).sub(expectedUout).toString();
+		let expectedYTreserves = (new BN(YTreserves)).sub(expectedYTout).toString();
+		let results = await amm1.getReserves();
+		Ureserves = results._Ureserves.toString();
+		YTreserves = results._YTreserves.toString();
+		assert.equal(Ureserves, expectedUreserves, "correct value of Ureserves");
+		assert.equal(YTreserves, expectedYTreserves, "correct value of Ureserves");
+		totalSupply = await amm1.totalSupply();
+		assert.equal(totalSupply.toString(), amm1balance.toString(), "correct YTamm totalSupply");
 	});
 
 	it('SwapFromSpecificYT()', async () => {
@@ -159,7 +185,7 @@ contract('YTamm', async function(accounts){
 		let yearsRemaining = (maturity - timestamp)/secondsPerYear;
 		let pctFee = 1 - Math.pow(1 - AnnualFeeRateNumber, yearsRemaining);
 		let r = (maturity-timestamp)/anchor;
-		let nonFeeAdjustedExpectedUout = YT_U_math.Uout(parseInt(YTreserves.toString()), parseInt(totalSupply.div(new BN(YTtoLmultiplier)).toString()), r, OracleRate, parseInt(amtIn.toString()));
+		let nonFeeAdjustedExpectedUout = YT_U_math.Uout(parseInt(YTreserves.toString()), parseInt(totalSupply.mul(_10To18BN).div(YTtoLmultiplierBN).toString()), r, OracleRate, parseInt(amtIn.toString()));
 		let expectedUout = nonFeeAdjustedExpectedUout * (1 - pctFee);
 		let prevZCBbalance = ZCBbalance;
 		ZCBbalance = await capitalHandlerInstance.balanceOf(accounts[0]);
@@ -182,7 +208,7 @@ contract('YTamm', async function(accounts){
 		let yearsRemaining = (maturity - timestamp)/secondsPerYear;
 		let pctFee = 1 - Math.pow(1 - AnnualFeeRateNumber, yearsRemaining);
 		let r = (maturity-timestamp)/anchor;
-		let nonFeeAdjustedUin = YT_U_math.Uin(parseInt(YTreserves.toString()), parseInt(totalSupply.div(new BN(YTtoLmultiplier)).toString()), r, OracleRate, parseInt(amtOut.toString()));
+		let nonFeeAdjustedUin = YT_U_math.Uin(parseInt(YTreserves.toString()), parseInt(totalSupply.mul(_10To18BN).div(YTtoLmultiplierBN).toString()), r, OracleRate, parseInt(amtOut.toString()));
 		let expectedUin = nonFeeAdjustedUin / (1 - pctFee);
 		let prevZCBbalance = ZCBbalance;
 		ZCBbalance = await capitalHandlerInstance.balanceOf(accounts[0]);
@@ -195,6 +221,7 @@ contract('YTamm', async function(accounts){
 	});
 
 	it('SwapToSpecificYT() push effective APY over APYo', async () => {
+		//process.exit();
 		amtOut = amtIn;
 		let results = await amm1.getReserves();
 		Ureserves = results._Ureserves;
@@ -205,7 +232,7 @@ contract('YTamm', async function(accounts){
 		let yearsRemaining = (maturity - timestamp)/secondsPerYear;
 		let pctFee = 1 - Math.pow(1 - AnnualFeeRateNumber, yearsRemaining);
 		let r = (maturity-timestamp)/anchor;
-		let nonFeeAdjustedUin = YT_U_math.Uin(parseInt(YTreserves.toString()), parseInt(totalSupply.div(new BN(YTtoLmultiplier)).toString()), r, OracleRate, parseInt(amtOut.toString()));
+		let nonFeeAdjustedUin = YT_U_math.Uin(parseInt(YTreserves.toString()), parseInt(totalSupply.mul(_10To18BN).div(YTtoLmultiplierBN).toString()), r, OracleRate, parseInt(amtOut.toString()));
 		let expectedUin = nonFeeAdjustedUin / (1 - pctFee);
 		let prevZCBbalance = ZCBbalance;
 		ZCBbalance = await capitalHandlerInstance.balanceOf(accounts[0]);
@@ -219,10 +246,10 @@ contract('YTamm', async function(accounts){
 
 	it('recalibrate() on being stuck at high APY', async () => {
 		//first the amm must encur losses
-		amt = toMint.mul(new BN(YTtoLmultiplier*4/5));
+		amt = toMint.mul(YTtoLmultiplierBN).mul(new BN(4)).div(new BN(5)).div(_10To18BN);
 		//buy YT, (amm sells YT)
 		await amm1.SwapToSpecificYT(amt);
-		OracleRate = 35.0;
+		OracleRate = 1.3;
 		await setRate(amm0, OracleRate, accounts[0]);
 		//sell YT, (amm buys YT)
 		await amm1.SwapFromSpecificYT(amt);
@@ -232,7 +259,7 @@ contract('YTamm', async function(accounts){
 		await setRate(amm0, OracleRate, accounts[0]);
 		//buy YT, (amm sells YT)
 		await amm1.SwapToSpecificYT(amt);
-		OracleRate = 35.0;
+		OracleRate = 1.3;
 		await setRate(amm0, OracleRate, accounts[0]);
 		//sell YT, (amm buys YT)
 		await amm1.SwapFromSpecificYT(amt);
@@ -244,7 +271,7 @@ contract('YTamm', async function(accounts){
 		let r = parseInt(results._TimeRemaining.toString()) * 2**-64;
 		let UpperBound = parseInt(YTreserves.toString());
 		while (parseInt(Ureserves.toString()) > 
-			YT_U_math.Uout(parseInt( YTreserves.toString()), parseInt(totalSupply.div(new BN(YTtoLmultiplier)).toString()), r, OracleRate, UpperBound) ) {
+			YT_U_math.Uout(parseInt(YTreserves.toString()), parseInt(totalSupply.mul(_10To18BN).div(new BN(YTtoLmultiplierBN)).toString()), r, OracleRate, UpperBound) ) {
 			UpperBound *= 10;
 		}
 
@@ -254,7 +281,7 @@ contract('YTamm', async function(accounts){
 		for (let i = 0; i < 100; i++) {
 			let Uout = YT_U_math.Uout(parseInt(
 				YTreserves.toString()),
-				parseInt(totalSupply.div(new BN(YTtoLmultiplier)).toString()),
+				parseInt(totalSupply.mul(_10To18BN).div(new BN(YTtoLmultiplierBN)).toString()),
 				r,
 				OracleRate,
 				MaxYin

@@ -36,21 +36,24 @@ contract YTamm is IYTamm {
 
 	constructor(
 		address _ZCBammAddress,
-		address _feeOracleAddress,
-		uint _YTtoLmultiplier
+		address _feeOracleAddress
 	) public {
-		require(_YTtoLmultiplier != 0);
 		name = "aYT amm Liquidity Token";
 		symbol = "aYTLT";
 		address _ZCBaddress = IZCBamm(_ZCBammAddress).ZCBaddress();
 		address _YTaddress = IZCBamm(_ZCBammAddress).YTaddress();
 		uint64 _maturity = IZCBamm(_ZCBammAddress).maturity();
 		require(_maturity > block.timestamp + 10 days);
-		require(IZCBamm(_ZCBammAddress).getRateFromOracle() > 0);
+		int128 rate = IZCBamm(_ZCBammAddress).getRateFromOracle();
+		require(rate > 0);
 		maturity = _maturity;
 		ZCBammAddress = _ZCBammAddress;
 		FeeOracleAddress = _feeOracleAddress;
-		YTtoLmultiplier = _YTtoLmultiplier;
+		YTtoLmultiplier = BigMath.U_YT_ratio(
+			rate,
+			maturity-block.timestamp,
+			IZCBamm(_ZCBammAddress).anchor()
+		);
 		init(_ZCBaddress, _YTaddress);
 	}
 

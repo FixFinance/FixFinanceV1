@@ -152,8 +152,8 @@ contract('VaultHealth', async function(accounts) {
 		for (let i = 0; i < LENGTH_RATE_SERIES; i++) {
 			await amm0.forceRateDataUpdate();
 			await amm1.forceRateDataUpdate();
-			//advance 1 minuite
-			helper.advanceTime(61);
+			//advance 2 minuites
+			helper.advanceTime(121);
 		}
 
 		let OracleRate0String = (await amm0.getImpliedRateData())._impliedRates[0].toString();

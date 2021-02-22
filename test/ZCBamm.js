@@ -120,8 +120,8 @@ contract('ZCBamm', async function(accounts){
 	});
 
 	it('burn liquidity tokens', async () => {
-		//advance 1 minuite and 1 second so that rate data may be recorded
-		await helper.advanceTime(61);
+		//advance 2 minuite and 1 second so that rate data may be recorded
+		await helper.advanceTime(121);
 
 		let toBurn = Uin;
 
@@ -246,7 +246,7 @@ contract('ZCBamm', async function(accounts){
 		Ureserves = results._Ureserves.toString();
 		ZCBreserves = results._ZCBreserves.toString();
 
-		await helper.advanceTime(61);
+		await helper.advanceTime(121);
 
 		amtIn = balance.div(new BN(100));
 
@@ -290,7 +290,7 @@ contract('ZCBamm', async function(accounts){
 	});
 
 	it('SwapFromSpecificTokens _ZCBin:false', async () => {
-		await helper.advanceTime(61);
+		await helper.advanceTime(121);
 
 		amtIn = balance.div(new BN(100));
 
@@ -332,7 +332,7 @@ contract('ZCBamm', async function(accounts){
 	});
 
 	it('SwapToSpecificTokens _ZCBin:false', async () => {
-		await helper.advanceTime(61);
+		await helper.advanceTime(121);
 
 		let amtOut = balance.div(new BN(100));
 
@@ -374,7 +374,7 @@ contract('ZCBamm', async function(accounts){
 	});
 
 	it('SwapToSpecificTokens _ZCBin:true', async () => {
-		await helper.advanceTime(61);
+		await helper.advanceTime(121);
 
 		let amtOut = balance.div(new BN(100));
 
@@ -416,7 +416,7 @@ contract('ZCBamm', async function(accounts){
 	});
 
 	it('Force Update Rate Data', async () => {
-		await helper.advanceTime(61);
+		await helper.advanceTime(121);
 		rec = await amm.forceRateDataUpdate();
 
 		let newRateData = await amm.getImpliedRateData();
@@ -433,13 +433,13 @@ contract('ZCBamm', async function(accounts){
 	it('Fill Out Rate Data arrays', async () => {
 		const LENGTH_RATE_SERIES = 31;
 		for (let i = 7; i < LENGTH_RATE_SERIES; i++) {
-			await helper.advanceTime(61);
+			await helper.advanceTime(121);
 			rec = await amm.forceRateDataUpdate();
 		}
 	});
 
 	it('Cannot Change Rate Data, until setOracleRate() is called', async () => {
-		await helper.advanceTime(61);
+		await helper.advanceTime(121);
 
 		rateData = await amm.getImpliedRateData();
 
@@ -481,7 +481,7 @@ contract('ZCBamm', async function(accounts){
 	});
 
 	it('Change Rate Data, after setOracleRate() is called', async () => {
-		await helper.advanceTime(61);
+		await helper.advanceTime(121);
 
 		rateData = await amm.getImpliedRateData();
 

@@ -376,7 +376,7 @@ contract ZCBamm is IZCBamm {
 		if (!CanSetOracleRate) {
 			uint8 _toSet = toSet;
 			uint8 mostRecent = (LENGTH_RATE_SERIES-1+_toSet)%LENGTH_RATE_SERIES;
-			if (block.timestamp >= timestamps[mostRecent] + (1 minutes)) internalSetOracleRate(_toSet);
+			if (block.timestamp >= timestamps[mostRecent] + (2 minutes)) internalSetOracleRate(_toSet);
 		}
 		_;
 	}

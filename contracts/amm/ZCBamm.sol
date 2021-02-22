@@ -148,37 +148,45 @@ contract ZCBamm is IZCBamm {
 		Ureserves = effectiveU;
 	}
 
-	function mint(uint _amount, uint _maxUin, uint _maxZCBin) external override setRateModifier {
+	function mint(uint _amount, uint _maxYTin, uint _maxZCBin) external override setRateModifier {
 		uint _totalSupply = totalSupply;	//gas savings
-		uint Uin = _amount*Ureserves;
-		Uin = Uin/_totalSupply + (Uin%_totalSupply == 0 ? 0 : 1);
-		require(Uin <= _maxUin);
 
-		uint ZCBin = _amount*ZCBreserves;
+		uint contractZCBbalance = IERC20(ZCBaddress).balanceOf(address(this));
+		uint contractYTbalance = IYieldToken(YTaddress).balanceOf_2(address(this), false);
+
+		uint ZCBin = _amount.mul(contractZCBbalance);
 		ZCBin = ZCBin/_totalSupply + (ZCBin%_totalSupply == 0 ? 0 : 1);
 		require(ZCBin <= _maxZCBin);
 
-		getZCB(ZCBin + Uin);
-		getYT(Uin);
+		uint YTin = _amount.mul(contractYTbalance);
+		YTin = YTin/_totalSupply + (YTin%_totalSupply == 0 ? 0 : 1);
+		require(YTin <= _maxYTin);
+
+		getZCB(ZCBin);
+		getYT(YTin);
 
 		_mint(msg.sender, _amount);
 
-		Ureserves += Uin;
-		ZCBreserves += ZCBin;
+		Ureserves = Ureserves.mul(_totalSupply+_amount) / _totalSupply;
+		ZCBreserves = ZCBreserves.mul(_totalSupply+_amount) / _totalSupply;
 	}
 
 	function burn(uint _amount) external override setRateModifier {
 		uint _totalSupply = totalSupply;	//gas savings
-		uint Uout = _amount*Ureserves/_totalSupply;
-		uint ZCBout = _amount*ZCBreserves/_totalSupply;
+
+		uint contractZCBbalance = IERC20(ZCBaddress).balanceOf(address(this));
+		uint contractYTbalance = IYieldToken(YTaddress).balanceOf_2(address(this), false);
+
+		uint ZCBout = _amount.mul(contractZCBbalance)/_totalSupply;
+		uint YTout = _amount.mul(contractYTbalance)/_totalSupply;
 
 		_burn(msg.sender, _amount);
 
-		sendZCB(Uout + ZCBout);
-		sendYT(Uout);
+		sendZCB(ZCBout);
+		sendYT(YTout);
 
-		Ureserves -= Uout;
-		ZCBreserves -= ZCBout;
+		Ureserves = Ureserves.mul(_totalSupply-_amount) / _totalSupply;
+		ZCBreserves = ZCBreserves.mul(_totalSupply-_amount) / _totalSupply;
 	}
 
 	function SwapFromSpecificTokens(int128 _amount, bool _ZCBin) public override setRateModifier returns (uint amountOut) {

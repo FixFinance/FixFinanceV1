@@ -84,10 +84,10 @@ contract('ZCBamm', async function(accounts){
 	});
 
 	it('second liquidity token deposit', async () => {
-		let maxUin = Uin;
-		let maxZCBin = ZCBin;
+		let maxYTin = Uin;
+		let maxZCBin = ZCBin.add(Uin);
 
-		rec = await amm.mint(balanceLT, maxUin, maxZCBin);
+		rec = await amm.mint(balanceLT, maxYTin, maxZCBin);
 
 		rateData = await amm.getImpliedRateData();
 

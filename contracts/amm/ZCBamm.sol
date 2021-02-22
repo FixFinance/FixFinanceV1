@@ -430,7 +430,7 @@ contract ZCBamm is IZCBamm {
 	}
 
 	function recalibrate(uint lowerBoundAnchor, uint upperBoundAnchor) external override {
-		require(block.timestamp > 4 weeks + lastRecalibration);
+		require(block.timestamp > 1 days + lastRecalibration);
 
 		uint _ZCBreserves = ZCBreserves;
 		uint _Ureserves = Ureserves;

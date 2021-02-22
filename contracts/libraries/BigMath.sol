@@ -387,7 +387,7 @@ library BigMath {
 
   function U_YT_ratio(int128 rate, uint secondsRemaining, uint anchor) external pure returns (uint ratio) {
     int128 timeRemaining = int128((secondsRemaining << 64) / anchor);
-    int128 ret = ABDK_1.sub(Exp(rate, -timeRemaining));
+    int128 ret = ABDK_1.div(ABDK_1.sub(Exp(rate, -timeRemaining)));
     return uint(ret).mul(1 ether) >> 64;
   }
 

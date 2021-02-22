@@ -246,10 +246,10 @@ contract('YTamm', async function(accounts){
 
 	it('recalibrate() on being stuck at high APY', async () => {
 		//first the amm must encur losses
-		amt = toMint.mul(YTtoLmultiplierBN).mul(new BN(4)).div(new BN(5)).div(_10To18BN);
+		amt = toMint.mul(YTtoLmultiplierBN).mul(new BN(2)).div(new BN(5)).div(_10To18BN);
 		//buy YT, (amm sells YT)
 		await amm1.SwapToSpecificYT(amt);
-		OracleRate = 1.3;
+		OracleRate = 2.5;
 		await setRate(amm0, OracleRate, accounts[0]);
 		//sell YT, (amm buys YT)
 		await amm1.SwapFromSpecificYT(amt);
@@ -259,7 +259,7 @@ contract('YTamm', async function(accounts){
 		await setRate(amm0, OracleRate, accounts[0]);
 		//buy YT, (amm sells YT)
 		await amm1.SwapToSpecificYT(amt);
-		OracleRate = 1.3;
+		OracleRate = 2.5;
 		await setRate(amm0, OracleRate, accounts[0]);
 		//sell YT, (amm buys YT)
 		await amm1.SwapFromSpecificYT(amt);
@@ -319,7 +319,7 @@ contract('YTamm', async function(accounts){
 			caught = true;
 		}
 		if (!caught) {
-			assert.fail("what on earth do you mean");
+			assert.fail("recalibration within timeframe passed when it should have failed");
 		}
 
 		const _5weeks = 5 * 7 * 24 * 60 * 60;

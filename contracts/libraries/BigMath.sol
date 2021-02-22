@@ -16,14 +16,13 @@ library BigMath {
   */
   int128 private constant epsilon = 2000000000;
 
-
   int128 private constant MAX = 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
 
   int128 public constant ABDK_1 = 1<<64;
 
   uint private constant BONE = 1 ether;
   
-  uint private constant SecondsPerYear = 31556926;
+  uint public constant SecondsPerYear = 31556926;
 
   function addition_series_data(uint8 _index) public pure returns (int256) {
       /*
@@ -385,8 +384,8 @@ library BigMath {
     return int128(result);
   }
 
-  function U_YT_ratio(int128 rate, uint secondsRemaining, uint anchor) external pure returns (uint ratio) {
-    int128 timeRemaining = int128((secondsRemaining << 64) / anchor);
+  function YT_U_ratio(int128 rate, uint secondsRemaining) external pure returns (uint ratio) {
+    int128 timeRemaining = int128((secondsRemaining << 64) / SecondsPerYear);
     int128 ret = ABDK_1.div(ABDK_1.sub(Exp(rate, -timeRemaining)));
     return uint(ret).mul(1 ether) >> 64;
   }

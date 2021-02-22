@@ -18,7 +18,6 @@ contract YTamm is IYTamm {
 	address public override ZCBammAddress;
 
 	uint64 public override maturity;
-	uint public override anchor;
 
 	uint YTreserves;
 	uint Ureserves;
@@ -49,7 +48,6 @@ contract YTamm is IYTamm {
 		require(_maturity > block.timestamp + 10 days);
 		require(IZCBamm(_ZCBammAddress).getRateFromOracle() > 0);
 		maturity = _maturity;
-		anchor = IZCBamm(_ZCBammAddress).anchor();
 		ZCBammAddress = _ZCBammAddress;
 		FeeOracleAddress = _feeOracleAddress;
 		YTtoLmultiplier = _YTtoLmultiplier;
@@ -103,7 +101,7 @@ contract YTamm is IYTamm {
 	}
 
 	function timeRemaining() internal view returns (uint) {
-		return uint(int128((maturity-block.timestamp)<<64).div(int128(anchor<<64)));
+		return uint(int128((maturity-block.timestamp)<<64).div(int128(IZCBamm(ZCBammAddress).anchor()<<64)));
 	}
 
 	function _inflatedTotalSupply() internal view returns (uint ret) {

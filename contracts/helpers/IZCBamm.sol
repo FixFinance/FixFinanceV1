@@ -25,6 +25,7 @@ abstract contract IZCBamm is IERC20 {
 	function forceRateDataUpdate() external virtual;
 	function maturity() external virtual view returns (uint64);
 	function anchor() external virtual view returns (uint);
+	function nextAnchor() external virtual view returns (uint);
 	function firstMint(uint128 _Uin, uint128 _ZCBin) external virtual;
 	function mint(uint _amount, uint _maxUin, uint _maxZCBin) external virtual;
 	function burn(uint _amount) external virtual;

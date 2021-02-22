@@ -19,6 +19,7 @@ contract ZCBamm is IZCBamm {
 
 	uint64 public override maturity;
 	uint public override anchor;
+	uint public override nextAnchor;
 
 	uint ZCBreserves;
 	uint Ureserves;
@@ -50,7 +51,9 @@ contract ZCBamm is IZCBamm {
 		require(_maturity > block.timestamp + 10 days);
 		maturity = _maturity;
 		//we want time remaining / anchor to be less than 1, thus make anchor greater than time remaining
-		anchor = 10 * (maturity - block.timestamp) / 9;
+		uint temp = 10 * (maturity - block.timestamp) / 9;
+		anchor = temp;
+		nextAnchor = temp;
 		FeeOracleAddress = _feeOracleAddress;
 		lastRecalibration = block.timestamp;
 		LPTokenInflation = 1 ether;
@@ -103,7 +106,11 @@ contract ZCBamm is IZCBamm {
 	}
 
 	function timeRemaining() internal view returns (uint) {
-		return uint(int128((maturity-block.timestamp)<<64).div(int128(anchor<<64)));
+		return uint(int128((maturity-block.timestamp)<<64).div(int128(nextAnchor<<64)));
+	}
+
+	function nextTimeRemaining() internal view returns (uint) {
+		return uint(int128((maturity-block.timestamp)<<64).div(int128(nextAnchor<<64)));
 	}
 
 	function getQuoteSignature(bool _ZCBin) internal view returns (bytes32) {
@@ -133,7 +140,7 @@ contract ZCBamm is IZCBamm {
 	function firstMint(uint128 _Uin, uint128 _ZCBin) external override {
 		require(totalSupply == 0);
 
-		uint r = timeRemaining();
+		uint r = nextTimeRemaining();
 		uint _Uout = uint(- BigMath.ZCB_U_reserve_change(_Uin, _Uin, r, int128(_ZCBin) ) );
 
 		require(_Uout < _Uin);
@@ -191,7 +198,7 @@ contract ZCBamm is IZCBamm {
 
 	function SwapFromSpecificTokens(int128 _amount, bool _ZCBin) public override setRateModifier returns (uint amountOut) {
 		require(_amount > 0);
-		uint r = timeRemaining();
+		uint r = nextTimeRemaining();
 
 		if (_ZCBin) {
 			{
@@ -231,7 +238,7 @@ contract ZCBamm is IZCBamm {
 
 	function SwapToSpecificTokens(int128 _amount, bool _ZCBin) public override setRateModifier returns (uint amountIn) {
 		require(_amount > 0);
-		uint r = timeRemaining();
+		uint r = nextTimeRemaining();
 
 		if (_ZCBin) {
 			require(Ureserves >= uint(_amount));
@@ -278,7 +285,7 @@ contract ZCBamm is IZCBamm {
 
 	function ReserveQuoteFromSpecificTokens(int128 _amount, bool _ZCBin) external override setRateModifier returns(uint amountOut) {
 		require(_amount > 0);
-		uint r = timeRemaining();
+		uint r = nextTimeRemaining();
 
 		if (_ZCBin) {
 			{
@@ -305,7 +312,7 @@ contract ZCBamm is IZCBamm {
 
 	function ReserveQuoteToSpecificTokens(int128 _amount, bool _ZCBin) external override setRateModifier returns(uint amountIn) {
 		require(_amount > 0);
-		uint r = timeRemaining();
+		uint r = nextTimeRemaining();
 
 		if (_ZCBin) {
 			require(Ureserves >= uint(_amount));
@@ -367,9 +374,7 @@ contract ZCBamm is IZCBamm {
 		if (_index+1 == LENGTH_RATE_SERIES) {
 			CanSetOracleRate = true;
 		}
-		else {
-			toSet++;
-		}
+		toSet++;
 	}
 
 	modifier setRateModifier() {
@@ -407,6 +412,7 @@ contract ZCBamm is IZCBamm {
 
 		OracleRate = _rate;
 		CanSetOracleRate = false;
+		anchor = nextAnchor;
 		toSet = 0;
 	}
 
@@ -431,6 +437,8 @@ contract ZCBamm is IZCBamm {
 
 	function recalibrate(uint lowerBoundAnchor, uint upperBoundAnchor) external override {
 		require(block.timestamp > 1 days + lastRecalibration);
+		require(nextAnchor == anchor);
+		require(toSet == 0);
 
 		uint _ZCBreserves = ZCBreserves;
 		uint _Ureserves = Ureserves;
@@ -475,7 +483,7 @@ contract ZCBamm is IZCBamm {
 		LPTokenInflation = totalSupply.mul(1 ether).div(effectiveTotalSupply);
 		ZCBreserves = newZCBreserves;
 		Ureserves = newUreserves;
-		anchor = lowerBoundAnchor.add(upperBoundAnchor) >> 1;
+		nextAnchor = lowerBoundAnchor.add(upperBoundAnchor) >> 1;
 		lastRecalibration = block.timestamp;
 		//non utilized reserves will be paid out as dividends to LPs
 	}

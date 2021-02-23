@@ -77,32 +77,32 @@ contract ZCBamm is IZCBamm {
 	}
 
 	function getZCBsendU(uint _amountZCB, uint _amountU) internal {
-		sendYT(_amountU);
+		sendYT(msg.sender, _amountU);
 		if (_amountZCB > _amountU) {
-			getZCB(_amountZCB - _amountU);
+			getZCB(address(this), _amountZCB - _amountU);
 		}
 	}
 
 	function sendZCBgetU(uint _amountZCB, uint _amountU) internal {
 		require(_amountZCB > _amountU);
-		sendZCB(_amountZCB - _amountU);
-		getYT(_amountU);
+		sendZCB(msg.sender, _amountZCB - _amountU);
+		getYT(address(this), _amountU);
 	}
 
-	function getZCB(uint _amount) internal {
-		ICapitalHandler(ZCBaddress).transferFrom(msg.sender, address(this), _amount);
+	function getZCB(address _to, uint _amount) internal {
+		ICapitalHandler(ZCBaddress).transferFrom(msg.sender, _to, _amount);
 	}
 
-	function getYT(uint _amount) internal {
-		IYieldToken(YTaddress).transferFrom_2(msg.sender, address(this), _amount, true);
+	function getYT(address _to, uint _amount) internal {
+		IYieldToken(YTaddress).transferFrom_2(msg.sender, _to, _amount, true);
 	}
 
-	function sendZCB(uint _amount) internal {
-		ICapitalHandler(ZCBaddress).transfer(msg.sender, _amount);
+	function sendZCB(address _to, uint _amount) internal {
+		ICapitalHandler(ZCBaddress).transfer(_to, _amount);
 	}
 
-	function sendYT(uint _amount) internal {
-		IYieldToken(YTaddress).transfer_2(msg.sender, _amount, false);
+	function sendYT(address _to, uint _amount) internal {
+		IYieldToken(YTaddress).transfer_2(_to, _amount, false);
 	}
 
 	function timeRemaining() internal view returns (uint) {
@@ -146,8 +146,8 @@ contract ZCBamm is IZCBamm {
 		require(_Uout < _Uin);
 		uint effectiveU = _Uin - _Uout;
 
-		getZCB(effectiveU + _ZCBin);
-		getYT(effectiveU);
+		getZCB(address(this), effectiveU + _ZCBin);
+		getYT(address(this), effectiveU);
 
 		_mint(msg.sender, _Uin);
 
@@ -169,8 +169,8 @@ contract ZCBamm is IZCBamm {
 		YTin = YTin/_totalSupply + (YTin%_totalSupply == 0 ? 0 : 1);
 		require(YTin <= _maxYTin);
 
-		getZCB(ZCBin);
-		getYT(YTin);
+		getZCB(address(this), ZCBin);
+		getYT(address(this), YTin);
 
 		_mint(msg.sender, _amount);
 
@@ -189,8 +189,8 @@ contract ZCBamm is IZCBamm {
 
 		_burn(msg.sender, _amount);
 
-		sendZCB(ZCBout);
-		sendYT(YTout);
+		sendZCB(msg.sender, ZCBout);
+		sendYT(msg.sender, YTout);
 
 		Ureserves = Ureserves.mul(_totalSupply-_amount) / _totalSupply;
 		ZCBreserves = ZCBreserves.mul(_totalSupply-_amount) / _totalSupply;

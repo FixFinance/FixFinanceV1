@@ -74,32 +74,32 @@ contract YTamm is IYTamm {
 	}
 
 	function getYTsendU(uint _amountYT, uint _amountU)  internal {
-		sendZCB(_amountU);
+		sendZCB(msg.sender, _amountU);
 		if (_amountYT > _amountU) {
-			getYT(_amountYT - _amountU);
+			getYT(address(this), _amountYT - _amountU);
 		}
 	}
 
 	function sendYTgetU(uint _amountYT, uint _amountU) internal {
 		require(_amountYT > _amountU);
-		sendYT(_amountYT - _amountU);
-		getZCB(_amountU);
+		sendYT(msg.sender, _amountYT - _amountU);
+		getZCB(address(this), _amountU);
 	}
 
-	function getZCB(uint _amount) internal {
-		IERC20(ZCBaddress).transferFrom(msg.sender, address(this), _amount);
+	function getZCB(address _to, uint _amount) internal {
+		IERC20(ZCBaddress).transferFrom(msg.sender, _to, _amount);
 	}
 
-	function getYT(uint _amount) internal {
-		IYieldToken(YTaddress).transferFrom_2(msg.sender, address(this), _amount, true);
+	function getYT(address _to, uint _amount) internal {
+		IYieldToken(YTaddress).transferFrom_2(msg.sender, _to, _amount, true);
 	}
 
-	function sendZCB(uint _amount) internal {
-		IERC20(ZCBaddress).transfer(msg.sender, _amount);
+	function sendZCB(address _to, uint _amount) internal {
+		IERC20(ZCBaddress).transfer(_to, _amount);
 	}
 
-	function sendYT(uint _amount) internal {
-		IYieldToken(YTaddress).transfer_2(msg.sender, _amount, false);
+	function sendYT(address _to, uint _amount) internal {
+		IYieldToken(YTaddress).transfer_2(_to, _amount, false);
 	}
 
 	function timeRemaining() internal view returns (uint) {
@@ -137,8 +137,8 @@ contract YTamm is IYTamm {
 		require(totalSupply == 0);
 		uint YTin = YTtoLmultiplier.mul(_Uin) / (1 ether);
 
-		getYT(_Uin + YTin);
-		getZCB(_Uin);
+		getYT(address(this), _Uin + YTin);
+		getZCB(address(this), _Uin);
 
 		_mint(msg.sender, _Uin);
 
@@ -233,8 +233,8 @@ contract YTamm is IYTamm {
 		YTin = YTin/_totalSupply + (YTin%_totalSupply == 0 ? 0 : 1);
 		require(YTin <= _maxYTin);
 
-		getZCB(Uin);
-		getYT(Uin + YTin);
+		getZCB(address(this), Uin);
+		getYT(address(this), Uin + YTin);
 
 		_mint(msg.sender, _amount);
 
@@ -249,8 +249,8 @@ contract YTamm is IYTamm {
 
 		_burn(msg.sender, _amount);
 
-		sendZCB(Uout);
-		sendYT(Uout + YTout);
+		sendZCB(msg.sender, Uout);
+		sendYT(msg.sender, Uout + YTout);
 
 		Ureserves -= Uout;
 		YTreserves -= YTout;

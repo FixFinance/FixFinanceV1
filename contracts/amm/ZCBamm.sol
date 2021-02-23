@@ -32,6 +32,7 @@ contract ZCBamm is IZCBamm {
 	bytes32 quoteSignature;
 	uint256 quotedAmountIn;
 	uint256 quotedAmountOut;
+	uint256 quotedTreasuryFee;
 
 	uint lastRecalibration;
 	uint LPTokenInflation;
@@ -76,17 +77,27 @@ contract ZCBamm is IZCBamm {
 		emit Burn(_from, _amount);
 	}
 
-	function getZCBsendU(uint _amountZCB, uint _amountU) internal {
+	function getZCBsendU(uint _amountZCB, uint _amountU, uint _treasuryFee, address _treasuryAddress, bool _treasuryFeeInZCB) internal {
 		sendYT(msg.sender, _amountU);
 		if (_amountZCB > _amountU) {
 			getZCB(address(this), _amountZCB - _amountU);
 		}
+
+		sendZCB(_treasuryAddress, _treasuryFee);
+		if (!_treasuryFeeInZCB) {
+			sendYT(_treasuryAddress, _treasuryFee);
+		}
 	}
 
-	function sendZCBgetU(uint _amountZCB, uint _amountU) internal {
+	function sendZCBgetU(uint _amountZCB, uint _amountU, uint _treasuryFee, address _treasuryAddress, bool _treasuryFeeInZCB) internal {
 		require(_amountZCB > _amountU);
 		sendZCB(msg.sender, _amountZCB - _amountU);
 		getYT(address(this), _amountU);
+
+		sendZCB(_treasuryAddress, _treasuryFee);
+		if (!_treasuryFeeInZCB) {
+			sendYT(_treasuryAddress, _treasuryFee);
+		}
 	}
 
 	function getZCB(address _to, uint _amount) internal {
@@ -113,24 +124,29 @@ contract ZCBamm is IZCBamm {
 		return uint(int128((maturity-block.timestamp)<<64).div(int128(nextAnchor<<64)));
 	}
 
-	function getQuoteSignature(bool _ZCBin) internal view returns (bytes32) {
-		return keccak256(abi.encodePacked(totalSupply, ZCBreserves, Ureserves, _ZCBin, block.number));
+	function getQuoteSignature(uint8 _tradeType) internal view returns (bytes32) {
+		return keccak256(abi.encodePacked(totalSupply, ZCBreserves, Ureserves, _tradeType, block.number));
 	}
 
 	function _inflatedTotalSupply() internal view returns (uint) {
 		return totalSupply.mul(LPTokenInflation).div(1 ether);
 	}
 
-	function writeQuoteSignature(bool _ZCBin, uint _amountIn, uint _amountOut) internal returns (bytes32) {
-		quoteSignature = getQuoteSignature(_ZCBin);
+	function writeQuoteSignature(bool _ZCBin, bool _ToSpecific, uint _amountIn, uint _amountOut, uint _treasuryFee) internal returns (bytes32) {
+		quoteSignature = getQuoteSignature(tradeType(_ZCBin, _ToSpecific));
 		quotedAmountIn = _amountIn;
 		quotedAmountOut = _amountOut;
+		quotedTreasuryFee = _treasuryFee;
 	}
 
-	modifier verifyQuote(uint _amountIn, uint _amountOut, bool _ZCBin) {
+	function tradeType(bool _ZCBin, bool _ToSpecific) internal pure returns (uint8) {
+		return uint8((_ZCBin ? 2: 0) | (_ToSpecific ? 1 : 0));
+	}
+
+	modifier verifyQuote(uint _amountIn, uint _amountOut, bool _ZCBin, bool _ToSpecific) {
 		require(quotedAmountIn == _amountIn);
 		require(quotedAmountOut == _amountOut);
-		require(getQuoteSignature(_ZCBin) == quoteSignature);
+		require(getQuoteSignature(tradeType(_ZCBin, _ToSpecific)) == quoteSignature);
 		_;
 	}
 
@@ -200,19 +216,23 @@ contract ZCBamm is IZCBamm {
 		require(_amount > 0);
 		uint r = nextTimeRemaining();
 
+		uint treasuryFee;
+		address sendTo;
+		uint reserveDecrease;
 		if (_ZCBin) {
 			{
 				int temp = -int(BigMath.ZCB_U_reserve_change(ZCBreserves+_inflatedTotalSupply(), Ureserves, r, _amount));
 				require(temp > 0);
-				(amountOut, , ) = FeeOracle(FeeOracleAddress).feeAdjustedAmountOut(maturity, uint(temp));
+				(amountOut, treasuryFee, sendTo) = FeeOracle(FeeOracleAddress).feeAdjustedAmountOut(maturity, uint(temp));
+				reserveDecrease = amountOut.add(treasuryFee);
 			}
 
-			require(Ureserves > amountOut);
+			require(Ureserves >= reserveDecrease);
 
-			getZCBsendU(uint(_amount), amountOut);
+			getZCBsendU(uint(_amount), amountOut, treasuryFee, sendTo, false);
 
 			ZCBreserves += uint(_amount);
-			Ureserves -= amountOut;
+			Ureserves -= reserveDecrease;
 
 			emit Swap(msg.sender, uint(_amount), amountOut, true);
 
@@ -220,17 +240,18 @@ contract ZCBamm is IZCBamm {
 			{
 				int temp = -int(BigMath.ZCB_U_reserve_change(Ureserves, ZCBreserves+_inflatedTotalSupply(), r, _amount));
 				require(temp > 0);
-				(amountOut, , ) = FeeOracle(FeeOracleAddress).feeAdjustedAmountOut(maturity, uint(temp));
+				(amountOut, treasuryFee, sendTo) = FeeOracle(FeeOracleAddress).feeAdjustedAmountOut(maturity, uint(temp));
+				reserveDecrease = amountOut.add(treasuryFee);
 			}
 
 			require(uint(_amount) < amountOut, "cannot swap to ZCB at negative rate");
 
-			require(ZCBreserves > amountOut);
+			require(ZCBreserves >= reserveDecrease);
 
-			sendZCBgetU(amountOut, uint(_amount));
+			sendZCBgetU(amountOut, uint(_amount), treasuryFee, sendTo, true);
 
 			Ureserves += uint(_amount);
-			ZCBreserves -= amountOut;
+			ZCBreserves -= reserveDecrease;
 
 			emit Swap(msg.sender, amountOut, uint(_amount), false);
 		}
@@ -240,17 +261,20 @@ contract ZCBamm is IZCBamm {
 		require(_amount > 0);
 		uint r = nextTimeRemaining();
 
+		uint treasuryFee;
+		address sendTo;
+		uint reserveIncrease;
 		if (_ZCBin) {
 			require(Ureserves >= uint(_amount));
 			{
 				int temp = int(BigMath.ZCB_U_reserve_change(Ureserves, ZCBreserves+_inflatedTotalSupply(), r, -_amount));
 				require(temp > 0);
-				(amountIn, , ) = FeeOracle(FeeOracleAddress).feeAdjustedAmountIn(maturity, uint(temp));
+				(amountIn, treasuryFee, sendTo) = FeeOracle(FeeOracleAddress).feeAdjustedAmountIn(maturity, uint(temp));
+				reserveIncrease = amountIn.sub(treasuryFee);
 			}
+			getZCBsendU(amountIn, uint(_amount), treasuryFee, sendTo, true);
 
-			getZCBsendU(amountIn, uint(_amount));
-
-			ZCBreserves += amountIn;
+			ZCBreserves += reserveIncrease;
 			Ureserves -= uint(_amount);
 
 			emit Swap(msg.sender, amountIn, uint(_amount), true);
@@ -259,14 +283,15 @@ contract ZCBamm is IZCBamm {
 			{
 				int temp = int(BigMath.ZCB_U_reserve_change(ZCBreserves+_inflatedTotalSupply(), Ureserves, r, -_amount));
 				require(temp > 0);
-				(amountIn, , ) = FeeOracle(FeeOracleAddress).feeAdjustedAmountIn(maturity, uint(temp));
+				(amountIn, treasuryFee, sendTo) = FeeOracle(FeeOracleAddress).feeAdjustedAmountIn(maturity, uint(temp));
+				reserveIncrease = amountIn.sub(treasuryFee);
 			}
 
 			require(uint(_amount) > amountIn, "cannot swap to ZCB at negative rate");
 
-			sendZCBgetU(uint(_amount), amountIn);
+			sendZCBgetU(uint(_amount), amountIn, treasuryFee, sendTo, false);
 
-			Ureserves += amountIn;
+			Ureserves += reserveIncrease;
 			ZCBreserves -= uint(_amount);
 
 			emit Swap(msg.sender, uint(_amount), amountIn, false);
@@ -287,11 +312,12 @@ contract ZCBamm is IZCBamm {
 		require(_amount > 0);
 		uint r = nextTimeRemaining();
 
+		uint treasuryFee;
 		if (_ZCBin) {
 			{
 				int temp = -int(BigMath.ZCB_U_reserve_change(ZCBreserves+_inflatedTotalSupply(), Ureserves, r, _amount));
 				require(temp > 0);
-				(amountOut, , ) = FeeOracle(FeeOracleAddress).feeAdjustedAmountOut(maturity, uint(temp));
+				(amountOut, treasuryFee, ) = FeeOracle(FeeOracleAddress).feeAdjustedAmountOut(maturity, uint(temp));
 			}
 
 			require(Ureserves > amountOut);
@@ -300,26 +326,29 @@ contract ZCBamm is IZCBamm {
 			{
 				int temp = -int(BigMath.ZCB_U_reserve_change(Ureserves, ZCBreserves+_inflatedTotalSupply(), r, _amount));
 				require(temp > 0);
-				(amountOut, , ) = FeeOracle(FeeOracleAddress).feeAdjustedAmountOut(maturity, uint(temp));
+				(amountOut, treasuryFee, ) = FeeOracle(FeeOracleAddress).feeAdjustedAmountOut(maturity, uint(temp));
 			}
 
 			require(uint(_amount) < amountOut, "cannot swap to ZCB at negative rate");
+			
+			uint reserveDecrease = amountOut.add(treasuryFee);
 
-			require(ZCBreserves > amountOut);
+			require(ZCBreserves >= reserveDecrease);
 		}
-		writeQuoteSignature(_ZCBin, uint(_amount), amountOut);
+		writeQuoteSignature(_ZCBin, false, uint(_amount), amountOut, treasuryFee);
 	}
 
 	function ReserveQuoteToSpecificTokens(int128 _amount, bool _ZCBin) external override setRateModifier returns(uint amountIn) {
 		require(_amount > 0);
 		uint r = nextTimeRemaining();
 
+		uint treasuryFee;
 		if (_ZCBin) {
 			require(Ureserves >= uint(_amount));
 			{
 				int temp = int(BigMath.ZCB_U_reserve_change(Ureserves, ZCBreserves+_inflatedTotalSupply(), r, -_amount));
 				require(temp > 0);
-				(amountIn, , ) = FeeOracle(FeeOracleAddress).feeAdjustedAmountIn(maturity, uint(temp));
+				(amountIn, treasuryFee, ) = FeeOracle(FeeOracleAddress).feeAdjustedAmountIn(maturity, uint(temp));
 			}
 
 		} else {
@@ -327,26 +356,28 @@ contract ZCBamm is IZCBamm {
 			{
 				int temp = int(BigMath.ZCB_U_reserve_change(ZCBreserves+_inflatedTotalSupply(), Ureserves, r, -_amount));
 				require(temp > 0);
-				(amountIn, , ) = FeeOracle(FeeOracleAddress).feeAdjustedAmountIn(maturity, uint(temp));
+				(amountIn, treasuryFee, ) = FeeOracle(FeeOracleAddress).feeAdjustedAmountIn(maturity, uint(temp));
 			}
 
 			require(uint(_amount) > amountIn, "cannot swap to ZCB at negative rate");
 		}
-		writeQuoteSignature(_ZCBin, amountIn, uint(_amount));
+		writeQuoteSignature(_ZCBin, true, amountIn, uint(_amount), treasuryFee);
 	}
 
-	function TakeQuote(uint _amountIn, uint _amountOut, bool _ZCBin) external override verifyQuote(_amountIn, _amountOut, _ZCBin) {
+	function TakeQuote(uint _amountIn, uint _amountOut, bool _ZCBin, bool _ToSpecific) external override verifyQuote(_amountIn, _amountOut, _ZCBin, _ToSpecific) {
+		address sendTo = FeeOracle(FeeOracleAddress).sendTo();
+		uint _quotedTreasuryFee = quotedTreasuryFee;
 		if (_ZCBin) {
 			require(Ureserves >= _amountOut);
-			getZCBsendU(_amountIn, _amountOut);
-			ZCBreserves += _amountIn;
-			Ureserves -= _amountOut;
+			getZCBsendU(_amountIn, _amountOut, _quotedTreasuryFee, sendTo, _ToSpecific);
+			ZCBreserves += _amountIn.sub(_ToSpecific ? _quotedTreasuryFee : 0);
+			Ureserves -= _amountOut.add(!_ToSpecific ? _quotedTreasuryFee : 0);
 			emit Swap(msg.sender, _amountIn, _amountOut, _ZCBin);
 		} else {
 			require(ZCBreserves >= _amountOut);
-			sendZCBgetU(_amountOut, _amountIn);
-			Ureserves += _amountIn;
-			ZCBreserves -= _amountOut;
+			sendZCBgetU(_amountOut, _amountIn, _quotedTreasuryFee, sendTo, !_ToSpecific);
+			Ureserves += _amountIn.sub(_ToSpecific ? _quotedTreasuryFee : 0);
+			ZCBreserves -= _amountOut.add(!_ToSpecific ? _quotedTreasuryFee : 0);
 			emit Swap(msg.sender, _amountOut, _amountIn, _ZCBin);
 		}
 	}
@@ -457,10 +488,10 @@ contract ZCBamm is IZCBamm {
 			uint incYT = amtYT.sub(_Ureserves);
 
 			if (incYT > incZCB) {
-				//transfer excess YT growth to contract owner
-				//this will only happen if someone makes a direct transfer to this contract
-				//todo replace address(0) with contract owner address
-				IYieldToken(YTaddress).transfer_2(address(0), incYT-incZCB, false);
+				//transfer excess YT growth to the fee oracle sendTo address this will only happen
+				//if someone makes a direct transfer of YT to this contract thus the natural yield
+				//generated by funds in the amm will never be transfered out
+				IYieldToken(YTaddress).transfer_2(FeeOracle(FeeOracleAddress).sendTo(), incYT-incZCB, false);
 				amtYT -= incYT - incZCB;
 			}
 			newUreserves = amtYT;

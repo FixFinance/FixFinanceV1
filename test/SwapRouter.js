@@ -27,6 +27,10 @@ const _0BalanceString = "0";
 const roundingBuffer = new BN(0x10);
 const LENGTH_RATE_SERIES = 31;
 
+const MaxFee = "125000000"; //12.5% in super basis point format
+const AnnualFee = "12500000"; //1.25% in super basis point format
+const BipsToTreasury = "100"; //1% in basis point format
+
 contract('SwapRouter', async function(accounts) {
 
 	it('before each', async () => {
@@ -40,7 +44,7 @@ contract('SwapRouter', async function(accounts) {
 		YTammDeployerInstance = await YTammDeployer.new();
 		capitalHandlerDeployerInstance = await CapitalHandlerDeployer.new();
 		swapRouterDeployerInstance = await SwapRouterDeployer.new();
-		feeOracleInstance = await FeeOracle.new("0", "0", "0", nullAddress);
+		feeOracleInstance = await FeeOracle.new(MaxFee, AnnualFee, BipsToTreasury, nullAddress);
 		organizerInstance = await organizer.new(
 			yieldTokenDeployerInstance.address,
 			bondMinterInstance.address,

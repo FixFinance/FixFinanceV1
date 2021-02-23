@@ -35,7 +35,7 @@ abstract contract IZCBamm is IERC20 {
 	function SwapToSpecificTokensWithLimit(int128 _amount, bool _ZCBin, uint _maxAmtIn) external virtual returns(uint _in);
 	function ReserveQuoteFromSpecificTokens(int128 _amount, bool _ZCBin) external virtual returns(uint _out);
 	function ReserveQuoteToSpecificTokens(int128 _amount, bool _ZCBin) external virtual returns(uint _out);
-	function TakeQuote(uint _amountIn, uint _amountOut, bool _ZCBin) external virtual;
+	function TakeQuote(uint _amountIn, uint _amountOut, bool _ZCBin, bool _ToSpecific) external virtual;
 	function recalibrate(uint lowerBoundAnchor, uint upperBoundAnchor) external virtual;
 	function inflatedTotalSupply() external virtual view returns (uint);
 	function getRateFromOracle() external virtual view returns (int128 rate);

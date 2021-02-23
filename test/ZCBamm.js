@@ -15,13 +15,22 @@ const _10To18BN = (new BN("10")).pow(new BN("18"));
 const secondsPerYear = 31556926;
 
 const MaxFee = "125000000"; //12.5% in super basis point format
+const BipsToTreasury = "1000"; //10% in basis point format
+const TreasuryFeeNumber = 0.1;
 const _2To64BN = (new BN("2")).pow(new BN("64"));
 const AnnualFeeRateBN = _2To64BN.div(new BN("100")); //0.01 or 1% in 64.64 form
 const AnnualFeeRateNumber = 0.01;
 const DesiredDigitsAccurate = 7;
 const ErrorRange = Math.pow(10,-7);
+const TreasuryErrorRange = Math.pow(10, -5);
 
 function AmountError(actual, expected) {
+	if (actual === expected) {
+		return 0;
+	}
+	else if (actual === 0 || expected === 0) {
+		return 1.0;
+	}
 	return Math.abs(actual-expected)/expected;
 }
 
@@ -37,7 +46,7 @@ contract('ZCBamm', async function(accounts){
 		capitalHandlerInstance = await capitalHandler.new(aaveWrapperInstance.address, maturity, yieldTokenDeployerInstance.address, nullAddress);
 		yieldTokenInstance = await yieldToken.at(await capitalHandlerInstance.yieldTokenAddress());
 		await ZCBamm.link("BigMath", BigMathInstance.address);
-		feeOracleInstance = await FeeOracle.new(MaxFee, AnnualFeeRateBN, "0", nullAddress);
+		feeOracleInstance = await FeeOracle.new(MaxFee, AnnualFeeRateBN, BipsToTreasury, nullAddress);
 		amm = await ZCBamm.new(capitalHandlerInstance.address, feeOracleInstance.address);
 		anchor = (await amm.anchor()).toNumber();
 
@@ -274,7 +283,9 @@ contract('ZCBamm', async function(accounts){
 		let yearsRemaining = (maturity - timestamp)/secondsPerYear;
 		let pctFee = 1 - Math.pow(1 - AnnualFeeRateNumber, yearsRemaining);
 		let UoutFeeAdjusted = Uout * (1 - pctFee);
-		let Uexpected = parseInt(Ureserves) - UoutFeeAdjusted;
+		let totalFee = Uout - UoutFeeAdjusted;
+		let treasuryFee = Math.floor(totalFee * TreasuryFeeNumber);
+		let Uexpected = parseInt(Ureserves) - UoutFeeAdjusted - treasuryFee;
 		let ZCBexpected = parseInt(ZCBreserves) + parseInt(amtIn.toString());
 
 		results = await amm.getReserves();
@@ -282,14 +293,20 @@ contract('ZCBamm', async function(accounts){
 		Ureserves = results._Ureserves.toString();
 		ZCBreserves = results._ZCBreserves.toString();
 
+		balanceTreasuryZCB = (await capitalHandlerInstance.balanceOf(nullAddress)).toString();
+		balanceTreasuryYT = (await yieldTokenInstance.balanceOf_2(nullAddress, false)).toString();
+
 		assert.isBelow(AmountError(parseInt(Ureserves), Uexpected), ErrorRange, "Ureserves within error range");
 		assert.isBelow(AmountError(parseInt(ZCBreserves), ZCBexpected), ErrorRange, "Ureserves within error range");
+
+		assert.isBelow(AmountError(parseInt(balanceTreasuryZCB), treasuryFee), TreasuryErrorRange, "treasury ZCB balance within error range");
+		assert.isBelow(AmountError(parseInt(balanceTreasuryYT), treasuryFee), TreasuryErrorRange, "treasury YT balance within error range");
 
 		balanceYT = await yieldTokenInstance.balanceOf_2(accounts[0], false);
 		balanceZCB = await capitalHandlerInstance.balanceOf(accounts[0]);
 
-		let expectedBalanceYT = balance.sub(new BN(Ureserves)).toString();
-		let expectedBalanceZCB = balance.sub((new BN(ZCBreserves)).add(new BN(Ureserves))).toString()
+		expectedBalanceYT = balance.sub(new BN(Ureserves)).sub(new BN(balanceTreasuryYT)).toString();
+		expectedBalanceZCB = balance.sub(new BN(ZCBreserves)).sub(new BN(Ureserves)).sub(new BN(balanceTreasuryZCB)).toString();
 		assert.equal(balanceLT.toString(), Uin.toString());
 		assert.equal(balanceYT.toString(), expectedBalanceYT, "correct balance YT");
 		assert.equal(balanceZCB.toString(), expectedBalanceZCB, "correct balance ZCB");
@@ -317,22 +334,32 @@ contract('ZCBamm', async function(accounts){
 		let yearsRemaining = (maturity - timestamp)/secondsPerYear;
 		let pctFee = 1 - Math.pow(1 - AnnualFeeRateNumber, yearsRemaining);
 		let ZCBoutFeeAdjusted = ZCBout * (1 - pctFee);
+		let totalFee = ZCBout - ZCBoutFeeAdjusted;
+		let treasuryFee = Math.floor(totalFee * TreasuryFeeNumber);
 		let Uexpected = parseInt(amtIn.add(new BN(Ureserves)).toString());
-		let ZCBexpected = parseInt(ZCBreserves) - ZCBoutFeeAdjusted;
+		let ZCBexpected = parseInt(ZCBreserves) - ZCBoutFeeAdjusted - treasuryFee;
 
 		let results = await amm.getReserves();
 
 		Ureserves = results._Ureserves.toString();
 		ZCBreserves = results._ZCBreserves.toString();
 
+		let prevTreasuryZCB = balanceTreasuryZCB;
+		let prevTreasuryYT = balanceTreasuryYT;
+		balanceTreasuryZCB = (await capitalHandlerInstance.balanceOf(nullAddress)).toString();
+		balanceTreasuryYT = (await yieldTokenInstance.balanceOf_2(nullAddress, false)).toString();
+
 		assert.isBelow(AmountError(parseInt(Ureserves), Uexpected), ErrorRange, "Ureserves within error range");
 		assert.isBelow(AmountError(parseInt(ZCBreserves), ZCBexpected), ErrorRange, "Ureserves within error range");
+
+		assert.isBelow(AmountError(parseInt((new BN(balanceTreasuryZCB)).sub(new BN(prevTreasuryZCB))), treasuryFee), TreasuryErrorRange, "treasury ZCB balance within error range");
+		assert.equal(balanceTreasuryYT, prevTreasuryYT, "treasury YT balance unchanged");
 
 		balanceYT = await yieldTokenInstance.balanceOf_2(accounts[0], false);
 		balanceZCB = await capitalHandlerInstance.balanceOf(accounts[0]);
 
-		let expectedBalanceYT = balance.sub(new BN(Ureserves)).toString();
-		let expectedBalanceZCB = balance.sub((new BN(ZCBreserves)).add(new BN(Ureserves))).toString();
+		expectedBalanceYT = balance.sub(new BN(Ureserves)).sub(new BN(balanceTreasuryYT)).toString();
+		expectedBalanceZCB = balance.sub(new BN(ZCBreserves)).sub(new BN(Ureserves)).sub(new BN(balanceTreasuryZCB)).toString();
 		assert.equal(balanceYT.toString(), expectedBalanceYT, "correct balance YT");
 		assert.equal(balanceZCB.toString(), expectedBalanceZCB, "correct balance ZCB");
 	});
@@ -359,7 +386,9 @@ contract('ZCBamm', async function(accounts){
 		let yearsRemaining = (maturity - timestamp)/secondsPerYear;
 		let pctFee = 1 - Math.pow(1 - AnnualFeeRateNumber, yearsRemaining);
 		let UinFeeAdjusted = Uin / (1 - pctFee);
-		let Uexpected = parseInt(Ureserves) + UinFeeAdjusted;
+		let totalFee = UinFeeAdjusted - Uin;
+		let treasuryFee = Math.floor(totalFee * TreasuryFeeNumber);
+		let Uexpected = parseInt(Ureserves) + UinFeeAdjusted - treasuryFee;
 		let ZCBexpected = parseInt(ZCBreserves) - parseInt(amtOut.toString());
 
 		let results = await amm.getReserves();
@@ -367,14 +396,25 @@ contract('ZCBamm', async function(accounts){
 		Ureserves = results._Ureserves.toString();
 		ZCBreserves = results._ZCBreserves.toString();
 
+		let prevTreasuryZCB = balanceTreasuryZCB;
+		let prevTreasuryYT = balanceTreasuryYT;
+		balanceTreasuryZCB = (await capitalHandlerInstance.balanceOf(nullAddress)).toString();
+		balanceTreasuryYT = (await yieldTokenInstance.balanceOf_2(nullAddress, false)).toString();
+		let treasuryZCBchange = (new BN(balanceTreasuryZCB)).sub(new BN(prevTreasuryZCB)).toString();
+		let treasuryYTchange = (new BN(balanceTreasuryYT)).sub(new BN(prevTreasuryYT)).toString();
+
 		assert.isBelow(AmountError(parseInt(Ureserves), Uexpected), ErrorRange, "Ureserves within error range");
 		assert.isBelow(AmountError(parseInt(ZCBreserves), ZCBexpected), ErrorRange, "Ureserves within error range");
+
+		assert.isBelow(AmountError(parseInt(treasuryZCBchange), treasuryFee), TreasuryErrorRange, "treasury ZCB balance within error range");
+		assert.isBelow(AmountError(parseInt(treasuryYTchange), treasuryFee), TreasuryErrorRange, "treasury YT balance within error range");
 
 		balanceYT = await yieldTokenInstance.balanceOf_2(accounts[0], false);
 		balanceZCB = await capitalHandlerInstance.balanceOf(accounts[0]);
 
-		let expectedBalanceYT = balance.sub(new BN(Ureserves)).toString();
-		let expectedBalanceZCB = balance.sub((new BN(ZCBreserves)).add(new BN(Ureserves))).toString();
+		expectedBalanceYT = balance.sub(new BN(Ureserves)).sub(new BN(balanceTreasuryYT)).toString();
+		expectedBalanceZCB = balance.sub(new BN(ZCBreserves)).sub(new BN(Ureserves)).sub(new BN(balanceTreasuryZCB)).toString();
+
 		assert.equal(balanceYT.toString(), expectedBalanceYT, "correct balance YT");
 		assert.equal(balanceZCB.toString(), expectedBalanceZCB, "correct balance ZCB");
 	});
@@ -401,7 +441,9 @@ contract('ZCBamm', async function(accounts){
 		let yearsRemaining = (maturity - timestamp)/secondsPerYear;
 		let pctFee = 1 - Math.pow(1 - AnnualFeeRateNumber, yearsRemaining);
 		let ZCBinFeeAdjusted = ZCBin / (1 - pctFee);
-		let ZCBexpected = parseInt(ZCBreserves) + ZCBinFeeAdjusted;
+		let totalFee = ZCBinFeeAdjusted - ZCBin;
+		let treasuryFee = Math.floor(totalFee * TreasuryFeeNumber);
+		let ZCBexpected = parseInt(ZCBreserves) + ZCBinFeeAdjusted - treasuryFee;
 		let Uexpected = parseInt(Ureserves) - parseInt(amtOut.toString());
 
 		let results = await amm.getReserves();
@@ -409,14 +451,24 @@ contract('ZCBamm', async function(accounts){
 		Ureserves = results._Ureserves.toString();
 		ZCBreserves = results._ZCBreserves.toString();
 
+		let prevTreasuryZCB = balanceTreasuryZCB;
+		let prevTreasuryYT = balanceTreasuryYT;
+		balanceTreasuryZCB = (await capitalHandlerInstance.balanceOf(nullAddress)).toString();
+		balanceTreasuryYT = (await yieldTokenInstance.balanceOf_2(nullAddress, false)).toString();
+		let treasuryZCBchange = (new BN(balanceTreasuryZCB)).sub(new BN(prevTreasuryZCB)).toString();
+		let treasuryYTchange = (new BN(balanceTreasuryYT)).sub(new BN(prevTreasuryYT)).toString();
+
 		assert.isBelow(AmountError(parseInt(Ureserves), Uexpected), ErrorRange, "Ureserves within error range");
 		assert.isBelow(AmountError(parseInt(ZCBreserves), ZCBexpected), ErrorRange, "Ureserves within error range");
+
+		assert.isBelow(AmountError(parseInt((new BN(balanceTreasuryZCB)).sub(new BN(prevTreasuryZCB))), treasuryFee), TreasuryErrorRange, "treasury ZCB balance within error range");
+		assert.equal(balanceTreasuryYT, prevTreasuryYT, "treasury YT balance unchanged");
 
 		balanceYT = await yieldTokenInstance.balanceOf_2(accounts[0], false);
 		balanceZCB = await capitalHandlerInstance.balanceOf(accounts[0]);
 
-		let expectedBalanceYT = balance.sub(new BN(Ureserves)).toString();
-		let expectedBalanceZCB = balance.sub((new BN(ZCBreserves)).add(new BN(Ureserves))).toString();
+		expectedBalanceYT = balance.sub(new BN(Ureserves)).sub(new BN(balanceTreasuryYT)).toString();
+		expectedBalanceZCB = balance.sub(new BN(ZCBreserves)).sub(new BN(Ureserves)).sub(new BN(balanceTreasuryZCB)).toString();
 		assert.equal(balanceYT.toString(), expectedBalanceYT, "correct balance YT");
 		assert.equal(balanceZCB.toString(), expectedBalanceZCB, "correct balance ZCB");
 	});

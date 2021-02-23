@@ -184,7 +184,7 @@ contract SwapRouter is ISwapRouter {
 		require(_amtZCB <= _maxZCBin);
 		ch.transferFrom(msg.sender, address(this), _amtZCB);
 		ch.approve(address(zAmm), _amtZCB);
-		zAmm.TakeQuote(_amtZCB, _amtU+RoundingBuffer, true);
+		zAmm.TakeQuote(_amtZCB, _amtU+RoundingBuffer, true, true);
 		//approvals for before yAmm swap
 		ch.approve(address(yAmm), _amtU);
 		yt.approve_2(address(yAmm), _amtU, true);

@@ -24,23 +24,27 @@ contract FeeOracle is Ownable {
 	// 0.125 in super basis points
 	uint32 private constant MaxMaxFee = 125_000_000;
 
+	// the treasury should receive no more than 40% of total fee revenue
+	uint16 private constant MaxBipsToTreasury = 4_000;
+
 	uint public maxFee;
 
 	//pct fee paid on swap with 1 year to maturity
 	int128 public annualRate;
 
-	uint8 public bipsToTreasury;
+	uint16 public bipsToTreasury;
 
 	address public sendTo;
 
-	constructor(uint32 _maxFee, int128 _annualRate, uint8 _bipsToTreasury, address _sendTo) public {
+	constructor(uint32 _maxFee, int128 _annualRate, uint16 _bipsToTreasury, address _sendTo) public {
 		setMaxFee(_maxFee);
 		setAnnualRate(_annualRate);
-		bipsToTreasury = _bipsToTreasury;
+		setToTreasuryFee(_bipsToTreasury);
 		sendTo = _sendTo;
 	}
 
-	function setToTreasuryFee(uint8 _bipsToTreasury) external onlyOwner {
+	function setToTreasuryFee(uint16 _bipsToTreasury) public onlyOwner {
+		require(_bipsToTreasury <= MaxBipsToTreasury);
 		bipsToTreasury = _bipsToTreasury;
 	}
 
@@ -94,8 +98,7 @@ contract FeeOracle is Ownable {
 	function feeAdjustedAmountIn(uint _maturity, uint _amountIn_preFee) external view returns (uint amountIn_postFee, uint toTreasury, address _sendTo) {
 		amountIn_postFee = totalSuperBasisPoints * _amountIn_preFee / (totalSuperBasisPoints - getFeePct(_maturity));
 		uint totalFee = amountIn_postFee - _amountIn_preFee;
-		uint fee_plusToTreasury = totalBasisPoints * totalFee / (totalBasisPoints - bipsToTreasury);
-		toTreasury = totalFee - fee_plusToTreasury;
+		toTreasury = totalFee * bipsToTreasury / totalBasisPoints;
 		_sendTo = sendTo;
 	}
 
@@ -106,8 +109,7 @@ contract FeeOracle is Ownable {
 	function feeAdjustedAmountOut(uint _maturity, uint _amountOut_preFee) external view returns (uint amountOut_postFee, uint toTreasury, address _sendTo) {
 		amountOut_postFee = _amountOut_preFee * (totalSuperBasisPoints - getFeePct(_maturity)) / totalSuperBasisPoints;
 		uint totalFee = _amountOut_preFee - amountOut_postFee;
-		uint fee_minusToTreasury = totalFee * (totalBasisPoints - bipsToTreasury) / totalBasisPoints;
-		toTreasury = totalFee - fee_minusToTreasury;
+		toTreasury = totalFee * bipsToTreasury / totalBasisPoints;
 		_sendTo = sendTo;
 	}
 

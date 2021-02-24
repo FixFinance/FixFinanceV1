@@ -477,8 +477,8 @@ contract ZCBamm is IZCBamm {
 
 		uint prevRatio = _ZCBreserves.add(_inflatedTotalSupply()).mul(1 ether).div(_Ureserves);
 
-		int128 prevAnchor_years = int128((anchor << 64) / SecondsPerYear);
-		int128 yearsRemaining = int128((( maturity - block.timestamp ) << 64) / SecondsPerYear);
+		int128 prevAnchor = int128(anchor << 64);
+		int128 secondsRemaining = int128(( maturity - block.timestamp ) << 64);
 		uint newZCBreserves;
 		uint newUreserves;
 		{
@@ -501,8 +501,8 @@ contract ZCBamm is IZCBamm {
 		require(newUreserves != 0 && newZCBreserves >> 192 == 0);
 		uint effectiveTotalSupply = BigMath.ZCB_U_recalibration(
 			prevRatio,
-			prevAnchor_years,
-			yearsRemaining,
+			prevAnchor,
+			secondsRemaining,
 			upperBoundAnchor,
 			lowerBoundAnchor,
 			newZCBreserves,
@@ -510,9 +510,9 @@ contract ZCBamm is IZCBamm {
 		);
 		/*
 			effectiveTotalSupply == totalSupply * LPTokenInflation
-			LPTokenInflation == totalSupply / effectiveTotalSupply
+			LPTokenInflation == effectiveTotalSupply / totalSupply
 		*/
-		LPTokenInflation = totalSupply.mul(1 ether).div(effectiveTotalSupply);
+		LPTokenInflation = effectiveTotalSupply.mul(1 ether).div(totalSupply);
 		ZCBreserves = newZCBreserves;
 		Ureserves = newUreserves;
 		nextAnchor = lowerBoundAnchor.add(upperBoundAnchor) >> 1;

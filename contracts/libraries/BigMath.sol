@@ -384,9 +384,9 @@ library BigMath {
     return int128(result);
   }
 
-  function YT_U_ratio(int128 rate, uint secondsRemaining) external pure returns (uint ratio) {
+  function YT_U_ratio(int128 APY, uint secondsRemaining) external pure returns (uint ratio) {
     int128 timeRemaining = int128((secondsRemaining << 64) / SecondsPerYear);
-    int128 ret = ABDK_1.div(ABDK_1.sub(Exp(rate, -timeRemaining)));
+    int128 ret = ABDK_1.div(ABDK_1.sub(Exp(APY, -timeRemaining)));
     return uint(ret).mul(1 ether) >> 64;
   }
 
@@ -436,15 +436,15 @@ library BigMath {
   uint private constant MaxAnchor = 1000 * SecondsPerYear;
   function ZCB_U_recalibration(
     uint prevRatio,
-    int128 prevAnchor_years,
-    int128 yearsRemaining,
+    int128 prevAnchorABDK,
+    int128 secondsRemaining,
     uint upperBoundAnchor,
     uint lowerBoundAnchor,
     uint ZCBreserves,
     uint Ureserves
     ) external pure returns (uint) {
     
-    require(upperBoundAnchor > lowerBoundAnchor && upperBoundAnchor < lowerBoundAnchor + 30 seconds && lowerBoundAnchor > (uint(yearsRemaining) * SecondsPerYear) >> 64);
+    require(upperBoundAnchor > lowerBoundAnchor && upperBoundAnchor < lowerBoundAnchor + 30 seconds && lowerBoundAnchor > uint(secondsRemaining) >> 64);
     require(upperBoundAnchor < MaxAnchor);
     require(int(ZCBreserves) <= MAX && int(ZCBreserves) > 0);
     require(int(Ureserves) <= MAX && int(Ureserves) > 0);
@@ -452,7 +452,7 @@ library BigMath {
     {
       uint base = (prevRatio << 64) / (1 ether);
       require(int(base) <= MAX && int(base) > 0);
-      prevYield = Exp(int128(base), prevAnchor_years);
+      prevYield = Exp(int128(base), secondsRemaining.div(prevAnchorABDK));
     }
 
     /*
@@ -461,16 +461,16 @@ library BigMath {
       0 ~= 2 * L**(1-t) - (Z + L)**(1-t) - U**(1-t)
       Where
       prevYield == ((Z+L)/U)**anchor
-      anchor == yearsRemaining / t
+      anchor == secondsRemaining / t
     */
 
     /*
       For any given value of anchor we can find the expected value of L with some algebra
       
-      prevYield == ( (Z+L)/U )**(anchor)
-      prevYield**(1/anchor) == (Z+L)/U
-      U * prevYield**(1/anchor) == Z+L
-      L == U * prevYield**(1/anchor) - Z
+      prevYield == ( (Z+L)/U )**(secondsRemaining/anchor)
+      prevYield**(anchor/secondsRemaining) == (Z+L)/U
+      U * prevYield**(anchor/secondsRemaining) == Z+L
+      L == U * prevYield**(anchor/secondsRemaining) - Z
 
       Next we need to check if this fits with our other equation
 
@@ -483,17 +483,19 @@ library BigMath {
     int128 lowAnchorG;
     int128 highAnchorG;
     {
-      int128 ABDKAnchor = int128((lowerBoundAnchor << 64) / SecondsPerYear);
-      LowerBoundL = Exp(prevYield, ABDK_1.div(ABDKAnchor)).mul(int128(Ureserves)).sub(int128(ZCBreserves));
-      int128 t = yearsRemaining.div(ABDKAnchor);
+      int128 ABDKAnchor = int128(lowerBoundAnchor << 64);
+      int128 exponent = ABDKAnchor.div(secondsRemaining);
+      LowerBoundL = Exp(prevYield, exponent).mul(int128(Ureserves)).sub(int128(ZCBreserves));
+      int128 t = secondsRemaining.div(ABDKAnchor);
       lowAnchorG = approxG(LowerBoundL, int128(ZCBreserves), int128(Ureserves), t);
 
-      ABDKAnchor = int128((upperBoundAnchor << 64) / SecondsPerYear);
-      UpperBoundL = Exp(prevYield, ABDK_1.div(ABDKAnchor)).mul(int128(Ureserves)).sub(int128(ZCBreserves));
-      t = yearsRemaining.div(ABDKAnchor);
+      ABDKAnchor = int128(upperBoundAnchor << 64);
+      exponent = ABDKAnchor.div(secondsRemaining);
+      UpperBoundL = Exp(prevYield, exponent).mul(int128(Ureserves)).sub(int128(ZCBreserves));
+      t = secondsRemaining.div(ABDKAnchor);
       highAnchorG = approxG(UpperBoundL, int128(ZCBreserves), int128(Ureserves), t);
     }
-    require(lowAnchorG >= 0 && highAnchorG <= 0);
+    require(lowAnchorG <= 0 && 0 <= highAnchorG);
 
     int128 ret = LowerBoundL.avg(UpperBoundL);
     require(ret > 0);

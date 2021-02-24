@@ -202,47 +202,50 @@ contract('ZCBamm', async function(accounts){
 		//let U = parseInt(reserves._Ureserves.toString()) * 2**-64;
 		//let Z = parseInt(reserves._ZCBreserves.toString()) * 2**-64;
 		let effectiveL = parseInt((await amm.inflatedTotalSupply()).toString());
-		let yearsRemaining = (maturity - timestamp) / secondsPerYear;
+		let secondsRemaining = maturity - timestamp;
 		let rate = (parseInt(ZCBreserves)+effectiveL) / (parseInt(Ureserves));
-		let impliedYield = Math.pow(rate, anchor/secondsPerYear);
-		let UpperBound = anchor*10 / secondsPerYear;
-		let LowerBound = yearsRemaining;
+		let impliedYield = Math.pow(rate, secondsRemaining/anchor);
+		let UpperBound = anchor*10;
+		let LowerBound = secondsRemaining;
 		let a = (UpperBound+LowerBound) / 2;
 		let step = (UpperBound-LowerBound) / 4;
 		for (let i = 0; i < 100; i++) {
-			let t = yearsRemaining / a;
+			let t = secondsRemaining / a;
 			let exp = 1.0-t;
-			let L = U * Math.pow(impliedYield,1/a) - Z;
+			let L = U * Math.pow(impliedYield, 1/t) - Z;
 			let G = 2*Math.pow(L, exp) - Math.pow(Z+L, exp) - Math.pow(U, exp);
 			if (G > 0) {
 				LowerBound = a;
-				a += step;
+				a -= step;
 			}
 			else if (L < 0 || G < 0) {
 				UpperBound = a;
-				a -= step;
+				a += step;
 			}
 			else {
 				if (a === UpperBound) {
-					a -= step;
+					a += step;
 				}
 				else {
-					a += step;
+					a -= step;
 				}
 			}
 			step /= 2;
 		}
-		let L = U * Math.pow(impliedYield,1/a) - Z;
-		let t = yearsRemaining / a;
+		let t = secondsRemaining / a;
+		let L = U * Math.pow(impliedYield, 1/t) - Z;
 		let exp = 1.0-t;
-		let lowerAnchor = Math.floor(LowerBound * secondsPerYear - 1).toString();
-		let upperAnchor = Math.ceil(UpperBound * secondsPerYear + 1).toString();
+		let lowerAnchor = Math.floor(LowerBound - 1).toString();
+		let upperAnchor = Math.ceil(UpperBound + 1).toString();
 		await amm.recalibrate(lowerAnchor, upperAnchor);
 
 		inflatedTotalSupplyLP = await amm.inflatedTotalSupply();
+		let inflatedTotalSupplyLPNum = parseInt(inflatedTotalSupplyLP.toString());
+		let expectedInflatedTotalSupply = L * Math.pow(2, 64);
 		nextAnchor = (await amm.nextAnchor()).toNumber();
 		assert.isBelow(nextAnchor, parseInt(upperAnchor)+1, "anchor is below upper bound");
 		assert.isAbove(nextAnchor, parseInt(lowerAnchor)-1, "anchor is above lower bound");
+		assert.isBelow(AmountError(expectedInflatedTotalSupply, inflatedTotalSupplyLPNum), ErrorRange, "inflatedTotalSupply is within the acceptable margin of error");
 	});
 
 	it('Valid reserves', async () => {

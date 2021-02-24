@@ -45,10 +45,32 @@ async function setRate(amm, rate, account) {
 		(ZCBreserves+totalSupply)/ Ureserves == rate
 		ZCBreserves+totalSupply == rate * Ureserves
 		ZCBreserves == rate * Ureserves - totalSupply
+
+		K = initialU**(1-t) + totalSupply**(1-t)
+		K = Ureserves**(1-t) + (totalSupply+ZCBreserves)**(1-t)
+
+		Ureserves = (K - (totalSupply+ZCBreserves)**(1-t))**(1/(1-t))
+		totalSupply+ZCBreserves = (K - (Ureserves)**(1-t))**(1/(1-t))
+
+		K = Ureserves**(1-t) + (rate * Ureserves)**(1-t)
+		K = Ureserves**(1-t) + rate**(1-t) * Ureserves**(1-t)
+		K = Ureserves**(1-t) * (1 + rate**(1-t))
+		Ureserves = (K / (1 + rate**(1-t)))**(1/(1-t))
 	*/
-	let Ureserves = 1000000;
-	let ZCBreserves = Math.floor(rate*Ureserves - Ureserves).toString();
-	await amm.firstMint(Ureserves.toString(), ZCBreserves);
+	let anchor = (await amm.anchor()).toNumber();
+	let timestamp = (await web3.eth.getBlock('latest')).timestamp;
+	let maturity = (await amm.maturity()).toNumber();
+	let secondsReamining = maturity-timestamp;
+	let t = secondsReamining/anchor;
+	let initialU = 100000000;
+	let totalSupply = initialU;
+
+	let K = 2*initialU**(1-t);
+	let Ureserves = (K / (1+rate**(1-t)))**(1/(1-t));
+	let ZCBreserves = (K - (Ureserves)**(1-t))**(1/(1-t)) - totalSupply;
+	Ureserves = Math.floor(Ureserves).toString();
+	ZCBreserves = Math.floor(ZCBreserves).toString();
+	await amm.firstMint(initialU, ZCBreserves);
 	for (let i = 0; i < LENGTH_RATE_SERIES; i++) {
 		await helper.advanceTime(121);
 		await amm.forceRateDataUpdate();
@@ -80,7 +102,8 @@ contract('YTamm', async function(accounts){
 		await aTokenInstance.setInflation("2"+_10To18BN.toString().substring(1));
 
 		//mint funds to accounts[0]
-		balance = _10To18BN;
+		balance = _10To18BN.mul(new BN(10));
+		await aTokenInstance.mintTo(accounts[0], balance);
 		await aTokenInstance.approve(aaveWrapperInstance.address, balance);
 		await aaveWrapperInstance.depositUnitAmount(accounts[0], balance);
 		await aaveWrapperInstance.approve(capitalHandlerInstance.address, balance);
@@ -121,7 +144,7 @@ contract('YTamm', async function(accounts){
 	});
 
 	it('First Liquidity Token Mint', async () => {
-		toMint = balance.div((new BN("10")));
+		toMint = balance.div((new BN("100")));
 		await amm1.firstMint(toMint);
 		assert.equal((await amm1.balanceOf(accounts[0])).toString(), toMint.toString(), "correct balance of YTamm liquidity tokens");
 		expectedZCBbalance = balance.sub(toMint).toString();
@@ -273,7 +296,6 @@ contract('YTamm', async function(accounts){
 	});
 
 	it('SwapToSpecificYT() push effective APY over APYo', async () => {
-		//process.exit();
 		amtOut = amtIn;
 		let results = await amm1.getReserves();
 		Ureserves = results._Ureserves;
@@ -298,10 +320,10 @@ contract('YTamm', async function(accounts){
 
 	it('recalibrate() on being stuck at high APY', async () => {
 		//first the amm must encur losses
-		amt = toMint.mul(YTtoLmultiplierBN).mul(new BN(2)).div(new BN(5)).div(_10To18BN);
+		amt = toMint.mul(YTtoLmultiplierBN).mul(new BN(9)).div(new BN(10)).div(_10To18BN);
 		//buy YT, (amm sells YT)
 		await amm1.SwapToSpecificYT(amt);
-		OracleRate = 2.5;
+		OracleRate = 500;
 		await setRate(amm0, OracleRate, accounts[0]);
 		//sell YT, (amm buys YT)
 		await amm1.SwapFromSpecificYT(amt);
@@ -311,7 +333,7 @@ contract('YTamm', async function(accounts){
 		await setRate(amm0, OracleRate, accounts[0]);
 		//buy YT, (amm sells YT)
 		await amm1.SwapToSpecificYT(amt);
-		OracleRate = 2.5;
+		OracleRate = 500;
 		await setRate(amm0, OracleRate, accounts[0]);
 		//sell YT, (amm buys YT)
 		await amm1.SwapFromSpecificYT(amt);
@@ -363,6 +385,7 @@ contract('YTamm', async function(accounts){
 	});
 
 	it('recalibrate() on time', async () => {
+		//process.exit();
 		let caught = false;
 		try {
 			await amm1.recalibrate(0);

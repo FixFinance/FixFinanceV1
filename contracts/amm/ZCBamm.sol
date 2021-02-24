@@ -52,12 +52,11 @@ contract ZCBamm is IZCBamm {
 		require(_maturity > block.timestamp + 10 days);
 		maturity = _maturity;
 		//we want time remaining / anchor to be less than 1, thus make anchor greater than time remaining
-		uint temp = 10 * (maturity - block.timestamp) / 9;
+		uint temp = 8 * (maturity - block.timestamp);
 		anchor = temp;
 		nextAnchor = temp;
 		FeeOracleAddress = _feeOracleAddress;
 		lastRecalibration = block.timestamp;
-		LPTokenInflation = 1 ether;
 		ZCBaddress = _ZCBaddress;
 		YTaddress = _YTaddress;
 	}
@@ -167,6 +166,7 @@ contract ZCBamm is IZCBamm {
 
 		_mint(msg.sender, _Uin);
 
+		LPTokenInflation = 1 ether;
 		ZCBreserves = _ZCBin;
 		Ureserves = effectiveU;
 	}

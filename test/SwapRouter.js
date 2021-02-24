@@ -58,8 +58,8 @@ contract('SwapRouter', async function(accounts) {
 		router = await SwapRouter.at(await organizerInstance.SwapRouterAddress());
 
 		let timestamp = (await web3.eth.getBlock('latest')).timestamp;
-		//maturity is 11 days out
-		maturity = timestamp + 11*24*60*60;
+		//maturity is 110 days out
+		maturity = timestamp + 110*24*60*60;
 
 		aTokenInstance = await dummyAToken.new("aCOIN");
 		await organizerInstance.deployAssetWrapper(aTokenInstance.address);
@@ -86,7 +86,7 @@ contract('SwapRouter', async function(accounts) {
 			make first deposit in amm0
 		*/
 		Uin = balance.div(new BN("10"));
-		ZCBin = balance.div(new BN("300"));
+		ZCBin = balance.div(new BN("30"));
 		rec = await amm0.firstMint(Uin, ZCBin);
 		/*
 			set rate in amm0

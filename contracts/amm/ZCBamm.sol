@@ -367,17 +367,18 @@ contract ZCBamm is IZCBamm {
 	function TakeQuote(uint _amountIn, uint _amountOut, bool _ZCBin, bool _ToSpecific) external override verifyQuote(_amountIn, _amountOut, _ZCBin, _ToSpecific) {
 		address sendTo = FeeOracle(FeeOracleAddress).sendTo();
 		uint _quotedTreasuryFee = quotedTreasuryFee;
+		uint reserveDecrease = _amountOut.add(!_ToSpecific ? _quotedTreasuryFee : 0);
 		if (_ZCBin) {
-			require(Ureserves >= _amountOut);
+			require(Ureserves >= reserveDecrease);
 			getZCBsendU(_amountIn, _amountOut, _quotedTreasuryFee, sendTo, _ToSpecific);
 			ZCBreserves += _amountIn.sub(_ToSpecific ? _quotedTreasuryFee : 0);
-			Ureserves -= _amountOut.add(!_ToSpecific ? _quotedTreasuryFee : 0);
+			Ureserves -= reserveDecrease;
 			emit Swap(msg.sender, _amountIn, _amountOut, _ZCBin);
 		} else {
-			require(ZCBreserves >= _amountOut);
+			require(ZCBreserves >= reserveDecrease);
 			sendZCBgetU(_amountOut, _amountIn, _quotedTreasuryFee, sendTo, !_ToSpecific);
 			Ureserves += _amountIn.sub(_ToSpecific ? _quotedTreasuryFee : 0);
-			ZCBreserves -= _amountOut.add(!_ToSpecific ? _quotedTreasuryFee : 0);
+			ZCBreserves -= reserveDecrease;
 			emit Swap(msg.sender, _amountOut, _amountIn, _ZCBin);
 		}
 	}

@@ -18,11 +18,21 @@ const secondsPerYear = 31556926;
 const AcceptableMarginOfError = Math.pow(10, -7);
 
 const MaxFee = "125000000"; //12.5% in super basis points
+const BipsToTreasury = "1000"; //10% in basis point format
+const TreasuryFeeNumber = 0.1;
 const AnnualFeeRate = (new BN("2")).pow(new BN("64")).div(new BN("100")); //0.01 or 1% in 64.64 form
 const AnnualFeeRateNumber = 0.01;
 const LENGTH_RATE_SERIES = 31;
+const ErrorRange = Math.pow(10,-7);
+const TreasuryErrorRange = Math.pow(10, -5);
 
 function AmountError(actual, expected) {
+	if (actual === expected) {
+		return 0;
+	}
+	else if (actual === 0 || expected === 0) {
+		return 1.0;
+	}
 	return Math.abs(actual-expected)/expected;
 }
 
@@ -62,7 +72,7 @@ contract('YTamm', async function(accounts){
 		yieldTokenInstance = await yieldToken.at(await capitalHandlerInstance.yieldTokenAddress());
 		await ZCBamm.link("BigMath", BigMathInstance.address);
 		await YTamm.link("BigMath", BigMathInstance.address);
-		feeOracleInstance = await FeeOracle.new(MaxFee, AnnualFeeRate, "0", nullAddress);
+		feeOracleInstance = await FeeOracle.new(MaxFee, AnnualFeeRate, BipsToTreasury, nullAddress);
 		amm0 = await ZCBamm.new(capitalHandlerInstance.address, feeOracleInstance.address);
 
 
@@ -186,22 +196,42 @@ contract('YTamm', async function(accounts){
 		let pctFee = 1 - Math.pow(1 - AnnualFeeRateNumber, yearsRemaining);
 		let r = (maturity-timestamp)/anchor;
 		let nonFeeAdjustedExpectedUout = YT_U_math.Uout(parseInt(YTreserves.toString()), parseInt(totalSupply.mul(_10To18BN).div(YTtoLmultiplierBN).toString()), r, OracleRate, parseInt(amtIn.toString()));
-		let expectedUout = nonFeeAdjustedExpectedUout * (1 - pctFee);
+		let UoutToSender = nonFeeAdjustedExpectedUout * (1 - pctFee);
+		let totalFee = nonFeeAdjustedExpectedUout - UoutToSender;
+		let treasuryFee = Math.floor(TreasuryFeeNumber * totalFee);
 		let prevZCBbalance = ZCBbalance;
 		ZCBbalance = await capitalHandlerInstance.balanceOf(accounts[0]);
-		let Uout = ZCBbalance.sub(prevZCBbalance);
-		let error = Math.abs(parseInt(Uout.toString())/expectedUout - 1);
-		assert.isBelow(error, 0.000001, "acceptable margin of error")
+		let ActualUout = ZCBbalance.sub(prevZCBbalance);
+		let ActualUoutNumber = parseInt(ActualUout.toString());
+
+		let prevUreserves = parseInt(Ureserves);
+		let prevYTreserves = parseInt(YTreserves);
+		let results = await amm1.getReserves();
+		Ureserves = parseInt(results._Ureserves.toString());
+		YTreserves = parseInt(results._YTreserves.toString());
+
+		treasuryZCBbalance = await capitalHandlerInstance.balanceOf(nullAddress);
+		treasuryYTbalance = await yieldTokenInstance.balanceOf_2(nullAddress, false);
+		let treasuryZCBnum = parseInt(treasuryZCBbalance.toString());
+		let treasuryYTnum = parseInt(treasuryYTbalance.toString());
+
+		assert.isBelow(AmountError(ActualUoutNumber, UoutToSender), ErrorRange, "acceptable margin of error");
+		assert.isBelow(AmountError(Ureserves, prevUreserves-UoutToSender-treasuryFee), ErrorRange, 'ZCBreserves within acceptable margin of error');
+		assert.isBelow(AmountError(YTreserves, prevYTreserves+parseInt(amtIn.toString())), ErrorRange, 'YTreserves within acceptable margin of error');
+
+		assert.isBelow(AmountError(treasuryZCBnum, treasuryFee), TreasuryErrorRange, "treasury ZCB balance within acceptable margin of error");
+		assert.isBelow(AmountError(treasuryYTnum, treasuryFee), TreasuryErrorRange, "treasury YT balance within acceptable margin of error");
+
 		let prevYTbalance = YTbalance;
 		YTbalance = await yieldTokenInstance.balanceOf_2(accounts[0], false);
-		assert.equal(prevYTbalance.add(Uout).sub(YTbalance).toString(), amtIn.toString(), "correct amount U in");
+		assert.equal(prevYTbalance.add(ActualUout).sub(YTbalance).toString(), amtIn.toString(), "correct amount U in");
 	});
 
 	it('SwapToSpecificYT()', async () => {
 		amtOut = amtIn;
 		let results = await amm1.getReserves();
-		Ureserves = results._Ureserves;
-		YTreserves = results._YTreserves;
+		Ureserves = parseInt(results._Ureserves.toString());
+		YTreserves = parseInt(results._YTreserves.toString());
 
 		rec = await amm1.SwapToSpecificYT(amtOut);
 		let timestamp = (await web3.eth.getBlock(rec.receipt.blockNumber)).timestamp;
@@ -210,11 +240,33 @@ contract('YTamm', async function(accounts){
 		let r = (maturity-timestamp)/anchor;
 		let nonFeeAdjustedUin = YT_U_math.Uin(parseInt(YTreserves.toString()), parseInt(totalSupply.mul(_10To18BN).div(YTtoLmultiplierBN).toString()), r, OracleRate, parseInt(amtOut.toString()));
 		let expectedUin = nonFeeAdjustedUin / (1 - pctFee);
+		let totalFee = expectedUin - nonFeeAdjustedUin;
+		let treasuryFee = Math.floor(TreasuryFeeNumber * totalFee);
 		let prevZCBbalance = ZCBbalance;
 		ZCBbalance = await capitalHandlerInstance.balanceOf(accounts[0]);
 		let Uin = prevZCBbalance.sub(ZCBbalance);
-		let error = Math.abs(parseInt(Uin.toString())/expectedUin - 1);
-		assert.isBelow(error, 0.000001, "acceptable margin of error")
+		let ActualUin = parseInt(Uin.toString());
+
+		let prevUreserves = Ureserves;
+		let prevYTreserves = YTreserves;
+		results = await amm1.getReserves();
+		Ureserves = parseInt(results._Ureserves.toString());
+		YTreserves = parseInt(results._YTreserves.toString());
+
+		let prevTreasuryZCBbalance = treasuryZCBbalance;
+		let prevTreasuryYTbalance = treasuryYTbalance;
+		treasuryZCBbalance = await capitalHandlerInstance.balanceOf(nullAddress);
+		treasuryYTbalance = await yieldTokenInstance.balanceOf_2(nullAddress, false);
+		let treasuryZCBchange = (treasuryZCBbalance.sub(prevTreasuryZCBbalance)).toString();
+		let treasuryYTchange = parseInt(treasuryYTbalance.sub(prevTreasuryYTbalance).toString());
+
+		assert.isBelow(AmountError(ActualUin, expectedUin), AcceptableMarginOfError, "acceptable margin of error Uin");
+		assert.isBelow(AmountError(Ureserves, prevUreserves+expectedUin-treasuryFee), AcceptableMarginOfError, "acceptable margin of error Ureserves");
+		assert.isBelow(AmountError(YTreserves, prevYTreserves-parseInt(amtOut.toString())), AcceptableMarginOfError, "acceptable margin of error YTreserves");
+
+		assert.isBelow(AmountError(treasuryZCBchange, treasuryFee), TreasuryErrorRange, "treasury ZCB balance within acceptable margin of error");
+		assert.isBelow(AmountError(treasuryYTchange, treasuryFee), TreasuryErrorRange, "treasury YT balance within acceptable margin of error");
+
 		let prevYTbalance = YTbalance;
 		YTbalance = await yieldTokenInstance.balanceOf_2(accounts[0], false);
 		assert.equal(YTbalance.sub(prevYTbalance.sub(Uin)).toString(), amtOut.toString(), "correct amount U out");

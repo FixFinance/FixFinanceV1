@@ -25,6 +25,8 @@ const AnnualFeeRateNumber = 0.01;
 const LENGTH_RATE_SERIES = 31;
 const ErrorRange = Math.pow(10,-7);
 const TreasuryErrorRange = Math.pow(10, -5);
+const wBN = new BN(0);
+const w = 0;
 
 function AmountError(actual, expected) {
 	if (actual === expected) {
@@ -218,7 +220,7 @@ contract('YTamm', async function(accounts){
 		let yearsRemaining = (maturity - timestamp)/secondsPerYear;
 		let pctFee = 1 - Math.pow(1 - AnnualFeeRateNumber, yearsRemaining);
 		let r = (maturity-timestamp)/anchor;
-		let nonFeeAdjustedExpectedUout = YT_U_math.Uout(parseInt(YTreserves.toString()), parseInt(totalSupply.mul(_10To18BN).div(YTtoLmultiplierBN).toString()), r, OracleRate, parseInt(amtIn.toString()));
+		let nonFeeAdjustedExpectedUout = YT_U_math.Uout(parseInt(YTreserves.toString()), parseInt(totalSupply.mul(_10To18BN).div(YTtoLmultiplierBN).toString()), r, w, OracleRate, parseInt(amtIn.toString()));
 		let UoutToSender = nonFeeAdjustedExpectedUout * (1 - pctFee);
 		let totalFee = nonFeeAdjustedExpectedUout - UoutToSender;
 		let treasuryFee = Math.floor(TreasuryFeeNumber * totalFee);
@@ -261,7 +263,7 @@ contract('YTamm', async function(accounts){
 		let yearsRemaining = (maturity - timestamp)/secondsPerYear;
 		let pctFee = 1 - Math.pow(1 - AnnualFeeRateNumber, yearsRemaining);
 		let r = (maturity-timestamp)/anchor;
-		let nonFeeAdjustedUin = YT_U_math.Uin(parseInt(YTreserves.toString()), parseInt(totalSupply.mul(_10To18BN).div(YTtoLmultiplierBN).toString()), r, OracleRate, parseInt(amtOut.toString()));
+		let nonFeeAdjustedUin = YT_U_math.Uin(parseInt(YTreserves.toString()), parseInt(totalSupply.mul(_10To18BN).div(YTtoLmultiplierBN).toString()), r, w, OracleRate, parseInt(amtOut.toString()));
 		let expectedUin = nonFeeAdjustedUin / (1 - pctFee);
 		let totalFee = expectedUin - nonFeeAdjustedUin;
 		let treasuryFee = Math.floor(TreasuryFeeNumber * totalFee);
@@ -306,7 +308,7 @@ contract('YTamm', async function(accounts){
 		let yearsRemaining = (maturity - timestamp)/secondsPerYear;
 		let pctFee = 1 - Math.pow(1 - AnnualFeeRateNumber, yearsRemaining);
 		let r = (maturity-timestamp)/anchor;
-		let nonFeeAdjustedUin = YT_U_math.Uin(parseInt(YTreserves.toString()), parseInt(totalSupply.mul(_10To18BN).div(YTtoLmultiplierBN).toString()), r, OracleRate, parseInt(amtOut.toString()));
+		let nonFeeAdjustedUin = YT_U_math.Uin(parseInt(YTreserves.toString()), parseInt(totalSupply.mul(_10To18BN).div(YTtoLmultiplierBN).toString()), r, w, OracleRate, parseInt(amtOut.toString()));
 		let expectedUin = nonFeeAdjustedUin / (1 - pctFee);
 		let prevZCBbalance = ZCBbalance;
 		ZCBbalance = await capitalHandlerInstance.balanceOf(accounts[0]);
@@ -345,7 +347,7 @@ contract('YTamm', async function(accounts){
 		let r = parseInt(results._TimeRemaining.toString()) * 2**-64;
 		let UpperBound = parseInt(YTreserves.toString());
 		while (parseInt(Ureserves.toString()) > 
-			YT_U_math.Uout(parseInt(YTreserves.toString()), parseInt(totalSupply.mul(_10To18BN).div(new BN(YTtoLmultiplierBN)).toString()), r, OracleRate, UpperBound) ) {
+			YT_U_math.Uout(parseInt(YTreserves.toString()), parseInt(totalSupply.mul(_10To18BN).div(new BN(YTtoLmultiplierBN)).toString()), r, w, OracleRate, UpperBound) ) {
 			UpperBound *= 10;
 		}
 
@@ -357,6 +359,7 @@ contract('YTamm', async function(accounts){
 				YTreserves.toString()),
 				parseInt(totalSupply.mul(_10To18BN).div(new BN(YTtoLmultiplierBN)).toString()),
 				r,
+				w,
 				OracleRate,
 				MaxYin
 			);

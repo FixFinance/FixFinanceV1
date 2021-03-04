@@ -1,24 +1,28 @@
 let Ei = require('./ei.js');
 
-function impliedK(U, Y, L, r, APYo) {
+function impliedK(U, Y, L, r, w, APYo) {
 	/*
-		U = K + (L* (r) * ln(APYo) * Ei(-L*(r)*ln(APYo)/Y) + Y*(APYo**(-L*r/Y) -1))
+		U = (c+Y)*(APYo+1)**(-S*r/(Y+c)) + S*t*ln(APYo+1)*Ei(-S*t*ln(APYo+1)/(Y+c)) - Y + K
 
-		K = U - (L* (r) * ln(APYo) * Ei(-L*(r)*ln(APYo)/Y) + Y*(APYo**(-L*r/Y) -1))
+		K = U - (c+Y)*(APYo+1)**(-S*r/(Y+c)) - S*t*ln(APYo+1)*Ei(-S*t*ln(APYo+1)/(Y+c)) + Y
 	*/
-	return U - (L* (r) * Math.log(APYo) * Ei.eval(-L*(r)*Math.log(APYo)/Y) + Y*(Math.pow(APYo,-L*r/Y) -1));
+	let c = L*w;
+	let S = L+c;
+	return U - (c+Y)*Math.pow(APYo, -S*r/(Y+c)) - S*r*Math.log(APYo)*Ei.eval(-S*r*Math.log(APYo)/(Y+c)) + Y
 }
 
-function KminusU(Y, L, r, APYo) {
-	return - (L* (r) * Math.log(APYo) * Ei.eval(-L*(r)*Math.log(APYo)/Y) + Y*(Math.pow(APYo,-L*r/Y) -1));
+function KminusU(Y, L, r, w, APYo) {
+	let c = L*w;
+	let S = L+c;
+	return - (c+Y)*Math.pow(APYo, -S*r/(Y+c)) - S*r*Math.log(APYo)*Ei.eval(-S*r*Math.log(APYo)/(Y+c)) + Y;
 }
 
-function Uout(Y, L, r, APYo, Yin) {
-	return KminusU(Y+Yin, L, r, APYo) - KminusU(Y, L, r, APYo);
+function Uout(Y, L, r, w, APYo, Yin) {
+	return KminusU(Y+Yin, L, r, w, APYo) - KminusU(Y, L, r, w, APYo);
 }
 
-function Uin(Y, L, r, APYo, Yout) {
-	return KminusU(Y, L, r, APYo) - KminusU(Y-Yout, L, r, APYo);
+function Uin(Y, L, r, w, APYo, Yout) {
+	return KminusU(Y, L, r, w, APYo) - KminusU(Y-Yout, L, r, w, APYo);
 }
 
 

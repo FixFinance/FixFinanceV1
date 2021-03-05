@@ -19,7 +19,8 @@ const AcceptableMarginOfError = Math.pow(10, -7);
 
 const MaxFee = "125000000"; //12.5% in super basis points
 const BipsToTreasury = "1000"; //10% in basis point format
-const SlippageConstant = "0";
+const SlippageConstant = (new BN("15")).mul(_10To18BN).div(new BN("10"));
+const w = 1.5;
 const TreasuryFeeNumber = 0.1;
 const AnnualFeeRate = (new BN("2")).pow(new BN("64")).div(new BN("100")); //0.01 or 1% in 64.64 form
 const AnnualFeeRateNumber = 0.01;
@@ -27,7 +28,6 @@ const LENGTH_RATE_SERIES = 31;
 const ErrorRange = Math.pow(10,-7);
 const TreasuryErrorRange = Math.pow(10, -5);
 const wBN = new BN(0);
-const w = 0;
 
 function AmountError(actual, expected) {
 	if (actual === expected) {

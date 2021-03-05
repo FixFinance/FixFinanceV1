@@ -3,7 +3,7 @@ import "./helpers/Ownable.sol";
 import "./libraries/SafeMath.sol";
 import "./libraries/ABDKMath64x64.sol";
 
-contract FeeOracle is Ownable {
+contract AmmInfoOracle is Ownable {
 
 	using ABDKMath64x64 for int128;
 	using SafeMath for uint256;
@@ -36,10 +36,13 @@ contract FeeOracle is Ownable {
 
 	address public sendTo;
 
-	constructor(uint32 _maxFee, int128 _annualRate, uint16 _bipsToTreasury, address _sendTo) public {
+	uint256 public SlippageConstant;
+
+	constructor(uint32 _maxFee, int128 _annualRate, uint16 _bipsToTreasury, uint _SlippageConstant, address _sendTo) public {
 		setMaxFee(_maxFee);
 		setAnnualRate(_annualRate);
 		setToTreasuryFee(_bipsToTreasury);
+		SlippageConstant = _SlippageConstant;
 		sendTo = _sendTo;
 	}
 
@@ -62,6 +65,10 @@ contract FeeOracle is Ownable {
 		require(_annualRate >= 0, "annual rate must not be negative");
 		require(_annualRate <= MaxAnnualRate, "_annualRate parameter above upper limit");
 		annualRate = _annualRate;
+	}
+
+	function setSlippageConstant(uint256 _SlippageConstant) public onlyOwner {
+		SlippageConstant = _SlippageConstant;
 	}
 
 	/*

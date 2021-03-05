@@ -11,7 +11,7 @@ const CapitalHandlerDeployer = artifacts.require('CapitalHandlerDeployer');
 const ZCBammDeployer = artifacts.require('ZCBammDeployer');
 const YTammDeployer = artifacts.require('YTammDeployer');
 const SwapRouterDeployer = artifacts.require('SwapRouterDeployer');
-const FeeOracle = artifacts.require("FeeOracle");
+const AmmInfoOracle = artifacts.require("AmmInfoOracle");
 
 const helper = require("../helper/helper.js");
 
@@ -50,7 +50,7 @@ contract('BondMinter', async function(accounts) {
 		YTammDeployerInstance = await YTammDeployer.new();
 		DeployCapitalHandlerInstance = await CapitalHandlerDeployer.new();
 		swapRouterDeployerInstance = await SwapRouterDeployer.new();
-		feeOracleInstance = await FeeOracle.new("0", "0", "0", nullAddress);
+		ammInfoOracleInstance = await AmmInfoOracle.new("0", "0", "0", "0", nullAddress);
 		organizerInstance = await organizer.new(
 			yieldTokenDeployerInstance.address,
 			bondMinterInstance.address,
@@ -58,7 +58,7 @@ contract('BondMinter', async function(accounts) {
 			ZCBammDeployerInstance.address,
 			YTammDeployerInstance.address,
 			swapRouterDeployerInstance.address,
-			feeOracleInstance.address
+			ammInfoOracleInstance.address
 		);
 
 		maturity = ((await web3.eth.getBlock('latest')).timestamp + _8days).toString();

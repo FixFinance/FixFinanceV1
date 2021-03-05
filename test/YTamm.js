@@ -6,7 +6,7 @@ const yieldToken = artifacts.require("YieldToken");
 const yieldTokenDeployer = artifacts.require("YieldTokenDeployer");
 const ZCBamm = artifacts.require("ZCBamm");
 const YTamm = artifacts.require("YTamm");
-const FeeOracle = artifacts.require("FeeOracle");
+const AmmInfoOracle = artifacts.require("AmmInfoOracle");
 
 const helper = require("../helper/helper.js");
 const YT_U_math = require("../helper/YT-U-Math.js");
@@ -19,6 +19,7 @@ const AcceptableMarginOfError = Math.pow(10, -7);
 
 const MaxFee = "125000000"; //12.5% in super basis points
 const BipsToTreasury = "1000"; //10% in basis point format
+const SlippageConstant = "0";
 const TreasuryFeeNumber = 0.1;
 const AnnualFeeRate = (new BN("2")).pow(new BN("64")).div(new BN("100")); //0.01 or 1% in 64.64 form
 const AnnualFeeRateNumber = 0.01;
@@ -65,7 +66,7 @@ async function setRate(amm, rate, account) {
 	let secondsReamining = maturity-timestamp;
 	let t = secondsReamining/anchor;
 	let initialU = 100000000;
-	let totalSupply = initialU;
+	let totalSupply = initialU;amm
 
 	let K = 2*initialU**(1-t);
 	let Ureserves = (K / (1+rate**(1-t)))**(1/(1-t));
@@ -96,8 +97,8 @@ contract('YTamm', async function(accounts){
 		yieldTokenInstance = await yieldToken.at(await capitalHandlerInstance.yieldTokenAddress());
 		await ZCBamm.link("BigMath", BigMathInstance.address);
 		await YTamm.link("BigMath", BigMathInstance.address);
-		feeOracleInstance = await FeeOracle.new(MaxFee, AnnualFeeRate, BipsToTreasury, nullAddress);
-		amm0 = await ZCBamm.new(capitalHandlerInstance.address, feeOracleInstance.address);
+		ammInfoOracleInstance = await AmmInfoOracle.new(MaxFee, AnnualFeeRate, BipsToTreasury, SlippageConstant, nullAddress);
+		amm0 = await ZCBamm.new(capitalHandlerInstance.address, ammInfoOracleInstance.address);
 
 
 		//simulate generation of 100% returns in money market
@@ -132,7 +133,7 @@ contract('YTamm', async function(accounts){
 		//burn all our amm0 LP tokens
 		await amm0.burn(await amm0.balanceOf(accounts[0]));
 
-		amm1 = await YTamm.new(amm0.address, feeOracleInstance.address);
+		amm1 = await YTamm.new(amm0.address, ammInfoOracleInstance.address);
 		YTtoLmultiplierBN = await amm1.YTtoLmultiplier();
 		YTtoLmultiplierBN_p1 = YTtoLmultiplierBN.add(_10To18BN);
 		YTtoLmultiplier = parseInt(YTtoLmultiplierBN.toString()) * Math.pow(10, -18);
@@ -252,7 +253,7 @@ contract('YTamm', async function(accounts){
 		assert.equal(prevYTbalance.add(ActualUout).sub(YTbalance).toString(), amtIn.toString(), "correct amount U in");
 	});
 
-	it('SwapToSpecificYT()', async () => {
+	it('SwapToSpeciammficYT()', async () => {
 		amtOut = amtIn;
 		let results = await amm1.getReserves();
 		Ureserves = parseInt(results._Ureserves.toString());

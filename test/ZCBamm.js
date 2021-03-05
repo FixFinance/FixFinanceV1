@@ -5,7 +5,7 @@ const capitalHandler = artifacts.require("CapitalHandler");
 const yieldToken = artifacts.require("YieldToken");
 const yieldTokenDeployer = artifacts.require("YieldTokenDeployer");
 const ZCBamm = artifacts.require("ZCBamm");
-const FeeOracle = artifacts.require("FeeOracle");
+const AmmInfoOracle = artifacts.require("AmmInfoOracle");
 
 const helper = require("../helper/helper.js");
 
@@ -16,6 +16,7 @@ const secondsPerYear = 31556926;
 
 const MaxFee = "125000000"; //12.5% in super basis point format
 const BipsToTreasury = "1000"; //10% in basis point format
+const SlippageConstant = "0";
 const TreasuryFeeNumber = 0.1;
 const _2To64BN = (new BN("2")).pow(new BN("64"));
 const AnnualFeeRateBN = _2To64BN.div(new BN("100")); //0.01 or 1% in 64.64 form
@@ -46,8 +47,8 @@ contract('ZCBamm', async function(accounts){
 		capitalHandlerInstance = await capitalHandler.new(aaveWrapperInstance.address, maturity, yieldTokenDeployerInstance.address, nullAddress);
 		yieldTokenInstance = await yieldToken.at(await capitalHandlerInstance.yieldTokenAddress());
 		await ZCBamm.link("BigMath", BigMathInstance.address);
-		feeOracleInstance = await FeeOracle.new(MaxFee, AnnualFeeRateBN, BipsToTreasury, nullAddress);
-		amm = await ZCBamm.new(capitalHandlerInstance.address, feeOracleInstance.address);
+		ammInfoOracleInstance = await AmmInfoOracle.new(MaxFee, AnnualFeeRateBN, BipsToTreasury, SlippageConstant, nullAddress);
+		amm = await ZCBamm.new(capitalHandlerInstance.address, ammInfoOracleInstance.address);
 		anchor = (await amm.anchor()).toNumber();
 
 		//simulate generation of 100% returns in money market

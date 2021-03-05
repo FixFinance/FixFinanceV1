@@ -364,10 +364,10 @@ library BigMath {
       .sub(term4);
   }
 
-  function YT_U_reserve_change(uint256 Y, uint256 L, uint256 r, int128 APYo, int128 changeYreserve) external pure returns (int128) {
+  function YT_U_reserve_change(uint256 Y, uint256 L, uint256 r, uint256 w, int128 APYo, int128 changeYreserve) external pure returns (int128) {
     require(changeYreserve > -int(Y));
-    int256 KminusU = YT_U_PoolConstantMinusU(Y, L, r, 0, APYo);
-    int256 newKminusU = YT_U_PoolConstantMinusU(uint(int(Y) + changeYreserve), L, r, 0, APYo);
+    int256 KminusU = YT_U_PoolConstantMinusU(Y, L, r, w, APYo);
+    int256 newKminusU = YT_U_PoolConstantMinusU(uint(int(Y) + changeYreserve), L, r, w, APYo);
     int256 result = KminusU.sub(newKminusU);
     require(result.abs() < MAX);
     return int128(result);

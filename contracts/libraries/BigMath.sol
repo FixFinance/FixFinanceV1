@@ -316,69 +316,58 @@ library BigMath {
   /*
     @Description: find the pool constant for the YT-U amm given current pool reserves
 
-    @param U: amount of pool reserves of Underlying asset, inflated by 64 bits
     @param Y: amount of pool reserves of Yield Tokens, inflated by 64 bits
     @param L: amount of Liquidity tokens, inflated by 64 bits
     @param r: amount of time remaining / anchor, inflated by 64 bits
+    @param w: slippage minimiser variable inflated by BONE
     @param APYo: the apy returned from the oracle inflated by 64 bits
   */
-  function YT_U_PoolConstant(uint256 U, uint256 Y, uint256 L, uint256 r, int128 APYo) public pure returns (int256) {
+  function YT_U_PoolConstantMinusU(uint256 Y, uint256 L, uint256 r, uint256 w, int128 APYo) public pure returns (int256) {
     /*
-      K = U - (L* r * ln(APYo) * Ei(-L*r*ln(APYo)/Y) + Y*(APYo**(-L*r/Y) -1))
-      K = U + (-L* r * ln(APYo) * Ei(-L*r*ln(APYo)/Y) - Y*(APYo**(-L*r/Y) -1))
+      K - U  = - (c+Y)*(APYo)**(-S*r/(Y+c)) - S*r*ln(APYo)*Ei(-S*r*ln(APYo)/(Y+c)) + Y
+      K - U  = - (c+Y)*(APYo)**(-S*r/(Y+c)) + (-S*r)*ln(APYo)*Ei(-S*r*ln(APYo)/(Y+c)) + Y
+
+      y_c = Y+c
+      term0 = -S*r
+
+      K - U  = - y_c*(APYo)**(term0/y_c) + term0*ln(APYo)*Ei(term0*ln(APYo)/y_c) + Y
+      K - U  = - y_c*e**ln((APYo)**(term0/y_c)) + term0*ln(APYo)*Ei(term0*ln(APYo)/y_c) + Y
+      K - U  = - y_c*e**((term0/y_c)*ln(APYo)) + term0*ln(APYo)*Ei(term0*ln(APYo)/y_c) + Y
+      K - U  = - y_c*e**(term0*ln(APYo)/y_c) + term0*ln(APYo)*Ei(term0*ln(APYo)/y_c) + Y
+
+      term1 = term * ln(APYo)
+
+      K - U  = - y_c*e**(term1/y_c) + term1*Ei(term1/y_c) + Y
+
+      term2 = term1/y-c
+
+      K - U  = - y_c*e**(term2) + term1*Ei(term2) + Y
+      K - U  = term1*Ei(term2) + Y - y_c*e**(term2)
     */
-    int256 lnAPYo = int256(APYo.ln());
-    //we know that L * r is a safe operation and does not require safemath
-    int256 term = - int256((L * r) >> 64);
-    //note that termMulLog is inflated by 128 bits not 64 bits
-    int256 termMulLog = term.mul(lnAPYo);
-    int256 term3 = termMulLog/int256(Y);
-    require(term3 < MAX);
-    int256 ei = Ei(int128(term3));
 
-    /*
-      APYo**(-L*r/Y) - 1 ==
-      APYo**(term/Y) - 1 ==
-      e**((term/y) * ln(APYo)) - 1 ==
-      e**(termMulLog/Y) - 1 ==
-      e**(term3) - 1
-    */
-    int256 APYoexp = ( int128(term3) ).exp().sub(1<<64);
+    uint256 c = L.mul(w)/BONE;
+    uint256 y_c = Y.add(c);
+    int128 term1;
+    {
+      uint256 S = L.add(c);
+      uint temp = S.mul(r) >> 64;
+      require(temp <= uint(MAX));
+      int128 term0 = int128(temp).neg();
+      term1 = APYo.ln().mul(term0);
+    }
+    int128 term2 = int128(int256(term1).mul(ABDK_1)/int256(y_c));
+    int256 term3 = Ei(term2).mul(int256(term1)) / int256(ABDK_1);
+    int256 term4 = int256(term2.exp()).mul(int256(y_c)) / int256(ABDK_1);
 
-    return int256(U).add( ((termMulLog >> 64).mul(ei) >> 64).sub(int256(Y).mul(APYoexp) >> 64) );
-  }
-
-  function YT_U_PoolConstantMinusU(uint256 Y, uint256 L, uint256 r, int128 APYo) public pure returns (int256) {
-    /*
-      K = U - (L* r * ln(APYo) * Ei(-L*r*ln(APYo)/Y) + Y*(APYo**(-L*r/Y) -1))
-      K = U + (-L* r * ln(APYo) * Ei(-L*r*ln(APYo)/Y) - Y*(APYo**(-L*r/Y) -1))
-      K - U = (-L* r * ln(APYo) * Ei(-L*r*ln(APYo)/Y) - Y*(APYo**(-L*r/Y) -1))
-    */
-    int256 lnAPYo = int256(APYo.ln());
-    //we know that L * r is a safe operation and does not require safemath
-    int256 term = - int256((L * r) >> 64);
-    //note that termMulLog is inflated by 128 bits not 64 bits
-    int256 termMulLog = term.mul(lnAPYo);
-    int256 term3 = termMulLog/int256(Y);
-    require(term3 < MAX);
-    int256 ei = Ei(int128(term3));
-
-    /*
-      APYo**(-L*r/Y) - 1 ==
-      APYo**(term/Y) - 1 ==
-      e**((term/y) * ln(APYo)) - 1 ==
-      e**(termMulLog/Y) - 1 ==
-      e**(term3) - 1
-    */
-    int256 APYoexp = ( int128(term3) ).exp().sub(1<<64);
-
-    return ((termMulLog >> 64).mul(ei) >> 64).sub(int256(Y).mul(APYoexp) >> 64);
+    return term3
+      .add(int256(Y))
+      .sub(term4);
   }
 
   function YT_U_reserve_change(uint256 Y, uint256 L, uint256 r, int128 APYo, int128 changeYreserve) external pure returns (int128) {
     require(changeYreserve > -int(Y));
-    int256 KminusU = YT_U_PoolConstantMinusU(Y, L, r, APYo);
-    int256 newKminusU = YT_U_PoolConstantMinusU(uint(int(Y) + changeYreserve), L, r, APYo);
+    int256 KminusU = YT_U_PoolConstantMinusU(Y, L, r, 0, APYo);
+    int256 newKminusU = YT_U_PoolConstantMinusU(uint(int(Y) + changeYreserve), L, r, 0, APYo);
     int256 result = KminusU.sub(newKminusU);
     require(result.abs() < MAX);
     return int128(result);

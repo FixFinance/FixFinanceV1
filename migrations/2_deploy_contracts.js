@@ -10,7 +10,7 @@ const YTammDeployer = artifacts.require('YTammDeployer');
 const SwapRouterDeployer = artifacts.require('SwapRouterDeployer');
 const AmmInfoOracle = artifacts.require("AmmInfoOracle");
 const BigMath = artifacts.require("BigMath");
-
+const Ei = artifacts.require("Ei");
 
 const UniswapV2FactoryAddress = "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f";
 
@@ -48,6 +48,8 @@ module.exports = async function(deployer) {
 	capitalHandlerDeployerInstance = await deployer.deploy(CapitalHandlerDeployer);
 	swapRouterDeployerInstance = await deployer.deploy(SwapRouterDeployer);
 	ammInfoOracle = await deployer.deploy(AmmInfoOracle, "0", "0", "0", "0", nullAddress);
+	EiInstance = await deployer.deploy(Ei);
+	await deployer.link(Ei, BigMath);
 	bigMathInstance = await deployer.deploy(BigMath);
 	await deployer.link(BigMath, [ZCBammDeployer, YTammDeployer]);
 	ZCBammDeployerInstance = await deployer.deploy(ZCBammDeployer);

@@ -1,6 +1,7 @@
 const aToken = artifacts.require("dummyAToken");
 const aaveWrapper = artifacts.require("AaveWrapper");
 const BigMath = artifacts.require("BigMath");
+const Ei = artifacts.require("Ei");
 const capitalHandler = artifacts.require("CapitalHandler");
 const yieldToken = artifacts.require("YieldToken");
 const yieldTokenDeployer = artifacts.require("YieldTokenDeployer");
@@ -88,6 +89,8 @@ contract('YTamm', async function(accounts){
 	it('before each', async () => {
 		aTokenInstance = await aToken.new("aCOIN");
 		aaveWrapperInstance = await aaveWrapper.new(aTokenInstance.address);
+		EiInstance = await Ei.new();
+		await BigMath.link("Ei", EiInstance.address);
 		BigMathInstance = await BigMath.new();
 		yieldTokenDeployerInstance = await yieldTokenDeployer.new();
 		let timestamp = (await web3.eth.getBlock('latest')).timestamp;

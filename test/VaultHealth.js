@@ -8,6 +8,7 @@ const organizer = artifacts.require('organizer');
 const BondMinter = artifacts.require('BondMinter');
 const IERC20 = artifacts.require("IERC20");
 const BigMath = artifacts.require("BigMath");
+const Ei = artifacts.require("Ei");
 const CapitalHandlerDeployer = artifacts.require('CapitalHandlerDeployer');
 const ZCBammDeployer = artifacts.require('ZCBammDeployer');
 const YTammDeployer = artifacts.require('YTammDeployer');
@@ -66,6 +67,8 @@ contract('VaultHealth', async function(accounts) {
 		yieldTokenDeployerInstance = await yieldTokenDeployer.new();
 		vaultHealthInstance = await VaultHealth.new(OracleContainerInstance.address);
 		bondMinterInstance = await BondMinter.new(vaultHealthInstance.address);
+		EiInstance = await Ei.new();
+		await BigMath.link("Ei", EiInstance.address);
 		BigMathInstance = await BigMath.new();
 		await ZCBammDeployer.link("BigMath", BigMathInstance.address);
 		await YTammDeployer.link("BigMath", BigMathInstance.address);

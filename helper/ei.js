@@ -2,8 +2,8 @@
    This is a js implementation of the following c file
    http://www.mymathlib.com/c_source/functions/exponential_integrals/exponential_integral_Ei.c
 */
-//const epsilon = 0.00000000000000000108420217248550443400745280086994171142578125;
-const epsilon = 0.000000000108420217248550443400745280086994171142578125;
+const epsilon = 0.00000000000000000108420217248550443400745280086994171142578125;
+//const epsilon = 0.000000000108420217248550443400745280086994171142578125;
 
 function Ei(x) {
    if (x < -5.0) return Continued_Fraction_Ei(x);

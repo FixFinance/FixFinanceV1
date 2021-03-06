@@ -20,6 +20,8 @@ library BigMath {
 
   int128 public constant ABDK_1 = 1<<64;
 
+  int256 private constant EI_INFLATOR = 1<<96;
+
   uint private constant BONE = 1 ether;
   
   uint public constant SecondsPerYear = 31556926;
@@ -156,6 +158,7 @@ library BigMath {
     return x < MIN_64x64 || x > MAX_64x64;
   }
 
+  int128 private constant POWER_SERIES_G = 1.0647749645774669733e19; // 0.5772156649015328606065121
 
   function Power_Series_Ei(int128 x) public pure returns (int256) { 
     int128 _epsilon = epsilon;  //gas savings
@@ -204,8 +207,7 @@ library BigMath {
     if (store == 0) {
       //copy x to top of the stack
       int128 _x = x;
-      int128 g = 1.0647749645774669733e19; // 0.5772156649015328606065121
-      return (g.add(_x.abs().ln()).sub(_x.exp().mul(Sn)));
+      return int256(POWER_SERIES_G.add(_x.abs().ln()).sub(_x.exp().mul(Sn))).mul(2**32);
     }
     while ( (Sn - Sm1).abs() > _epsilon.mul(Sm1.abs()) && i < 36) {
       y += 1<<64;
@@ -218,8 +220,10 @@ library BigMath {
     }
     //copy x to top of the stack
     int128 _x = x;
-    int128 g = 1.0647749645774669733e19; // 0.5772156649015328606065121
-    return int256(g.add(_x.abs().ln()).sub(_x.exp().mul(Sn)));
+
+    //to return a value inflated by 64 bits return int256(POWER_SERIES_G.add(_x.abs().ln()).sub(_x.exp().mul(Sn)));
+    //we want a value inflated by 96 bits thus:
+    return int256(POWER_SERIES_G.add(_x.abs().ln()).sub(_x.exp().mul(Sn))).mul(2**32);
   }
 
   function arg_add_series_return(int128 k, int128 Sn, int128 xx) internal pure returns (int256) {
@@ -263,7 +267,9 @@ library BigMath {
         Sn = Sn.add(term);
      }
 
-     return arg_add_series_return(k, Sn, xx);
+     //to return a value inflated by 64 bits return arg_add_series_return(k, Sn, xx);
+     //we want a value inflated by 96 bits thus
+     return arg_add_series_return(k, Sn, xx).mul(2**32);
   }
 
 
@@ -298,18 +304,67 @@ library BigMath {
         j += 1<<64;
      }
 
-     return (-Ap1).mul(1<<64).div(Bp1);
+    //to get a value inflated by 64 bits return -Ap1).mul(1<<64).div(Bp1);
+    //we want a value inflated by 96 bits thus:
+    return (-Ap1).mul(1<<96).div(Bp1);
+  }
+
+  int private constant MAX_ITERATIONS = 10;
+
+  function Continued_Fraction_Ei_2(int128 _x) public pure returns (int256) {
+    int256 x = int256(_x) * 2**32;
+    int256 Am1 = 1 << 96;
+    int256 A0 = 0;
+    int256 Bm1 = 0;
+    int256 B0 = 1 << 96;
+    int256 a = int256(_x.exp()) << 32;
+    int256 b = (-x).add(1<<96);
+    int256 Ap1 = a;
+    int256 Bp1 = b;
+    int256 j = 1;
+    int _epsilon = epsilon; //gas savings
+
+    //while ( ( (Ap1.mul(B0) >> 96).sub(A0.mul(Bp1) >> 96) ).abs() > (A0.mul(Bp1) >> 96).abs().mul(_epsilon) >> 64 ) {
+    //inflate both sides by 96 bits
+    while ( ( (Ap1.mul(B0)).sub(A0.mul(Bp1)) ).abs() > (A0.mul(Bp1) >> 64).abs().mul(_epsilon) && j <= MAX_ITERATIONS) {
+      if ( Bp1.abs() > 1 << 96) {
+        Am1 = A0.mul(1<<96).div(Bp1);
+        A0 = Ap1.mul(1<<96).div(Bp1);
+        Bm1 = B0.mul(1<<96).div(Bp1);
+        B0 = 1 << 96;
+      } else {
+        Am1 = A0;
+        A0 = Ap1;
+        Bm1 = B0;
+        B0 = Bp1;
+      }
+      a = -((j*j)<<96);
+      b += 2 << 96;
+      Ap1 = (b.mul(A0) >> 96).add(a.mul(Am1) >> 96);
+      Bp1 = (b.mul(B0) >> 96).add(a.mul(Bm1) >> 96);
+      j++;
+    }
+
+     return (-Ap1).mul(1<<96).div(Bp1);
   }
 
 
+  /*
+    @Description: approximates the exponential integral function
+
+    @param int128 x: value for which to approximate Ei(x), inflated by 64 bits
+
+    @return int256: an approximation of Ei(x) inflated by 96 bits
+  */
   function Ei(int128 x) public pure returns (int256) {
-    require(x >= int(-19 * 2**64) && x <= int(87 * 2**64), "not in range");
-    if (x < int(-5 * 2**64) || x > int(50 * 2**64))
-      return Continued_Fraction_Ei(x);
-    else if (x < int(uint(68 * 2**64) / 10))
+    require(x >= int(-35 * 2**64) && x <= int(87 * 2**64), "not in range");
+    if (x < -5 * 2**64)
+      return Continued_Fraction_Ei_2(x);
+    if (x < int(uint(68 * 2**64) / 10))
       return Power_Series_Ei(x);
-    else
-      return Argument_Addition_Series_Ei(x);
+    if (x > int(50 * 2**64))
+      return Continued_Fraction_Ei(x);
+    return Argument_Addition_Series_Ei(x);
   }
 
 
@@ -356,7 +411,7 @@ library BigMath {
       term1 = APYo.ln().mul(term0);
     }
     int128 term2 = int128(int256(term1).mul(ABDK_1)/int256(y_c));
-    int256 term3 = Ei(term2).mul(int256(term1)) / int256(ABDK_1);
+    int256 term3 = Ei(term2).mul(int256(term1)) / EI_INFLATOR;
     int256 term4 = int256(term2.exp()).mul(int256(y_c)) / int256(ABDK_1);
 
     return term3

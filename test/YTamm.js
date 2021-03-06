@@ -392,7 +392,6 @@ contract('YTamm', async function(accounts){
 	});
 
 	it('recalibrate() on time', async () => {
-		//process.exit();
 		let caught = false;
 		try {
 			await amm1.recalibrate(0);

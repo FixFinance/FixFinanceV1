@@ -36,6 +36,8 @@ contract YTamm is IYTamm {
 	uint public YTtoLmultiplier;
 	uint public SlippageConstant;
 
+	int128 _2WeeksABDK = int128((2 weeks << 64)/BigMath.SecondsPerYear);
+
 	constructor(
 		address _ZCBammAddress,
 		address _feeOracleAddress
@@ -208,6 +210,11 @@ contract YTamm is IYTamm {
 		{
 			int128 OracleRate = IZCBamm(ZCBammAddress).getAPYFromOracle();
 			int128 _TimeRemaining = int128(timeRemaining());
+			//we want to recalibrate such that it is perfectly calibrated at the
+			//midpoint in time between this recalibration and the next
+			if (_TimeRemaining > 2*_2WeeksABDK) {
+				_TimeRemaining = _TimeRemaining.sub(_2WeeksABDK);
+			}
 			// term == OracleRate**(-_TimeRemaining)
 			int128 term = OracleRate.log_2().mul(_TimeRemaining).neg().exp_2();
 			int128 multiplier = BigMath.ABDK_1.sub(term);

@@ -106,7 +106,9 @@ library BigMath {
     return exponent.mul( int128( U ).log_2() ).exp_2().add(  exponent.mul( int128( Z ).log_2() ).exp_2()  );
   }
 
-  function ZCB_U_reserve_change(uint reserve0, uint reserve1, uint r, int128 changeReserve0) public pure returns (int128 changeReserve1) {
+  function ZCB_U_reserve_change(uint reserve0, uint reserve1, uint r, uint feeConstant, int128 changeReserve0) public pure returns (int128 changeReserve1) {
+    //adjust for fee constant
+    r = r.mul(feeConstant) / 1 ether;
     int128 K = ZCB_U_PoolConstant(reserve0, reserve1, r);
     /*
       K == U**(1-r) + Z**(1-r)

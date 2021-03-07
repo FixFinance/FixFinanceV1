@@ -156,7 +156,13 @@ contract ZCBamm is IZCBamm {
 		require(totalSupply == 0);
 
 		uint r = nextTimeRemaining();
-		uint _Uout = uint(- BigMath.ZCB_U_reserve_change(_Uin, _Uin, r, int128(_ZCBin) ) );
+		uint _Uout = uint(- BigMath.ZCB_U_reserve_change(
+			_Uin,
+			_Uin,
+			r,
+			(1 ether),
+			int128(_ZCBin)
+		));
 
 		require(_Uout < _Uin);
 		uint effectiveU = _Uin - _Uout;
@@ -221,7 +227,13 @@ contract ZCBamm is IZCBamm {
 		uint reserveDecrease;
 		if (_ZCBin) {
 			{
-				int temp = -int(BigMath.ZCB_U_reserve_change(ZCBreserves+_inflatedTotalSupply(), Ureserves, r, _amount));
+				int temp = -int(BigMath.ZCB_U_reserve_change(
+					ZCBreserves+_inflatedTotalSupply(),
+					Ureserves,
+					r,
+					(1 ether),
+					_amount
+				));
 				require(temp > 0);
 				(amountOut, treasuryFee, sendTo) = AmmInfoOracle(AmmInfoOracleAddress).feeAdjustedAmountOut(maturity, uint(temp));
 				reserveDecrease = amountOut.add(treasuryFee);
@@ -238,7 +250,13 @@ contract ZCBamm is IZCBamm {
 
 		} else {
 			{
-				int temp = -int(BigMath.ZCB_U_reserve_change(Ureserves, ZCBreserves+_inflatedTotalSupply(), r, _amount));
+				int temp = -int(BigMath.ZCB_U_reserve_change(
+					Ureserves,
+					ZCBreserves+_inflatedTotalSupply(),
+					r,
+					(1 ether),
+					_amount
+				));
 				require(temp > 0);
 				(amountOut, treasuryFee, sendTo) = AmmInfoOracle(AmmInfoOracleAddress).feeAdjustedAmountOut(maturity, uint(temp));
 				reserveDecrease = amountOut.add(treasuryFee);
@@ -267,7 +285,13 @@ contract ZCBamm is IZCBamm {
 		if (_ZCBin) {
 			require(Ureserves >= uint(_amount));
 			{
-				int temp = int(BigMath.ZCB_U_reserve_change(Ureserves, ZCBreserves+_inflatedTotalSupply(), r, -_amount));
+				int temp = int(BigMath.ZCB_U_reserve_change(
+					Ureserves,
+					ZCBreserves+_inflatedTotalSupply(),
+					r,
+					(1 ether),
+					-_amount
+				));
 				require(temp > 0);
 				(amountIn, treasuryFee, sendTo) = AmmInfoOracle(AmmInfoOracleAddress).feeAdjustedAmountIn(maturity, uint(temp));
 				reserveIncrease = amountIn.sub(treasuryFee);
@@ -281,7 +305,13 @@ contract ZCBamm is IZCBamm {
 		} else {
 			require(ZCBreserves >= uint(_amount));
 			{
-				int temp = int(BigMath.ZCB_U_reserve_change(ZCBreserves+_inflatedTotalSupply(), Ureserves, r, -_amount));
+				int temp = int(BigMath.ZCB_U_reserve_change(
+					ZCBreserves+_inflatedTotalSupply(),
+					Ureserves,
+					r,
+					(1 ether),
+					-_amount
+				));
 				require(temp > 0);
 				(amountIn, treasuryFee, sendTo) = AmmInfoOracle(AmmInfoOracleAddress).feeAdjustedAmountIn(maturity, uint(temp));
 				reserveIncrease = amountIn.sub(treasuryFee);
@@ -315,7 +345,13 @@ contract ZCBamm is IZCBamm {
 		uint treasuryFee;
 		if (_ZCBin) {
 			{
-				int temp = -int(BigMath.ZCB_U_reserve_change(ZCBreserves+_inflatedTotalSupply(), Ureserves, r, _amount));
+				int temp = -int(BigMath.ZCB_U_reserve_change(
+					ZCBreserves+_inflatedTotalSupply(),
+					Ureserves,
+					r,
+					(1 ether),
+					_amount
+				));
 				require(temp > 0);
 				(amountOut, treasuryFee, ) = AmmInfoOracle(AmmInfoOracleAddress).feeAdjustedAmountOut(maturity, uint(temp));
 			}
@@ -324,7 +360,13 @@ contract ZCBamm is IZCBamm {
 
 		} else {
 			{
-				int temp = -int(BigMath.ZCB_U_reserve_change(Ureserves, ZCBreserves+_inflatedTotalSupply(), r, _amount));
+				int temp = -int(BigMath.ZCB_U_reserve_change(
+					Ureserves,
+					ZCBreserves+_inflatedTotalSupply(),
+					r,
+					(1 ether),
+					_amount
+				));
 				require(temp > 0);
 				(amountOut, treasuryFee, ) = AmmInfoOracle(AmmInfoOracleAddress).feeAdjustedAmountOut(maturity, uint(temp));
 			}
@@ -346,7 +388,13 @@ contract ZCBamm is IZCBamm {
 		if (_ZCBin) {
 			require(Ureserves >= uint(_amount));
 			{
-				int temp = int(BigMath.ZCB_U_reserve_change(Ureserves, ZCBreserves+_inflatedTotalSupply(), r, -_amount));
+				int temp = int(BigMath.ZCB_U_reserve_change(
+					Ureserves,
+					ZCBreserves+_inflatedTotalSupply(),
+					r,
+					(1 ether),
+					-_amount
+				));
 				require(temp > 0);
 				(amountIn, treasuryFee, ) = AmmInfoOracle(AmmInfoOracleAddress).feeAdjustedAmountIn(maturity, uint(temp));
 			}
@@ -354,7 +402,13 @@ contract ZCBamm is IZCBamm {
 		} else {
 			require(ZCBreserves >= uint(_amount));
 			{
-				int temp = int(BigMath.ZCB_U_reserve_change(ZCBreserves+_inflatedTotalSupply(), Ureserves, r, -_amount));
+				int temp = int(BigMath.ZCB_U_reserve_change(
+					ZCBreserves+_inflatedTotalSupply(),
+					Ureserves,
+					r,
+					(1 ether),
+					-_amount
+				));
 				require(temp > 0);
 				(amountIn, treasuryFee, ) = AmmInfoOracle(AmmInfoOracleAddress).feeAdjustedAmountIn(maturity, uint(temp));
 			}

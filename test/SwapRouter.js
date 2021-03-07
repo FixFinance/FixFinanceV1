@@ -32,6 +32,7 @@ const MaxFee = "125000000"; //12.5% in super basis point format
 const AnnualFee = "12500000"; //1.25% in super basis point format
 const BipsToTreasury = "100"; //1% in basis point format
 const SlippageConstant = "0";
+const ZCBammFeeConstant = _10To18BN;
 const YTammFeeConstant = _10To18BN;
 
 contract('SwapRouter', async function(accounts) {
@@ -54,6 +55,7 @@ contract('SwapRouter', async function(accounts) {
 			AnnualFee,
 			BipsToTreasury,
 			SlippageConstant, 
+			ZCBammFeeConstant,
 			YTammFeeConstant,
 			nullAddress
 		);

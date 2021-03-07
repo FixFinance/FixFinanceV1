@@ -39,14 +39,25 @@ contract AmmInfoOracle is Ownable {
 
 	uint256 public SlippageConstant;
 
+	uint256 public ZCBammFeeConstant;
+
 	uint256 public YTammFeeConstant;
 
-	constructor(uint32 _maxFee, int128 _annualRate, uint16 _bipsToTreasury, uint _SlippageConstant, uint _YTammFeeConstant, address _sendTo) public {
+	constructor(
+		uint32 _maxFee,
+		int128 _annualRate,
+		uint16 _bipsToTreasury,
+		uint _SlippageConstant,
+		uint _ZCBammFeeConstant,
+		uint _YTammFeeConstant,
+		address _sendTo
+		) public {
+
 		setMaxFee(_maxFee);
 		setAnnualRate(_annualRate);
 		setToTreasuryFee(_bipsToTreasury);
 		SlippageConstant = _SlippageConstant;
-		YTammFeeConstant = _YTammFeeConstant;
+		setFeeConstants(_ZCBammFeeConstant, _YTammFeeConstant);
 		sendTo = _sendTo;
 	}
 
@@ -69,6 +80,12 @@ contract AmmInfoOracle is Ownable {
 		require(_annualRate >= 0, "annual rate must not be negative");
 		require(_annualRate <= MaxAnnualRate, "_annualRate parameter above upper limit");
 		annualRate = _annualRate;
+	}
+
+	function setFeeConstants(uint _ZCBammFeeConstant, uint _YTammFeeConstant) public onlyOwner {
+		require(_ZCBammFeeConstant >= 1 ether && _YTammFeeConstant >= 1 ether);
+		ZCBammFeeConstant = _ZCBammFeeConstant;
+		YTammFeeConstant = _YTammFeeConstant;
 	}
 
 	function setSlippageConstant(uint256 _SlippageConstant) public onlyOwner {

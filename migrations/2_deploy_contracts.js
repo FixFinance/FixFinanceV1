@@ -23,6 +23,10 @@ const start2021 = "1609459200";
 const start2022 = "1640995200";
 const start2026 = "1767225600";
 
+const BN = web3.utils.BN;
+
+const _10to18 = (new BN(10)).pow(new BN(18));
+
 module.exports = async function(deployer) {
 	/*
 	factory = await UniswapV2Factory.at(UniswapV2FactoryAddress);
@@ -47,7 +51,7 @@ module.exports = async function(deployer) {
 	bondMinterInstance = await deployer.deploy(BondMinter, nullAddress);
 	capitalHandlerDeployerInstance = await deployer.deploy(CapitalHandlerDeployer);
 	swapRouterDeployerInstance = await deployer.deploy(SwapRouterDeployer);
-	ammInfoOracle = await deployer.deploy(AmmInfoOracle, "0", "0", "0", "0", "0", nullAddress);
+	ammInfoOracle = await deployer.deploy(AmmInfoOracle, "0", "0", "0", "0", _10to18, _10to18, nullAddress);
 	EiInstance = await deployer.deploy(Ei);
 	await deployer.link(Ei, BigMath);
 	bigMathInstance = await deployer.deploy(BigMath);

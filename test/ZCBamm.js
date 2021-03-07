@@ -9,6 +9,7 @@ const ZCBamm = artifacts.require("ZCBamm");
 const AmmInfoOracle = artifacts.require("AmmInfoOracle");
 
 const helper = require("../helper/helper.js");
+const ZCBammMath = require("../helper/ZCB-U-Math.js");
 
 const BN = web3.utils.BN;
 const nullAddress = "0x0000000000000000000000000000000000000000";
@@ -18,6 +19,7 @@ const secondsPerYear = 31556926;
 const MaxFee = "125000000"; //12.5% in super basis point format
 const BipsToTreasury = "1000"; //10% in basis point format
 const SlippageConstant = "0";
+const ZCBammFeeConstant = _10To18BN;
 const YTammFeeConstant = _10To18BN;
 const TreasuryFeeNumber = 0.1;
 const _2To64BN = (new BN("2")).pow(new BN("64"));
@@ -51,7 +53,7 @@ contract('ZCBamm', async function(accounts){
 		capitalHandlerInstance = await capitalHandler.new(aaveWrapperInstance.address, maturity, yieldTokenDeployerInstance.address, nullAddress);
 		yieldTokenInstance = await yieldToken.at(await capitalHandlerInstance.yieldTokenAddress());
 		await ZCBamm.link("BigMath", BigMathInstance.address);
-		ammInfoOracleInstance = await AmmInfoOracle.new(MaxFee, AnnualFeeRateBN, BipsToTreasury, SlippageConstant, YTammFeeConstant, nullAddress);
+		ammInfoOracleInstance = await AmmInfoOracle.new(MaxFee, AnnualFeeRateBN, BipsToTreasury, SlippageConstant, ZCBammFeeConstant, YTammFeeConstant, nullAddress);
 		amm = await ZCBamm.new(capitalHandlerInstance.address, ammInfoOracleInstance.address);
 		anchor = (await amm.anchor()).toNumber();
 
@@ -286,8 +288,14 @@ contract('ZCBamm', async function(accounts){
 		rateData = newRateData;
 
 		let r = (maturity-timestamp)/nextAnchor;
-		let k = Math.pow(parseInt(Ureserves), 1-r) + Math.pow(parseInt(inflatedTotalSupplyLP.add(new BN(ZCBreserves)).toString()), 1-r);
-		let Uout = parseInt(Ureserves) - (k - Math.pow(parseInt(inflatedTotalSupplyLP.add(new BN(ZCBreserves)).add(amtIn).toString()), 1-r))**(1/(1-r));
+
+		let Uout = -ZCBammMath.reserveChange(
+			parseInt(inflatedTotalSupplyLP.add(new BN(ZCBreserves)).toString()),
+			parseInt(Ureserves),
+			r,
+			1.0,
+			parseInt(amtIn.toString())
+		);
 		let yearsRemaining = (maturity - timestamp)/secondsPerYear;
 		let pctFee = 1 - Math.pow(1 - AnnualFeeRateNumber, yearsRemaining);
 		let UoutFeeAdjusted = Uout * (1 - pctFee);
@@ -337,8 +345,13 @@ contract('ZCBamm', async function(accounts){
 		rateData = newRateData;
 
 		let r = (maturity-timestamp)/nextAnchor;
-		let k = Math.pow(parseInt(Ureserves), 1-r) + Math.pow(parseInt(inflatedTotalSupplyLP.add(new BN(ZCBreserves)).toString()), 1-r);
-		let ZCBout = parseInt(inflatedTotalSupplyLP.add(new BN(ZCBreserves)).toString()) - (k - Math.pow( (new BN(Ureserves)).add(amtIn).toString() , 1-r))**(1/(1-r));
+		let ZCBout = -ZCBammMath.reserveChange(
+			parseInt(Ureserves),
+			parseInt(inflatedTotalSupplyLP.add(new BN(ZCBreserves)).toString()),
+			r,
+			1.0,
+			parseInt(amtIn.toString())
+		);
 		let yearsRemaining = (maturity - timestamp)/secondsPerYear;
 		let pctFee = 1 - Math.pow(1 - AnnualFeeRateNumber, yearsRemaining);
 		let ZCBoutFeeAdjusted = ZCBout * (1 - pctFee);
@@ -389,8 +402,13 @@ contract('ZCBamm', async function(accounts){
 		rateData = newRateData;
 
 		let r = (maturity-timestamp)/nextAnchor;
-		let k = Math.pow(parseInt(Ureserves), 1-r) + Math.pow(parseInt(inflatedTotalSupplyLP.add(new BN(ZCBreserves)).toString()), 1-r);
-		let Uin = (k - Math.pow(parseInt(inflatedTotalSupplyLP.add(new BN(ZCBreserves)).sub(amtOut).toString()), 1-r))**(1/(1-r)) - parseInt(Ureserves);
+		let Uin = ZCBammMath.reserveChange(
+				parseInt(inflatedTotalSupplyLP.add(new BN(ZCBreserves)).toString()),
+				parseInt(Ureserves),
+				r,
+				1.0,
+				-parseInt(amtOut.toString())
+		);
 		let yearsRemaining = (maturity - timestamp)/secondsPerYear;
 		let pctFee = 1 - Math.pow(1 - AnnualFeeRateNumber, yearsRemaining);
 		let UinFeeAdjusted = Uin / (1 - pctFee);
@@ -444,8 +462,13 @@ contract('ZCBamm', async function(accounts){
 		rateData = newRateData;
 
 		let r = (maturity-timestamp)/nextAnchor;
-		let k = Math.pow(parseInt(Ureserves), 1-r) + Math.pow(parseInt(inflatedTotalSupplyLP.add(new BN(ZCBreserves)).toString()), 1-r);
-		let ZCBin = (k - Math.pow( (new BN(Ureserves)).sub(amtOut).toString() , 1-r))**(1/(1-r)) - parseInt(inflatedTotalSupplyLP.add(new BN(ZCBreserves)).toString());
+		let ZCBin = ZCBammMath.reserveChange(
+				parseInt(Ureserves),
+				parseInt(inflatedTotalSupplyLP.add(new BN(ZCBreserves)).toString()),
+				r,
+				1.0,
+				-parseInt(amtOut.toString())
+		);
 		let yearsRemaining = (maturity - timestamp)/secondsPerYear;
 		let pctFee = 1 - Math.pow(1 - AnnualFeeRateNumber, yearsRemaining);
 		let ZCBinFeeAdjusted = ZCBin / (1 - pctFee);

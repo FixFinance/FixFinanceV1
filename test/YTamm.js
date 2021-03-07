@@ -225,7 +225,11 @@ contract('YTamm', async function(accounts){
 		let pctFee = 1 - Math.pow(1 - AnnualFeeRateNumber, yearsRemaining);
 		let r = (maturity-timestamp)/anchor;
 		let nonFeeAdjustedExpectedUout = YT_U_math.Uout(parseInt(YTreserves.toString()), parseInt(totalSupply.mul(_10To18BN).div(YTtoLmultiplierBN).toString()), r, w, OracleRate, parseInt(amtIn.toString()));
-		let UoutToSender = nonFeeAdjustedExpectedUout * (1 - pctFee);
+		let nonFeeAdjPrice = nonFeeAdjustedExpectedUout/parseInt(amtIn.toString());
+		let nonFeeAdjAPY = Math.pow(1 - nonFeeAdjPrice, -1/yearsRemaining);
+		let feeAdjAPY = (nonFeeAdjAPY - 1) * (1 - AnnualFeeRateNumber) + 1; 
+		let feeAdjPrice = 1 - Math.pow(feeAdjAPY, -yearsRemaining);
+		let UoutToSender = parseInt(amtIn.toString()) * feeAdjPrice;
 		let totalFee = nonFeeAdjustedExpectedUout - UoutToSender;
 		let treasuryFee = Math.floor(TreasuryFeeNumber * totalFee);
 		let prevZCBbalance = ZCBbalance;
@@ -265,10 +269,13 @@ contract('YTamm', async function(accounts){
 		rec = await amm1.SwapToSpecificYT(amtOut);
 		let timestamp = (await web3.eth.getBlock(rec.receipt.blockNumber)).timestamp;
 		let yearsRemaining = (maturity - timestamp)/secondsPerYear;
-		let pctFee = 1 - Math.pow(1 - AnnualFeeRateNumber, yearsRemaining);
 		let r = (maturity-timestamp)/anchor;
 		let nonFeeAdjustedUin = YT_U_math.Uin(parseInt(YTreserves.toString()), parseInt(totalSupply.mul(_10To18BN).div(YTtoLmultiplierBN).toString()), r, w, OracleRate, parseInt(amtOut.toString()));
-		let expectedUin = nonFeeAdjustedUin / (1 - pctFee);
+		let nonFeeAdjPrice = nonFeeAdjustedUin/parseInt(amtOut.toString());
+		let nonFeeAdjAPY = Math.pow(1 - nonFeeAdjPrice, -1/yearsRemaining);
+		let feeAdjAPY = (nonFeeAdjAPY - 1) / (1 - AnnualFeeRateNumber) + 1; 
+		let feeAdjPrice = 1 - Math.pow(feeAdjAPY, -yearsRemaining);
+		let expectedUin = parseInt(amtOut.toString()) * feeAdjPrice;		
 		let totalFee = expectedUin - nonFeeAdjustedUin;
 		let treasuryFee = Math.floor(TreasuryFeeNumber * totalFee);
 		let prevZCBbalance = ZCBbalance;
@@ -289,6 +296,9 @@ contract('YTamm', async function(accounts){
 		let treasuryZCBchange = (treasuryZCBbalance.sub(prevTreasuryZCBbalance)).toString();
 		let treasuryYTchange = parseInt(treasuryYTbalance.sub(prevTreasuryYTbalance).toString());
 
+		let realPrice = ActualUin/parseInt(amtOut.toString());
+		let realAPY = Math.pow(1 - realPrice, -1/yearsRemaining);
+
 		assert.isBelow(AmountError(ActualUin, expectedUin), AcceptableMarginOfError, "acceptable margin of error Uin");
 		assert.isBelow(AmountError(Ureserves, prevUreserves+expectedUin-treasuryFee), AcceptableMarginOfError, "acceptable margin of error Ureserves");
 		assert.isBelow(AmountError(YTreserves, prevYTreserves-parseInt(amtOut.toString())), AcceptableMarginOfError, "acceptable margin of error YTreserves");
@@ -298,7 +308,7 @@ contract('YTamm', async function(accounts){
 
 		let prevYTbalance = YTbalance;
 		YTbalance = await yieldTokenInstance.balanceOf_2(accounts[0], false);
-		assert.equal(YTbalance.sub(prevYTbalance.sub(Uin)).toString(), amtOut.toString(), "correct amount U out");
+		assert.equal(YTbalance.sub(prevYTbalance.sub(Uin)).toString(), amtOut.toString(), "correct amount YT out");
 	});
 
 	it('SwapToSpecificYT() push effective APY over APYo', async () => {
@@ -313,12 +323,17 @@ contract('YTamm', async function(accounts){
 		let pctFee = 1 - Math.pow(1 - AnnualFeeRateNumber, yearsRemaining);
 		let r = (maturity-timestamp)/anchor;
 		let nonFeeAdjustedUin = YT_U_math.Uin(parseInt(YTreserves.toString()), parseInt(totalSupply.mul(_10To18BN).div(YTtoLmultiplierBN).toString()), r, w, OracleRate, parseInt(amtOut.toString()));
-		let expectedUin = nonFeeAdjustedUin / (1 - pctFee);
+		let nonFeeAdjPrice = nonFeeAdjustedUin/parseInt(amtOut.toString());
+		let nonFeeAdjAPY = Math.pow(1 - nonFeeAdjPrice, -1/yearsRemaining);
+		let feeAdjAPY = (nonFeeAdjAPY - 1) / (1 - AnnualFeeRateNumber) + 1; 
+		let feeAdjPrice = 1 - Math.pow(feeAdjAPY, -yearsRemaining);
+		let expectedUin = parseInt(amtOut.toString()) * feeAdjPrice;
+		//let expectedUin = nonFeeAdjustedUin / (1 - pctFee);
 		let prevZCBbalance = ZCBbalance;
 		ZCBbalance = await capitalHandlerInstance.balanceOf(accounts[0]);
 		let Uin = prevZCBbalance.sub(ZCBbalance);
 		let error = Math.abs(parseInt(Uin.toString())/expectedUin - 1);
-		assert.isBelow(error, 0.000001, "acceptable margin of error")
+		assert.isBelow(error, ErrorRange, "acceptable margin of error")
 		let prevYTbalance = YTbalance;
 		YTbalance = await yieldTokenInstance.balanceOf_2(accounts[0], false);
 		assert.equal(YTbalance.sub(prevYTbalance.sub(Uin)).toString(), amtOut.toString(), "correct amount U out");

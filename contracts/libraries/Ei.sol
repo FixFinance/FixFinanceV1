@@ -12,7 +12,7 @@ library Ei {
 
 	int256 internal constant INFLATOR = 1<<96;
 
-	function addition_series_data(uint8 _index) internal pure returns (int256) {
+	function addition_series_data(uint8 _index) private pure returns (int256) {
 		/*
 			because this is a library we cannot use state data, also there is not support for constant arrays in solidity libraries
 			thus we must return the correct value using a series of if statements
@@ -130,7 +130,7 @@ library Ei {
 		return int256( 1.9527053469860518e39);
 	}
 
-	function isOutOfBounds(int256 x) internal pure returns (bool) {
+	function isOutOfBounds(int256 x) private pure returns (bool) {
 		/*
 		* Minimum value signed 64.64-bit fixed point number may have. 
 		*/
@@ -146,7 +146,7 @@ library Ei {
 
 	int128 private constant POWER_SERIES_G = 1.0647749645774669733e19; // 0.5772156649015328606065121
 
-	function Power_Series_Ei(int128 x) internal pure returns (int256) { 
+	function Power_Series_Ei(int128 x) private pure returns (int256) { 
 		int128 _epsilon = epsilon;  //gas savings
 		int128 xn = -x;
 		int128 Sn = -x;
@@ -212,7 +212,7 @@ library Ei {
 		return int256(POWER_SERIES_G.add(_x.abs().ln()).sub(_x.exp().mul(Sn))).mul(2**32);
 	}
 
-	function arg_add_series_return(int128 k, int128 Sn, int128 xx) internal pure returns (int256) {
+	function arg_add_series_return(int128 k, int128 Sn, int128 xx) private pure returns (int256) {
 		/*
 		we divide the exponent by 2 and then square the result is because
 		the math library we use is bound to 128 bits
@@ -230,7 +230,7 @@ library Ei {
 		return c;
 	}
 
-	function Argument_Addition_Series_Ei(int128 x) internal pure returns (int256) {
+	function Argument_Addition_Series_Ei(int128 x) private pure returns (int256) {
 		int128 k = ((x + (1<<63)) >> 64) << 64;
 		int128 j = 0;
 		int128 xx = k;
@@ -259,7 +259,7 @@ library Ei {
 	}
 
 
-	function Continued_Fraction_Ei(int128 x) internal pure returns (int256) {
+	function Continued_Fraction_Ei(int128 x) private pure returns (int256) {
 		int256 Am1 = 1 << 64;
 		int256 A0 = 0;
 		int256 Bm1 = 0;
@@ -297,7 +297,7 @@ library Ei {
 
 	int private constant MAX_ITERATIONS = 10;
 
-	function Continued_Fraction_Ei_2(int128 _x) internal pure returns (int256) {
+	function Continued_Fraction_Ei_2(int128 _x) private pure returns (int256) {
 		int256 x = int256(_x) * 2**32;
 		int256 Am1 = 1 << 96;
 		int256 A0 = 0;

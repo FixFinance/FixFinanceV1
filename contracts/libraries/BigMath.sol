@@ -17,13 +17,13 @@ library BigMath {
   */
   int128 private constant epsilon = 2000000000;
 
-  int128 private constant MAX = 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
+  int128 internal constant MAX = 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
 
-  int128 public constant ABDK_1 = 1<<64;
+  int128 internal constant ABDK_1 = 1<<64;
 
   uint private constant BONE = 1 ether;
   
-  uint public constant SecondsPerYear = 31556926;
+  uint internal constant SecondsPerYear = 31556926;
 
 
   /*
@@ -35,7 +35,7 @@ library BigMath {
     @param w: slippage minimiser variable inflated by BONE
     @param APYo: the apy returned from the oracle inflated by 64 bits
   */
-  function YT_U_PoolConstantMinusU(uint256 Y, uint256 L, uint256 r, uint256 w, int128 APYo) public pure returns (int256) {
+  function YT_U_PoolConstantMinusU(uint256 Y, uint256 L, uint256 r, uint256 w, int128 APYo) private pure returns (int256) {
     /*
       K - U  = - (c+Y)*(APYo)**(-S*r/(Y+c)) - S*r*ln(APYo)*Ei(-S*r*ln(APYo)/(Y+c)) + Y
       K - U  = - (c+Y)*(APYo)**(-S*r/(Y+c)) + (-S*r)*ln(APYo)*Ei(-S*r*ln(APYo)/(Y+c)) + Y
@@ -92,6 +92,31 @@ library BigMath {
     return uint(ret).mul(1 ether) >> 64;
   }
 
+  function YT_U_APY(int128 yearsRemaining, uint YT, uint U) internal pure returns (int128 APY) {
+    /*
+      U == (1 - APY**-yearsRemaining) * YT
+      APY**-yearsRemaining == 1 - U/YT
+      APY == (1 - U/YT)**(-1/yearsRemaining)
+
+      price = U/YT
+      APY == (1 - price)**(-1/yearsRemaining)
+    */
+    int256 temp = int(U).mul(int(BigMath.ABDK_1)).div(int(YT));
+    require(temp <= BigMath.MAX);
+    int128 price = int128(temp);
+    APY = BigMath.Exp(BigMath.ABDK_1.sub(price), BigMath.ABDK_1.div(yearsRemaining).neg());
+  }
+
+  function UtoYT_Price(int128 yearsRemaining, int128 APY) internal pure returns (uint256 price) {
+    /*
+      U == (1 - APY**-yearsRemaining) * YT
+      U/YT == (1 - APY**-yearsRemaining)
+    */
+    int128 temp = BigMath.ABDK_1.sub(BigMath.Exp(APY, yearsRemaining.neg()));
+    require(temp > 0);
+    price = uint256(temp);
+  }
+
   /*
       All params inflated by 64 bits
   */
@@ -105,7 +130,7 @@ library BigMath {
     return exponent.mul( int128( U ).log_2() ).exp_2().add(  exponent.mul( int128( Z ).log_2() ).exp_2()  );
   }
 
-  function ZCB_U_reserve_change(uint reserve0, uint reserve1, uint r, int128 changeReserve0) public pure returns (int128 changeReserve1) {
+  function ZCB_U_reserve_change(uint reserve0, uint reserve1, uint r, int128 changeReserve0) external pure returns (int128 changeReserve1) {
     int128 K = ZCB_U_PoolConstant(reserve0, reserve1, r);
     /*
       K == U**(1-r) + Z**(1-r)
@@ -136,6 +161,7 @@ library BigMath {
 
   int128 private constant MAX_ANNUAL_ERROR = ABDK_1 / 100000;
   uint private constant MaxAnchor = 1000 * SecondsPerYear;
+
   function ZCB_U_recalibration(
     uint prevRatio,
     int128 prevAnchorABDK,
@@ -204,7 +230,7 @@ library BigMath {
     return uint(ret);
   }
 
-  function approxG(int128 L, int128 Z, int128 U, int128 t) internal pure returns (int128) {
+  function approxG(int128 L, int128 Z, int128 U, int128 t) private pure returns (int128) {
     int128 exp = ABDK_1.sub(t);
     int128 term0 = (2 * ABDK_1).mul(Exp(L, exp));
     int128 term1 = Exp(L.add(Z), exp);

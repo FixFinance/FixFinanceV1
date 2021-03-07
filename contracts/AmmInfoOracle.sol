@@ -1,11 +1,14 @@
 pragma solidity >=0.6.0;
 import "./helpers/Ownable.sol";
 import "./libraries/SafeMath.sol";
+import "./libraries/SignedSafeMath.sol";
 import "./libraries/ABDKMath64x64.sol";
+import "./libraries/BigMath.sol";
 
 contract AmmInfoOracle is Ownable {
 
 	using ABDKMath64x64 for int128;
+	using SignedSafeMath for int256;
 	using SafeMath for uint256;
 
 	// 1.0 in super basis points
@@ -69,6 +72,85 @@ contract AmmInfoOracle is Ownable {
 
 	function setSlippageConstant(uint256 _SlippageConstant) public onlyOwner {
 		SlippageConstant = _SlippageConstant;
+	}
+
+	function YT_U_feeAdjustedAmtIn(int128 yearsRemaining, uint YT, uint U) external view returns (uint amountIn_postFee, uint toTreasury, address _sendTo) {
+		/*
+			U is being swapped for a specific amount of YT
+			because U is being swapped for YT we must increase
+			the effective APY of the swap thus increasing the
+			effective price paid for YT
+		*/
+
+		int128 originalAPY = BigMath.YT_U_APY(yearsRemaining, YT, U);
+
+		/*
+			feeAdjAPY-1 = (APY-1)/(1-annualRate)
+			feeAdjAPY = (APY-1)/(1-annualRate) + 1
+		*/
+		int128 feeAdjAPY = originalAPY.sub(BigMath.ABDK_1).div(BigMath.ABDK_1.sub(annualRate)).add(BigMath.ABDK_1);
+
+		uint256 newPrice = BigMath.UtoYT_Price(yearsRemaining, feeAdjAPY);
+
+		amountIn_postFee = newPrice.mul(YT) >> 64;
+
+		/*
+			Ensure Fee charged is <= maximum fee
+		*/
+		uint _maxFee = maxFee;
+		if (amountIn_postFee.mul(totalSuperBasisPoints).div(U).sub(totalSuperBasisPoints) > _maxFee) {
+			/*
+				(amountIn_postFee * totalSuperBips / U) - totalSuperBips == maxFee
+				(amountIn_postFee * totalSuperBips / U) == maxFee + totalSuperBips
+				amountIn_postFee == U * (maxFee + totalSuperBips) / totalSuperBips
+			*/
+			amountIn_postFee = U.mul(uint(totalSuperBasisPoints).add(_maxFee)).div(totalSuperBasisPoints);
+		}
+
+		uint totalFee = amountIn_postFee.sub(U);
+
+		toTreasury = totalFee * bipsToTreasury / totalBasisPoints;
+		_sendTo = sendTo;
+	}
+
+	function YT_U_feeAdjustedAmtOut(int128 yearsRemaining, uint YT, uint U) external view returns (uint amountOut_postFee, uint toTreasury, address _sendTo) {
+		/*
+			a specific amount of YT is being swapped for U
+			because YT is being swapped for U we must decrease
+			the effective APY of the swap thus increasing the
+			effective price paid for U
+		*/
+
+		int128 originalAPY = BigMath.YT_U_APY(yearsRemaining, YT, U);
+
+		/*
+			feeAdjAPY-1 = (APY-1)*(1-annualRate)
+			feeAdjAPY = (APY-1)*(1-annualRate) + 1
+		*/
+		int128 feeAdjAPY = originalAPY.sub(BigMath.ABDK_1).mul(BigMath.ABDK_1.sub(annualRate)).add(BigMath.ABDK_1);
+
+		uint256 newPrice = BigMath.UtoYT_Price(yearsRemaining, feeAdjAPY);
+
+		amountOut_postFee = newPrice.mul(YT) >> 64;
+
+		/*
+			Ensure Fee charged is <= maximum fee
+		*/
+		uint _maxFee = maxFee;
+		if (U.mul(totalSuperBasisPoints).div(amountOut_postFee).sub(totalSuperBasisPoints) > _maxFee) {
+			/*
+				(U * totalSuperBips / amountOut_postFee) - totalSuperBips == maxFee
+				U * totalSuperBips / amountOut_postFee == maxFee + totalSuperBips
+				U * totalSuperBips == (maxFee + totalSuperBips) * amountOut_postFee
+				amountOut_postFee == U * totalSuperBips / (maxFee + totalSuperBips)
+			*/
+			amountOut_postFee = U.mul(totalSuperBasisPoints).div(_maxFee.add(totalSuperBasisPoints));
+		}
+
+		uint totalFee = U.sub(amountOut_postFee);
+
+		toTreasury = totalFee * bipsToTreasury / totalBasisPoints;
+		_sendTo = sendTo;
 	}
 
 	/*

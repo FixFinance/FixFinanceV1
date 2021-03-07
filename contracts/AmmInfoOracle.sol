@@ -2,6 +2,7 @@ pragma solidity >=0.6.0;
 import "./helpers/Ownable.sol";
 import "./libraries/SafeMath.sol";
 import "./libraries/ABDKMath64x64.sol";
+import "./libraries/BigMath.sol";
 
 contract AmmInfoOracle is Ownable {
 
@@ -38,11 +39,14 @@ contract AmmInfoOracle is Ownable {
 
 	uint256 public SlippageConstant;
 
-	constructor(uint32 _maxFee, int128 _annualRate, uint16 _bipsToTreasury, uint _SlippageConstant, address _sendTo) public {
+	uint256 public YTammFeeConstant;
+
+	constructor(uint32 _maxFee, int128 _annualRate, uint16 _bipsToTreasury, uint _SlippageConstant, uint _YTammFeeConstant, address _sendTo) public {
 		setMaxFee(_maxFee);
 		setAnnualRate(_annualRate);
 		setToTreasuryFee(_bipsToTreasury);
 		SlippageConstant = _SlippageConstant;
+		YTammFeeConstant = _YTammFeeConstant;
 		sendTo = _sendTo;
 	}
 
@@ -69,6 +73,13 @@ contract AmmInfoOracle is Ownable {
 
 	function setSlippageConstant(uint256 _SlippageConstant) public onlyOwner {
 		SlippageConstant = _SlippageConstant;
+	}
+
+	function treasuryFee(uint larger, uint smaller) external view returns (uint toTreasury, address _sendTo) {
+		require(larger >= smaller);
+		uint totalFee = larger - smaller;
+		toTreasury = totalFee * bipsToTreasury / totalBasisPoints;
+		_sendTo = sendTo;
 	}
 
 	/*

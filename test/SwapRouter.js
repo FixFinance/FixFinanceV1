@@ -32,6 +32,7 @@ const MaxFee = "125000000"; //12.5% in super basis point format
 const AnnualFee = "12500000"; //1.25% in super basis point format
 const BipsToTreasury = "100"; //1% in basis point format
 const SlippageConstant = "0";
+const YTammFeeConstant = _10To18BN;
 
 contract('SwapRouter', async function(accounts) {
 
@@ -48,7 +49,14 @@ contract('SwapRouter', async function(accounts) {
 		YTammDeployerInstance = await YTammDeployer.new();
 		capitalHandlerDeployerInstance = await CapitalHandlerDeployer.new();
 		swapRouterDeployerInstance = await SwapRouterDeployer.new();
-		ammInfoOracleInstance = await AmmInfoOracle.new(MaxFee, AnnualFee, BipsToTreasury, SlippageConstant, nullAddress);
+		ammInfoOracleInstance = await AmmInfoOracle.new(
+			MaxFee,
+			AnnualFee,
+			BipsToTreasury,
+			SlippageConstant, 
+			YTammFeeConstant,
+			nullAddress
+		);
 		organizerInstance = await organizer.new(
 			yieldTokenDeployerInstance.address,
 			bondMinterInstance.address,

@@ -47,7 +47,7 @@ module.exports = async function(deployer) {
 	bondMinterInstance = await deployer.deploy(BondMinter, nullAddress);
 	capitalHandlerDeployerInstance = await deployer.deploy(CapitalHandlerDeployer);
 	swapRouterDeployerInstance = await deployer.deploy(SwapRouterDeployer);
-	ammInfoOracle = await deployer.deploy(AmmInfoOracle, "0", "0", "0", "0", nullAddress);
+	ammInfoOracle = await deployer.deploy(AmmInfoOracle, "0", "0", "0", "0", "0", nullAddress);
 	EiInstance = await deployer.deploy(Ei);
 	await deployer.link(Ei, BigMath);
 	bigMathInstance = await deployer.deploy(BigMath);

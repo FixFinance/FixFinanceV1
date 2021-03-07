@@ -167,6 +167,7 @@ contract YTamm is IYTamm {
 			effectiveTotalSupply,
 			timeRemaining(),
 			SlippageConstant,
+			1 ether, // fee constant of 1.0 means no fee
 			IZCBamm(ZCBammAddress).getAPYFromOracle(),
 			_approxYTin
 		));
@@ -276,17 +277,29 @@ contract YTamm is IYTamm {
 
 	function SwapFromSpecificYT(int128 _amount) public override returns (uint) {
 		require(_amount > 0);
+		uint _YTreserves = YTreserves;
 		uint _TimeRemaining = timeRemaining();
 		int128 OracleRate = IZCBamm(ZCBammAddress).getAPYFromOracle();
+		uint inflTotalSupply = _inflatedTotalSupply();
 		uint nonFeeAdjustedUout = uint(-BigMath.YT_U_reserve_change(
-			YTreserves,
-			_inflatedTotalSupply(),
+			_YTreserves,
+			inflTotalSupply,
 			_TimeRemaining,
 			SlippageConstant,
+			(1 ether), //fee constant of 1.0 means no fee
 			OracleRate,
 			_amount
 		));
-		(uint Uout, uint treasuryFee, address sendTo) = AmmInfoOracle(AmmInfoOracleAddress).feeAdjustedAmountOut(maturity, nonFeeAdjustedUout);
+		uint Uout = uint(-BigMath.YT_U_reserve_change(
+			_YTreserves,
+			inflTotalSupply,
+			_TimeRemaining,
+			SlippageConstant,
+			(1 ether)**2 / AmmInfoOracle(AmmInfoOracleAddress).YTammFeeConstant(),
+			OracleRate,
+			_amount
+		));
+		(uint treasuryFee, address sendTo) = AmmInfoOracle(AmmInfoOracleAddress).treasuryFee(nonFeeAdjustedUout, Uout);
 		uint reserveDecrease = Uout.add(treasuryFee);
 
 		require(Ureserves >= reserveDecrease);
@@ -306,15 +319,26 @@ contract YTamm is IYTamm {
 		require(_YTreserves > uint(_amount));
 		uint _TimeRemaining = timeRemaining();
 		int128 OracleRate = IZCBamm(ZCBammAddress).getAPYFromOracle();
+		uint inflTotalSupply = _inflatedTotalSupply();
 		uint nonFeeAdjustedUin = uint(BigMath.YT_U_reserve_change(
 			_YTreserves,
-			_inflatedTotalSupply(),
+			inflTotalSupply,
 			_TimeRemaining,
 			SlippageConstant,
+			(1 ether), //fee constant of 1.0 means no fee
 			OracleRate,
 			-_amount
 		));
-		(uint Uin, uint treasuryFee, address sendTo) = AmmInfoOracle(AmmInfoOracleAddress).feeAdjustedAmountIn(maturity, nonFeeAdjustedUin);
+		uint Uin = uint(BigMath.YT_U_reserve_change(
+			_YTreserves,
+			inflTotalSupply,
+			_TimeRemaining,
+			SlippageConstant,
+			AmmInfoOracle(AmmInfoOracleAddress).YTammFeeConstant(),
+			OracleRate,
+			-_amount
+		));
+		(uint treasuryFee, address sendTo) = AmmInfoOracle(AmmInfoOracleAddress).treasuryFee(Uin, nonFeeAdjustedUin);
 		uint reserveIncrease = Uin.sub(treasuryFee);
 
 		sendYTgetU(uint(_amount), Uin, treasuryFee, sendTo);
@@ -343,15 +367,27 @@ contract YTamm is IYTamm {
 		uint _TimeRemaining = timeRemaining();
 		int128 OracleRate = IZCBamm(ZCBammAddress).getAPYFromOracle();
 		uint _YTreserves = YTreserves;
+		uint inflTotalSupply = _inflatedTotalSupply();
 		uint nonFeeAdjustedUout = uint(-BigMath.YT_U_reserve_change(
 			_YTreserves,
-			_inflatedTotalSupply(),
+			inflTotalSupply,
 			_TimeRemaining,
 			SlippageConstant,
+			(1 ether),
 			OracleRate,
 			_amount
 		));
-		(uint Uout, uint treasuryFee, ) = AmmInfoOracle(AmmInfoOracleAddress).feeAdjustedAmountOut(maturity, nonFeeAdjustedUout);
+		uint Uout = uint(-BigMath.YT_U_reserve_change(
+			_YTreserves,
+			inflTotalSupply,
+			_TimeRemaining,
+			SlippageConstant,
+			(1 ether)**2 / AmmInfoOracle(AmmInfoOracleAddress).YTammFeeConstant(),
+			OracleRate,
+			_amount
+		));
+		(uint treasuryFee, ) = AmmInfoOracle(AmmInfoOracleAddress).treasuryFee(nonFeeAdjustedUout, Uout);
+		//(uint Uout, uint treasuryFee, ) = AmmInfoOracle(AmmInfoOracleAddress).feeAdjustedAmountOut(maturity, nonFeeAdjustedUout);
 		uint reserveDecrease = Uout.add(treasuryFee);
 		require(Ureserves >= reserveDecrease);
 		writeQuoteSignature(true, _amount, Uout, treasuryFee);
@@ -364,15 +400,27 @@ contract YTamm is IYTamm {
 		require(_YTreserves > uint(_amount));
 		uint _TimeRemaining = timeRemaining();
 		int128 OracleRate = IZCBamm(ZCBammAddress).getAPYFromOracle();
+		uint inflTotalSupply = _inflatedTotalSupply();
 		uint nonFeeAdjustedUin = uint(BigMath.YT_U_reserve_change(
 			_YTreserves,
-			_inflatedTotalSupply(),
+			inflTotalSupply,
 			_TimeRemaining,
 			SlippageConstant,
+			(1 ether),
 			OracleRate,
 			-_amount
 		));
-		(uint Uin, uint treasuryFee, ) = AmmInfoOracle(AmmInfoOracleAddress).feeAdjustedAmountIn(maturity, nonFeeAdjustedUin);
+		uint Uin = uint(BigMath.YT_U_reserve_change(
+			_YTreserves,
+			inflTotalSupply,
+			_TimeRemaining,
+			SlippageConstant,
+			AmmInfoOracle(AmmInfoOracleAddress).YTammFeeConstant(),
+			OracleRate,
+			-_amount
+		));
+		(uint treasuryFee, ) = AmmInfoOracle(AmmInfoOracleAddress).treasuryFee(Uin, nonFeeAdjustedUin);
+		//(uint Uin, uint treasuryFee, ) = AmmInfoOracle(AmmInfoOracleAddress).feeAdjustedAmountIn(maturity, nonFeeAdjustedUin);
 		writeQuoteSignature(false, _amount, Uin, treasuryFee);
 		return Uin;
 	}

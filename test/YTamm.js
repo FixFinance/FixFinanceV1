@@ -22,6 +22,9 @@ const MaxFee = "125000000"; //12.5% in super basis points
 const BipsToTreasury = "1000"; //10% in basis point format
 const SlippageConstant = (new BN("15")).mul(_10To18BN).div(new BN("10"));
 const w = 1.5;
+const YTammFeeConstant = _10To18BN.mul(new BN("105")).div(new BN("100"));
+const fToYT = 1.05;
+const fFromYT = 1/fToYT;
 const TreasuryFeeNumber = 0.1;
 const AnnualFeeRate = (new BN("2")).pow(new BN("64")).div(new BN("100")); //0.01 or 1% in 64.64 form
 const AnnualFeeRateNumber = 0.01;
@@ -31,6 +34,8 @@ const TreasuryErrorRange = Math.pow(10, -5);
 const wBN = new BN(0);
 
 function AmountError(actual, expected) {
+	actual = parseInt(actual);
+	expected = parseInt(expected);
 	if (actual === expected) {
 		return 0;
 	}
@@ -100,7 +105,7 @@ contract('YTamm', async function(accounts){
 		yieldTokenInstance = await yieldToken.at(await capitalHandlerInstance.yieldTokenAddress());
 		await ZCBamm.link("BigMath", BigMathInstance.address);
 		await YTamm.link("BigMath", BigMathInstance.address);
-		ammInfoOracleInstance = await AmmInfoOracle.new(MaxFee, AnnualFeeRate, BipsToTreasury, SlippageConstant, nullAddress);
+		ammInfoOracleInstance = await AmmInfoOracle.new(MaxFee, AnnualFeeRate, BipsToTreasury, SlippageConstant, YTammFeeConstant, nullAddress);
 		amm0 = await ZCBamm.new(capitalHandlerInstance.address, ammInfoOracleInstance.address);
 
 
@@ -224,8 +229,8 @@ contract('YTamm', async function(accounts){
 		let yearsRemaining = (maturity - timestamp)/secondsPerYear;
 		let pctFee = 1 - Math.pow(1 - AnnualFeeRateNumber, yearsRemaining);
 		let r = (maturity-timestamp)/anchor;
-		let nonFeeAdjustedExpectedUout = YT_U_math.Uout(parseInt(YTreserves.toString()), parseInt(totalSupply.mul(_10To18BN).div(YTtoLmultiplierBN).toString()), r, w, OracleRate, parseInt(amtIn.toString()));
-		let UoutToSender = nonFeeAdjustedExpectedUout * (1 - pctFee);
+		let nonFeeAdjustedExpectedUout = YT_U_math.Uout(parseInt(YTreserves.toString()), parseInt(totalSupply.mul(_10To18BN).div(YTtoLmultiplierBN).toString()), r, w, 1.0, OracleRate, parseInt(amtIn.toString()));
+		let UoutToSender = YT_U_math.Uout(parseInt(YTreserves.toString()), parseInt(totalSupply.mul(_10To18BN).div(YTtoLmultiplierBN).toString()), r, w, fFromYT, OracleRate, parseInt(amtIn.toString()));
 		let totalFee = nonFeeAdjustedExpectedUout - UoutToSender;
 		let treasuryFee = Math.floor(TreasuryFeeNumber * totalFee);
 		let prevZCBbalance = ZCBbalance;
@@ -267,8 +272,8 @@ contract('YTamm', async function(accounts){
 		let yearsRemaining = (maturity - timestamp)/secondsPerYear;
 		let pctFee = 1 - Math.pow(1 - AnnualFeeRateNumber, yearsRemaining);
 		let r = (maturity-timestamp)/anchor;
-		let nonFeeAdjustedUin = YT_U_math.Uin(parseInt(YTreserves.toString()), parseInt(totalSupply.mul(_10To18BN).div(YTtoLmultiplierBN).toString()), r, w, OracleRate, parseInt(amtOut.toString()));
-		let expectedUin = nonFeeAdjustedUin / (1 - pctFee);
+		let nonFeeAdjustedUin = YT_U_math.Uin(parseInt(YTreserves.toString()), parseInt(totalSupply.mul(_10To18BN).div(YTtoLmultiplierBN).toString()), r, w, 1.0, OracleRate, parseInt(amtOut.toString()));
+		let expectedUin = YT_U_math.Uin(parseInt(YTreserves.toString()), parseInt(totalSupply.mul(_10To18BN).div(YTtoLmultiplierBN).toString()), r, w, fToYT, OracleRate, parseInt(amtOut.toString()));
 		let totalFee = expectedUin - nonFeeAdjustedUin;
 		let treasuryFee = Math.floor(TreasuryFeeNumber * totalFee);
 		let prevZCBbalance = ZCBbalance;
@@ -312,8 +317,9 @@ contract('YTamm', async function(accounts){
 		let yearsRemaining = (maturity - timestamp)/secondsPerYear;
 		let pctFee = 1 - Math.pow(1 - AnnualFeeRateNumber, yearsRemaining);
 		let r = (maturity-timestamp)/anchor;
-		let nonFeeAdjustedUin = YT_U_math.Uin(parseInt(YTreserves.toString()), parseInt(totalSupply.mul(_10To18BN).div(YTtoLmultiplierBN).toString()), r, w, OracleRate, parseInt(amtOut.toString()));
-		let expectedUin = nonFeeAdjustedUin / (1 - pctFee);
+		let nonFeeAdjustedUin = YT_U_math.Uin(parseInt(YTreserves.toString()), parseInt(totalSupply.mul(_10To18BN).div(YTtoLmultiplierBN).toString()), r, w, 1.0, OracleRate, parseInt(amtOut.toString()));
+		let expectedUin = YT_U_math.Uin(parseInt(YTreserves.toString()), parseInt(totalSupply.mul(_10To18BN).div(YTtoLmultiplierBN).toString()), r, w, fToYT, OracleRate, parseInt(amtOut.toString()));
+		//let expectedUin = nonFeeAdjustedUin / (1 - pctFee);
 		let prevZCBbalance = ZCBbalance;
 		ZCBbalance = await capitalHandlerInstance.balanceOf(accounts[0]);
 		let Uin = prevZCBbalance.sub(ZCBbalance);

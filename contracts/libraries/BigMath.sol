@@ -35,7 +35,7 @@ library BigMath {
     @param w: slippage minimiser variable inflated by BONE
     @param APYo: the apy returned from the oracle inflated by 64 bits
   */
-  function YT_U_PoolConstantMinusU(uint256 Y, uint256 L, uint256 r, uint256 w, int128 APYo) public pure returns (int256) {
+  function YT_U_PoolConstantMinusU(uint256 Y, uint256 L, uint256 r, uint256 w, uint256 feeConstant, int128 APYo) public pure returns (int256) {
     /*
       K - U  = - (c+Y)*(APYo)**(-S*r/(Y+c)) - S*r*ln(APYo)*Ei(-S*r*ln(APYo)/(Y+c)) + Y
       K - U  = - (c+Y)*(APYo)**(-S*r/(Y+c)) + (-S*r)*ln(APYo)*Ei(-S*r*ln(APYo)/(Y+c)) + Y
@@ -63,6 +63,7 @@ library BigMath {
     int128 term1;
     {
       uint256 S = L.add(c);
+      S = S.mul(feeConstant)/BONE;
       uint temp = S.mul(r) >> 64;
       require(temp <= uint(MAX));
       int128 term0 = int128(temp).neg();
@@ -77,10 +78,10 @@ library BigMath {
       .sub(term4);
   }
 
-  function YT_U_reserve_change(uint256 Y, uint256 L, uint256 r, uint256 w, int128 APYo, int128 changeYreserve) external pure returns (int128) {
+  function YT_U_reserve_change(uint256 Y, uint256 L, uint256 r, uint256 w, uint feeConstant, int128 APYo, int128 changeYreserve) external pure returns (int128) {
     require(changeYreserve > -int(Y));
-    int256 KminusU = YT_U_PoolConstantMinusU(Y, L, r, w, APYo);
-    int256 newKminusU = YT_U_PoolConstantMinusU(uint(int(Y) + changeYreserve), L, r, w, APYo);
+    int256 KminusU = YT_U_PoolConstantMinusU(Y, L, r, w, feeConstant, APYo);
+    int256 newKminusU = YT_U_PoolConstantMinusU(uint(int(Y) + changeYreserve), L, r, w, feeConstant, APYo);
     int256 result = KminusU.sub(newKminusU);
     require(result.abs() < MAX);
     return int128(result);

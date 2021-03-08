@@ -19,8 +19,10 @@ const secondsPerYear = 31556926;
 const MaxFee = "125000000"; //12.5% in super basis point format
 const BipsToTreasury = "1000"; //10% in basis point format
 const SlippageConstant = "0";
-const ZCBammFeeConstant = _10To18BN;
+const ZCBammFeeConstant = _10To18BN.mul(new BN(105)).div(new BN(100));
 const YTammFeeConstant = _10To18BN;
+const fZCBin = 1.05;
+const fToZCB = 1/fZCBin;
 const TreasuryFeeNumber = 0.1;
 const _2To64BN = (new BN("2")).pow(new BN("64"));
 const AnnualFeeRateBN = _2To64BN.div(new BN("100")); //0.01 or 1% in 64.64 form
@@ -30,6 +32,8 @@ const ErrorRange = Math.pow(10,-7);
 const TreasuryErrorRange = Math.pow(10, -5);
 
 function AmountError(actual, expected) {
+	actual = parseInt(actual);
+	expected = parseInt(expected);
 	if (actual === expected) {
 		return 0;
 	}
@@ -296,9 +300,14 @@ contract('ZCBamm', async function(accounts){
 			1.0,
 			parseInt(amtIn.toString())
 		);
-		let yearsRemaining = (maturity - timestamp)/secondsPerYear;
-		let pctFee = 1 - Math.pow(1 - AnnualFeeRateNumber, yearsRemaining);
-		let UoutFeeAdjusted = Uout * (1 - pctFee);
+
+		let UoutFeeAdjusted = -ZCBammMath.reserveChange(
+			parseInt(inflatedTotalSupplyLP.add(new BN(ZCBreserves)).toString()),
+			parseInt(Ureserves),
+			r,
+			fZCBin,
+			parseInt(amtIn.toString())
+		);
 		let totalFee = Uout - UoutFeeAdjusted;
 		let treasuryFee = Math.floor(totalFee * TreasuryFeeNumber);
 		let Uexpected = parseInt(Ureserves) - UoutFeeAdjusted - treasuryFee;
@@ -329,6 +338,7 @@ contract('ZCBamm', async function(accounts){
 	});
 
 	it('SwapFromSpecificTokens _ZCBin:false', async () => {
+		//process.exit();
 		await helper.advanceTime(121);
 
 		amtIn = balance.div(new BN(100));
@@ -352,9 +362,14 @@ contract('ZCBamm', async function(accounts){
 			1.0,
 			parseInt(amtIn.toString())
 		);
-		let yearsRemaining = (maturity - timestamp)/secondsPerYear;
-		let pctFee = 1 - Math.pow(1 - AnnualFeeRateNumber, yearsRemaining);
-		let ZCBoutFeeAdjusted = ZCBout * (1 - pctFee);
+
+		let ZCBoutFeeAdjusted = -ZCBammMath.reserveChange(
+			parseInt(Ureserves),
+			parseInt(inflatedTotalSupplyLP.add(new BN(ZCBreserves)).toString()),
+			r,
+			fToZCB,
+			parseInt(amtIn.toString())
+		);
 		let totalFee = ZCBout - ZCBoutFeeAdjusted;
 		let treasuryFee = Math.floor(totalFee * TreasuryFeeNumber);
 		let Uexpected = parseInt(amtIn.add(new BN(Ureserves)).toString());
@@ -403,15 +418,19 @@ contract('ZCBamm', async function(accounts){
 
 		let r = (maturity-timestamp)/nextAnchor;
 		let Uin = ZCBammMath.reserveChange(
-				parseInt(inflatedTotalSupplyLP.add(new BN(ZCBreserves)).toString()),
-				parseInt(Ureserves),
-				r,
-				1.0,
-				-parseInt(amtOut.toString())
+			parseInt(inflatedTotalSupplyLP.add(new BN(ZCBreserves)).toString()),
+			parseInt(Ureserves),
+			r,
+			1.0,
+			-parseInt(amtOut.toString())
 		);
-		let yearsRemaining = (maturity - timestamp)/secondsPerYear;
-		let pctFee = 1 - Math.pow(1 - AnnualFeeRateNumber, yearsRemaining);
-		let UinFeeAdjusted = Uin / (1 - pctFee);
+		let UinFeeAdjusted = ZCBammMath.reserveChange(
+			parseInt(inflatedTotalSupplyLP.add(new BN(ZCBreserves)).toString()),
+			parseInt(Ureserves),
+			r,
+			fToZCB,
+			-parseInt(amtOut.toString())
+		);
 		let totalFee = UinFeeAdjusted - Uin;
 		let treasuryFee = Math.floor(totalFee * TreasuryFeeNumber);
 		let Uexpected = parseInt(Ureserves) + UinFeeAdjusted - treasuryFee;
@@ -463,15 +482,20 @@ contract('ZCBamm', async function(accounts){
 
 		let r = (maturity-timestamp)/nextAnchor;
 		let ZCBin = ZCBammMath.reserveChange(
-				parseInt(Ureserves),
-				parseInt(inflatedTotalSupplyLP.add(new BN(ZCBreserves)).toString()),
-				r,
-				1.0,
-				-parseInt(amtOut.toString())
+			parseInt(Ureserves),
+			parseInt(inflatedTotalSupplyLP.add(new BN(ZCBreserves)).toString()),
+			r,
+			1.0,
+			-parseInt(amtOut.toString())
 		);
-		let yearsRemaining = (maturity - timestamp)/secondsPerYear;
-		let pctFee = 1 - Math.pow(1 - AnnualFeeRateNumber, yearsRemaining);
-		let ZCBinFeeAdjusted = ZCBin / (1 - pctFee);
+
+		let ZCBinFeeAdjusted = ZCBammMath.reserveChange(
+			parseInt(Ureserves),
+			parseInt(inflatedTotalSupplyLP.add(new BN(ZCBreserves)).toString()),
+			r,
+			fZCBin,
+			-parseInt(amtOut.toString())
+		);
 		let totalFee = ZCBinFeeAdjusted - ZCBin;
 		let treasuryFee = Math.floor(totalFee * TreasuryFeeNumber);
 		let ZCBexpected = parseInt(ZCBreserves) + ZCBinFeeAdjusted - treasuryFee;

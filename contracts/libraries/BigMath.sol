@@ -5,6 +5,8 @@ import "./SignedSafeMath.sol";
 import "./SafeMath.sol";
 import "./Ei.sol";
 
+import "../AmmInfoOracle.sol";
+
 library BigMath {
   using ABDKMath64x64 for int128;
   using SignedSafeMath for int256;
@@ -135,6 +137,55 @@ library BigMath {
       changeReserve1 == exp_2((1/exponent)*log_2(base)) - reserve1
     */
     changeReserve1 = (ABDK_1.div(exponent)).mul( base.log_2() ).exp_2().sub(int128(reserve1));
+  }
+
+  /*
+    @Description: get info about the affect on reserves and the amount of fees to be paid to the treasury
+      when a user makes a swap transaction in the ZCBamm
+
+    @param uint reserve0: the reserve of the asset for which the user is swapping a specific amount
+    @param uint reserve1: the reserve of the asset we need to find the change in resulting
+      change in reserve of after the swap
+    @param uint r: seconds remaining ABDK format divided by anchor
+    @param int128: the effect on reserve0 of the user's swap transaction
+    @param address AmmInfoOracleAddress: the address of the contract which tells us how much of the
+      total fee to send to the treasury
+    @param flipFee: when we get the feeConstant from AmmInfoOracle if this is true assign it to 1/itself
+      This should be true when the swap is selling U for ZCB and false when selling ZCB for U
+  */
+  function ZCB_U_ReserveAndFeeChange(
+    uint reserve0,
+    uint reserve1,
+    uint r,
+    int128 changeReserve0,
+    address AmmInfoOracleAddress,
+    bool flipFee
+    ) public view returns (uint change, uint treasuryFee, address sendTo) {
+
+    uint nonFeeAdjustedChange = uint(int(ZCB_U_reserve_change(
+      reserve0,
+      reserve1,
+      r,
+      (1 ether),
+      changeReserve0
+    )).abs());
+
+    uint feeConstant = AmmInfoOracle(AmmInfoOracleAddress).ZCBammFeeConstant();
+    if (flipFee) {
+      feeConstant = uint((1 ether)**2).div(feeConstant);
+    }
+    change = uint(int(ZCB_U_reserve_change(
+      reserve0,
+      reserve1,
+      r,
+      feeConstant,
+      changeReserve0
+    )).abs());
+
+    (uint larger, uint smaller) = nonFeeAdjustedChange > change ? (nonFeeAdjustedChange, change) : (change, nonFeeAdjustedChange) ;
+
+    (treasuryFee, sendTo) = AmmInfoOracle(AmmInfoOracleAddress).treasuryFee(larger, smaller);
+
   }
 
   int128 private constant MAX_ANNUAL_ERROR = ABDK_1 / 100000;

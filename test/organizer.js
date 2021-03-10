@@ -40,7 +40,7 @@ contract('organizer', function(accounts) {
 		YTammDeployerInstance = await YTammDeployer.new();
 		capitalHandlerDeployerInstance = await CapitalHandlerDeployer.new();
 		swapRouterDeployerInstance = await SwapRouterDeployer.new();
-		ammInfoOracleInstance = await AmmInfoOracle.new("0", "0", "0", "0", _10To18BN, _10To18BN, nullAddress);
+		ammInfoOracleInstance = await AmmInfoOracle.new("0", "0", _10To18BN, _10To18BN, nullAddress);
 		organizerInstance = await organizer.new(
 			yieldTokenDeployerInstance.address,
 			capitalHandlerDeployerInstance.address,

@@ -16,7 +16,6 @@ const nullAddress = "0x0000000000000000000000000000000000000000";
 const _10To18BN = (new BN("10")).pow(new BN("18"));
 const secondsPerYear = 31556926;
 
-const MaxFee = "125000000"; //12.5% in super basis point format
 const BipsToTreasury = "1000"; //10% in basis point format
 const SlippageConstant = "0";
 const ZCBammFeeConstant = _10To18BN.mul(new BN(105)).div(new BN(100));
@@ -25,8 +24,6 @@ const fZCBin = 1.05;
 const fToZCB = 1/fZCBin;
 const TreasuryFeeNumber = 0.1;
 const _2To64BN = (new BN("2")).pow(new BN("64"));
-const AnnualFeeRateBN = _2To64BN.div(new BN("100")); //0.01 or 1% in 64.64 form
-const AnnualFeeRateNumber = 0.01;
 const DesiredDigitsAccurate = 7;
 const ErrorRange = Math.pow(10,-7);
 const TreasuryErrorRange = Math.pow(10, -5);
@@ -57,7 +54,7 @@ contract('ZCBamm', async function(accounts){
 		capitalHandlerInstance = await capitalHandler.new(aaveWrapperInstance.address, maturity, yieldTokenDeployerInstance.address);
 		yieldTokenInstance = await yieldToken.at(await capitalHandlerInstance.yieldTokenAddress());
 		await ZCBamm.link("BigMath", BigMathInstance.address);
-		ammInfoOracleInstance = await AmmInfoOracle.new(MaxFee, AnnualFeeRateBN, BipsToTreasury, SlippageConstant, ZCBammFeeConstant, YTammFeeConstant, nullAddress);
+		ammInfoOracleInstance = await AmmInfoOracle.new(BipsToTreasury, SlippageConstant, ZCBammFeeConstant, YTammFeeConstant, nullAddress);
 		amm = await ZCBamm.new(capitalHandlerInstance.address, ammInfoOracleInstance.address);
 		anchor = (await amm.anchor()).toNumber();
 

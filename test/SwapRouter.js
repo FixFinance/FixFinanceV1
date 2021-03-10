@@ -27,8 +27,6 @@ const _0BalanceString = "0";
 const roundingBuffer = new BN(0x10);
 const LENGTH_RATE_SERIES = 31;
 
-const MaxFee = "125000000"; //12.5% in super basis point format
-const AnnualFee = "12500000"; //1.25% in super basis point format
 const BipsToTreasury = "100"; //1% in basis point format
 const SlippageConstant = "0";
 const ZCBammFeeConstant = _10To18BN;
@@ -49,8 +47,6 @@ contract('SwapRouter', async function(accounts) {
 		capitalHandlerDeployerInstance = await CapitalHandlerDeployer.new();
 		swapRouterDeployerInstance = await SwapRouterDeployer.new();
 		ammInfoOracleInstance = await AmmInfoOracle.new(
-			MaxFee,
-			AnnualFee,
 			BipsToTreasury,
 			SlippageConstant, 
 			ZCBammFeeConstant,

@@ -61,15 +61,13 @@ module.exports = async function(deployer) {
 	organizerInstance = await deployer.deploy(
 		organizer,
 		yieldTokenDeployerInstance.address,
-		bondMinterInstance.address,
 		capitalHandlerDeployerInstance.address,
 		ZCBammDeployerInstance.address,
 		YTammDeployerInstance.address,
 		swapRouterDeployerInstance.address,
 		ammInfoOracle.address
 	);
-	//await organizerInstance.DeploySwapRouter();
+	await organizerInstance.DeploySwapRouter();
 	await organizerInstance.deployAssetWrapper(dummyATokenInstance.address);
 	await organizerInstance.deployCapitalHandlerInstance(dummyATokenInstance.address, start2026);
-
 };

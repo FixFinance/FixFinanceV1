@@ -5,7 +5,6 @@ const CapitalHandler = artifacts.require('CapitalHandler');
 const YieldToken = artifacts.require('YieldToken');
 const yieldTokenDeployer = artifacts.require('YieldTokenDeployer');
 const organizer = artifacts.require('organizer');
-const BondMinter = artifacts.require('BondMinter');
 const IERC20 = artifacts.require("IERC20");
 const BigMath = artifacts.require("BigMath");
 const Ei = artifacts.require("Ei");
@@ -40,7 +39,6 @@ contract('SwapRouter', async function(accounts) {
 	it('before each', async () => {
 		yieldTokenDeployerInstance = await yieldTokenDeployer.new();
 		vaultHealthInstance = await dummyVaultHealth.new();
-		bondMinterInstance = await BondMinter.new(vaultHealthInstance.address);
 		EiInstance = await Ei.new();
 		await BigMath.link("Ei", EiInstance.address);
 		BigMathInstance = await BigMath.new();
@@ -61,7 +59,6 @@ contract('SwapRouter', async function(accounts) {
 		);
 		organizerInstance = await organizer.new(
 			yieldTokenDeployerInstance.address,
-			bondMinterInstance.address,
 			capitalHandlerDeployerInstance.address,
 			ZCBammDeployerInstance.address,
 			YTammDeployerInstance.address,
@@ -78,8 +75,8 @@ contract('SwapRouter', async function(accounts) {
 		aTokenInstance = await dummyAToken.new("aCOIN");
 		await organizerInstance.deployAssetWrapper(aTokenInstance.address);
 		aaveWrapperInstance = await AaveWrapper.at(await organizerInstance.assetWrappers(aTokenInstance.address));
-		await organizerInstance.deployCapitalHandlerInstance(aTokenInstance.address, maturity);
-		capitalHandlerInstance = await CapitalHandler.at(await organizerInstance.capitalHandlerMapping(aTokenInstance.address, maturity));
+		rec = await organizerInstance.deployCapitalHandlerInstance(aTokenInstance.address, maturity);
+		capitalHandlerInstance = await CapitalHandler.at(rec.receipt.logs[0].args.addr);
 		yieldTokenInstance = await YieldToken.at(await capitalHandlerInstance.yieldTokenAddress());
 		await organizerInstance.deployZCBamm(capitalHandlerInstance.address);
 		amm0 = await ZCBamm.at(await organizerInstance.ZCBamms(capitalHandlerInstance.address));

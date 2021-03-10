@@ -54,7 +54,7 @@ contract('ZCBamm', async function(accounts){
 		let timestamp = (await web3.eth.getBlock('latest')).timestamp;
 		//maturity is 110 days out
 		maturity = timestamp + 110*24*60*60;
-		capitalHandlerInstance = await capitalHandler.new(aaveWrapperInstance.address, maturity, yieldTokenDeployerInstance.address, nullAddress);
+		capitalHandlerInstance = await capitalHandler.new(aaveWrapperInstance.address, maturity, yieldTokenDeployerInstance.address);
 		yieldTokenInstance = await yieldToken.at(await capitalHandlerInstance.yieldTokenAddress());
 		await ZCBamm.link("BigMath", BigMathInstance.address);
 		ammInfoOracleInstance = await AmmInfoOracle.new(MaxFee, AnnualFeeRateBN, BipsToTreasury, SlippageConstant, ZCBammFeeConstant, YTammFeeConstant, nullAddress);

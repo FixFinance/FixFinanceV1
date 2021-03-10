@@ -6,8 +6,9 @@ import "./ERC20.sol";
 import "./YieldTokenDeployer.sol";
 import "./libraries/SafeMath.sol";
 import "./libraries/SignedSafeMath.sol";
+import "./helpers/Ownable.sol";
 
-contract CapitalHandler is ICapitalHandler {
+contract CapitalHandler is ICapitalHandler, Ownable {
 	using SafeMath for uint;
 	using SignedSafeMath for int;
 
@@ -42,8 +43,7 @@ contract CapitalHandler is ICapitalHandler {
 	constructor(
 		address _wrapper,
 		uint64 _maturity,
-		address _yieldTokenDeployer,
-		address _bondMinterAddress
+		address _yieldTokenDeployer
 		) public {
 		IWrapper temp = IWrapper(_wrapper);
 		wrapper = temp;
@@ -56,7 +56,6 @@ contract CapitalHandler is ICapitalHandler {
 		(bool success , ) = _yieldTokenDeployer.call(abi.encodeWithSignature("deploy(address)", _wrapper));
 		require(success);
 		yieldTokenAddress = YieldTokenDeployer(_yieldTokenDeployer).addr();
-		bondMinterAddress = _bondMinterAddress;
 	}
 
 	function wrappedTokenFree(address _owner) public view override returns (uint wrappedTknFree) {
@@ -197,5 +196,16 @@ contract CapitalHandler is ICapitalHandler {
 		minimumUnitAmountAtMaturity(_from);
 	}
 
+	//----------------admin----------------------------
+	bool public override isFinalized;
+
+	function setBondMinterAddress(address _bondMinterAddress) external override onlyOwner {
+		require(!isFinalized);
+		bondMinterAddress = _bondMinterAddress;
+	}
+
+	function finalize() external override onlyOwner {
+		isFinalized = true;
+	}
 
 }

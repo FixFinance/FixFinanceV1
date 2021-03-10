@@ -79,7 +79,6 @@ contract('VaultHealth', async function(accounts) {
 		ammInfoOracleInstance = await AmmInfoOracle.new("0", "0", "0", "0", _10To18, _10To18, nullAddress);
 		organizerInstance = await organizer.new(
 			yieldTokenDeployerInstance.address,
-			bondMinterInstance.address,
 			CapitalHandlerDeployerInstance.address,
 			ZCBammDeployerInstance.address,
 			YTammDeployerInstance.address,
@@ -92,8 +91,8 @@ contract('VaultHealth', async function(accounts) {
 
 		await organizerInstance.deployAssetWrapper(asset0.address);
 		await organizerInstance.deployAssetWrapper(asset1.address);
-		await organizerInstance.deployCapitalHandlerInstance(asset0.address, maturity);
-		await organizerInstance.deployCapitalHandlerInstance(asset1.address, maturity);
+		let rec0 = await organizerInstance.deployCapitalHandlerInstance(asset0.address, maturity);
+		let rec1 = await organizerInstance.deployCapitalHandlerInstance(asset1.address, maturity);
 
 		wAsset0 = await aaveWrapper.at(await organizerInstance.assetWrappers(asset0.address));
 		wAsset1 = await aaveWrapper.at(await organizerInstance.assetWrappers(asset1.address));
@@ -104,8 +103,8 @@ contract('VaultHealth', async function(accounts) {
 		await wAsset0.depositUnitAmount(accounts[0], _10To18.toString());
 		await wAsset1.depositUnitAmount(accounts[0], _10To18.toString());
 
-		zcbAsset0 = await capitalHandler.at(await organizerInstance.capitalHandlerMapping(asset0.address, maturity));
-		zcbAsset1 = await capitalHandler.at(await organizerInstance.capitalHandlerMapping(asset1.address, maturity));
+		zcbAsset0 = await capitalHandler.at(rec0.receipt.logs[0].args.addr);
+		zcbAsset1 = await capitalHandler.at(rec1.receipt.logs[0].args.addr);
 
 		ytAsset0 = await YieldToken.at(await zcbAsset0.yieldTokenAddress());
 		ytAsset1 = await YieldToken.at(await zcbAsset1.yieldTokenAddress());

@@ -17,7 +17,7 @@ contract('capitalHandler', async function(accounts){
 		aaveWrapperInstance = await aaveWrapper.new(dummyATokenInstance.address);
 		yieldTokenDeployerInstance = await yieldTokenDeployer.new();
 		timeNow = (await web3.eth.getBlock('latest')).timestamp;
-		capitalHandlerInstance = await capitalHandler.new(aaveWrapperInstance.address, timeNow+86400, yieldTokenDeployerInstance.address, nullAddress);
+		capitalHandlerInstance = await capitalHandler.new(aaveWrapperInstance.address, timeNow+86400, yieldTokenDeployerInstance.address);
 		inflation = await dummyATokenInstance.inflation();
 		yieldTokenInstance = await IERC20.at(await capitalHandlerInstance.yieldTokenAddress());
 		//wrap aTokens

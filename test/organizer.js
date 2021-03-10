@@ -31,7 +31,6 @@ contract('organizer', function(accounts) {
 
 		yieldTokenDeployerInstance = await yieldTokenDeployer.new();
 		vaultHealthInstance = await dummyVaultHealth.new();
-		bondMinterInstance = await BondMinter.new(vaultHealthInstance.address);
 		EiInstance = await Ei.new();
 		await BigMath.link("Ei", EiInstance.address);
 		BigMathInstance = await BigMath.new();
@@ -44,7 +43,6 @@ contract('organizer', function(accounts) {
 		ammInfoOracleInstance = await AmmInfoOracle.new("0", "0", "0", "0", _10To18BN, _10To18BN, nullAddress);
 		organizerInstance = await organizer.new(
 			yieldTokenDeployerInstance.address,
-			bondMinterInstance.address,
 			capitalHandlerDeployerInstance.address,
 			ZCBammDeployerInstance.address,
 			YTammDeployerInstance.address,
@@ -77,20 +75,10 @@ contract('organizer', function(accounts) {
 	});
 
 	it('deploy CapitalHandler', async () => {
-		await organizerInstance.deployCapitalHandlerInstance(asset0.address, maturity);
-		capitalHandlerInstance = await CapitalHandler.at(await organizerInstance.capitalHandlerMapping(asset0.address, maturity));
+		let rec = await organizerInstance.deployCapitalHandlerInstance(asset0.address, maturity);
+		capitalHandlerInstance = await CapitalHandler.at(rec.receipt.logs[0].args.addr);
 		yieldTokenInstance = await YieldToken.at(await capitalHandlerInstance.yieldTokenAddress());
 		assert.notEqual(capitalHandlerInstance.address, nullAddress, "organizer::capitalHandlerMapping[asset0] must be non-null");
-	});
-
-	it('cannot override CapitalHandler deployment', async () => {
-		let caught = false;
-		try {
-			await organizerInstance.deployCapitalHandlerInstance(asset0.address, maturity);
-		} catch (err) {
-			caught = true
-		}
-		if (!caught) assert.fail('capital handler deployment was overridden');
 	});
 
 	it('deploy ZCBamm', async () => {

@@ -21,4 +21,9 @@ interface ICapitalHandler is IERC20 {
 	function yieldTokenAddress() external view returns(address);
 	function bondMinterAddress() external view returns(address);
 	function wrapper() external view returns(IWrapper);
+
+	//----------------admin----------------------------
+	function isFinalized() external view returns(bool);
+	function setBondMinterAddress(address _bondMinterAddress) external;
+	function finalize() external;
 }

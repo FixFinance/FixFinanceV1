@@ -12,19 +12,20 @@ import "./AmmInfoOracle.sol";
 
 contract organizer {
 
+	event CapitalHandlerDeployment(
+		address addr
+	);
+
 	address[] public capitalHandlerInstances;
 
 	mapping(address => address) public assetWrappers;
 
-	//underlyingAsset => maturity of bond => capitalHandler
-	mapping(address => mapping(uint64 => address)) public capitalHandlerMapping;
 	mapping(address => address) public capitalHandlerToUnderlyingAsset;
 
 	mapping(address => address) public YTamms;
 	mapping(address => address) public ZCBamms;
 
 	address public yieldTokenDeployerAddress;
-	address public bondMinterAddress;
 	address public CapitalHandlerDeployerAddress;
 	address public ZCBammDeployerAddress;
 	address public YTammDeployerAddress;
@@ -34,7 +35,6 @@ contract organizer {
 
 	constructor (
 		address _yieldTokenDeployerAddress,
-		address _bondMinterAddress,
 		address _CapitalhandlerDeployerAddress,
 		address _ZCBammDeployerAddress,
 		address _YTammDeployerAddress,
@@ -42,7 +42,6 @@ contract organizer {
 		address _AmmInfoOracleAddress
 		) public {
 		yieldTokenDeployerAddress = _yieldTokenDeployerAddress;	
-		bondMinterAddress = _bondMinterAddress;
 		CapitalHandlerDeployerAddress = _CapitalhandlerDeployerAddress;
 		ZCBammDeployerAddress = _ZCBammDeployerAddress;
 		YTammDeployerAddress = _YTammDeployerAddress;
@@ -70,12 +69,11 @@ contract organizer {
 
 	function deployCapitalHandlerInstance(address _aTokenAddress, uint64 _maturity) public {
 		require(_maturity > block.timestamp+(1 weeks), "maturity must be at least 1 weeks away");
-		require(capitalHandlerMapping[_aTokenAddress][_maturity] == address(0), "capital handler with these parameters already exists");
 		address aaveWrapperAddress = assetWrappers[_aTokenAddress];
 		require(aaveWrapperAddress != address(0), "deploy a wrapper for this aToken first");
-		address capitalHandlerAddress = CapitalHandlerDeployer(CapitalHandlerDeployerAddress).deploy(aaveWrapperAddress, _maturity, yieldTokenDeployerAddress, bondMinterAddress);
+		address capitalHandlerAddress = CapitalHandlerDeployer(CapitalHandlerDeployerAddress).deploy(aaveWrapperAddress, _maturity, yieldTokenDeployerAddress, msg.sender);
+		emit CapitalHandlerDeployment(capitalHandlerAddress);
 		capitalHandlerInstances.push(capitalHandlerAddress);
-		capitalHandlerMapping[_aTokenAddress][_maturity] = capitalHandlerAddress;
 		capitalHandlerToUnderlyingAsset[capitalHandlerAddress] = _aTokenAddress;
 	}
 

@@ -90,7 +90,9 @@ contract('BondMinter', async function(accounts) {
 		await asset1.approve(wAsset1.address, _10To18.mul(new BN("10")).toString());
 		await wAsset1.depositUnitAmount(accounts[0], _10To18.mul(new BN("10")).toString());
 		await wAsset1.approve(bondMinterInstance.address, _10To18.mul(new BN("10")).toString());
-		await zcbAsset0.approve(bondMinterInstance.address, _10To18.mul(new BN("10")).toString());
+		await wAsset1.approve(zcbAsset1.address, _10To18.mul(new BN("10")).toString());
+		await zcbAsset1.depositWrappedToken(accounts[0], _10To18.mul(new BN("10")).toString());
+		await zcbAsset1.approve(bondMinterInstance.address, _10To18.mul(new BN("10")).toString());
 
 		//mint assets to account 1
 		await asset0.mintTo(accounts[1], _10To18.mul(new BN("10")).toString());
@@ -114,9 +116,26 @@ contract('BondMinter', async function(accounts) {
 		await vaultHealthInstance.setLower(asset1.address, zcbAsset0.address, lowerRatio);
 	});
 
+	it('cannot open vault without whitelisting supplied asset', async () => {
+		let caught = false;
+		amountBorrowed = _10To18.mul(_10To18).div(new BN(upperRatio)).toString();
+		await vaultHealthInstance.setToReturn(true);
+		maxShortInterest0 = _10To18.mul(_10To18).toString();
+		await vaultHealthInstance.setMaximumShortInterest(asset0.address, maxShortInterest0);
+		try {
+			await bondMinterInstance.openVault(zcbAsset1.address, zcbAsset0.address, _10To18.toString(), amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
+		} catch (err) {
+			caught = true;
+		}
+		await zcbAsset1.withdrawAll(accounts[0], false);
+		if (!caught) assert.fail('only whitelisted assets may be supplied');
+	});
+
 	it('opens vault', async () => {
 		amountBorrowed = _10To18.mul(_10To18).div(new BN(upperRatio)).toString();
 		let caught = false;
+		maxShortInterest0 = "0";
+		await vaultHealthInstance.setMaximumShortInterest(asset0.address, maxShortInterest0);
 		//we are usign a dummy vault health contract, we need to set the value which it will return on vaultWithstandsChange() call
 		await vaultHealthInstance.setToReturn(true);
 		try {

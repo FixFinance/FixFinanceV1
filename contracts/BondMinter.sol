@@ -38,6 +38,10 @@ contract BondMinter is Ownable {
 	//wrapper => underlying asset
 	mapping(address => address) public wrapperToUnderlyingAsset;
 
+	//acts as a whitelist for ZCBs & YTs that may be supplied as collateral
+	//capitalHandler => wrapper
+	mapping(address => address) public capitalHandlerToWrapper;
+
 	//underlying asset => short interest
 	mapping(address => uint) public shortInterestAllDurations;
 
@@ -119,7 +123,7 @@ contract BondMinter is Ownable {
 		shortInterestAllDurations[underlyingAssetAddress] = shortInterestAllDurations[underlyingAssetAddress].sub(_amount);
 	}
 
-	function passInfoTorVaultManager(address _suppliedAsset, uint _suppliedAmount) internal view returns (address addr, uint amt) {
+	function passInfoToVaultManager(address _suppliedAsset, uint _suppliedAmount) internal view returns (address addr, uint amt) {
 		addr = wrapperToUnderlyingAsset[_suppliedAsset];
 		if (addr == address(0)) {
 			addr = _suppliedAsset;
@@ -144,7 +148,7 @@ contract BondMinter is Ownable {
 		require(_suppliedRateChange >= ABDK_1);
 		require(_borrowRateChange <= ABDK_1);
 
-		(address _suppliedAddrToPass, uint _suppliedAmtToPass) = passInfoTorVaultManager(_assetSupplied, _amountSupplied);
+		(address _suppliedAddrToPass, uint _suppliedAmtToPass) = passInfoToVaultManager(_assetSupplied, _amountSupplied);
 
 		return vaultHealthContract.vaultWithstandsChange(
 			_suppliedAddrToPass,
@@ -165,7 +169,7 @@ contract BondMinter is Ownable {
 		bool upper
 		) internal view returns (bool) {
 
-		(address _suppliedAddrToPass, uint _suppliedAmtToPass) = passInfoTorVaultManager(_assetSupplied, _amountSupplied);
+		(address _suppliedAddrToPass, uint _suppliedAmtToPass) = passInfoToVaultManager(_assetSupplied, _amountSupplied);
 
 		return ( upper ?
 			vaultHealthContract.satisfiesUpperLimit(_suppliedAddrToPass, _assetBorrowed, _suppliedAmtToPass, _amountBorrowed)
@@ -185,6 +189,8 @@ contract BondMinter is Ownable {
 		int128 _suppliedRateChange,
 		int128 _borrowRateChange
 		) external {
+
+		require(capitalHandlerToWrapper[_assetSupplied] != address(0) || wrapperToUnderlyingAsset[_assetSupplied] != address(0));
 		require(vaultWithstandsChange(_assetSupplied, _assetBorrowed, _amountSupplied, _amountBorrowed, _priceMultiplier, _suppliedRateChange, _borrowRateChange));
 
 		IERC20(_assetSupplied).transferFrom(msg.sender, address(this), _amountSupplied);
@@ -418,6 +424,10 @@ contract BondMinter is Ownable {
 
 	function whitelistWrapper(address _wrapeprAddress) external onlyOwner {
 		wrapperToUnderlyingAsset[_wrapeprAddress] = IWrapper(_wrapeprAddress).underlyingAssetAddress();
+	}
+
+	function whitelistCapitalHandler(address _capitalHandlerAddress) external onlyOwner {
+		capitalHandlerToWrapper[_capitalHandlerAddress] = address(ICapitalHandler(_capitalHandlerAddress).wrapper());
 	}
 
 	function claimRevenue(address _asset, uint _amount) external onlyOwner {

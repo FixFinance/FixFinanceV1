@@ -53,7 +53,7 @@ contract YTamm is IYTamm {
 		maturity = _maturity;
 		ZCBammAddress = _ZCBammAddress;
 		AmmInfoOracleAddress = _feeOracleAddress;
-		SlippageConstant = AmmInfoOracle(_feeOracleAddress).SlippageConstant();
+		SlippageConstant = AmmInfoOracle(_feeOracleAddress).YTammSlippageConstants(_ZCBaddress);
 		YTtoLmultiplier = BigMath.YT_U_ratio(
 			apy,
 			maturity-block.timestamp
@@ -237,6 +237,7 @@ contract YTamm is IYTamm {
 			YTtoLmultiplier == totalSupply / YTreserves
 		*/
 		YTtoLmultiplier = totalSupply.mul(1 ether) / _YTreserves;
+		SlippageConstant = AmmInfoOracle(AmmInfoOracleAddress).YTammSlippageConstants(ZCBaddress);
 		lastRecalibration = block.timestamp;
 		//ensure noone reserves quote before recalibrating and is then able to take the quote
 		quoteSignature = bytes32(0);
@@ -295,7 +296,7 @@ contract YTamm is IYTamm {
 			inflTotalSupply,
 			_TimeRemaining,
 			SlippageConstant,
-			(1 ether)**2 / AmmInfoOracle(AmmInfoOracleAddress).YTammFeeConstant(),
+			(1 ether)**2 / AmmInfoOracle(AmmInfoOracleAddress).YTammFeeConstants(ZCBaddress),
 			OracleRate,
 			_amount
 		));
@@ -334,7 +335,7 @@ contract YTamm is IYTamm {
 			inflTotalSupply,
 			_TimeRemaining,
 			SlippageConstant,
-			AmmInfoOracle(AmmInfoOracleAddress).YTammFeeConstant(),
+			AmmInfoOracle(AmmInfoOracleAddress).YTammFeeConstants(ZCBaddress),
 			OracleRate,
 			-_amount
 		));
@@ -382,7 +383,7 @@ contract YTamm is IYTamm {
 			inflTotalSupply,
 			_TimeRemaining,
 			SlippageConstant,
-			(1 ether)**2 / AmmInfoOracle(AmmInfoOracleAddress).YTammFeeConstant(),
+			(1 ether)**2 / AmmInfoOracle(AmmInfoOracleAddress).YTammFeeConstants(ZCBaddress),
 			OracleRate,
 			_amount
 		));
@@ -415,7 +416,7 @@ contract YTamm is IYTamm {
 			inflTotalSupply,
 			_TimeRemaining,
 			SlippageConstant,
-			AmmInfoOracle(AmmInfoOracleAddress).YTammFeeConstant(),
+			AmmInfoOracle(AmmInfoOracleAddress).YTammFeeConstants(ZCBaddress),
 			OracleRate,
 			-_amount
 		));

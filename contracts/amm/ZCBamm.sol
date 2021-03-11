@@ -233,6 +233,7 @@ contract ZCBamm is IZCBamm {
 				r,
 				_amount,
 				AmmInfoOracleAddress,
+				ZCBaddress,
 				false
 			);
 
@@ -254,6 +255,7 @@ contract ZCBamm is IZCBamm {
 				r,
 				_amount,
 				AmmInfoOracleAddress,
+				ZCBaddress,
 				true
 			);
 
@@ -287,6 +289,7 @@ contract ZCBamm is IZCBamm {
 				r,
 				-_amount,
 				AmmInfoOracleAddress,
+				ZCBaddress,
 				false
 			);
 			reserveIncrease = amountIn.sub(treasuryFee);
@@ -305,6 +308,7 @@ contract ZCBamm is IZCBamm {
 				r,
 				-_amount,
 				AmmInfoOracleAddress,
+				ZCBaddress,
 				true
 			);
 			reserveIncrease = amountIn.sub(treasuryFee);
@@ -342,6 +346,7 @@ contract ZCBamm is IZCBamm {
 				r,
 				_amount,
 				AmmInfoOracleAddress,
+				ZCBaddress,
 				false
 			);
 
@@ -354,6 +359,7 @@ contract ZCBamm is IZCBamm {
 				r,
 				_amount,
 				AmmInfoOracleAddress,
+				ZCBaddress,
 				true
 			);
 
@@ -379,6 +385,7 @@ contract ZCBamm is IZCBamm {
 				r,
 				-_amount,
 				AmmInfoOracleAddress,
+				ZCBaddress,
 				false
 			);
 
@@ -390,6 +397,7 @@ contract ZCBamm is IZCBamm {
 				r,
 				-_amount,
 				AmmInfoOracleAddress,
+				ZCBaddress,
 				true
 			);
 

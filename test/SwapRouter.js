@@ -48,9 +48,6 @@ contract('SwapRouter', async function(accounts) {
 		swapRouterDeployerInstance = await SwapRouterDeployer.new();
 		ammInfoOracleInstance = await AmmInfoOracle.new(
 			BipsToTreasury,
-			SlippageConstant, 
-			ZCBammFeeConstant,
-			YTammFeeConstant,
 			nullAddress
 		);
 		organizerInstance = await organizer.new(
@@ -73,6 +70,10 @@ contract('SwapRouter', async function(accounts) {
 		aaveWrapperInstance = await AaveWrapper.at(await organizerInstance.assetWrappers(aTokenInstance.address));
 		rec = await organizerInstance.deployCapitalHandlerInstance(aTokenInstance.address, maturity);
 		capitalHandlerInstance = await CapitalHandler.at(rec.receipt.logs[0].args.addr);
+
+		await ammInfoOracleInstance.setSlippageConstant(capitalHandlerInstance.address, SlippageConstant);
+		await ammInfoOracleInstance.setFeeConstants(capitalHandlerInstance.address, ZCBammFeeConstant, YTammFeeConstant);
+
 		yieldTokenInstance = await YieldToken.at(await capitalHandlerInstance.yieldTokenAddress());
 		await organizerInstance.deployZCBamm(capitalHandlerInstance.address);
 		amm0 = await ZCBamm.at(await organizerInstance.ZCBamms(capitalHandlerInstance.address));

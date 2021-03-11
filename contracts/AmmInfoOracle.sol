@@ -33,19 +33,41 @@ contract AmmInfoOracle is Ownable {
 
 	uint256 public YTammFeeConstant;
 
+	mapping(address => uint) public YTammSlippageConstants;
+
+	mapping(address => uint) public ZCBammFeeConstants;
+
+	mapping(address => uint) public YTammFeeConstants;
+
 	constructor(
 		uint16 _bipsToTreasury,
-		uint _SlippageConstant,
-		uint _ZCBammFeeConstant,
-		uint _YTammFeeConstant,
 		address _sendTo
 		) public {
 
 		setToTreasuryFee(_bipsToTreasury);
-		SlippageConstant = _SlippageConstant;
-		setFeeConstants(_ZCBammFeeConstant, _YTammFeeConstant);
 		sendTo = _sendTo;
 	}
+
+	function setFeeConstants(address _capitalHandlerAddress, uint _ZCBammFeeConstant, uint _YTammFeeConstant) public {
+		require(msg.sender == Ownable(_capitalHandlerAddress).owner());
+		require(_ZCBammFeeConstant >= 1 ether && _YTammFeeConstant >= 1 ether);
+		ZCBammFeeConstants[_capitalHandlerAddress] = _ZCBammFeeConstant;
+		YTammFeeConstants[_capitalHandlerAddress] = _YTammFeeConstant;
+	}
+
+	function setSlippageConstant(address _capitalHandlerAddress, uint256 _SlippageConstant) public {
+		require(msg.sender == Ownable(_capitalHandlerAddress).owner());
+		YTammSlippageConstants[_capitalHandlerAddress] = _SlippageConstant;
+	}
+
+	function treasuryFee(uint larger, uint smaller) external view returns (uint toTreasury, address _sendTo) {
+		require(larger >= smaller);
+		uint totalFee = larger - smaller;
+		toTreasury = totalFee * bipsToTreasury / totalBasisPoints;
+		_sendTo = sendTo;
+	}
+
+	//--------------------------AmmInfoOracle admin----------------------------
 
 	function setToTreasuryFee(uint16 _bipsToTreasury) public onlyOwner {
 		require(_bipsToTreasury <= MaxBipsToTreasury);
@@ -54,23 +76,6 @@ contract AmmInfoOracle is Ownable {
 
 	function setSendTo(address _sendTo) external onlyOwner {
 		sendTo = _sendTo;
-	}
-
-	function setFeeConstants(uint _ZCBammFeeConstant, uint _YTammFeeConstant) public onlyOwner {
-		require(_ZCBammFeeConstant >= 1 ether && _YTammFeeConstant >= 1 ether);
-		ZCBammFeeConstant = _ZCBammFeeConstant;
-		YTammFeeConstant = _YTammFeeConstant;
-	}
-
-	function setSlippageConstant(uint256 _SlippageConstant) public onlyOwner {
-		SlippageConstant = _SlippageConstant;
-	}
-
-	function treasuryFee(uint larger, uint smaller) external view returns (uint toTreasury, address _sendTo) {
-		require(larger >= smaller);
-		uint totalFee = larger - smaller;
-		toTreasury = totalFee * bipsToTreasury / totalBasisPoints;
-		_sendTo = sendTo;
 	}
 
 }

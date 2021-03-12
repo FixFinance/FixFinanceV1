@@ -5,7 +5,6 @@ const CapitalHandler = artifacts.require('CapitalHandler');
 const YieldToken = artifacts.require('YieldToken');
 const yieldTokenDeployer = artifacts.require('YieldTokenDeployer');
 const organizer = artifacts.require('organizer');
-const BondMinter = artifacts.require('BondMinter');
 const IERC20 = artifacts.require("IERC20");
 const BigMath = artifacts.require("BigMath");
 const Ei = artifacts.require("Ei");

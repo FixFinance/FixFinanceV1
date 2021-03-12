@@ -253,7 +253,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 		uint _priceMultiplier,
 		int128 _suppliedRateChange,
 		int128 _borrowRateChange
-		) external view override returns(bool) {
+		) public view override returns(bool) {
 
 		(address _baseSupplied, address _baseBorrowed) = baseAssetAddresses(_assetSupplied, _assetBorrowed);
 
@@ -271,6 +271,8 @@ contract VaultHealth is IVaultHealth, Ownable {
 
 		return _amountBorrowed < _amountSupplied;
 	}
+
+	//---------f-u-n-c-t-i-o-n-s---t-o---b-e---c-a-l-l-e-d---v-i-a---d-e-l-e-g-a-t-e-c-a-l-l------
 
 	//-----------------------a-d-m-i-n---o-p-e-r-a-t-i-o-n-s---------------------------
 	function setCollateralizationRatios(address _underlyingAssetAddress, uint120 _upper, uint120 _lower) external onlyOwner {

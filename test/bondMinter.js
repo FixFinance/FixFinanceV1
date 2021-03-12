@@ -4,6 +4,7 @@ const aaveWrapper = artifacts.require('AaveWrapper');
 const capitalHandler = artifacts.require('CapitalHandler');
 const yieldTokenDeployer = artifacts.require('YieldTokenDeployer');
 const organizer = artifacts.require('organizer');
+const BondMinterDelegate = artifacts.require("BondMinterDelegate");
 const BondMinter = artifacts.require('BondMinter');
 const IERC20 = artifacts.require("IERC20");
 const BigMath = artifacts.require("BigMath");
@@ -43,7 +44,8 @@ contract('BondMinter', async function(accounts) {
 		asset1 = await dummyAToken.new("aTOKEN");
 		yieldTokenDeployerInstance = await yieldTokenDeployer.new();
 		vaultHealthInstance = await dummyVaultHealth.new();
-		bondMinterInstance = await BondMinter.new(vaultHealthInstance.address);
+		bondMinterDelegateInstance = await BondMinterDelegate.new();
+		bondMinterInstance = await BondMinter.new(vaultHealthInstance.address, bondMinterDelegateInstance.address);
 		EiInstance = await Ei.new();
 		await BigMath.link("Ei", EiInstance.address);
 		BigMathInstance = await BigMath.new();
@@ -207,6 +209,7 @@ contract('BondMinter', async function(accounts) {
 	});
 
 	it('deposits into vault', async () => {
+		//process.exit();
 		var prevBalanceW1 = await wAsset1.balanceOf(accounts[0]);
 		prevSupplied = new BN(vaults[0].amountSupplied);
 		await bondMinterInstance.deposit(accounts[0], 0, _10To18.toString());

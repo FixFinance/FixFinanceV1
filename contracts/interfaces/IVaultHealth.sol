@@ -20,6 +20,5 @@ interface IVaultHealth {
 		int128 _suppliedRateChange,
 		int128 _borrowRateChange
 	) external view returns (bool);
-
 	function maximumShortInterest(address _underlyingAssetAddress) external view returns (uint);
 }

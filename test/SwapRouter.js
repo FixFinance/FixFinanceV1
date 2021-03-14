@@ -96,7 +96,7 @@ contract('SwapRouter', async function(accounts) {
 			make first deposit in amm0
 		*/
 		Uin = balance.div(new BN("10"));
-		ZCBin = balance.div(new BN("30"));
+		ZCBin = balance.div(new BN("10"));
 		rec = await amm0.firstMint(Uin, ZCBin);
 		/*
 			set rate in amm0
@@ -201,13 +201,55 @@ contract('SwapRouter', async function(accounts) {
 
 		let amtYT = "900000";
 		let minZCBout = "10";
-		await yieldTokenInstance.approve_2(router.address, amtYT, false);
+		await yieldTokenInstance.approve_2(router.address, amtYT, true);
 		await router.SwapYTtoZCB(capitalHandlerInstance.address, amtYT, minZCBout);
 
 		newBalanceYT = await yieldTokenInstance.balanceOf_2(accounts[0], false);
 		newBalanceZCB = await capitalHandlerInstance.balanceOf(accounts[0]);
 
 		if (balanceYT.sub(newBalanceYT).cmp(new BN(amtYT)) === 1)  {
+			assert.fail("the amount of YT in ought to be less than or equal to _amountYT");
+		}
+		if (newBalanceZCB.sub(balanceZCB).cmp(new BN(minZCBout)) === -1) {
+			assert.fail("the amount of ZCB out ought to have been greater than or equal to _minZCBout");
+		}
+	});
+
+	it('SwapZCBtoYT_ZCBamm()', async () => {
+		balanceZCB = await capitalHandlerInstance.balanceOf(accounts[0]);
+		balanceYT = await yieldTokenInstance.balanceOf_2(accounts[0], false);
+
+		let amtYT = "90000";
+		let maxZCBin = "1000000";
+		await capitalHandlerInstance.approve(router.address, maxZCBin);
+		await router.SwapZCBtoYT_ZCBamm(capitalHandlerInstance.address, amtYT, maxZCBin);
+
+		newBalanceYT = await yieldTokenInstance.balanceOf_2(accounts[0], false);
+		newBalanceZCB = await capitalHandlerInstance.balanceOf(accounts[0]);
+
+		if (newBalanceYT.sub(balanceYT).cmp(new BN(amtYT)) === -1)  {
+			assert.fail("the amount of YT gained ought to be greater than or equal to _amountYT");
+		}
+		if (balanceZCB.sub(newBalanceZCB).cmp(new BN(maxZCBin)) === 1) {
+			assert.fail("the amount of ZCB in ought to have been less than or equal to _maxZCBin")
+		}
+	});
+
+	it('SwapYTtoZCB_ZCBamm()', async () => {
+		balanceZCB = await capitalHandlerInstance.balanceOf(accounts[0]);
+		balanceYT = await yieldTokenInstance.balanceOf_2(accounts[0], false);
+
+		let amtYT = "900000";
+		let minZCBout = "10";
+
+		await yieldTokenInstance.approve_2(router.address, amtYT, true);
+		let approveAmount = await aaveWrapperInstance.WrappedAmtToUnitAmt_RoundUp(await aaveWrapperInstance.UnitAmtToWrappedAmt_RoundUp(amtYT));
+		await router.SwapYTtoZCB_ZCBamm(capitalHandlerInstance.address, amtYT, minZCBout);
+
+		newBalanceYT = await yieldTokenInstance.balanceOf_2(accounts[0], false);
+		newBalanceZCB = await capitalHandlerInstance.balanceOf(accounts[0]);
+
+		if (balanceYT.sub(newBalanceYT).cmp(new BN(approveAmount)) === 1)  {
 			assert.fail("the amount of YT in ought to be less than or equal to _amountYT");
 		}
 		if (newBalanceZCB.sub(balanceZCB).cmp(new BN(minZCBout)) === -1) {

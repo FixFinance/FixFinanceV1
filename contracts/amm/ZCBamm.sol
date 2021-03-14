@@ -15,8 +15,10 @@ contract ZCBamm is IZCBamm {
 	using SafeMath for uint256;
 
 	uint8 private constant LENGTH_RATE_SERIES = 31;
+	uint8 private constant ANCHOR_MULTIPLIER = 8;
 	int128 private constant MAX = 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
 	uint private constant SecondsPerYear = 31556926;
+
 
 	uint64 public override maturity;
 	uint public override anchor;
@@ -53,7 +55,7 @@ contract ZCBamm is IZCBamm {
 		require(_maturity > block.timestamp + 10 days);
 		maturity = _maturity;
 		//we want time remaining / anchor to be less than 1, thus make anchor greater than time remaining
-		uint temp = 8 * (maturity - block.timestamp);
+		uint temp = ANCHOR_MULTIPLIER * (maturity - block.timestamp);
 		anchor = temp;
 		nextAnchor = temp;
 		AmmInfoOracleAddress = _feeOracleAddress;

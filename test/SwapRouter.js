@@ -15,6 +15,7 @@ const ZCBammDeployer = artifacts.require('ZCBammDeployer');
 const YTammDeployer = artifacts.require('YTammDeployer');
 const SwapRouter = artifacts.require("SwapRouter");
 const SwapRouterDeployer = artifacts.require("SwapRouterDeployer");
+const SwapRouterDelegate = artifacts.require('SwapRouterDelegate');
 const AmmInfoOracle = artifacts.require("AmmInfoOracle");
 
 const helper = require("../helper/helper.js");
@@ -45,7 +46,8 @@ contract('SwapRouter', async function(accounts) {
 		ZCBammDeployerInstance = await ZCBammDeployer.new();
 		YTammDeployerInstance = await YTammDeployer.new();
 		capitalHandlerDeployerInstance = await CapitalHandlerDeployer.new();
-		swapRouterDeployerInstance = await SwapRouterDeployer.new();
+		swapRouterDelegateInstance = await SwapRouterDelegate.new();
+		swapRouterDeployerInstance = await SwapRouterDeployer.new(swapRouterDelegateInstance.address);
 		ammInfoOracleInstance = await AmmInfoOracle.new(
 			BipsToTreasury,
 			nullAddress

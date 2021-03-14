@@ -12,7 +12,6 @@ const Ei = artifacts.require("Ei");
 const CapitalHandlerDeployer = artifacts.require('CapitalHandlerDeployer');
 const ZCBammDeployer = artifacts.require('ZCBammDeployer');
 const YTammDeployer = artifacts.require('YTammDeployer');
-const SwapRouterDeployer = artifacts.require('SwapRouterDeployer');
 const AmmInfoOracle = artifacts.require("AmmInfoOracle");
 
 const helper = require("../helper/helper.js");
@@ -54,14 +53,13 @@ contract('BondMinter', async function(accounts) {
 		ZCBammDeployerInstance = await ZCBammDeployer.new();
 		YTammDeployerInstance = await YTammDeployer.new();
 		DeployCapitalHandlerInstance = await CapitalHandlerDeployer.new();
-		swapRouterDeployerInstance = await SwapRouterDeployer.new();
 		ammInfoOracleInstance = await AmmInfoOracle.new("0", nullAddress);
 		organizerInstance = await organizer.new(
 			yieldTokenDeployerInstance.address,
 			DeployCapitalHandlerInstance.address,
 			ZCBammDeployerInstance.address,
 			YTammDeployerInstance.address,
-			swapRouterDeployerInstance.address,
+			nullAddress,
 			ammInfoOracleInstance.address
 		);
 

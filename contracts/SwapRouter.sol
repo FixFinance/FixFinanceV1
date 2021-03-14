@@ -7,9 +7,12 @@ import "./interfaces/IWrapper.sol";
 import "./interfaces/ISwapRouter.sol";
 import "./interfaces/IERC20.sol";
 import "./organizer.sol";
+import "./SwapRouterDelegate.sol";
 
 contract SwapRouter is ISwapRouter {
+	//data
 	organizer org;
+	address delegateAddress;
 
 	int128 private constant MAX = 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
 
@@ -17,112 +20,39 @@ contract SwapRouter is ISwapRouter {
 
 	uint private constant RoundingBuffer = 0x10;
 
-	constructor(address _organizerAddress) public {
+	constructor(address _organizerAddress, address _delegateAddress) public {
 		org = organizer(_organizerAddress);
+		delegateAddress = _delegateAddress;
 	}
 
 	function UnitToZCB(address _capitalHandlerAddress, uint _amount, uint _minZCBout) external override {
-		ICapitalHandler ch = ICapitalHandler(_capitalHandlerAddress);
-		organizer _org = org;
-		IERC20 underlyingAsset = IERC20(_org.capitalHandlerToUnderlyingAsset(_capitalHandlerAddress));
-		IWrapper wrapper = IWrapper(_org.assetWrappers(address(underlyingAsset)));
-		IZCBamm amm = IZCBamm(_org.ZCBamms(_capitalHandlerAddress));
-		IYieldToken yt = IYieldToken(ch.yieldTokenAddress());
-
-		uint _amountWrapped;
-		if (wrapper.underlyingIsWrapped()) {
-			_amountWrapped = wrapper.UnitAmtToWrappedAmt_RoundUp(_amount);
-			underlyingAsset.transferFrom(msg.sender, address(this), _amountWrapped);
-			underlyingAsset.approve(address(wrapper), _amountWrapped);
-			wrapper.depositWrappedAmount(address(this), _amountWrapped);
-		}
-		else {
-			underlyingAsset.transferFrom(msg.sender, address(this), _amount);
-			underlyingAsset.approve(address(wrapper), _amount);
-			_amountWrapped = wrapper.depositUnitAmount(address(this), _amount);
-		}
-		wrapper.approve(_capitalHandlerAddress, _amountWrapped);
-		ch.depositWrappedToken(address(this), _amountWrapped);
-		ch.approve(address(amm), _amount);
-		yt.approve(address(amm), _amountWrapped);
-		uint _amountToSwap = wrapper.WrappedAmtToUnitAmt_RoundUp(_amountWrapped);
-		require(_amountToSwap <= uint(MAX));
-		uint _out = amm.SwapFromSpecificTokensWithLimit(int128(_amountToSwap), false, _minZCBout);
-		ch.transfer(msg.sender, _out);
+		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
+			"UnitToZCB(address,uint256,uint256)",
+			_capitalHandlerAddress,
+			_amount,
+			_minZCBout
+		));
+		require(success);
 	}
 
 	function UnitToYT(address _capitalHandlerAddress, int128 _amountYT, uint _maxUnitAmount) external override {
-		_amountYT++;	//account for rounding error when transfering funds out of YTamm
-		require(_amountYT > 0);
-		ICapitalHandler ch = ICapitalHandler(_capitalHandlerAddress);
-		organizer _org = org;
-		IERC20 underlyingAsset = IERC20(_org.capitalHandlerToUnderlyingAsset(_capitalHandlerAddress));
-		IWrapper wrapper = IWrapper(_org.assetWrappers(address(underlyingAsset)));
-		IYTamm amm = IYTamm(_org.YTamms(_capitalHandlerAddress));
-		IYieldToken yt = IYieldToken(ch.yieldTokenAddress());
-
-		uint _amtATkn = amm.ReserveQuoteToYT(_amountYT);
-		//remove possibility for problems due to rounding error
-		uint _amtTransfer = _amtATkn + RoundingBuffer;
-		require(_amtTransfer <= _maxUnitAmount, "Required AToken in is Greater than _maxUnitAmount");
-		uint _amountWrapped;
-		if (wrapper.underlyingIsWrapped()) {
-			_amountWrapped = wrapper.UnitAmtToWrappedAmt_RoundUp(_amtTransfer);
-			underlyingAsset.transferFrom(msg.sender, address(this), _amountWrapped);
-			underlyingAsset.approve(address(wrapper), _amountWrapped);
-			wrapper.depositWrappedAmount(address(this), _amountWrapped);
-		}
-		else {
-			underlyingAsset.transferFrom(msg.sender, address(this), _amtTransfer);
-			underlyingAsset.approve(address(wrapper), _amtTransfer);
-			_amountWrapped = wrapper.depositUnitAmount(address(this), _amtTransfer);
-		}
-		wrapper.approve(_capitalHandlerAddress, _amountWrapped);
-		ch.depositWrappedToken(address(this), _amountWrapped);
-		ch.approve(address(amm), _amtTransfer);
-		yt.approve(address(amm), _amountWrapped);
-		amm.TakeQuote(_amtATkn, int128(_amountYT), false);
-		yt.transfer(msg.sender, yt.balanceOf(address(this)));
+		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
+			"UnitToYT(address,int128,uint256)",
+			_capitalHandlerAddress,
+			_amountYT,
+			_maxUnitAmount
+		));
+		require(success);
 	}
 
 	function LiquidateAllToUnderlying(address _capitalHandlerAddress, uint _minUout, bool _unwrap) external override {
-		ICapitalHandler ch = ICapitalHandler(_capitalHandlerAddress);
-		IYieldToken yt = IYieldToken(ch.yieldTokenAddress());
-
-		yt.transferFrom(msg.sender, address(this), yt.balanceOf(msg.sender));
-		ch.transferFrom(msg.sender, address(this), ch.balanceOf(msg.sender));
-
-		int _bondBal = ch.balanceBonds(address(this));
-
-		if (_bondBal < -int(MinBalance)) {
-			require(_bondBal >= -int(MAX));
-			uint totalBalance = ch.balanceOf(address(this));
-			//yAmm swap
-			IYTamm yAmm = IYTamm(org.YTamms(_capitalHandlerAddress));
-			yt.approve_2(address(yAmm), uint(-_bondBal), true);
-			if (_minUout + RoundingBuffer > totalBalance) {
-				yAmm.SwapFromSpecificYTWithLimit(int128(-_bondBal), _minUout-totalBalance+RoundingBuffer);
-			}
-			else {
-				yAmm.SwapFromSpecificYT(int128(-_bondBal));
-			}
-
-		}
-		else if (_bondBal > int(MinBalance)) {
-			require(_bondBal <= int(MAX));
-			uint totalBalance = yt.balanceOf_2(address(this), false);
-			//zAmm swap
-			IZCBamm zAmm = IZCBamm(org.ZCBamms(_capitalHandlerAddress));
-			ch.approve(address(zAmm), uint(_bondBal));
-			if (_minUout + RoundingBuffer > totalBalance) {
-				zAmm.SwapFromSpecificTokensWithLimit(int128(_bondBal), true, _minUout-totalBalance+RoundingBuffer);
-			}
-			else {
-				zAmm.SwapFromSpecificTokens(int128(_bondBal), true);				
-			}
-		}
-
-		ch.withdrawAll(msg.sender, _unwrap);
+		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
+			"LiquidateAllToUnderlying(address,uint256,bool)",
+			_capitalHandlerAddress,
+			_minUout,
+			_unwrap
+		));
+		require(success);
 	}
 
 	function LiquidateSpecificToUnderlying(
@@ -213,5 +143,88 @@ contract SwapRouter is ISwapRouter {
 		ch.transfer(msg.sender, _amtZCB);
 	}
 
+	function _SwapZCBtoYT_ZCBamm(address _capitalHandlerAddress, uint _amountYT, uint _maxZCBin, bool _transferIn, bool _transferOut) internal returns (uint ZCBin) {
+		require(_amountYT < uint(MAX) && _amountYT > RoundingBuffer);
+		ICapitalHandler ch = ICapitalHandler(_capitalHandlerAddress);
+		IYieldToken yt = IYieldToken(ch.yieldTokenAddress());
+		IZCBamm zAmm = IZCBamm(org.ZCBamms(_capitalHandlerAddress));
+
+		uint quotedAmtIn = zAmm.ReserveQuoteToSpecificTokens(int128(_amountYT), true);
+		ZCBin = quotedAmtIn > _amountYT ? quotedAmtIn - _amountYT : 0;
+		require(ZCBin <= _maxZCBin);
+
+		if (_transferIn) {
+			ch.transferFrom(msg.sender, address(this), ZCBin);
+		}
+		ch.approve(address(zAmm), _maxZCBin);
+		zAmm.TakeQuote(quotedAmtIn, _amountYT, true, true);
+		if (_transferOut) {
+			yt.transfer(msg.sender, yt.balanceOf(address(this)));
+			ch.transfer(msg.sender, ch.balanceOf(address(this)));
+		}
+	}
+
+	function _SwapYTtoZCB_ZCBamm(address _capitalHandlerAddress, uint _amountYT, uint _minZCBout, bool _transferIn, bool _transferOut) internal returns (uint ZCBout) {
+		require(_amountYT < uint(MAX) && _amountYT > RoundingBuffer);
+		ICapitalHandler ch = ICapitalHandler(_capitalHandlerAddress);
+		IYieldToken yt = IYieldToken(ch.yieldTokenAddress());
+		IZCBamm zAmm = IZCBamm(org.ZCBamms(_capitalHandlerAddress));
+
+		uint quotedAmtOut = zAmm.ReserveQuoteFromSpecificTokens(int128(_amountYT), false);
+		require(quotedAmtOut >= _amountYT);
+		ZCBout = quotedAmtOut - _amountYT;
+		require(ZCBout >= _minZCBout);
+
+		if (_transferIn) {
+			yt.transferFrom_2(msg.sender, address(this), _amountYT, true);
+		}
+		yt.approve_2(address(zAmm), _amountYT, true);
+		zAmm.TakeQuote(_amountYT, quotedAmtOut, false, false);
+		if (_transferOut) {
+			yt.transfer(msg.sender, yt.balanceOf(address(this)));
+			ch.transfer(msg.sender, ch.balanceOf(address(this)));
+		}
+	}
+
+	function SwapZCBtoYT_ZCBamm(address _capitalHandlerAddress, uint _amountYT, uint _maxZCBin) external override {
+		_SwapZCBtoYT_ZCBamm(_capitalHandlerAddress, _amountYT, _maxZCBin, true, true);
+	}
+
+	function SwapYTtoZCB_ZCBamm(address _capitalHandlerAddress, uint _amountYT, uint _minZCBout) external override {
+		_SwapYTtoZCB_ZCBamm(_capitalHandlerAddress, _amountYT, _minZCBout, true, true);
+	}
+
+	function SwapUtoYT_ZCBamm(address _capitalHandlerAddress, uint _amountYT, int128 _ZCBinMiddle, uint _maxUin) external override {
+		require(_amountYT <= uint(MAX) && _amountYT > RoundingBuffer);
+		require(_ZCBinMiddle <= MAX && _ZCBinMiddle > int128(RoundingBuffer));
+		ICapitalHandler ch = ICapitalHandler(_capitalHandlerAddress);
+		IYieldToken yt = IYieldToken(ch.yieldTokenAddress());
+		IZCBamm zAmm = IZCBamm(org.ZCBamms(_capitalHandlerAddress));
+
+		uint Uin = zAmm.ReserveQuoteToSpecificTokens(_ZCBinMiddle, false);
+		require(Uin <= _maxUin);
+		yt.transferFrom_2(msg.sender, address(this), Uin, true);
+		ch.transferFrom(msg.sender, address(this), Uin);
+		yt.approve_2(address(zAmm), Uin, true);
+		zAmm.TakeQuote(Uin, uint(_ZCBinMiddle), false, true);
+
+		_SwapZCBtoYT_ZCBamm(_capitalHandlerAddress, _amountYT, uint(_ZCBinMiddle), false, true);
+	}
+
+	function SwapYTtoU_ZCBamm(address _capitalHandlerAddress, uint _amountYT, uint _minUout) external override {
+		uint ZCBout = _SwapYTtoZCB_ZCBamm(_capitalHandlerAddress, _amountYT, _minUout, true, false);
+		ICapitalHandler ch = ICapitalHandler(_capitalHandlerAddress);
+		IYieldToken yt = IYieldToken(ch.yieldTokenAddress());
+		IZCBamm zAmm = IZCBamm(org.ZCBamms(_capitalHandlerAddress));
+		require(ZCBout <= uint(MAX));
+
+		//now we will use ZCBout as the input to the next trade
+		uint Uout = zAmm.ReserveQuoteFromSpecificTokens(int128(ZCBout), true);
+		require(Uout >= _minUout);
+		zAmm.TakeQuote(ZCBout, Uout, true, false);
+
+		yt.transfer(msg.sender, yt.balanceOf(address(this)));
+		ch.transfer(msg.sender, ch.balanceOf(address(this)));
+	}
 
 }

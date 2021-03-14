@@ -8,6 +8,7 @@ const BondMinter = artifacts.require("BondMinter");
 const CapitalHandlerDeployer = artifacts.require('CapitalHandlerDeployer');
 const ZCBammDeployer = artifacts.require('ZCBammDeployer');
 const YTammDeployer = artifacts.require('YTammDeployer');
+const SwapRouterDelegate = artifacts.require('SwapRouterDelegate');
 const SwapRouterDeployer = artifacts.require('SwapRouterDeployer');
 const AmmInfoOracle = artifacts.require("AmmInfoOracle");
 const BigMath = artifacts.require("BigMath");
@@ -52,7 +53,8 @@ module.exports = async function(deployer) {
 	bondMinterDelegateInstance = await deployer.deploy(BondMinterDelegate);
 	bondMinterInstance = await deployer.deploy(BondMinter, nullAddress, bondMinterDelegateInstance.address);
 	capitalHandlerDeployerInstance = await deployer.deploy(CapitalHandlerDeployer);
-	swapRouterDeployerInstance = await deployer.deploy(SwapRouterDeployer);
+	swapRouterDelegateInstance = await deployer.deploy(SwapRouterDelegate);
+	swapRouterDeployerInstance = await deployer.deploy(SwapRouterDeployer, swapRouterDelegateInstance.address);
 	ammInfoOracle = await deployer.deploy(AmmInfoOracle, "0", nullAddress);
 	EiInstance = await deployer.deploy(Ei);
 	await deployer.link(Ei, BigMath);

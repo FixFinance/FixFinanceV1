@@ -9,6 +9,6 @@ interface ISwapRouter {
 	function SwapYTtoZCB(address _capitalHandlerAddress, uint _amountYT, uint _minZCBout) external;
 	function SwapZCBtoYT_ZCBamm(address _capitalHandlerAddress, uint _amountYT, uint _maxZCBin) external;
 	function SwapYTtoZCB_ZCBamm(address _capitalHandlerAddress, uint _amountYT, uint _minZCBout) external;
-	function SwapUtoYT_ZCBamm(address _capitalHandlerAddress, uint _amountYT, int128 _ZCBinMiddle, uint _maxUin) external;
+	function SwapUtoYT_ZCBamm(address _capitalHandlerAddress, uint _amountYT, int128 _Uin) external;
 	function SwapYTtoU_ZCBamm(address _capitalHandlerAddress, uint _amountYT, uint _minUout) external;
 }

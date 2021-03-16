@@ -194,21 +194,21 @@ contract SwapRouter is ISwapRouter {
 		_SwapYTtoZCB_ZCBamm(_capitalHandlerAddress, _amountYT, _minZCBout, true, true);
 	}
 
-	function SwapUtoYT_ZCBamm(address _capitalHandlerAddress, uint _amountYT, int128 _ZCBinMiddle, uint _maxUin) external override {
+	function SwapUtoYT_ZCBamm(address _capitalHandlerAddress, uint _amountYT, int128 _Uin) external override {
 		require(_amountYT <= uint(MAX) && _amountYT > RoundingBuffer);
-		require(_ZCBinMiddle <= MAX && _ZCBinMiddle > int128(RoundingBuffer));
+		require(_Uin > 0);
 		ICapitalHandler ch = ICapitalHandler(_capitalHandlerAddress);
 		IYieldToken yt = IYieldToken(ch.yieldTokenAddress());
 		IZCBamm zAmm = IZCBamm(org.ZCBamms(_capitalHandlerAddress));
 
-		uint Uin = zAmm.ReserveQuoteToSpecificTokens(_ZCBinMiddle, false);
-		require(Uin <= _maxUin);
-		yt.transferFrom_2(msg.sender, address(this), Uin, true);
-		ch.transferFrom(msg.sender, address(this), Uin);
-		yt.approve_2(address(zAmm), Uin, true);
-		zAmm.TakeQuote(Uin, uint(_ZCBinMiddle), false, true);
+		uint ZCBinMiddle = zAmm.ReserveQuoteFromSpecificTokens(_Uin, false);
 
-		_SwapZCBtoYT_ZCBamm(_capitalHandlerAddress, _amountYT, uint(_ZCBinMiddle), false, true);
+		yt.transferFrom_2(msg.sender, address(this), uint(_Uin), true);
+		ch.transferFrom(msg.sender, address(this), uint(_Uin));
+		yt.approve_2(address(zAmm), uint(_Uin), true);
+		zAmm.TakeQuote(uint(_Uin), ZCBinMiddle, false, false);
+
+		_SwapZCBtoYT_ZCBamm(_capitalHandlerAddress, _amountYT, ZCBinMiddle, false, true);
 	}
 
 	function SwapYTtoU_ZCBamm(address _capitalHandlerAddress, uint _amountYT, uint _minUout) external override {
@@ -221,6 +221,7 @@ contract SwapRouter is ISwapRouter {
 		//now we will use ZCBout as the input to the next trade
 		uint Uout = zAmm.ReserveQuoteFromSpecificTokens(int128(ZCBout), true);
 		require(Uout >= _minUout);
+		ch.approve(address(zAmm), ZCBout);
 		zAmm.TakeQuote(ZCBout, Uout, true, false);
 
 		yt.transfer(msg.sender, yt.balanceOf(address(this)));

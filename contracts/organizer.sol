@@ -21,8 +21,6 @@ contract organizer {
 		address addr
 	);
 
-	address[] public capitalHandlerInstances;
-
 	mapping(address => address) public assetWrappers;
 
 	mapping(address => address) public capitalHandlerToUnderlyingAsset;
@@ -58,14 +56,6 @@ contract organizer {
 		SwapRouterAddress = SwapRouterDeployer(SwapRouterDeployerAddress).deploy(address(this));		
 	}
 
-	function capitalHandlerInstancesLength() public view returns(uint) {
-		return capitalHandlerInstances.length;
-	}
-
-	function allCapitalHandlerInstances() public view returns(address[] memory) {
-		return capitalHandlerInstances;
-	}
-
 	function deployAssetWrapper(address _assetAddress) public {
 		require(assetWrappers[_assetAddress] == address(0), "can only make a wrapper if none currently exists");
 		AaveWrapper temp = new AaveWrapper(_assetAddress);
@@ -80,7 +70,6 @@ contract organizer {
 		require(aaveWrapperAddress != address(0), "deploy a wrapper for this aToken first");
 		address capitalHandlerAddress = CapitalHandlerDeployer(CapitalHandlerDeployerAddress).deploy(aaveWrapperAddress, _maturity, yieldTokenDeployerAddress, msg.sender);
 		emit CapitalHandlerDeployment(capitalHandlerAddress);
-		capitalHandlerInstances.push(capitalHandlerAddress);
 		capitalHandlerToUnderlyingAsset[capitalHandlerAddress] = _aTokenAddress;
 	}
 

@@ -1,9 +1,9 @@
 pragma solidity >=0.6.0;
-import "./helpers/IZCBamm.sol";
-import "./helpers/IYTamm.sol";
-import "./interfaces/ICapitalHandler.sol";
-import "./interfaces/IYieldToken.sol";
-import "./organizer.sol";
+import "../helpers/IZCBamm.sol";
+import "../helpers/IYTamm.sol";
+import "../interfaces/ICapitalHandler.sol";
+import "../interfaces/IYieldToken.sol";
+import "../organizer.sol";
 
 contract SwapRouterDelegate {
 	//data

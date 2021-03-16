@@ -1,12 +1,12 @@
 pragma solidity >=0.6.0;
-import "./helpers/IZCBamm.sol";
-import "./helpers/IYTamm.sol";
-import "./interfaces/ICapitalHandler.sol";
-import "./interfaces/IYieldToken.sol";
-import "./interfaces/IWrapper.sol";
-import "./interfaces/ISwapRouter.sol";
-import "./interfaces/IERC20.sol";
-import "./organizer.sol";
+import "../helpers/IZCBamm.sol";
+import "../helpers/IYTamm.sol";
+import "../interfaces/ICapitalHandler.sol";
+import "../interfaces/IYieldToken.sol";
+import "../interfaces/IWrapper.sol";
+import "../interfaces/ISwapRouter.sol";
+import "../interfaces/IERC20.sol";
+import "../organizer.sol";
 import "./SwapRouterDelegate.sol";
 
 contract SwapRouter is ISwapRouter {

@@ -6,8 +6,8 @@ import "./amm/YTamm.sol";
 import "./amm/ZCBammDeployer.sol";
 import "./amm/YTammDeployer.sol";
 import "./CapitalHandlerDeployer.sol";
-import "./SwapRouterDeployer.sol";
-import "./SwapRouter.sol";
+import "./SwapRouter/SwapRouterDeployer.sol";
+import "./SwapRouter/SwapRouter.sol";
 import "./AmmInfoOracle.sol";
 
 contract organizer {

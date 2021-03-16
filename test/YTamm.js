@@ -1,5 +1,5 @@
 const aToken = artifacts.require("dummyAToken");
-const aaveWrapper = artifacts.require("NGBwrapper");
+const NGBwrapper = artifacts.require("NGBwrapper");
 const BigMath = artifacts.require("BigMath");
 const Ei = artifacts.require("Ei");
 const capitalHandler = artifacts.require("CapitalHandler");
@@ -91,7 +91,7 @@ async function setRate(amm, rate, account) {
 contract('YTamm', async function(accounts){
 	it('before each', async () => {
 		aTokenInstance = await aToken.new("aCOIN");
-		aaveWrapperInstance = await aaveWrapper.new(aTokenInstance.address);
+		NGBwrapperInstance = await NGBwrapper.new(aTokenInstance.address);
 		EiInstance = await Ei.new();
 		await BigMath.link("Ei", EiInstance.address);
 		BigMathInstance = await BigMath.new();
@@ -99,7 +99,7 @@ contract('YTamm', async function(accounts){
 		let timestamp = (await web3.eth.getBlock('latest')).timestamp;
 		//maturity is 110 days out
 		maturity = timestamp + 110*24*60*60;
-		capitalHandlerInstance = await capitalHandler.new(aaveWrapperInstance.address, maturity, yieldTokenDeployerInstance.address);
+		capitalHandlerInstance = await capitalHandler.new(NGBwrapperInstance.address, maturity, yieldTokenDeployerInstance.address);
 		yieldTokenInstance = await yieldToken.at(await capitalHandlerInstance.yieldTokenAddress());
 		await ZCBamm.link("BigMath", BigMathInstance.address);
 		await YTamm.link("BigMath", BigMathInstance.address);
@@ -118,9 +118,9 @@ contract('YTamm', async function(accounts){
 		//mint funds to accounts[0]
 		balance = _10To18BN.mul(new BN(10));
 		await aTokenInstance.mintTo(accounts[0], balance);
-		await aTokenInstance.approve(aaveWrapperInstance.address, balance);
-		await aaveWrapperInstance.depositUnitAmount(accounts[0], balance);
-		await aaveWrapperInstance.approve(capitalHandlerInstance.address, balance);
+		await aTokenInstance.approve(NGBwrapperInstance.address, balance);
+		await NGBwrapperInstance.depositUnitAmount(accounts[0], balance);
+		await NGBwrapperInstance.approve(capitalHandlerInstance.address, balance);
 		await capitalHandlerInstance.depositWrappedToken(accounts[0], balance);
 		await capitalHandlerInstance.approve(amm0.address, balance);
 		await yieldTokenInstance.approve(amm0.address, balance);

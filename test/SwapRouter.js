@@ -1,6 +1,6 @@
 const dummyAToken = artifacts.require('dummyAToken');
 const dummyVaultHealth = artifacts.require('DummyVaultHealth');
-const AaveWrapper = artifacts.require('NGBwrapper');
+const NGBwrapper = artifacts.require('NGBwrapper');
 const CapitalHandler = artifacts.require('CapitalHandler');
 const YieldToken = artifacts.require('YieldToken');
 const yieldTokenDeployer = artifacts.require('YieldTokenDeployer');
@@ -69,8 +69,8 @@ contract('SwapRouter', async function(accounts) {
 
 		aTokenInstance = await dummyAToken.new("aCOIN");
 		let rec = await organizerInstance.deployAssetWrapper(aTokenInstance.address);
-		aaveWrapperInstance = await AaveWrapper.at(rec.receipt.logs[0].args.wrapperAddress);
-		rec = await organizerInstance.deployCapitalHandlerInstance(aaveWrapperInstance.address, maturity);
+		NGBwrapperInstance = await NGBwrapper.at(rec.receipt.logs[0].args.wrapperAddress);
+		rec = await organizerInstance.deployCapitalHandlerInstance(NGBwrapperInstance.address, maturity);
 		capitalHandlerInstance = await CapitalHandler.at(rec.receipt.logs[0].args.addr);
 
 		await ammInfoOracleInstance.setSlippageConstant(capitalHandlerInstance.address, SlippageConstant);
@@ -85,9 +85,9 @@ contract('SwapRouter', async function(accounts) {
 
 		//mint funds to accounts[0]
 		balance = _10To18BN;
-		await aTokenInstance.approve(aaveWrapperInstance.address, balance);
-		await aaveWrapperInstance.depositUnitAmount(accounts[0], balance);
-		await aaveWrapperInstance.approve(capitalHandlerInstance.address, balance);
+		await aTokenInstance.approve(NGBwrapperInstance.address, balance);
+		await NGBwrapperInstance.depositUnitAmount(accounts[0], balance);
+		await NGBwrapperInstance.approve(capitalHandlerInstance.address, balance);
 		await capitalHandlerInstance.depositWrappedToken(accounts[0], balance);
 		await capitalHandlerInstance.approve(amm0.address, balance);
 		await yieldTokenInstance.approve(amm0.address, balance);

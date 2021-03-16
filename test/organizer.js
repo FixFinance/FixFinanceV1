@@ -1,6 +1,6 @@
 const dummyAToken = artifacts.require('dummyAToken');
 const dummyVaultHealth = artifacts.require('DummyVaultHealth');
-const AaveWrapper = artifacts.require('NGBwrapper');
+const NGBwrapper = artifacts.require('NGBwrapper');
 const CapitalHandler = artifacts.require('CapitalHandler');
 const YieldToken = artifacts.require('YieldToken');
 const yieldTokenDeployer = artifacts.require('YieldTokenDeployer');
@@ -63,7 +63,7 @@ contract('organizer', function(accounts) {
 		let rec = await organizerInstance.deployAssetWrapper(asset0.address);
 		assert.equal(rec.receipt.logs[0].args.underlyingAddress, asset0.address, "correct value in event of underlyingAddress");
 		assert.notEqual(rec.receipt.logs[0].args.wrapperAddress, nullAddress, "wrapper address must be non null");
-		wAsset0 = await AaveWrapper.at(rec.receipt.logs[0].args.wrapperAddress);
+		wAsset0 = await NGBwrapper.at(rec.receipt.logs[0].args.wrapperAddress);
 	});
 
 	it('deploy CapitalHandler', async () => {

@@ -1,5 +1,5 @@
 const dummyAToken = artifacts.require('dummyAToken');
-const aaveWrapper = artifacts.require('NGBwrapper');
+const NGBwrapper = artifacts.require('NGBwrapper');
 const capitalHandler = artifacts.require('CapitalHandler');
 const yieldTokenDeployer = artifacts.require('YieldTokenDeployer');
 const IERC20 = artifacts.require("IERC20");
@@ -14,20 +14,20 @@ const _10To18 = (new BN('10')).pow(new BN('18'));
 contract('capitalHandler', async function(accounts){
 	it('before each', async () => {
 		dummyATokenInstance = await dummyAToken.new("aCOIN");
-		aaveWrapperInstance = await aaveWrapper.new(dummyATokenInstance.address);
+		NGBwrapperInstance = await NGBwrapper.new(dummyATokenInstance.address);
 		yieldTokenDeployerInstance = await yieldTokenDeployer.new();
 		timeNow = (await web3.eth.getBlock('latest')).timestamp;
-		capitalHandlerInstance = await capitalHandler.new(aaveWrapperInstance.address, timeNow+86400, yieldTokenDeployerInstance.address);
+		capitalHandlerInstance = await capitalHandler.new(NGBwrapperInstance.address, timeNow+86400, yieldTokenDeployerInstance.address);
 		inflation = await dummyATokenInstance.inflation();
 		yieldTokenInstance = await IERC20.at(await capitalHandlerInstance.yieldTokenAddress());
 		//wrap aTokens
 		amount = '100000';
-		await dummyATokenInstance.approve(aaveWrapperInstance.address, amount);
-		await aaveWrapperInstance.depositUnitAmount(accounts[0], amount);
+		await dummyATokenInstance.approve(NGBwrapperInstance.address, amount);
+		await NGBwrapperInstance.depositUnitAmount(accounts[0], amount);
 	});
 
 	it('deposits funds', async () => {
-		await aaveWrapperInstance.approve(capitalHandlerInstance.address, amount);
+		await NGBwrapperInstance.approve(capitalHandlerInstance.address, amount);
 		await capitalHandlerInstance.depositWrappedToken(accounts[0], amount);
 		assert.equal((await capitalHandlerInstance.balanceYield(accounts[0])).toString(), amount, "correct balance yield for account 1");
 	});
@@ -62,7 +62,7 @@ contract('capitalHandler', async function(accounts){
 		toWithdraw = (parseInt(amount)/8)+"";
 		prevBalanceYield = await capitalHandlerInstance.balanceYield(accounts[0]);
 		await capitalHandlerInstance.withdraw(accounts[1], toWithdraw, false);
-		assert.equal((await aaveWrapperInstance.balanceOf(accounts[1])).toString(), toWithdraw, "corect balance wrapped token for account 1");
+		assert.equal((await NGBwrapperInstance.balanceOf(accounts[1])).toString(), toWithdraw, "corect balance wrapped token for account 1");
 		assert.equal((await capitalHandlerInstance.balanceYield(accounts[0])).toString(), prevBalanceYield.sub(new BN(toWithdraw)).toString(), "correct balance yield for account 0");
 	});
 

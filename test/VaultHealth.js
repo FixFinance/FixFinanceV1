@@ -1,6 +1,6 @@
 const dummyAToken = artifacts.require('dummyAToken');
 const VaultHealth = artifacts.require('VaultHealth');
-const aaveWrapper = artifacts.require('NGBwrapper');
+const NGBwrapper = artifacts.require('NGBwrapper');
 const capitalHandler = artifacts.require('CapitalHandler');
 const YieldToken = artifacts.require("YieldToken");
 const yieldTokenDeployer = artifacts.require('YieldTokenDeployer');
@@ -87,8 +87,8 @@ contract('VaultHealth', async function(accounts) {
 		let reca = await organizerInstance.deployAssetWrapper(asset0.address);
 		let recb = await organizerInstance.deployAssetWrapper(asset1.address);
 
-		wAsset0 = await aaveWrapper.at(reca.receipt.logs[0].args.wrapperAddress);
-		wAsset1 = await aaveWrapper.at(recb.receipt.logs[0].args.wrapperAddress);
+		wAsset0 = await NGBwrapper.at(reca.receipt.logs[0].args.wrapperAddress);
+		wAsset1 = await NGBwrapper.at(recb.receipt.logs[0].args.wrapperAddress);
 
 		let rec0 = await organizerInstance.deployCapitalHandlerInstance(wAsset0.address, maturity);
 		let rec1 = await organizerInstance.deployCapitalHandlerInstance(wAsset1.address, maturity);

@@ -12,6 +12,11 @@ import "./AmmInfoOracle.sol";
 
 contract organizer {
 
+	event WrapperDeployment(
+		address _wrapperAddress,
+		address _underlyingAddress
+	);
+
 	event CapitalHandlerDeployment(
 		address addr
 	);
@@ -21,7 +26,6 @@ contract organizer {
 	mapping(address => address) public assetWrappers;
 
 	mapping(address => address) public capitalHandlerToUnderlyingAsset;
-
 	mapping(address => address) public YTamms;
 	mapping(address => address) public ZCBamms;
 
@@ -64,7 +68,10 @@ contract organizer {
 
 	function deployAssetWrapper(address _assetAddress) public {
 		require(assetWrappers[_assetAddress] == address(0), "can only make a wrapper if none currently exists");
-		assetWrappers[_assetAddress] = address(new AaveWrapper(_assetAddress));
+		AaveWrapper temp = new AaveWrapper(_assetAddress);
+		temp.transferOwnership(msg.sender);
+		assetWrappers[_assetAddress] = address(temp);
+		emit WrapperDeployment(address(temp), _assetAddress);
 	}
 
 	function deployCapitalHandlerInstance(address _aTokenAddress, uint64 _maturity) public {

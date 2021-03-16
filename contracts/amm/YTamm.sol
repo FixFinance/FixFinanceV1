@@ -53,7 +53,7 @@ contract YTamm is IYTamm {
 		maturity = _maturity;
 		ZCBammAddress = _ZCBammAddress;
 		AmmInfoOracleAddress = _feeOracleAddress;
-		SlippageConstant = AmmInfoOracle(_feeOracleAddress).YTammSlippageConstants(_ZCBaddress);
+		SlippageConstant = AmmInfoOracle(_feeOracleAddress).getSlippageConstant(_ZCBaddress);
 		YTtoLmultiplier = BigMath.YT_U_ratio(
 			apy,
 			maturity-block.timestamp
@@ -237,7 +237,7 @@ contract YTamm is IYTamm {
 			YTtoLmultiplier == totalSupply / YTreserves
 		*/
 		YTtoLmultiplier = totalSupply.mul(1 ether) / _YTreserves;
-		SlippageConstant = AmmInfoOracle(AmmInfoOracleAddress).YTammSlippageConstants(ZCBaddress);
+		SlippageConstant = AmmInfoOracle(AmmInfoOracleAddress).getSlippageConstant(ZCBaddress);
 		lastRecalibration = block.timestamp;
 		//ensure noone reserves quote before recalibrating and is then able to take the quote
 		quoteSignature = bytes32(0);
@@ -296,7 +296,7 @@ contract YTamm is IYTamm {
 			inflTotalSupply,
 			_TimeRemaining,
 			SlippageConstant,
-			(1 ether)**2 / AmmInfoOracle(AmmInfoOracleAddress).YTammFeeConstants(ZCBaddress),
+			(1 ether)**2 / AmmInfoOracle(AmmInfoOracleAddress).getYTammFeeConstant(ZCBaddress),
 			OracleRate,
 			_amount
 		));
@@ -335,7 +335,7 @@ contract YTamm is IYTamm {
 			inflTotalSupply,
 			_TimeRemaining,
 			SlippageConstant,
-			AmmInfoOracle(AmmInfoOracleAddress).YTammFeeConstants(ZCBaddress),
+			AmmInfoOracle(AmmInfoOracleAddress).getYTammFeeConstant(ZCBaddress),
 			OracleRate,
 			-_amount
 		));
@@ -383,7 +383,7 @@ contract YTamm is IYTamm {
 			inflTotalSupply,
 			_TimeRemaining,
 			SlippageConstant,
-			(1 ether)**2 / AmmInfoOracle(AmmInfoOracleAddress).YTammFeeConstants(ZCBaddress),
+			(1 ether)**2 / AmmInfoOracle(AmmInfoOracleAddress).getYTammFeeConstant(ZCBaddress),
 			OracleRate,
 			_amount
 		));
@@ -416,7 +416,7 @@ contract YTamm is IYTamm {
 			inflTotalSupply,
 			_TimeRemaining,
 			SlippageConstant,
-			AmmInfoOracle(AmmInfoOracleAddress).YTammFeeConstants(ZCBaddress),
+			AmmInfoOracle(AmmInfoOracleAddress).getYTammFeeConstant(ZCBaddress),
 			OracleRate,
 			-_amount
 		));

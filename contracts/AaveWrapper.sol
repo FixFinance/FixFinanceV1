@@ -2,9 +2,10 @@ pragma solidity >=0.6.5 <0.7.0;
 import "./interfaces/IERC20.sol";
 import "./interfaces/IWrapper.sol";
 import "./libraries/SafeMath.sol";
+import "./helpers/Ownable.sol";
 import "./ERC20.sol";
 
-contract AaveWrapper is IWrapper {
+contract AaveWrapper is IWrapper, Ownable {
 	using SafeMath for uint;
 
 	address public override underlyingAssetAddress;

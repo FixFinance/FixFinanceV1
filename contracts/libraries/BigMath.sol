@@ -171,7 +171,7 @@ library BigMath {
       changeReserve0
     )).abs());
 
-    uint feeConstant = AmmInfoOracle(AmmInfoOracleAddress).ZCBammFeeConstants(capitalHandlerAddress);
+    uint feeConstant = AmmInfoOracle(AmmInfoOracleAddress).getZCBammFeeConstant(capitalHandlerAddress);
     if (flipFee) {
       feeConstant = uint((1 ether)**2).div(feeConstant);
     }

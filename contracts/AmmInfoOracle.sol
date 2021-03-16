@@ -1,5 +1,6 @@
 pragma solidity >=0.6.0;
 import "./helpers/Ownable.sol";
+import "./interfaces/ICapitalHandler.sol";
 import "./libraries/SafeMath.sol";
 import "./libraries/ABDKMath64x64.sol";
 import "./libraries/BigMath.sol";
@@ -27,11 +28,11 @@ contract AmmInfoOracle is Ownable {
 
 	address public sendTo;
 
-	uint256 public SlippageConstant;
+	mapping(address => uint) public WrapperToYTSlippageConst;
 
-	uint256 public ZCBammFeeConstant;
+	mapping(address => uint) public WrapperToZCBFeeConst;
 
-	uint256 public YTammFeeConstant;
+	mapping(address => uint) public WrapperToYTFeeConst;
 
 	mapping(address => uint) public YTammSlippageConstants;
 
@@ -48,6 +49,18 @@ contract AmmInfoOracle is Ownable {
 		sendTo = _sendTo;
 	}
 
+	function wrapperSetFeeConstants(address _wrapper, uint _ZCBammFeeConstant, uint _YTammFeeConstant) public {
+		require(msg.sender == Ownable(_wrapper).owner());
+		require(_ZCBammFeeConstant >= 1 ether && _YTammFeeConstant >= 1 ether);
+		WrapperToZCBFeeConst[_wrapper] = _ZCBammFeeConstant;
+		WrapperToYTFeeConst[_wrapper] = _YTammFeeConstant;
+	}
+
+	function wrapperSetSlippageConst(address _wrapper, uint _SlippageConstant) public {
+		require(msg.sender == Ownable(_wrapper).owner());
+		WrapperToYTSlippageConst[_wrapper] = _SlippageConstant;
+	}
+
 	function setFeeConstants(address _capitalHandlerAddress, uint _ZCBammFeeConstant, uint _YTammFeeConstant) public {
 		require(msg.sender == Ownable(_capitalHandlerAddress).owner());
 		require(_ZCBammFeeConstant >= 1 ether && _YTammFeeConstant >= 1 ether);
@@ -60,11 +73,34 @@ contract AmmInfoOracle is Ownable {
 		YTammSlippageConstants[_capitalHandlerAddress] = _SlippageConstant;
 	}
 
+	//--------------------------------------------v-i-e-w-s------------------------------
+
 	function treasuryFee(uint larger, uint smaller) external view returns (uint toTreasury, address _sendTo) {
 		require(larger >= smaller);
 		uint totalFee = larger - smaller;
 		toTreasury = totalFee * bipsToTreasury / totalBasisPoints;
 		_sendTo = sendTo;
+	}
+
+	function getZCBammFeeConstant(address _capitalHandlerAddress) external view returns (uint FeeConstant) {
+		FeeConstant = ZCBammFeeConstants[_capitalHandlerAddress];
+		if (FeeConstant == 0) {
+			FeeConstant = WrapperToZCBFeeConst[address(ICapitalHandler(_capitalHandlerAddress).wrapper())];
+		}
+	}
+
+	function getYTammFeeConstant(address _capitalHandlerAddress) external view returns (uint FeeConstant) {
+		FeeConstant = YTammFeeConstants[_capitalHandlerAddress];
+		if (FeeConstant == 0) {
+			FeeConstant = WrapperToYTFeeConst[address(ICapitalHandler(_capitalHandlerAddress).wrapper())];
+		}
+	}
+
+	function getSlippageConstant(address _capitalHandlerAddress) external view returns (uint SlippageConstant) {
+		SlippageConstant = YTammSlippageConstants[_capitalHandlerAddress];
+		if (SlippageConstant == 0) {
+			SlippageConstant = WrapperToYTSlippageConst[address(ICapitalHandler(_capitalHandlerAddress).wrapper())];
+		}
 	}
 
 	//--------------------------AmmInfoOracle admin----------------------------

@@ -18,7 +18,7 @@ contract SwapRouterDelegate {
 	function UnitToZCB(address _capitalHandlerAddress, uint _amount, uint _minZCBout) external {
 		ICapitalHandler ch = ICapitalHandler(_capitalHandlerAddress);
 		organizer _org = org;
-		IERC20 underlyingAsset = IERC20(_org.capitalHandlerToUnderlyingAsset(_capitalHandlerAddress));
+		IERC20 underlyingAsset = IERC20(ICapitalHandler(_capitalHandlerAddress).underlyingAssetAddress());
 		IWrapper wrapper = IWrapper(_org.assetWrappers(address(underlyingAsset)));
 		IZCBamm amm = IZCBamm(_org.ZCBamms(_capitalHandlerAddress));
 		IYieldToken yt = IYieldToken(ch.yieldTokenAddress());
@@ -50,7 +50,7 @@ contract SwapRouterDelegate {
 		require(_amountYT > 0);
 		ICapitalHandler ch = ICapitalHandler(_capitalHandlerAddress);
 		organizer _org = org;
-		IERC20 underlyingAsset = IERC20(_org.capitalHandlerToUnderlyingAsset(_capitalHandlerAddress));
+		IERC20 underlyingAsset = IERC20(ICapitalHandler(_capitalHandlerAddress).underlyingAssetAddress());
 		IWrapper wrapper = IWrapper(_org.assetWrappers(address(underlyingAsset)));
 		IYTamm amm = IYTamm(_org.YTamms(_capitalHandlerAddress));
 		IYieldToken yt = IYieldToken(ch.yieldTokenAddress());

@@ -168,8 +168,8 @@ contract VaultHealth is IVaultHealth, Ownable {
 
 	function baseAssetAddresses(address _deposited, address _borrowed) internal view returns (address baseDepositedAsset, address baseBorrowedAsset) {
 		organizer org = organizer(organizerAddress);
-		baseDepositedAsset = UpperRateThreshold[_deposited] == 0 ? org.capitalHandlerToUnderlyingAsset(_deposited) : _deposited;
-		baseBorrowedAsset = org.capitalHandlerToUnderlyingAsset(_borrowed);
+		baseDepositedAsset = UpperRateThreshold[_deposited] == 0 ? org.capitalHandlerToWrapper(_deposited) : _deposited;
+		baseBorrowedAsset = org.capitalHandlerToWrapper(_borrowed);
 	}
 
 
@@ -278,7 +278,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 	function setCollateralizationRatios(address _underlyingAssetAddress, uint120 _upper, uint120 _lower) external onlyOwner {
 		require(_upper >= _lower && _lower > ABDK_1);
 		//ensure that the contract at _underlyingAssetAddress is not a capital handler contract
-		require(organizer(organizerAddress).capitalHandlerToUnderlyingAsset(_underlyingAssetAddress) == address(0));
+		require(organizer(organizerAddress).capitalHandlerToWrapper(_underlyingAssetAddress) == address(0));
 		UpperCollateralizationRatio[_underlyingAssetAddress] = _upper;
 		LowerCollateralizationRatio[_underlyingAssetAddress] = _lower;
 	}
@@ -286,7 +286,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 	function setRateThresholds(address _underlyingAssetAddress, uint120 _upper, uint120 _lower) external onlyOwner {
 		require(_upper >= _lower && _lower > ABDK_1);
 		//ensure that the contract at _underlyingAssetAddress is not a capital handler contract
-		require(organizer(organizerAddress).capitalHandlerToUnderlyingAsset(_underlyingAssetAddress) == address(0));
+		require(organizer(organizerAddress).capitalHandlerToWrapper(_underlyingAssetAddress) == address(0));
 		UpperRateThreshold[_underlyingAssetAddress] = _upper;
 		LowerRateThreshold[_underlyingAssetAddress] = _lower;
 	}

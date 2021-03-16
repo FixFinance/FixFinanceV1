@@ -58,12 +58,7 @@ contract('VaultHealth', async function(accounts) {
 		aggregator1 = await dummyAggregator.new(DECIMALS, symbol1.substring(1)+" / ETH");
 		await aggregator0.addRound(_10To18);
 		price = 0;
-
 		OracleContainerInstance = await OracleContainer.new(nullAddress.substring(0, nullAddress.length-1)+"1");
-		await OracleContainerInstance.addAggregators([aggregator0.address, aggregator1.address]);
-		await OracleContainerInstance.AddAToken(asset0.address, 1, 4, symbol0.substring(1));
-		await OracleContainerInstance.AddAToken(asset1.address, 1, 5, symbol1.substring(1));
-
 		yieldTokenDeployerInstance = await yieldTokenDeployer.new();
 		vaultHealthInstance = await VaultHealth.new(OracleContainerInstance.address);
 		bondMinterDelegateInstance = await BondMinterDelegate.new();
@@ -96,6 +91,10 @@ contract('VaultHealth', async function(accounts) {
 
 		wAsset0 = await aaveWrapper.at(await organizerInstance.assetWrappers(asset0.address));
 		wAsset1 = await aaveWrapper.at(await organizerInstance.assetWrappers(asset1.address));
+
+		await OracleContainerInstance.addAggregators([aggregator0.address, aggregator1.address]);
+		await OracleContainerInstance.AddAToken(wAsset0.address, 2, 5, symbol0.substring(1));
+		await OracleContainerInstance.AddAToken(wAsset1.address, 2, 6, symbol1.substring(1));
 
 		await asset0.approve(wAsset0.address, _10To18.toString());
 		await asset1.approve(wAsset1.address, _10To18.toString());
@@ -189,9 +188,9 @@ contract('VaultHealth', async function(accounts) {
 		lowerRatio0 = 1.05;
 		UpperRatio0Str = basisPointsToABDKString(10700);	//107%
 		LowerRatio0Str = basisPointsToABDKString(10500);	//105%
-		await vaultHealthInstance.setCollateralizationRatios(asset0.address, UpperRatio0Str, LowerRatio0Str);
-		let _upper = await vaultHealthInstance.UpperCollateralizationRatio(asset0.address);
-		let _lower = await vaultHealthInstance.LowerCollateralizationRatio(asset0.address);
+		await vaultHealthInstance.setCollateralizationRatios(wAsset0.address, UpperRatio0Str, LowerRatio0Str);
+		let _upper = await vaultHealthInstance.UpperCollateralizationRatio(wAsset0.address);
+		let _lower = await vaultHealthInstance.LowerCollateralizationRatio(wAsset0.address);
 		assert.equal(_upper.toString(), UpperRatio0Str, "correct lower rate threshold");
 		assert.equal(_lower.toString(), LowerRatio0Str, "correct lower rate threshold");
 
@@ -200,9 +199,9 @@ contract('VaultHealth', async function(accounts) {
 		lowerRatio1 = 1.09;
 		UpperRatio1Str = basisPointsToABDKString(11200);	//112%
 		LowerRatio1Str = basisPointsToABDKString(10900);	//109%
-		await vaultHealthInstance.setCollateralizationRatios(asset1.address, UpperRatio1Str, LowerRatio1Str);
-		_upper = await vaultHealthInstance.UpperCollateralizationRatio(asset1.address);
-		_lower = await vaultHealthInstance.LowerCollateralizationRatio(asset1.address);
+		await vaultHealthInstance.setCollateralizationRatios(wAsset1.address, UpperRatio1Str, LowerRatio1Str);
+		_upper = await vaultHealthInstance.UpperCollateralizationRatio(wAsset1.address);
+		_lower = await vaultHealthInstance.LowerCollateralizationRatio(wAsset1.address);
 		assert.equal(_upper.toString(), UpperRatio1Str, "correct lower rate threshold");
 		assert.equal(_lower.toString(), LowerRatio1Str, "correct lower rate threshold");
 	});
@@ -213,9 +212,9 @@ contract('VaultHealth', async function(accounts) {
 		lowerThreshold0 = 1.3;
 		UpperThreshold0Str = basisPointsToABDKString(15000);	//150%
 		LowerThreshold0Str = basisPointsToABDKString(13000);	//130%
-		await vaultHealthInstance.setRateThresholds(asset0.address, UpperThreshold0Str, LowerThreshold0Str);
-		let _upper = await vaultHealthInstance.UpperRateThreshold(asset0.address);
-		let _lower = await vaultHealthInstance.LowerRateThreshold(asset0.address);
+		await vaultHealthInstance.setRateThresholds(wAsset0.address, UpperThreshold0Str, LowerThreshold0Str);
+		let _upper = await vaultHealthInstance.UpperRateThreshold(wAsset0.address);
+		let _lower = await vaultHealthInstance.LowerRateThreshold(wAsset0.address);
 		assert.equal(_upper.toString(), UpperThreshold0Str, "correct lower rate threshold");
 		assert.equal(_lower.toString(), LowerThreshold0Str, "correct lower rate threshold");
 
@@ -224,9 +223,9 @@ contract('VaultHealth', async function(accounts) {
 		lowerThreshold1 = 1.5;
 		UpperThreshold1Str = basisPointsToABDKString(20000);	//100%
 		LowerThreshold1Str = basisPointsToABDKString(15000);	//150%
-		await vaultHealthInstance.setRateThresholds(asset1.address, UpperThreshold1Str, LowerThreshold1Str);
-		_upper = await vaultHealthInstance.UpperRateThreshold(asset1.address);
-		_lower = await vaultHealthInstance.LowerRateThreshold(asset1.address);
+		await vaultHealthInstance.setRateThresholds(wAsset1.address, UpperThreshold1Str, LowerThreshold1Str);
+		_upper = await vaultHealthInstance.UpperRateThreshold(wAsset1.address);
+		_lower = await vaultHealthInstance.LowerRateThreshold(wAsset1.address);
 		assert.equal(_upper.toString(), UpperThreshold1Str, "correct lower rate threshold");
 		assert.equal(_lower.toString(), LowerThreshold1Str, "correct lower rate threshold");
 	});
@@ -291,15 +290,15 @@ contract('VaultHealth', async function(accounts) {
 		let amountBorrowed = 10000000;	//asset0
 		let collateralizationRatio = upperRatio0*upperRatio1;
 		let expectedAmountSupplied = Math.floor(amountBorrowed*rateMultiplier0*price*collateralizationRatio/rateMultiplier1);
-		let actualBN = await vaultHealthInstance.amountSuppliedAtUpperLimit(asset1.address, zcbAsset0.address, amountBorrowed)
+		let actualBN = await vaultHealthInstance.amountSuppliedAtUpperLimit(wAsset1.address, zcbAsset0.address, amountBorrowed)
 		let actual = parseInt(actualBN.toString());
 
 		let error = (expectedAmountSupplied-actual) / expectedAmountSupplied;
 		assert.isBelow(error, ErrorRange, "output within acceptable error range");
 
 		let needed = Math.ceil(actual/amountBorrowed) + 1;
-		assert.equal(await vaultHealthInstance.satisfiesUpperLimit(asset1.address, zcbAsset0.address, actualBN, amountBorrowed), false, "correct value returned by satisfiesUpperLimit");
-		assert.equal(await vaultHealthInstance.satisfiesUpperLimit(asset1.address, zcbAsset0.address, actualBN.add(new BN(needed)), amountBorrowed), true, "correct value returned by satisfiesUpperLimit");
+		assert.equal(await vaultHealthInstance.satisfiesUpperLimit(wAsset1.address, zcbAsset0.address, actualBN, amountBorrowed), false, "correct value returned by satisfiesUpperLimit");
+		assert.equal(await vaultHealthInstance.satisfiesUpperLimit(wAsset1.address, zcbAsset0.address, actualBN.add(new BN(needed)), amountBorrowed), true, "correct value returned by satisfiesUpperLimit");
 	});
 
 	it('amountSuppliedAtLowerLimit: zcb deposited', async () => {
@@ -358,15 +357,15 @@ contract('VaultHealth', async function(accounts) {
 		let amountBorrowed = 10000000;	//asset0
 		let collateralizationRatio = lowerRatio0*lowerRatio1;
 		let expectedAmountSupplied = Math.floor(amountBorrowed*rateMultiplier0*price*collateralizationRatio/rateMultiplier1);
-		let actualBN = await vaultHealthInstance.amountSuppliedAtLowerLimit(asset1.address, zcbAsset0.address, amountBorrowed)
+		let actualBN = await vaultHealthInstance.amountSuppliedAtLowerLimit(wAsset1.address, zcbAsset0.address, amountBorrowed)
 		let actual = parseInt(actualBN.toString());
 
 		let error = (expectedAmountSupplied-actual) / expectedAmountSupplied;
 		assert.isBelow(error, ErrorRange, "output within acceptable error range");
 
 		let needed = Math.ceil(actual/amountBorrowed) + 1;
-		assert.equal(await vaultHealthInstance.satisfiesLowerLimit(asset1.address, zcbAsset0.address, actualBN, amountBorrowed), false, "correct value returned by satisfiesLowerLimit");
-		assert.equal(await vaultHealthInstance.satisfiesLowerLimit(asset1.address, zcbAsset0.address, actualBN.add(new BN(needed)), amountBorrowed), true, "correct value returned by satisfiesLowerLimit");
+		assert.equal(await vaultHealthInstance.satisfiesLowerLimit(wAsset1.address, zcbAsset0.address, actualBN, amountBorrowed), false, "correct value returned by satisfiesLowerLimit");
+		assert.equal(await vaultHealthInstance.satisfiesLowerLimit(wAsset1.address, zcbAsset0.address, actualBN.add(new BN(needed)), amountBorrowed), true, "correct value returned by satisfiesLowerLimit");
 	});
 
 	it('amountBorrowedAtUpperLimit: zcb deposited', async () => {
@@ -426,15 +425,15 @@ contract('VaultHealth', async function(accounts) {
 		let amountSupplied = 10000000;	//asset0
 		let collateralizationRatio = upperRatio0*upperRatio1;
 		let expectedAmountBorrowed = Math.floor(rateMultiplier1/rateMultiplier0/price/collateralizationRatio);
-		let actualBN = await vaultHealthInstance.amountBorrowedAtUpperLimit(asset1.address, zcbAsset0.address, amountSupplied);
+		let actualBN = await vaultHealthInstance.amountBorrowedAtUpperLimit(wAsset1.address, zcbAsset0.address, amountSupplied);
 		let actual = parseInt(actualBN.toString());
 
 		let error = (expectedAmountBorrowed-actual) / expectedAmountBorrowed;
 		assert.isBelow(error, ErrorRange, "output within acceptable error range");
 
 		let needed = new BN(Math.ceil(actual/amountSupplied) + 1);
-		assert.equal(await vaultHealthInstance.satisfiesUpperLimit(asset1.address, zcbAsset0.address, amountSupplied, actualBN), true, "correct value returned by satisfiesUpperLimit");
-		assert.equal(await vaultHealthInstance.satisfiesUpperLimit(asset1.address, zcbAsset0.address, amountSupplied, actualBN.add(new BN(needed))), false, "correct value returned by satisfiesUpperLimit");
+		assert.equal(await vaultHealthInstance.satisfiesUpperLimit(wAsset1.address, zcbAsset0.address, amountSupplied, actualBN), true, "correct value returned by satisfiesUpperLimit");
+		assert.equal(await vaultHealthInstance.satisfiesUpperLimit(wAsset1.address, zcbAsset0.address, amountSupplied, actualBN.add(new BN(needed))), false, "correct value returned by satisfiesUpperLimit");
 	});
 
 	it('amountBorrowedAtLowerLimit: zcb deposited', async () => {
@@ -494,15 +493,15 @@ contract('VaultHealth', async function(accounts) {
 		let amountSupplied = 10000000;	//asset0
 		let collateralizationRatio = lowerRatio0*lowerRatio1;
 		let expectedAmountBorrowed = Math.floor(rateMultiplier1/rateMultiplier0/price/collateralizationRatio);
-		let actualBN = await vaultHealthInstance.amountBorrowedAtLowerLimit(asset1.address, zcbAsset0.address, amountSupplied);
+		let actualBN = await vaultHealthInstance.amountBorrowedAtLowerLimit(wAsset1.address, zcbAsset0.address, amountSupplied);
 		let actual = parseInt(actualBN.toString());
 
 		let error = (expectedAmountBorrowed-actual) / expectedAmountBorrowed;
 		assert.isBelow(error, ErrorRange, "output within acceptable error range");
 
 		let needed = new BN(Math.ceil(actual/amountSupplied) + 1);
-		assert.equal(await vaultHealthInstance.satisfiesLowerLimit(asset1.address, zcbAsset0.address, amountSupplied, actualBN), true, "correct value returned by satisfiesLowerLimit");
-		assert.equal(await vaultHealthInstance.satisfiesLowerLimit(asset1.address, zcbAsset0.address, amountSupplied, actualBN.add(new BN(needed))), false, "correct value returned by satisfiesLowerLimit");
+		assert.equal(await vaultHealthInstance.satisfiesLowerLimit(wAsset1.address, zcbAsset0.address, amountSupplied, actualBN), true, "correct value returned by satisfiesLowerLimit");
+		assert.equal(await vaultHealthInstance.satisfiesLowerLimit(wAsset1.address, zcbAsset0.address, amountSupplied, actualBN.add(new BN(needed))), false, "correct value returned by satisfiesLowerLimit");
 	});
 
 	it('vaultWithstandsChange: aToken deposited', async () => {
@@ -526,13 +525,13 @@ contract('VaultHealth', async function(accounts) {
 		let amountSupplied = 10000000;	//asset1
 		let collateralizationRatio = upperRatio0*upperRatio1;
 		let expectedAmountBorrowed = Math.floor(rateMultiplier1/rateMultiplier0/price/collateralizationRatio);
-		let actualBN = await vaultHealthInstance.amountBorrowedAtUpperLimit(asset1.address, zcbAsset0.address, amountSupplied);
+		let actualBN = await vaultHealthInstance.amountBorrowedAtUpperLimit(wAsset1.address, zcbAsset0.address, amountSupplied);
 		let actual = parseInt(actualBN.toString());
 
-		let res = await vaultHealthInstance.vaultWithstandsChange(asset1.address, zcbAsset0.address, amountSupplied, actualBN, TotalBasisPoints, ABDK_1, ABDK_1);
+		let res = await vaultHealthInstance.vaultWithstandsChange(wAsset1.address, zcbAsset0.address, amountSupplied, actualBN, TotalBasisPoints, ABDK_1, ABDK_1);
 		assert.equal(res, true, "correct value returned by vaultWithstandsChange");
 
-		res = await vaultHealthInstance.vaultWithstandsChange(asset1.address, zcbAsset0.address, amountSupplied, actualBN, TotalBasisPoints+1, ABDK_1, ABDK_1);
+		res = await vaultHealthInstance.vaultWithstandsChange(wAsset1.address, zcbAsset0.address, amountSupplied, actualBN, TotalBasisPoints+1, ABDK_1, ABDK_1);
 		assert.equal(res, false, "correct value returned by vaultWithstandsChange");
 
 		const _0 = "0";
@@ -542,10 +541,10 @@ contract('VaultHealth', async function(accounts) {
 
 		let priceChange = Math.floor(TotalBasisPoints * amountSupplied / (actual * price * collateralizationRatio * rateMultiplier0 / rateMultiplier1));
 
-		res = await vaultHealthInstance.vaultWithstandsChange(asset1.address, zcbAsset0.address, amountSupplied, actualBN, priceChange, _0, _0);
+		res = await vaultHealthInstance.vaultWithstandsChange(wAsset1.address, zcbAsset0.address, amountSupplied, actualBN, priceChange, _0, _0);
 		assert.equal(res, true, "correct value returned by vaultWithstandsChange");
 
-		res = await vaultHealthInstance.vaultWithstandsChange(asset1.address, zcbAsset0.address, amountSupplied, actualBN, priceChange+1, _0, _0);
+		res = await vaultHealthInstance.vaultWithstandsChange(wAsset1.address, zcbAsset0.address, amountSupplied, actualBN, priceChange+1, _0, _0);
 		assert.equal(res, false, "correct value returned by vaultWithstandsChange");
 
 		const rateChange0 = 2.43;
@@ -563,10 +562,10 @@ contract('VaultHealth', async function(accounts) {
 
 		priceChange = Math.floor(TotalBasisPoints * amountSupplied / (actual * price * collateralizationRatio * rateMultiplier0 / rateMultiplier1));
 
-		res = await vaultHealthInstance.vaultWithstandsChange(asset1.address, zcbAsset0.address, amountSupplied, actualBN, priceChange, _0, rateChange0Str);
+		res = await vaultHealthInstance.vaultWithstandsChange(wAsset1.address, zcbAsset0.address, amountSupplied, actualBN, priceChange, _0, rateChange0Str);
 		assert.equal(res, true, "correct value returned by vaultWithstandsChange");
 
-		res = await vaultHealthInstance.vaultWithstandsChange(asset1.address, zcbAsset0.address, amountSupplied, actualBN, priceChange+1, _0, rateChange0Str);
+		res = await vaultHealthInstance.vaultWithstandsChange(wAsset1.address, zcbAsset0.address, amountSupplied, actualBN, priceChange+1, _0, rateChange0Str);
 		assert.equal(res, false, "correct value returned by vaultWithstandsChange");
 	});
 
@@ -656,7 +655,7 @@ contract('VaultHealth', async function(accounts) {
 
 		let caught = false;
 		try {
-			await vaultHealthInstance.setMaximumShortInterest(asset0.address, setTo, {from: accounts[1]});
+			await vaultHealthInstance.setMaximumShortInterest(wAsset0.address, setTo, {from: accounts[1]});
 		} catch (err) {
 			caught = true;
 		}
@@ -664,8 +663,8 @@ contract('VaultHealth', async function(accounts) {
 			assert.fail('setMaximumShortInterest() should be onlyOwner');
 		}
 
-		await vaultHealthInstance.setMaximumShortInterest(asset0.address, setTo);
+		await vaultHealthInstance.setMaximumShortInterest(wAsset0.address, setTo);
 
-		assert.equal((await vaultHealthInstance.maximumShortInterest(asset0.address)).toString(), setTo, "correct value for maximum short interest");
+		assert.equal((await vaultHealthInstance.maximumShortInterest(wAsset0.address)).toString(), setTo, "correct value for maximum short interest");
 	});
 });

@@ -23,7 +23,8 @@ contract organizer {
 
 	mapping(address => address) public assetWrappers;
 
-	mapping(address => address) public capitalHandlerToUnderlyingAsset;
+	//acts as a whitelist for capitalHandlers that were deployed using this organiser
+	mapping(address => address) public capitalHandlerToWrapper;
 	mapping(address => address) public YTamms;
 	mapping(address => address) public ZCBamms;
 
@@ -66,16 +67,16 @@ contract organizer {
 
 	function deployCapitalHandlerInstance(address _aTokenAddress, uint64 _maturity) public {
 		require(_maturity > block.timestamp+(1 weeks), "maturity must be at least 1 weeks away");
-		address aaveWrapperAddress = assetWrappers[_aTokenAddress];
-		require(aaveWrapperAddress != address(0), "deploy a wrapper for this aToken first");
-		address capitalHandlerAddress = CapitalHandlerDeployer(CapitalHandlerDeployerAddress).deploy(aaveWrapperAddress, _maturity, yieldTokenDeployerAddress, msg.sender);
+		address wrapperAddress = assetWrappers[_aTokenAddress];
+		require(wrapperAddress != address(0), "deploy a wrapper for this aToken first");
+		address capitalHandlerAddress = CapitalHandlerDeployer(CapitalHandlerDeployerAddress).deploy(wrapperAddress, _maturity, yieldTokenDeployerAddress, msg.sender);
 		emit CapitalHandlerDeployment(capitalHandlerAddress);
-		capitalHandlerToUnderlyingAsset[capitalHandlerAddress] = _aTokenAddress;
+		capitalHandlerToWrapper[capitalHandlerAddress] = wrapperAddress;
 	}
 
 	function deployZCBamm(address _capitalHandlerAddress) public {
 		require(ZCBamms[_capitalHandlerAddress] == address(0));
-		require(capitalHandlerToUnderlyingAsset[_capitalHandlerAddress] != address(0));
+		require(capitalHandlerToWrapper[_capitalHandlerAddress] != address(0));
 		ZCBamms[_capitalHandlerAddress] = ZCBammDeployer(ZCBammDeployerAddress).deploy(_capitalHandlerAddress, AmmInfoOracleAddress);
 	}
 

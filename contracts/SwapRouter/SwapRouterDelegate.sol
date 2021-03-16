@@ -19,7 +19,7 @@ contract SwapRouterDelegate {
 		ICapitalHandler ch = ICapitalHandler(_capitalHandlerAddress);
 		organizer _org = org;
 		IERC20 underlyingAsset = IERC20(ICapitalHandler(_capitalHandlerAddress).underlyingAssetAddress());
-		IWrapper wrapper = IWrapper(_org.assetWrappers(address(underlyingAsset)));
+		IWrapper wrapper = ICapitalHandler(_capitalHandlerAddress).wrapper();
 		IZCBamm amm = IZCBamm(_org.ZCBamms(_capitalHandlerAddress));
 		IYieldToken yt = IYieldToken(ch.yieldTokenAddress());
 
@@ -51,7 +51,7 @@ contract SwapRouterDelegate {
 		ICapitalHandler ch = ICapitalHandler(_capitalHandlerAddress);
 		organizer _org = org;
 		IERC20 underlyingAsset = IERC20(ICapitalHandler(_capitalHandlerAddress).underlyingAssetAddress());
-		IWrapper wrapper = IWrapper(_org.assetWrappers(address(underlyingAsset)));
+		IWrapper wrapper = ICapitalHandler(_capitalHandlerAddress).wrapper();
 		IYTamm amm = IYTamm(_org.YTamms(_capitalHandlerAddress));
 		IYieldToken yt = IYieldToken(ch.yieldTokenAddress());
 

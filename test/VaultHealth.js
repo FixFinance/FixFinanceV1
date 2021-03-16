@@ -84,13 +84,14 @@ contract('VaultHealth', async function(accounts) {
 
 		maturity = ((await web3.eth.getBlock('latest')).timestamp + _80days).toString();
 
-		await organizerInstance.deployAssetWrapper(asset0.address);
-		await organizerInstance.deployAssetWrapper(asset1.address);
-		let rec0 = await organizerInstance.deployCapitalHandlerInstance(asset0.address, maturity);
-		let rec1 = await organizerInstance.deployCapitalHandlerInstance(asset1.address, maturity);
+		let reca = await organizerInstance.deployAssetWrapper(asset0.address);
+		let recb = await organizerInstance.deployAssetWrapper(asset1.address);
 
-		wAsset0 = await aaveWrapper.at(await organizerInstance.assetWrappers(asset0.address));
-		wAsset1 = await aaveWrapper.at(await organizerInstance.assetWrappers(asset1.address));
+		wAsset0 = await aaveWrapper.at(reca.receipt.logs[0].args.wrapperAddress);
+		wAsset1 = await aaveWrapper.at(recb.receipt.logs[0].args.wrapperAddress);
+
+		let rec0 = await organizerInstance.deployCapitalHandlerInstance(wAsset0.address, maturity);
+		let rec1 = await organizerInstance.deployCapitalHandlerInstance(wAsset1.address, maturity);
 
 		await OracleContainerInstance.addAggregators([aggregator0.address, aggregator1.address]);
 		await OracleContainerInstance.AddAToken(wAsset0.address, 2, 5, symbol0.substring(1));

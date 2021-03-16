@@ -52,11 +52,11 @@ contract('BondMinter', async function(accounts) {
 		await YTammDeployer.link("BigMath", BigMathInstance.address);
 		ZCBammDeployerInstance = await ZCBammDeployer.new();
 		YTammDeployerInstance = await YTammDeployer.new();
-		DeployCapitalHandlerInstance = await CapitalHandlerDeployer.new();
+		capitalHandlerDeployerInstance = await CapitalHandlerDeployer.new();
 		ammInfoOracleInstance = await AmmInfoOracle.new("0", nullAddress);
 		organizerInstance = await organizer.new(
 			yieldTokenDeployerInstance.address,
-			DeployCapitalHandlerInstance.address,
+			capitalHandlerDeployerInstance.address,
 			ZCBammDeployerInstance.address,
 			YTammDeployerInstance.address,
 			nullAddress,
@@ -65,13 +65,14 @@ contract('BondMinter', async function(accounts) {
 
 		maturity = ((await web3.eth.getBlock('latest')).timestamp + _8days).toString();
 
-		await organizerInstance.deployAssetWrapper(asset0.address);
-		await organizerInstance.deployAssetWrapper(asset1.address);
-		rec0 = await organizerInstance.deployCapitalHandlerInstance(asset0.address, maturity);
-		rec1 = await organizerInstance.deployCapitalHandlerInstance(asset1.address, maturity);
+		let reca = await organizerInstance.deployAssetWrapper(asset0.address);
+		let recb = await organizerInstance.deployAssetWrapper(asset1.address);
 
-		wAsset0 = await aaveWrapper.at(await organizerInstance.assetWrappers(asset0.address));
-		wAsset1 = await aaveWrapper.at(await organizerInstance.assetWrappers(asset1.address));
+		wAsset0 = await aaveWrapper.at(reca.receipt.logs[0].args.wrapperAddress);
+		wAsset1 = await aaveWrapper.at(recb.receipt.logs[0].args.wrapperAddress);
+
+		let rec0 = await organizerInstance.deployCapitalHandlerInstance(wAsset0.address, maturity);
+		let rec1 = await organizerInstance.deployCapitalHandlerInstance(wAsset1.address, maturity);
 
 		await asset0.approve(wAsset0.address, _10To18.toString());
 		await asset1.approve(wAsset1.address, _10To18.toString());

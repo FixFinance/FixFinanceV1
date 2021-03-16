@@ -60,23 +60,14 @@ contract('organizer', function(accounts) {
 	});
 
 	it('deploy aToken wrapper', async () => {
-		await organizerInstance.deployAssetWrapper(asset0.address);
-		wAsset0 = await AaveWrapper.at(await organizerInstance.assetWrappers(asset0.address));
-		assert.notEqual(wAsset0.address, nullAddress, "organizer::assetWrappers[asset0] must be non-null");
-	});
-
-	it('cannot override aToken wrapper deployment', async () => {
-		let caught = false;
-		try {
-			await organizerInstance.deployAssetWrapper(asset0.address);
-		} catch (err) {
-			caught = true
-		}
-		if (!caught) assert.fail('organizer::assetWrappers[asset0] was overridden');
+		let rec = await organizerInstance.deployAssetWrapper(asset0.address);
+		assert.equal(rec.receipt.logs[0].args.underlyingAddress, asset0.address, "correct value in event of underlyingAddress");
+		assert.notEqual(rec.receipt.logs[0].args.wrapperAddress, nullAddress, "wrapper address must be non null");
+		wAsset0 = await AaveWrapper.at(rec.receipt.logs[0].args.wrapperAddress);
 	});
 
 	it('deploy CapitalHandler', async () => {
-		let rec = await organizerInstance.deployCapitalHandlerInstance(asset0.address, maturity);
+		let rec = await organizerInstance.deployCapitalHandlerInstance(wAsset0.address, maturity);
 		capitalHandlerInstance = await CapitalHandler.at(rec.receipt.logs[0].args.addr);
 		yieldTokenInstance = await YieldToken.at(await capitalHandlerInstance.yieldTokenAddress());
 		assert.notEqual(capitalHandlerInstance.address, nullAddress, "organizer::capitalHandlerMapping[asset0] must be non-null");

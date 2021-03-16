@@ -13,15 +13,13 @@ import "./AmmInfoOracle.sol";
 contract organizer {
 
 	event WrapperDeployment(
-		address _wrapperAddress,
-		address _underlyingAddress
+		address wrapperAddress,
+		address underlyingAddress
 	);
 
 	event CapitalHandlerDeployment(
 		address addr
 	);
-
-	mapping(address => address) public assetWrappers;
 
 	//acts as a whitelist for capitalHandlers that were deployed using this organiser
 	mapping(address => address) public capitalHandlerToWrapper;
@@ -58,20 +56,16 @@ contract organizer {
 	}
 
 	function deployAssetWrapper(address _assetAddress) public {
-		require(assetWrappers[_assetAddress] == address(0), "can only make a wrapper if none currently exists");
 		AaveWrapper temp = new AaveWrapper(_assetAddress);
 		temp.transferOwnership(msg.sender);
-		assetWrappers[_assetAddress] = address(temp);
 		emit WrapperDeployment(address(temp), _assetAddress);
 	}
 
-	function deployCapitalHandlerInstance(address _aTokenAddress, uint64 _maturity) public {
+	function deployCapitalHandlerInstance(address _wrapperAddress, uint64 _maturity) public {
 		require(_maturity > block.timestamp+(1 weeks), "maturity must be at least 1 weeks away");
-		address wrapperAddress = assetWrappers[_aTokenAddress];
-		require(wrapperAddress != address(0), "deploy a wrapper for this aToken first");
-		address capitalHandlerAddress = CapitalHandlerDeployer(CapitalHandlerDeployerAddress).deploy(wrapperAddress, _maturity, yieldTokenDeployerAddress, msg.sender);
+		address capitalHandlerAddress = CapitalHandlerDeployer(CapitalHandlerDeployerAddress).deploy(_wrapperAddress, _maturity, yieldTokenDeployerAddress, msg.sender);
 		emit CapitalHandlerDeployment(capitalHandlerAddress);
-		capitalHandlerToWrapper[capitalHandlerAddress] = wrapperAddress;
+		capitalHandlerToWrapper[capitalHandlerAddress] = _wrapperAddress;
 	}
 
 	function deployZCBamm(address _capitalHandlerAddress) public {

@@ -72,6 +72,7 @@ module.exports = async function(deployer) {
 		ammInfoOracle.address
 	);
 	await organizerInstance.DeploySwapRouter();
-	await organizerInstance.deployAssetWrapper(dummyATokenInstance.address);
-	await organizerInstance.deployCapitalHandlerInstance(dummyATokenInstance.address, start2026);
+	let rec = await organizerInstance.deployAssetWrapper(dummyATokenInstance.address);
+	wAsset = await aaveWrapper.at(rec.receipt.logs[0].args.wrapperAddress);
+	await organizerInstance.deployCapitalHandlerInstance(wAsset.address, start2026);
 };

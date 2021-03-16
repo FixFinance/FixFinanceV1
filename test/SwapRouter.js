@@ -68,9 +68,9 @@ contract('SwapRouter', async function(accounts) {
 		maturity = timestamp + 110*24*60*60;
 
 		aTokenInstance = await dummyAToken.new("aCOIN");
-		await organizerInstance.deployAssetWrapper(aTokenInstance.address);
-		aaveWrapperInstance = await AaveWrapper.at(await organizerInstance.assetWrappers(aTokenInstance.address));
-		rec = await organizerInstance.deployCapitalHandlerInstance(aTokenInstance.address, maturity);
+		let rec = await organizerInstance.deployAssetWrapper(aTokenInstance.address);
+		aaveWrapperInstance = await AaveWrapper.at(rec.receipt.logs[0].args.wrapperAddress);
+		rec = await organizerInstance.deployCapitalHandlerInstance(aaveWrapperInstance.address, maturity);
 		capitalHandlerInstance = await CapitalHandler.at(rec.receipt.logs[0].args.addr);
 
 		await ammInfoOracleInstance.setSlippageConstant(capitalHandlerInstance.address, SlippageConstant);

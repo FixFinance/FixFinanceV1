@@ -55,6 +55,9 @@ contract AaveWrapper is IWrapper, Ownable {
 		deposit(_to, _amountUnit);
 	}
 
+	function lastUpdate() external view override returns (uint timestamp) {
+		timestamp = block.timestamp;
+	}
 
 	function withdrawUnitAmount(address _to, uint _amountAToken) public override returns (uint _amountWrappedToken) {
 		IERC20 _aToken = IERC20(underlyingAssetAddress);

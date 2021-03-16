@@ -4,7 +4,9 @@ import "../helpers/IYTamm.sol";
 import "../libraries/ABDKMath64x64.sol";
 import "../libraries/SafeMath.sol";
 import "../libraries/BigMath.sol";
+import "../interfaces/ICapitalHandler.sol";
 import "../interfaces/IYieldToken.sol";
+import "../interfaces/IWrapper.sol";
 import "../interfaces/IERC20.sol";
 import "../helpers/IZCBamm.sol";
 import "../AmmInfoOracle.sol";
@@ -26,6 +28,7 @@ contract YTamm is IYTamm {
 	string public override symbol;
 
 	address AmmInfoOracleAddress;
+	IWrapper wrapper;
 
 	bytes32 quoteSignature;
 	int128 quotedAmountYT;
@@ -54,6 +57,7 @@ contract YTamm is IYTamm {
 		ZCBammAddress = _ZCBammAddress;
 		AmmInfoOracleAddress = _feeOracleAddress;
 		SlippageConstant = AmmInfoOracle(_feeOracleAddress).getSlippageConstant(_ZCBaddress);
+		wrapper = ICapitalHandler(_ZCBaddress).wrapper();
 		YTtoLmultiplier = BigMath.YT_U_ratio(
 			apy,
 			maturity-block.timestamp
@@ -114,7 +118,7 @@ contract YTamm is IYTamm {
 	}
 
 	function timeRemaining() internal view returns (uint) {
-		return uint(int128((maturity-block.timestamp)<<64).div(int128(BigMath.SecondsPerYear<<64)));
+		return uint( ((maturity-wrapper.lastUpdate())<<64) / BigMath.SecondsPerYear);
 	}
 
 	function _inflatedTotalSupply() internal view returns (uint ret) {

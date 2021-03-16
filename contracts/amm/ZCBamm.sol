@@ -5,6 +5,7 @@ import "../libraries/ABDKMath64x64.sol";
 import "../libraries/BigMath.sol";
 import "../interfaces/ICapitalHandler.sol";
 import "../interfaces/IYieldToken.sol";
+import "../interfaces/IWrapper.sol";
 import "../interfaces/IERC20.sol";
 import "../AmmInfoOracle.sol";
 
@@ -31,6 +32,7 @@ contract ZCBamm is IZCBamm {
 	string public override symbol;
 
 	address AmmInfoOracleAddress;
+	IWrapper wrapper;
 
 	bytes32 quoteSignature;
 	uint256 quotedAmountIn;
@@ -59,6 +61,7 @@ contract ZCBamm is IZCBamm {
 		anchor = temp;
 		nextAnchor = temp;
 		AmmInfoOracleAddress = _feeOracleAddress;
+		wrapper = ICapitalHandler(_ZCBaddress).wrapper();
 		lastRecalibration = block.timestamp;
 		ZCBaddress = _ZCBaddress;
 		YTaddress = _YTaddress;
@@ -119,11 +122,11 @@ contract ZCBamm is IZCBamm {
 	}
 
 	function timeRemaining() internal view returns (uint) {
-		return uint(int128((maturity-block.timestamp)<<64).div(int128(nextAnchor<<64)));
+		return uint( ((maturity-wrapper.lastUpdate())<<64) / anchor);
 	}
 
 	function nextTimeRemaining() internal view returns (uint) {
-		return uint(int128((maturity-block.timestamp)<<64).div(int128(nextAnchor<<64)));
+		return uint( ((maturity-wrapper.lastUpdate())<<64) / nextAnchor);
 	}
 
 	function getQuoteSignature(uint8 _tradeType) internal view returns (bytes32) {

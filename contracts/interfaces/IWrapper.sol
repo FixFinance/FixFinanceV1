@@ -10,6 +10,7 @@ interface IWrapper is IERC20 {
 	function withdrawUnitAmount(address _to, uint _amountAToken) external returns (uint _amountWrappedToken);
 	function withdrawWrappedAmount(address _to, uint _amountWrappedToken) external returns (uint _amountAToken);
 
+	function lastUpdate() external view returns (uint timestamp);
 	function balanceUnit(address _owner) external view returns (uint balance);
 	function UnitAmtToWrappedAmt_RoundDown(uint _amountAToken) external view returns (uint _amountWrappedToken);
 	function UnitAmtToWrappedAmt_RoundUp(uint _amountAToken) external view returns (uint _amountWrappedToken);

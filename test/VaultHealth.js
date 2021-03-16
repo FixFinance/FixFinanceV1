@@ -1,6 +1,6 @@
 const dummyAToken = artifacts.require('dummyAToken');
 const VaultHealth = artifacts.require('VaultHealth');
-const aaveWrapper = artifacts.require('AaveWrapper');
+const aaveWrapper = artifacts.require('NGBwrapper');
 const capitalHandler = artifacts.require('CapitalHandler');
 const YieldToken = artifacts.require("YieldToken");
 const yieldTokenDeployer = artifacts.require('YieldTokenDeployer');

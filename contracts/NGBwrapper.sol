@@ -5,7 +5,14 @@ import "./libraries/SafeMath.sol";
 import "./helpers/Ownable.sol";
 import "./ERC20.sol";
 
-contract AaveWrapper is IWrapper, Ownable {
+/*
+	Native Growing Balance Wrapper
+
+	Underlying Asset is native to the chain of the wrapper
+
+	The balances of the underlying asset automatically grow as yield is generated
+*/
+contract NGBwrapper is IWrapper, Ownable {
 	using SafeMath for uint;
 
 	address public override underlyingAssetAddress;

@@ -1,5 +1,5 @@
 pragma solidity >=0.6.0 <0.7.0;
-import "./AaveWrapper.sol";
+import "./NGBwrapper.sol";
 import "./CapitalHandler.sol";
 import "./amm/ZCBamm.sol";
 import "./amm/YTamm.sol";
@@ -56,7 +56,7 @@ contract organizer {
 	}
 
 	function deployAssetWrapper(address _assetAddress) public {
-		AaveWrapper temp = new AaveWrapper(_assetAddress);
+		NGBwrapper temp = new NGBwrapper(_assetAddress);
 		temp.transferOwnership(msg.sender);
 		emit WrapperDeployment(address(temp), _assetAddress);
 	}

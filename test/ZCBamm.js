@@ -1,5 +1,5 @@
 const aToken = artifacts.require("dummyAToken");
-const aaveWrapper = artifacts.require("AaveWrapper");
+const aaveWrapper = artifacts.require("NGBwrapper");
 const BigMath = artifacts.require("BigMath");
 const Ei = artifacts.require("Ei");
 const capitalHandler = artifacts.require("CapitalHandler");

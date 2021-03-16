@@ -452,16 +452,17 @@ contract ZCBamm is IZCBamm {
 		impliedRates[_index] = int128(rate);
 		if (_index+1 == LENGTH_RATE_SERIES) {
 			CanSetOracleRate = true;
+			toSet = 0;
 		}
-		toSet++;
+		else {
+			toSet++;
+		}
 	}
 
 	modifier setRateModifier() {
-		if (!CanSetOracleRate) {
-			uint8 _toSet = toSet;
-			uint8 mostRecent = (LENGTH_RATE_SERIES-1+_toSet)%LENGTH_RATE_SERIES;
-			if (block.timestamp >= timestamps[mostRecent] + (2 minutes)) internalSetOracleRate(_toSet);
-		}
+		uint8 _toSet = toSet;
+		uint8 mostRecent = (LENGTH_RATE_SERIES-1+_toSet)%LENGTH_RATE_SERIES;
+		if (block.timestamp >= timestamps[mostRecent] + (2 minutes)) internalSetOracleRate(_toSet);
 		_;
 	}
 
@@ -483,11 +484,9 @@ contract ZCBamm is IZCBamm {
 				numEqual++;
 			}
 		}
-		//uint8 numSmaller = LENGTH_RATE_SERIES - numEqual - numLarger;
-		uint8 medianIndex = LENGTH_RATE_SERIES/2;
-		require(numLarger + numEqual >= medianIndex);
-		//require(numSmaller + numEqual >= medianIndex);
-		require(LENGTH_RATE_SERIES - numLarger >= medianIndex);
+		uint8 numSmaller = LENGTH_RATE_SERIES - numEqual - numLarger;
+		require(numLarger+numEqual >= numSmaller);
+		require(numSmaller+numEqual >= numLarger);
 
 		OracleRate = _rate;
 		CanSetOracleRate = false;

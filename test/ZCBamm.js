@@ -544,29 +544,15 @@ contract('ZCBamm', async function(accounts){
 
 	it('Fill Out Rate Data arrays', async () => {
 		const LENGTH_RATE_SERIES = 31;
-		for (let i = 4; i < LENGTH_RATE_SERIES; i++) {
+		for (let i = 5; i < LENGTH_RATE_SERIES; i++) {
 			await helper.advanceTime(121);
 			rec = await amm.forceRateDataUpdate();
 		}
 	});
 
-	it('Cannot Change Rate Data, until setOracleRate() is called', async () => {
-		await helper.advanceTime(121);
-
-		rateData = await amm.getImpliedRateData();
-
-		let rate0 = rateData._impliedRates[0].toString();
-		let ts0 = rateData._timestamps[0].toString();
-
-		await amm.forceRateDataUpdate();
-
-		let newRateData = await amm.getImpliedRateData();
-		assert.equal(newRateData._impliedRates[0].toString(), rate0, "rate not updated");
-		assert.equal(newRateData._timestamps[0].toString(), ts0, "timestamp not updated");
-	});
-
 	it('Cannot set invalid rate', async () => {
 		let caught = false;
+		rateData = await amm.getImpliedRateData();
 		validRate = rateData._impliedRates[6].toString();
 		invalidRate = rateData._impliedRates[0].toString();
 		try {

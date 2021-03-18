@@ -51,11 +51,15 @@ contract('capitalHandler', async function(accounts){
 
 	it('gives yield to yield holder', async () => {
 		//increase value of wrapped token by 2x
+		//adjust for 10 bip deduction from capitalHandler
+		adjustedInflation = inflation.add(inflation.mul(new BN(999)).div(new BN(1000)));
+		let yieldGenerated = (new BN(amount)).mul(adjustedInflation).div(_10To18).sub(new BN(amount)).toString();
+		let expectedWrappedFree = (new BN(yieldGenerated)).mul(_10To18).div(adjustedInflation);
 		inflation = inflation.mul(new BN(2));
 		await dummyATokenInstance.setInflation(inflation.toString());
 		assert.equal((await capitalHandlerInstance.balanceBonds(accounts[0])).toString(), '-'+amount, "correct bond balance for account 0");
-		assert.equal((await capitalHandlerInstance.balanceOf(accounts[0])).toString(), amount, "correct val returned by minimumATokensAtMaturity()");
-		assert.equal((await capitalHandlerInstance.wrappedTokenFree(accounts[0])).toString(), (parseInt(amount)/2)+"", 'correct val returned by wrappedTokenFree()');
+		assert.equal((await capitalHandlerInstance.balanceOf(accounts[0])).toString(), yieldGenerated, "correct val returned by minimumATokensAtMaturity()");
+		assert.equal((await capitalHandlerInstance.wrappedTokenFree(accounts[0])).toString(), expectedWrappedFree, 'correct val returned by wrappedTokenFree()');
 	});
 
 	it('withdraws funds unwrap:false', async () => {
@@ -77,14 +81,17 @@ contract('capitalHandler', async function(accounts){
 
 	it('transfers yield', async () => {
 		toTransferYield = (parseInt(amount)/8)+"";
-		toTransferATkn = inflation.mul(new BN(toTransferYield)).div(_10To18).toString();
+		toTransferATkn = adjustedInflation.mul(new BN(toTransferYield)).div(_10To18).toString();
 		prevBalanceBond = await capitalHandlerInstance.balanceBonds(accounts[0]);
 		prevBalanceYield = await capitalHandlerInstance.balanceYield(accounts[0]);
 		prevBalanceOf = await capitalHandlerInstance.balanceOf(accounts[0]);
 		await yieldTokenInstance.transfer(accounts[2], toTransferYield);
-		assert.equal((await capitalHandlerInstance.balanceBonds(accounts[0])).sub(prevBalanceBond).toString(), toTransferATkn, "correct balance bonds account 0");
-		assert.equal(prevBalanceYield.sub(await capitalHandlerInstance.balanceYield(accounts[0])).toString(), toTransferYield, "correct balance yield account 0")
-		assert.equal((await capitalHandlerInstance.balanceOf(accounts[0])).toString(), prevBalanceOf.toString(), "correct minimum aTkn balance at maturity account 0");
+		let expectedBondChange = toTransferATkn;
+		let expectedYieldChange = toTransferYield;
+		let expectedBalance0 = prevBalanceOf.sub(new BN(1)).toString(); //account for rounding error
+		assert.equal((await capitalHandlerInstance.balanceBonds(accounts[0])).sub(prevBalanceBond).toString(), expectedBondChange, "correct balance bonds account 0");
+		assert.equal(prevBalanceYield.sub(await capitalHandlerInstance.balanceYield(accounts[0])).toString(), expectedYieldChange, "correct balance yield account 0")
+		assert.equal((await capitalHandlerInstance.balanceOf(accounts[0])).toString(), expectedBalance0, "correct minimum aTkn balance at maturity account 0");
 		assert.equal((await capitalHandlerInstance.balanceBonds(accounts[2])).toString(), "-"+toTransferATkn, "correct balance bonds account 2");
 		assert.equal((await capitalHandlerInstance.balanceYield(accounts[2])).toString(), toTransferYield, "correct balance yield account 2");
 		assert.equal((await capitalHandlerInstance.balanceOf(accounts[2])).toString(), "0", "correct minimum aTkn balance at maturity account 2");
@@ -133,7 +140,12 @@ contract('capitalHandler', async function(accounts){
 
 	it('bond holders capture yield generated after maturity', async () => {
 		bondBalAct1 = await capitalHandlerInstance.balanceBonds(accounts[1]);
-		expectedPayout = bondBalAct1.mul(postMaturityInflation).div(inflation);
+		/*
+			On call to withdraw harvestToTreasury() is called, because neglidgeble time has
+			passed no funds will go to the treasury. thus we do not need to adjust post
+			maturity inflation in our calculations below
+		*/
+		expectedPayout = bondBalAct1.mul(postMaturityInflation).div(adjustedInflation);
 		await capitalHandlerInstance.claimBondPayout(accounts[2], {from: accounts[1]});
 		assert.equal((await capitalHandlerInstance.balanceBonds(accounts[1])).toString(), '0', "balance long bond decrease to 0");
 		assert.equal((await dummyATokenInstance.balanceOf(accounts[2])).toString(), expectedPayout.toString(), "correct payout of long bond tokens");

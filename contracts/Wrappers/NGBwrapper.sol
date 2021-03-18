@@ -1,9 +1,11 @@
 pragma solidity >=0.6.5 <0.7.0;
-import "./interfaces/IERC20.sol";
-import "./interfaces/IWrapper.sol";
-import "./libraries/SafeMath.sol";
-import "./helpers/Ownable.sol";
-import "./ERC20.sol";
+import "../interfaces/IERC20.sol";
+import "../interfaces/IWrapper.sol";
+import "../libraries/SafeMath.sol";
+import "../libraries/ABDKMath64x64.sol";
+import "../libraries/BigMath.sol";
+import "../helpers/Ownable.sol";
+import "../ERC20.sol";
 
 /*
 	Native Growing Balance Wrapper
@@ -14,18 +16,34 @@ import "./ERC20.sol";
 */
 contract NGBwrapper is IWrapper, Ownable {
 	using SafeMath for uint;
+	using ABDKMath64x64 for int128;
 
 	address public override underlyingAssetAddress;
 
 	bool public constant override underlyingIsWrapped = false;
 
+	uint public prevRatio;
+
 	uint8 public immutable override decimals;
+
+	address public immutable treasuryAddress;
+
+	uint32 private constant superBipsToTreasury = 1_000;
+
+	uint32 private constant totalSuperBips = 1_000_000;
+
+	uint private constant ABDK_1 = 1 << 64;
+
+	int128 private constant MAX = 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
+
+	uint public lastHarvest;
 
 	constructor (address _underlyingAssetAddress) public {
 		underlyingAssetAddress = _underlyingAssetAddress;
 		decimals = IERC20(_underlyingAssetAddress).decimals();
 		name = string(abi.encodePacked('wrapped ',IERC20(_underlyingAssetAddress).name()));
 		symbol = string(abi.encodePacked('w', IERC20(_underlyingAssetAddress).symbol()));
+		treasuryAddress = address(0);
 	}
 
 	function balanceUnit(address _owner) external view override returns (uint balance) {
@@ -39,6 +57,8 @@ contract NGBwrapper is IWrapper, Ownable {
 		balanceOf[_to] = _amountAToken;
 		totalSupply = _amountAToken;
 		_amountWrappedToken = _amountAToken;
+		lastHarvest = block.timestamp;
+		prevRatio = 1 ether;
 	}
 
 	function deposit(address _to, uint _amountAToken) internal returns (uint _amountWrappedToken) {
@@ -46,6 +66,7 @@ contract NGBwrapper is IWrapper, Ownable {
 		if (_totalSupply == 0) {
 			return firstDeposit(_to, _amountAToken);
 		}
+		harvestToTreasury();
 		IERC20 _aToken = IERC20(underlyingAssetAddress);
 		uint contractBalance = _aToken.balanceOf(address(this));
 		_aToken.transferFrom(msg.sender, address(this), _amountAToken);
@@ -57,16 +78,66 @@ contract NGBwrapper is IWrapper, Ownable {
 	function depositUnitAmount(address _to, uint _amount) external override returns (uint _amountWrapped) {
 		return deposit(_to, _amount);
 	}
+
 	function depositWrappedAmount(address _to, uint _amount) external override returns (uint _amountUnit) {
 		_amountUnit = WrappedAmtToUnitAmt_RoundUp(_amount);
 		deposit(_to, _amountUnit);
 	}
 
-	function lastUpdate() external view override returns (uint timestamp) {
-		timestamp = block.timestamp;
+	function lastUpdate() external view override returns (uint) {
+		return block.timestamp;
+	}
+
+	function getRatio() internal view returns (uint) {
+		uint _totalSupply = totalSupply;	
+		uint _prevRatio = prevRatio;
+		uint contractBalance = IERC20(underlyingAssetAddress).balanceOf(address(this));
+		uint nonFeeAdjustedRatio = uint(1 ether).mul(contractBalance).div(_totalSupply);
+		uint minNewRatio = nonFeeAdjustedRatio
+			.sub(_prevRatio)
+			.mul(totalSuperBips-superBipsToTreasury)
+			.div(totalSuperBips)
+			.add(_prevRatio);
+		return minNewRatio;
+	}
+
+	function harvestToTreasury() internal {
+		uint _lastHarvest = lastHarvest;
+		if (block.timestamp < _lastHarvest+(5 minutes)) {
+			return;
+		}
+		uint contractBalance = IERC20(underlyingAssetAddress).balanceOf(address(this));
+		uint prevTotalSupply = totalSupply;
+		uint _prevRatio = prevRatio;
+		//time in years
+		int128 time = int128(((block.timestamp - _lastHarvest) << 64)/ BigMath.SecondsPerYear);
+		/*
+			nextBalance = contractBalance * ((totalBips-bipsToTreasury)/totalBips)**t
+			prevTotalSupply*contractBalance/totalSupply = contractBalance * ((totalBips-bipsToTreasury)/totalBips)**t
+			prevTotalSupply/totalSupply = ((totalBips-bipsToTreasury)/totalBips)**t
+			totalSupply = prevTotalSupply*((totalBips-bipsToTreasury)/totalBips)**(-t)
+		*/
+		uint term = uint(BigMath.Exp(int128(totalSuperBips-superBipsToTreasury).div(int128(totalSuperBips)), time.neg()));
+		uint newTotalSupply = prevTotalSupply.mul(term) / ABDK_1;
+		uint effectiveRatio = uint(1 ether).mul(contractBalance);
+		uint nonFeeAdjustedRatio = effectiveRatio.div(prevTotalSupply);
+		effectiveRatio = effectiveRatio.div(newTotalSupply);
+		uint minNewRatio = nonFeeAdjustedRatio.sub(_prevRatio).mul(totalSuperBips-superBipsToTreasury).div(totalSuperBips).add(_prevRatio);
+		if (effectiveRatio < minNewRatio) {
+			/*
+				ratio == contractBalance/totalSupply
+				totalSupply == contractBalance/ratio
+			*/
+			newTotalSupply = contractBalance.mul(1 ether).div(minNewRatio);
+		}
+
+		lastHarvest = block.timestamp;
+		balanceOf[treasuryAddress] += newTotalSupply.sub(prevTotalSupply);
+		totalSupply = newTotalSupply;
 	}
 
 	function withdrawUnitAmount(address _to, uint _amountAToken) public override returns (uint _amountWrappedToken) {
+		harvestToTreasury();
 		IERC20 _aToken = IERC20(underlyingAssetAddress);
 		uint contractBalance = _aToken.balanceOf(address(this));
 		//_amountWrappedToken == ceil(totalSupply*_amountAToken/contractBalance)
@@ -80,6 +151,7 @@ contract NGBwrapper is IWrapper, Ownable {
 
 	function withdrawWrappedAmount(address _to, uint _amountWrappedToken) public override returns (uint _amountAToken) {
 		require(balanceOf[msg.sender] >= _amountWrappedToken);
+		harvestToTreasury();
 		IERC20 _aToken = IERC20(underlyingAssetAddress);
 		uint contractBalance = _aToken.balanceOf(address(this));
 		_amountAToken = contractBalance*_amountWrappedToken/totalSupply;
@@ -89,42 +161,41 @@ contract NGBwrapper is IWrapper, Ownable {
 	}
 
 	function UnitAmtToWrappedAmt_RoundDown(uint _amountAToken) public view override returns (uint _amountWrappedToken) {
-		IERC20 _aToken = IERC20(underlyingAssetAddress);
-		uint contractBalance = _aToken.balanceOf(address(this));
-		uint _totalSupply = totalSupply;
-		if (_totalSupply == 0) return _amountAToken;
+		uint ratio = getRatio();
 		/*
-			_amountWrappedToken == ceil(contractBalance*_amountAToken/totalSupply)
+			ratio == amountUnit/amountWrapped
+			amountWrapped == amountUnit/ratio
 		*/
-		_amountWrappedToken = _totalSupply*_amountAToken/contractBalance;
+		_amountWrappedToken = _amountAToken.mul(1 ether).div(ratio);
 	}
 
 	function UnitAmtToWrappedAmt_RoundUp(uint _amountAToken) public view override returns (uint _amountWrappedToken) {
-		IERC20 _aToken = IERC20(underlyingAssetAddress);
-		uint contractBalance = _aToken.balanceOf(address(this));
-		uint _totalSupply = totalSupply;
-		if (_totalSupply == 0) return _amountAToken;
+		uint ratio = getRatio();
 		/*
-			_amountWrappedToken == ceil(contractBalance*_amountAToken/totalSupply)
+			ratio == amountUnit/amountWrapped
+			amountWrapped == amountUnit/ratio
 		*/
-		_amountWrappedToken = _totalSupply*_amountAToken;
-		_amountWrappedToken = (_amountWrappedToken%contractBalance == 0 ? 0 : 1) + _amountWrappedToken/contractBalance;
+		_amountWrappedToken = _amountAToken.mul(1 ether);
+		_amountWrappedToken = _amountWrappedToken/ratio + (_amountWrappedToken%ratio == 0 ? 0 : 1);
 	}
 
 	function WrappedAmtToUnitAmt_RoundDown(uint _amountWrappedToken) public view override returns (uint _amountAToken) {
-		IERC20 _aToken = IERC20(underlyingAssetAddress);
-		uint contractBalance = _aToken.balanceOf(address(this));
-		uint _totalSupply = totalSupply;
-		_amountAToken = _totalSupply == 0 ? _amountWrappedToken : contractBalance*_amountWrappedToken/_totalSupply;
+		uint ratio = getRatio();
+		/*
+			ratio == amountUnit/amountWrapped
+			amountUnit == amountWrapped * ratio
+		*/
+		_amountAToken = _amountWrappedToken.mul(ratio)/(1 ether);
 	}
 
 	function WrappedAmtToUnitAmt_RoundUp(uint _amountWrappedToken) public view override returns (uint _amountAToken) {
-		IERC20 _aToken = IERC20(underlyingAssetAddress);
-		uint contractBalance = _aToken.balanceOf(address(this));
-		uint _totalSupply = totalSupply;
-		if (_totalSupply == 0) return _amountWrappedToken;
-		_amountAToken = contractBalance*_amountWrappedToken;
-		_amountAToken = _amountAToken/_totalSupply + (_amountAToken % _totalSupply == 0 ? 0 : 1);
+		uint ratio = getRatio();
+		/*
+			ratio == amountUnit/amountWrapped
+			amountUnit == amountWrapped * ratio
+		*/
+		_amountAToken = _amountWrappedToken.mul(ratio);
+		_amountAToken = _amountAToken/(1 ether) + (_amountAToken%(1 ether) == 0 ? 0 : 1);
 	}
 
 

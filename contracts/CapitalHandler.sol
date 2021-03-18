@@ -97,7 +97,7 @@ contract CapitalHandler is ICapitalHandler, Ownable {
 
 	function claimBondPayout(address _to) external override {
 		int bondBal = balanceBonds[msg.sender];
-		require(block.timestamp >= maturity && bondBal > 0);
+		require(inPayoutPhase && bondBal > 0);
 		wrapper.withdrawWrappedAmount(_to, uint(bondBal)*1e18/maturityConversionRate);
 		balanceBonds[msg.sender] = 0;
 	}

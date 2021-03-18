@@ -4,23 +4,41 @@ const capitalHandler = artifacts.require('CapitalHandler');
 const BN = web3.utils.BN;
 const _10To18 = (new BN('10')).pow(new BN('18'));
 
+let helper = require('../helper/helper.js');
+
+const ErrorRange = Math.pow(10,-7);
+const TreasuryErrorRange = Math.pow(10, -5);
+
+function AmountError(actual, expected) {
+	actual = parseInt(actual);
+	expected = parseInt(expected);
+	if (actual === expected) {
+		return 0;
+	}
+	else if (actual === 0 || expected === 0) {
+		return 1.0;
+	}
+	return Math.abs(actual-expected)/expected;
+}
 
 contract('NGBwrapper', async function(accounts){
 	it('before each', async () => {
 		dummyATokenInstance = await dummyAToken.new("DMY");
 		NGBwrapperInstance = await NGBwrapper.new(dummyATokenInstance.address);
 		inflation = await dummyATokenInstance.inflation();
+		treasuryAddress = await NGBwrapperInstance.treasuryAddress();
 		assert.equal(await NGBwrapperInstance.underlyingAssetAddress(), dummyATokenInstance.address, 'correct address for aToken');
 		assert.equal((await NGBwrapperInstance.totalSupply()).toString(), "0", "correct total supply");
 	});
 
 	it('executes 1st deposit', async () => {
-		amount = '10000';
+		amount = _10To18.div(new BN(100)).toString();
 		await dummyATokenInstance.approve(NGBwrapperInstance.address, amount);
 		await NGBwrapperInstance.depositUnitAmount(accounts[0], amount);
 		totalSupply = await NGBwrapperInstance.totalSupply();
 		assert.equal(totalSupply.toString(), amount, "correct total supply after 1st deposit");
 		assert.equal((await NGBwrapperInstance.balanceOf(accounts[0])).toString(), amount, "correct balance of account 0 after 1st deposit");
+		assert.equal((await NGBwrapperInstance.prevRatio()).toString(), _10To18.toString(), "correct value of prevRatio");
 	});
 
 	it('executes standard deposits', async () => {
@@ -45,7 +63,9 @@ contract('NGBwrapper', async function(accounts){
 		wrappedBalanceAct0 = await NGBwrapperInstance.balanceOf(accounts[0]);
 		assert.equal(totalSupply.toString(), prevTotalSupply.sub(toWithdraw).toString(), "correct total supply after withdrawWrappedToken() call");
 		assert.equal(wrappedBalanceAct0.toString(), (new BN(amount)).sub(toWithdraw).toString(), "correct balance wrapped tokens for account 0");
-		assert.equal((await dummyATokenInstance.balanceOf(accounts[1])).toString(), inflation.mul(toWithdraw).div(_10To18).toString(), "correct aToken balance for account");
+		let expected = inflation.mul(toWithdraw).div(_10To18).toString();
+		let actual = (await dummyATokenInstance.balanceOf(accounts[1])).toString();
+		assert.isBelow(AmountError(expected, actual), ErrorRange, "correct aToken balance for account");
 	});
 
 	it('executes withdrawAToken', async () => {

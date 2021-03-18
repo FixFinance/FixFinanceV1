@@ -1,5 +1,5 @@
 pragma solidity >=0.6.0 <0.7.0;
-import "./NGBwrapper.sol";
+import "./Wrappers/NGBwrapper.sol";
 import "./CapitalHandler.sol";
 import "./amm/ZCBamm.sol";
 import "./amm/YTamm.sol";
@@ -14,7 +14,8 @@ contract organizer {
 
 	event WrapperDeployment(
 		address wrapperAddress,
-		address underlyingAddress
+		address underlyingAddress,
+		uint8 wrapperType
 	);
 
 	event CapitalHandlerDeployment(
@@ -58,7 +59,7 @@ contract organizer {
 	function deployAssetWrapper(address _assetAddress) public {
 		NGBwrapper temp = new NGBwrapper(_assetAddress);
 		temp.transferOwnership(msg.sender);
-		emit WrapperDeployment(address(temp), _assetAddress);
+		emit WrapperDeployment(address(temp), _assetAddress, 0);
 	}
 
 	function deployCapitalHandlerInstance(address _wrapperAddress, uint64 _maturity) public {

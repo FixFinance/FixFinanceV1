@@ -52,7 +52,7 @@ contract('capitalHandler', async function(accounts){
 	it('gives yield to yield holder', async () => {
 		//increase value of wrapped token by 2x
 		//adjust for 10 bip deduction from capitalHandler
-		adjustedInflation = inflation.add(inflation.mul(new BN(999)).div(new BN(1000)));
+		adjustedInflation = inflation.add(inflation.mul(new BN(4)).div(new BN(5)));
 		let yieldGenerated = (new BN(amount)).mul(adjustedInflation).div(_10To18).sub(new BN(amount)).toString();
 		let expectedWrappedFree = (new BN(yieldGenerated)).mul(_10To18).div(adjustedInflation);
 		inflation = inflation.mul(new BN(2));
@@ -70,15 +70,6 @@ contract('capitalHandler', async function(accounts){
 		assert.equal((await capitalHandlerInstance.balanceYield(accounts[0])).toString(), prevBalanceYield.sub(new BN(toWithdraw)).toString(), "correct balance yield for account 0");
 	});
 
-	it('withdraws funds unwrap:true', async () => {
-		toWithdraw = (parseInt(amount)/8)+"";
-		prevBalanceYield = await capitalHandlerInstance.balanceYield(accounts[0]);
-		await capitalHandlerInstance.withdraw(accounts[1], toWithdraw, true);
-		expectedAToken = inflation.mul(new BN(toWithdraw)).div(_10To18);
-		assert.equal((await dummyATokenInstance.balanceOf(accounts[1])).toString(), expectedAToken, "corect balance wrapped token for account 1");
-		assert.equal((await capitalHandlerInstance.balanceYield(accounts[0])).toString(), prevBalanceYield.sub(new BN(toWithdraw)).toString(), "correct balance yield for account 0");		
-	});
-
 	it('transfers yield', async () => {
 		toTransferYield = (parseInt(amount)/8)+"";
 		toTransferATkn = adjustedInflation.mul(new BN(toTransferYield)).div(_10To18).toString();
@@ -86,15 +77,29 @@ contract('capitalHandler', async function(accounts){
 		prevBalanceYield = await capitalHandlerInstance.balanceYield(accounts[0]);
 		prevBalanceOf = await capitalHandlerInstance.balanceOf(accounts[0]);
 		await yieldTokenInstance.transfer(accounts[2], toTransferYield);
+		//await yieldTokenInstance.transfer_2(accounts[2], toTransferYield, true);
+		//let expectedBondChange = (new BN(toTransferATkn)).mul(adjustedInflation).div(_10To18).toString();
 		let expectedBondChange = toTransferATkn;
 		let expectedYieldChange = toTransferYield;
-		let expectedBalance0 = prevBalanceOf.sub(new BN(1)).toString(); //account for rounding error
+		let expectedBalance0 = prevBalanceOf.toString();
 		assert.equal((await capitalHandlerInstance.balanceBonds(accounts[0])).sub(prevBalanceBond).toString(), expectedBondChange, "correct balance bonds account 0");
 		assert.equal(prevBalanceYield.sub(await capitalHandlerInstance.balanceYield(accounts[0])).toString(), expectedYieldChange, "correct balance yield account 0")
 		assert.equal((await capitalHandlerInstance.balanceOf(accounts[0])).toString(), expectedBalance0, "correct minimum aTkn balance at maturity account 0");
 		assert.equal((await capitalHandlerInstance.balanceBonds(accounts[2])).toString(), "-"+toTransferATkn, "correct balance bonds account 2");
 		assert.equal((await capitalHandlerInstance.balanceYield(accounts[2])).toString(), toTransferYield, "correct balance yield account 2");
 		assert.equal((await capitalHandlerInstance.balanceOf(accounts[2])).toString(), "0", "correct minimum aTkn balance at maturity account 2");
+	});
+
+	it('withdraws funds unwrap:true', async () => {
+		toWithdraw = (parseInt(amount)/8)+"";
+		prevBalanceYield = await capitalHandlerInstance.balanceYield(accounts[0]);
+		await capitalHandlerInstance.withdraw(accounts[1], toWithdraw, true);
+		expectedAToken = inflation.mul(new BN(toWithdraw)).div(_10To18);
+		assert.equal((await dummyATokenInstance.balanceOf(accounts[1])).toString(), expectedAToken, "corect balance wrapped token for account 1");
+		assert.equal((await capitalHandlerInstance.balanceYield(accounts[0])).toString(), prevBalanceYield.sub(new BN(toWithdraw)).toString(), "correct balance yield for account 0");		
+		//because neglidgeble time has elapsed the actual fee in the wrapper contract is -
+		//thus the ratio of wrapped to unwrapped asset is == inflation
+		adjustedInflation = inflation;
 	});
 
 	it('cannot transfer too much yield', async () => {

@@ -6,8 +6,12 @@ const _10To18 = (new BN('10')).pow(new BN('18'));
 
 let helper = require('../helper/helper.js');
 
-const ErrorRange = Math.pow(10,-7);
-const TreasuryErrorRange = Math.pow(10, -5);
+const secondsPerYear = 31556926;
+const ErrorRange = Math.pow(10,-9);
+const annualFee = 0.001;
+const annualRetention = 1 - annualFee;
+
+const _1Month = 31*24*60*60;
 
 function AmountError(actual, expected) {
 	actual = parseInt(actual);
@@ -42,42 +46,65 @@ contract('NGBwrapper', async function(accounts){
 	});
 
 	it('executes standard deposits', async () => {
+		await helper.advanceTime(_1Month);
 		inflation = inflation.mul(new BN(2));
 		await dummyATokenInstance.setInflation(inflation.toString());
 		await dummyATokenInstance.approve(NGBwrapperInstance.address, amount);
-		await NGBwrapperInstance.depositUnitAmount(accounts[1], amount);
+		let lastHarvest = (await NGBwrapperInstance.lastHarvest()).toNumber();
+		let rec = await NGBwrapperInstance.depositUnitAmount(accounts[1], amount);
+		let timestamp = (await web3.eth.getBlock(rec.receipt.blockNumber)).timestamp;
+		let yearsElapsed = (timestamp-lastHarvest)/secondsPerYear;
+		let pctRetained = Math.pow(annualRetention, yearsElapsed);
+		let supplyInflation = 1/pctRetained;
 		expectedBalanceIncrease = (new BN(amount)).div(new BN(2));
 		prevTotalSupply = totalSupply;
 		totalSupply = await NGBwrapperInstance.totalSupply();
-		assert.equal(totalSupply.toString(), prevTotalSupply.add(expectedBalanceIncrease).toString(), "correct total supply after standard deposit");
-		assert.equal((await NGBwrapperInstance.balanceOf(accounts[1])).toString(), (new BN(amount)).div(new BN(2)).toString(), "correct balance account 1");
+		let actual = totalSupply.toString();
+		let expected = parseInt(prevTotalSupply.add(expectedBalanceIncrease).toString())*supplyInflation;
+		assert.isBelow(AmountError(actual, expected), ErrorRange, "total supply after standard deposit is within acceptable range of error");
+		actual = (await NGBwrapperInstance.balanceOf(accounts[1])).toString();
+		expected = parseInt((new BN(amount)).div(new BN(2)).toString())*supplyInflation;
+		assert.isBelow(AmountError(actual, expected), ErrorRange, "balance of account 1 within acceptable range of error");
 	});
 
 	it('executes withdrawWrappedToken', async () => {
+		await helper.advanceTime(_1Month);
 		inflation = inflation.mul(new BN(3));
 		await dummyATokenInstance.setInflation(inflation.toString());
 		toWithdraw = (new BN(amount)).div(new BN(2));
-		await NGBwrapperInstance.withdrawWrappedAmount(accounts[1], toWithdraw.toString());
+		let lastHarvest = (await NGBwrapperInstance.lastHarvest()).toNumber();
+		let rec = await NGBwrapperInstance.withdrawWrappedAmount(accounts[1], toWithdraw.toString());
+		let timestamp = (await web3.eth.getBlock(rec.receipt.blockNumber)).timestamp;
+		let yearsElapsed = (timestamp-lastHarvest)/secondsPerYear;
+		let pctRetained = Math.pow(annualRetention, yearsElapsed);
+		let supplyInflation = 1/pctRetained;
 		prevTotalSupply = totalSupply;
 		totalSupply = await NGBwrapperInstance.totalSupply();
 		wrappedBalanceAct0 = await NGBwrapperInstance.balanceOf(accounts[0]);
-		assert.equal(totalSupply.toString(), prevTotalSupply.sub(toWithdraw).toString(), "correct total supply after withdrawWrappedToken() call");
+		let expected = parseInt(prevTotalSupply.toString())*supplyInflation - parseInt(toWithdraw.toString());
+		let actual = totalSupply.toString();
+		assert.isBelow(AmountError(actual, expected), ErrorRange, "total supply after withdrawWrappedToken() in range of acceptable error");
 		assert.equal(wrappedBalanceAct0.toString(), (new BN(amount)).sub(toWithdraw).toString(), "correct balance wrapped tokens for account 0");
-		let expected = inflation.mul(toWithdraw).div(_10To18).toString();
-		let actual = (await dummyATokenInstance.balanceOf(accounts[1])).toString();
+		let contractBalance = await dummyATokenInstance.balanceOf(NGBwrapperInstance.address);
+		expected = toWithdraw.mul(contractBalance).div(totalSupply).toString();
+		actual = (await dummyATokenInstance.balanceOf(accounts[1])).toString();
 		assert.isBelow(AmountError(expected, actual), ErrorRange, "correct aToken balance for account");
 	});
 
 	it('executes withdrawAToken', async () => {
+		await helper.advanceTime(_1Month);
 		toWithdraw = new BN(amount);
-		await NGBwrapperInstance.withdrawUnitAmount(accounts[2], toWithdraw.toString());
+		let rec = await NGBwrapperInstance.withdrawUnitAmount(accounts[2], toWithdraw.toString());
+		let prevRatio = await NGBwrapperInstance.prevRatio();
 		expectedWrappedTokenDecrease = toWithdraw.mul(_10To18);
-		expectedWrappedTokenDecrease = expectedWrappedTokenDecrease.div(inflation).add(new BN(expectedWrappedTokenDecrease.mod(inflation).toString() == "0" ? 0 : 1));
+		expectedWrappedTokenDecrease = expectedWrappedTokenDecrease.div(prevRatio).add(new BN(expectedWrappedTokenDecrease.mod(prevRatio).toString() == "0" ? 0 : 1));
 		prevTotalSupply = totalSupply;
 		totalSupply = await NGBwrapperInstance.totalSupply();
 		prevWrappedBalanceAct0 = wrappedBalanceAct0;
 		wrappedBalanceAct0 = await NGBwrapperInstance.balanceOf(accounts[0]);
-		assert.equal(totalSupply.toString(), prevTotalSupply.sub(expectedWrappedTokenDecrease).toString(), "correct total supply after withdrawAToken() call");
+		let actual = totalSupply.toString();
+		let expected = prevTotalSupply.sub(expectedWrappedTokenDecrease).toString();
+		assert.equal(actual, expected, "correct total supply after withdrawAToken() call");
 		assert.equal(wrappedBalanceAct0.toString(), prevWrappedBalanceAct0.sub(expectedWrappedTokenDecrease).toString(), "correct balance wrapped token account 0");
 		aTknBalAct2 = await dummyATokenInstance.balanceOf(accounts[2]);
 		//inflation is 6*10**18 thus we can expect the range abs of the error in the balance of account[2] to be less than 6

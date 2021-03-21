@@ -208,7 +208,6 @@ contract('BondMinter', async function(accounts) {
 	});
 
 	it('deposits into vault', async () => {
-		//process.exit();
 		var prevBalanceW1 = await wAsset1.balanceOf(accounts[0]);
 		prevSupplied = new BN(vaults[0].amountSupplied);
 		await bondMinterInstance.deposit(accounts[0], 0, _10To18.toString());

@@ -131,20 +131,22 @@ contract('SwapRouter', async function(accounts) {
 
 
 	it('ATknToZCB()', async () => {
+		helper.advanceTime(100);
 		balanceATkn = await aTokenInstance.balanceOf(accounts[0]);
 		balanceZCB = await capitalHandlerInstance.balanceOf(accounts[0]);
 		balanceYT = await yieldTokenInstance.balanceOf(accounts[0]);
 
 		let amt = "100000";
 		let minZCB = "100001";
-		await aTokenInstance.approve(router.address, amt);
+		let toApprove = roundingBuffer.add(new BN(amt));
+		await aTokenInstance.approve(router.address, toApprove);
 		await router.UnitToZCB(capitalHandlerInstance.address, amt, minZCB);
 
 		newBalanceATkn = await aTokenInstance.balanceOf(accounts[0]);
 		newBalanceYT = await yieldTokenInstance.balanceOf(accounts[0]);
 		newBalanceZCB = await capitalHandlerInstance.balanceOf(accounts[0]);
 
-		assert.equal(balanceATkn.sub(newBalanceATkn).toString(), amt, "correct amount of aTkn in");
+		assert.equal(balanceATkn.sub(newBalanceATkn).toString(), toApprove, "correct amount of aTkn in");
 		assert.equal(balanceYT.toString(), newBalanceYT.toString(), "YT balance not affected");
 		if (newBalanceZCB.sub(balanceZCB).cmp(new BN(minZCB)) == -1) {
 			assert.fail("new balance of ZCB must be greater than prev balance by at least _minZCBout");
@@ -152,6 +154,7 @@ contract('SwapRouter', async function(accounts) {
 	});
 
 	it('ATknToYT()', async () => {
+		helper.advanceTime(100);
 		balanceATkn = await aTokenInstance.balanceOf(accounts[0]);
 		balanceZCB = await capitalHandlerInstance.balanceOf(accounts[0]);
 		balanceYT = await yieldTokenInstance.balanceOf(accounts[0]);

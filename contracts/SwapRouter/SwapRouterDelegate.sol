@@ -16,6 +16,7 @@ contract SwapRouterDelegate {
 	uint private constant RoundingBuffer = 0x10;
 
 	function UnitToZCB(address _capitalHandlerAddress, uint _amount, uint _minZCBout) external {
+		require(_amount > MinBalance && _amount < uint(MAX));
 		ICapitalHandler ch = ICapitalHandler(_capitalHandlerAddress);
 		organizer _org = org;
 		IERC20 underlyingAsset = IERC20(ICapitalHandler(_capitalHandlerAddress).underlyingAssetAddress());
@@ -23,7 +24,10 @@ contract SwapRouterDelegate {
 		IZCBamm amm = IZCBamm(_org.ZCBamms(_capitalHandlerAddress));
 		IYieldToken yt = IYieldToken(ch.yieldTokenAddress());
 
+		wrapper.forceHarvest();
+		uint amtZCBout = amm.ReserveQuoteFromSpecificTokens(int128(_amount), false);
 		uint _amountWrapped;
+		require(amtZCBout >= _minZCBout);
 		if (wrapper.underlyingIsWrapped()) {
 			_amountWrapped = wrapper.UnitAmtToWrappedAmt_RoundUp(_amount);
 			underlyingAsset.transferFrom(msg.sender, address(this), _amountWrapped);
@@ -31,23 +35,28 @@ contract SwapRouterDelegate {
 			wrapper.depositWrappedAmount(address(this), _amountWrapped);
 		}
 		else {
-			underlyingAsset.transferFrom(msg.sender, address(this), _amount);
-			underlyingAsset.approve(address(wrapper), _amount);
-			_amountWrapped = wrapper.depositUnitAmount(address(this), _amount);
+			//when underlying is not wrapped there may be some rounding error, this
+			//may result in us having too little funds to take the quote we reserved
+			uint toDeposit = _amount + RoundingBuffer;
+			underlyingAsset.transferFrom(msg.sender, address(this), toDeposit);
+			underlyingAsset.approve(address(wrapper), toDeposit);
+			_amountWrapped = wrapper.depositUnitAmount(address(this), toDeposit);
 		}
 		wrapper.approve(_capitalHandlerAddress, _amountWrapped);
 		ch.depositWrappedToken(address(this), _amountWrapped);
 		ch.approve(address(amm), _amount);
 		yt.approve(address(amm), _amountWrapped);
-		uint _amountToSwap = wrapper.WrappedAmtToUnitAmt_RoundUp(_amountWrapped);
-		require(_amountToSwap <= uint(MAX));
-		uint _out = amm.SwapFromSpecificTokensWithLimit(int128(_amountToSwap), false, _minZCBout);
-		ch.transfer(msg.sender, _out);
+		amm.TakeQuote(_amount, amtZCBout, false, false);
+		//uint _amountToSwap = wrapper.WrappedAmtToUnitAmt_RoundUp(_amountWrapped);
+		//require(_amountToSwap <= uint(MAX));
+		//uint _out = amm.SwapFromSpecificTokensWithLimit(int128(_amountToSwap), false, _minZCBout);
+		
+		ch.transfer(msg.sender, ch.balanceOf(address(this)));
 	}
 
 	function UnitToYT(address _capitalHandlerAddress, int128 _amountYT, uint _maxUnitAmount) external {
 		_amountYT++;	//account for rounding error when transfering funds out of YTamm
-		require(_amountYT > 0);
+		require(_amountYT > int128(MinBalance));
 		ICapitalHandler ch = ICapitalHandler(_capitalHandlerAddress);
 		organizer _org = org;
 		IERC20 underlyingAsset = IERC20(ICapitalHandler(_capitalHandlerAddress).underlyingAssetAddress());
@@ -55,6 +64,7 @@ contract SwapRouterDelegate {
 		IYTamm amm = IYTamm(_org.YTamms(_capitalHandlerAddress));
 		IYieldToken yt = IYieldToken(ch.yieldTokenAddress());
 
+		wrapper.forceHarvest();
 		uint _amtATkn = amm.ReserveQuoteToYT(_amountYT);
 		//remove possibility for problems due to rounding error
 		uint _amtTransfer = _amtATkn + RoundingBuffer;

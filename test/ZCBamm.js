@@ -337,7 +337,6 @@ contract('ZCBamm', async function(accounts){
 	});
 
 	it('SwapFromSpecificTokens _ZCBin:false', async () => {
-		//process.exit();
 		await helper.advanceTime(121);
 
 		amtIn = balance.div(new BN(100));

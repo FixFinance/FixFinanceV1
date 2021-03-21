@@ -128,7 +128,8 @@ contract YTamm is IYTamm {
 
 	function getQuoteSignature(bool _YTin) internal view returns (bytes32) {
 		IZCBamm zcbamm = IZCBamm(ZCBammAddress);
-		return keccak256(abi.encodePacked(totalSupply, YTreserves, zcbamm.getRateFromOracle(), zcbamm.anchor(), _YTin, block.number));
+		(uint updateTimestamp, uint ratio) = wrapper.getStatus();
+		return keccak256(abi.encodePacked(totalSupply, YTreserves, zcbamm.getRateFromOracle(), zcbamm.anchor(), _YTin, updateTimestamp, ratio));
 	}
 
 	function writeQuoteSignature(bool _YTin, int128 _amountYT, uint _amountU, uint _treasuryFee) internal returns (bytes32) {

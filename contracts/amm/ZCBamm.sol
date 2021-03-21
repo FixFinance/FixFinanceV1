@@ -130,7 +130,8 @@ contract ZCBamm is IZCBamm {
 	}
 
 	function getQuoteSignature(uint8 _tradeType) internal view returns (bytes32) {
-		return keccak256(abi.encodePacked(totalSupply, ZCBreserves, Ureserves, _tradeType, block.number));
+		(uint updateTimestamp, uint ratio) = wrapper.getStatus();
+		return keccak256(abi.encodePacked(totalSupply, ZCBreserves, Ureserves, _tradeType, updateTimestamp, ratio));
 	}
 
 	function _inflatedTotalSupply() internal view returns (uint) {

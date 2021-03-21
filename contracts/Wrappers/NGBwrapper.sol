@@ -18,6 +18,25 @@ contract NGBwrapper is IWrapper, Ownable {
 	using SafeMath for uint;
 	using ABDKMath64x64 for int128;
 
+	//SBPS == super bips == 1/100th of a bip
+	//100 * 10_000 == 1_000_000
+	uint32 private constant totalSBPS = 1_000_000;
+
+	//totalSBPS - annualTreasuryFee(in sbps)
+	uint32 private constant SBPSRetained = 999_000;
+
+	//minimum amount of interest on each harvest that should be retained for holders
+	//of this token.
+	//800_000 sbps == 8_000 bips == 80%
+	//ex. if 1000 units of interest are generated between harvests then 800 units
+	//is the minimum amount that must be retained for tokens holders thus the
+	//maximum amount that may go to the treasury is 200 units
+	uint32 private constant minHarvestRetention = 800_000;
+
+	uint private constant ABDK_1 = 1 << 64;
+
+	int128 private constant MAX = 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
+
 	address public override underlyingAssetAddress;
 
 	bool public constant override underlyingIsWrapped = false;
@@ -27,14 +46,6 @@ contract NGBwrapper is IWrapper, Ownable {
 	uint8 public immutable override decimals;
 
 	address public immutable treasuryAddress;
-
-	uint32 private constant superBipsToTreasury = 1_000;
-
-	uint32 private constant totalSuperBips = 1_000_000;
-
-	uint private constant ABDK_1 = 1 << 64;
-
-	int128 private constant MAX = 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
 
 	uint public lastHarvest;
 
@@ -93,17 +104,25 @@ contract NGBwrapper is IWrapper, Ownable {
 		uint _prevRatio = prevRatio;
 		uint contractBalance = IERC20(underlyingAssetAddress).balanceOf(address(this));
 		uint nonFeeAdjustedRatio = uint(1 ether).mul(contractBalance).div(_totalSupply);
+		//handle odd case, most likely only caused by rounding error (off by 1)
+		if (nonFeeAdjustedRatio < _prevRatio) {
+			return nonFeeAdjustedRatio;
+		}
 		uint minNewRatio = nonFeeAdjustedRatio
 			.sub(_prevRatio)
-			.mul(totalSuperBips-superBipsToTreasury)
-			.div(totalSuperBips)
+			.mul(minHarvestRetention)
+			.div(totalSBPS)
 			.add(_prevRatio);
 		return minNewRatio;
 	}
 
+	function getStatus() external view override returns (uint updateTimestamp, uint ratio) {
+		return (block.timestamp, getRatio());
+	}
+
 	function harvestToTreasury() internal {
 		uint _lastHarvest = lastHarvest;
-		if (block.timestamp < _lastHarvest+(5 minutes)) {
+		if (block.timestamp == _lastHarvest) {
 			return;
 		}
 		uint contractBalance = IERC20(underlyingAssetAddress).balanceOf(address(this));
@@ -117,23 +136,30 @@ contract NGBwrapper is IWrapper, Ownable {
 			prevTotalSupply/totalSupply = ((totalBips-bipsToTreasury)/totalBips)**t
 			totalSupply = prevTotalSupply*((totalBips-bipsToTreasury)/totalBips)**(-t)
 		*/
-		uint term = uint(BigMath.Exp(int128(totalSuperBips-superBipsToTreasury).div(int128(totalSuperBips)), time.neg()));
+		uint term = uint(BigMath.Exp(int128((uint(SBPSRetained) << 64) / totalSBPS), time.neg()));
 		uint newTotalSupply = prevTotalSupply.mul(term) / ABDK_1;
 		uint effectiveRatio = uint(1 ether).mul(contractBalance);
 		uint nonFeeAdjustedRatio = effectiveRatio.div(prevTotalSupply);
 		effectiveRatio = effectiveRatio.div(newTotalSupply);
-		uint minNewRatio = nonFeeAdjustedRatio.sub(_prevRatio).mul(totalSuperBips-superBipsToTreasury).div(totalSuperBips).add(_prevRatio);
+		uint minNewRatio = nonFeeAdjustedRatio.sub(_prevRatio).mul(minHarvestRetention).div(totalSBPS).add(_prevRatio);
 		if (effectiveRatio < minNewRatio) {
 			/*
 				ratio == contractBalance/totalSupply
 				totalSupply == contractBalance/ratio
 			*/
 			newTotalSupply = contractBalance.mul(1 ether).div(minNewRatio);
+			prevRatio = minNewRatio;
 		}
-
+		else {
+			prevRatio = effectiveRatio;
+		}
 		lastHarvest = block.timestamp;
 		balanceOf[treasuryAddress] += newTotalSupply.sub(prevTotalSupply);
 		totalSupply = newTotalSupply;
+	}
+
+	function forceHarvest() external override {
+		harvestToTreasury();
 	}
 
 	function withdrawUnitAmount(address _to, uint _amountAToken) public override returns (uint _amountWrappedToken) {

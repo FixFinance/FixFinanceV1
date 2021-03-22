@@ -18,7 +18,6 @@ contract YTamm is IYTamm {
 	using SafeMath for uint256;
 
 	address public override ZCBammAddress;
-
 	uint64 public override maturity;
 
 	uint YTreserves;
@@ -41,6 +40,9 @@ contract YTamm is IYTamm {
 
 	int128 _2WeeksABDK = int128((2 weeks << 64)/BigMath.SecondsPerYear);
 
+	/*
+		Init AMM
+	*/
 	constructor(
 		address _ZCBammAddress,
 		address _feeOracleAddress
@@ -52,6 +54,7 @@ contract YTamm is IYTamm {
 		uint64 _maturity = IZCBamm(_ZCBammAddress).maturity();
 		require(_maturity > block.timestamp + 10 days);
 		int128 apy = IZCBamm(_ZCBammAddress).getAPYFromOracle();
+		//YTamm cannot be created until it has a matching ZCBamm from which to get rate information
 		require(apy > 0);
 		maturity = _maturity;
 		ZCBammAddress = _ZCBammAddress;
@@ -65,6 +68,12 @@ contract YTamm is IYTamm {
 		init(_ZCBaddress, _YTaddress);
 	}
 
+	/*
+		@Description: mint LP tokens
+
+		@param address _to: address that shall receive LP tokens
+		@param uint _amount: amount of LP tokens to be minted
+	*/
 	function _mint(address _to, uint _amount) internal {
         claimDividendInternal(_to, _to);
 		balanceOf[_to] += _amount;
@@ -73,6 +82,12 @@ contract YTamm is IYTamm {
 		emit Mint(_to, _amount);
 	}
 
+	/*
+		@Description: burn LP tokens
+
+		@param address _from: address that is burning LP tokenns
+		@param uint _amount: amount of LP tokens to burn
+	*/
 	function _burn(address _from, uint _amount) internal {
 		require(balanceOf[_from] >= _amount);
         claimDividendInternal(_from, _from);
@@ -82,6 +97,14 @@ contract YTamm is IYTamm {
 		emit Burn(_from, _amount);
 	}
 
+	/*
+		@Descripiton: aggregate fund transfers when pool receives YT and sends U
+
+		@param uint _amountYT: amount of YT to get
+		@param uint _amountU: amount of U to send
+		@param uint _treasuryFee: amount of U to be sent to the treasury
+		@param address _treasuryAddress: destination of treasury fee
+	*/
 	function getYTsendU(uint _amountYT, uint _amountU, uint _treasuryFee, address _treasuryAddress)  internal {
 		sendZCB(msg.sender, _amountU);
 		if (_amountYT > _amountU) {
@@ -92,6 +115,14 @@ contract YTamm is IYTamm {
 		sendZCB(_treasuryAddress, _treasuryFee);
 	}
 
+	/*
+		@Descripiton: aggregate fund transfers when pool sends YT and receives U
+
+		@param uint _amountYT: amount of YT to send
+		@param uint _amountU: amount of U to get
+		@param uint _treasuryFee: amount of U to be sent to the treasury
+		@param address _treasuryAddress: destination of treasury fee
+	*/
 	function sendYTgetU(uint _amountYT, uint _amountU, uint _treasuryFee, address _treasuryAddress) internal {
 		require(_amountYT > _amountU);
 		sendYT(msg.sender, _amountYT - _amountU);
@@ -101,44 +132,101 @@ contract YTamm is IYTamm {
 		sendZCB(_treasuryAddress, _treasuryFee);
 	}
 
+	/*
+		@Description: pool receives ZCB from user
+
+		@param address _to: address to get ZCB from
+		@param uint _amount: amount of ZCB for pool to receive
+	*/
 	function getZCB(address _to, uint _amount) internal {
 		IERC20(ZCBaddress).transferFrom(msg.sender, _to, _amount);
 	}
 
+	/*
+		@Description: pool receives YT from user
+
+		@param address _to: address to get YT from
+		@param uint _amount: amount of YT for pool to receive
+	*/
 	function getYT(address _to, uint _amount) internal {
 		IYieldToken(YTaddress).transferFrom_2(msg.sender, _to, _amount, true);
 	}
 
+	/*
+		@Description: pool transfers ZCB to user
+
+		@param address _to: address to which to transfer ZCB
+		@param uint _amount: amount of ZCB to transfer
+	*/
 	function sendZCB(address _to, uint _amount) internal {
 		IERC20(ZCBaddress).transfer(_to, _amount);
 	}
 
+	/*
+		@Description: pool transfers YT to user
+
+		@param address _to: address to which to transfer YT
+		@param uint _amount: amount of YT to transfer
+	*/
 	function sendYT(address _to, uint _amount) internal {
 		IYieldToken(YTaddress).transfer_2(_to, _amount, false);
 	}
 
+	/*
+		@return uint: amount of time remaining to maturity (in years) inflated by 64 bits
+	*/
 	function timeRemaining() internal view returns (uint) {
 		return uint( ((maturity-wrapper.lastUpdate())<<64) / BigMath.SecondsPerYear);
 	}
 
+	/*
+		@Description: used in swap calculations regular totalSupply is used when minting/
+			when burning LP tokens
+
+		@return uint ret: totalSupply divided by a constant
+	*/
 	function _inflatedTotalSupply() internal view returns (uint ret) {
 		ret = totalSupply.mul(1 ether) / YTtoLmultiplier;
 		require(ret > 0);
 	}
 
+	/*
+		@Description: get signature of amm state, useful for when reserving and taking amm quotes
+
+		@param bool _YTin: if the user is getting a quote for sendingYT and receiveing U this will be true
+
+		@return bytes32: signature of amm state
+	*/
 	function getQuoteSignature(bool _YTin) internal view returns (bytes32) {
 		IZCBamm zcbamm = IZCBamm(ZCBammAddress);
 		(uint updateTimestamp, uint ratio) = wrapper.getStatus();
 		return keccak256(abi.encodePacked(totalSupply, YTreserves, zcbamm.getRateFromOracle(), zcbamm.anchor(), _YTin, updateTimestamp, ratio));
 	}
 
-	function writeQuoteSignature(bool _YTin, int128 _amountYT, uint _amountU, uint _treasuryFee) internal returns (bytes32) {
+	/*
+		@Description: write state signature to storage so that quote may be taken later
+
+		@param bool _YTin: if the quote is for sendingYT to the pool and receiveing U this will be true
+			otherwise it will be false
+		@param int128 _amountYT: the amount of YT that is being quoted to be sent or received
+		@param uint _amountU: the amount of U that is being quoted to be sent or received
+		@param uint _treasuryFee: the amoun of U that will be sent to the treasury if this quote is taken
+	*/
+	function writeQuoteSignature(bool _YTin, int128 _amountYT, uint _amountU, uint _treasuryFee) internal {
 		quoteSignature = getQuoteSignature(_YTin);
 		quotedAmountYT = _amountYT;
 		quotedAmountU = _amountU;
 		quotedTreasuryFee = _treasuryFee;
 	}
 
+	/*
+		@Description: ensure the quote in storage matches the quote the user is asking for
+
+		@uint _amountU: the amount of U that is quoted to be sent or received
+		@param int128 _amountYT: the amount of YT that is quoted to be sent or received
+		@param bool _YTin: if the quote is for sendingYT to the pool and receiveing U this will be true
+			otherwise it will be false
+	*/
 	modifier verifyQuote(uint _amountU, int128 _amountYT, bool _YTin) {
 		require(quotedAmountU == _amountU);
 		require(quotedAmountYT == _amountYT);
@@ -147,8 +235,8 @@ contract YTamm is IYTamm {
 	}
 
 	/*
-		@Description first deposit in pool, pool starts at equilibrim
-		this means the implied rate of the pool is the same as the rate fetched from the oracle
+		@Description first deposit of liquidity into this contract, totalSupply must be == 0
+			pool starts at equilibrim this means the implied rate of the pool is the same as the rate fetched from the oracle
 	*/
 	function firstMint(uint128 _Uin) external override {
 		require(totalSupply == 0);
@@ -163,6 +251,17 @@ contract YTamm is IYTamm {
 		YTreserves = YTin;
 	}
 
+	/*
+		@Description: if this pool has encured losses due to market events there is a chance that
+			the ratio of U and YT reserves is out of sync, this function should tell us if this
+			has happened or not
+
+		@param int128 _approxYTin: an approximation of the maximum amount of YT that may be swapped
+			into this amm in order to get U out. This value should be greater than the actual maximum
+			amount of YT that may be swapped in
+
+		@return bool: return true if the U and YT reserve ratio is out of sync, return false otherwise
+	*/
 	function isOutOfSync(int128 _approxYTin) internal view returns (bool) {
 		uint _YTreserves = YTreserves;
 		require(_approxYTin > 0);
@@ -201,6 +300,17 @@ contract YTamm is IYTamm {
 		return false;
 	}
 
+	/*
+		@Description: as time progresses the optimal ratio of YT to U reserves changes
+			this function ensures that we return to that ratio every so often
+			this function may also be called when outOfSync returns true
+
+		@param int128 _approxYTin: an approximation of the maximum amount of YT that may be swapped
+			into this amm in order to get U out. This value should be greater than the actual maximum
+			amount of YT that may be swapped in
+			This param only matters if the user is trying to recalibrate based on reserves going out
+			of sync
+	*/
 	function recalibrate(int128 _approxYTin) external override {
 		require(block.timestamp > lastRecalibration + 4 weeks || isOutOfSync(_approxYTin));
 		/*
@@ -248,6 +358,13 @@ contract YTamm is IYTamm {
 		quoteSignature = bytes32(0);
 	}
 
+	/*
+		@Description: to supply liquidity to this contract this function must be called
+
+		@param uint _amount: the amount of LP tokens to mint
+		@param uint _maxUin: the maximum amount of U to deposit as liquidity
+		@param uint _maxYTin: the maximum amount of YT to deposit as liquidity
+	*/
 	function mint(uint _amount, uint _maxUin, uint _maxYTin) external override {
 		uint _totalSupply = totalSupply;	//gas savings
 		uint Uin = _amount*Ureserves;
@@ -267,6 +384,11 @@ contract YTamm is IYTamm {
 		YTreserves += YTin;
 	}
 
+	/*
+		@Description: to remove liquidity from this contract this function must be called
+
+		@param uint _amount: the amount of LP tokens to burn
+	*/
 	function burn(uint _amount) external override {
 		uint _totalSupply = totalSupply;	//gas savings
 		uint Uout = _amount*Ureserves/_totalSupply;
@@ -281,6 +403,14 @@ contract YTamm is IYTamm {
 		YTreserves -= YTout;
 	}
 
+
+	/*
+		@Description: call this function to send a specified amount of YT to the contract and receive U
+
+		@param int128 _amount: the amount of YT to send
+
+		@return uint: the amount of U received by the user
+	*/
 	function SwapFromSpecificYT(int128 _amount) public override returns (uint) {
 		require(_amount > 0);
 		uint _YTreserves = YTreserves;
@@ -319,6 +449,13 @@ contract YTamm is IYTamm {
 		return Uout;
 	}
 
+	/*
+		@Description: call this function to send U to the contract and receive a specified amount of YT
+
+		@param int128 _amount: the amount of YT to receive
+
+		@return uint: the amount of U sent to the contract
+	*/
 	function SwapToSpecificYT(int128 _amount) public override returns (uint) {
 		require(_amount > 0);
 		uint _YTreserves = YTreserves;
@@ -356,18 +493,43 @@ contract YTamm is IYTamm {
 		return Uin;
 	}
 
+	/*
+		@Description: send a specific amount of YT to the contract and receive U
+			revert if the amount of U received is less than a minimum U desired
+
+		@param int128: the amount of YT to send
+		@param uint _minUout: the minimum amount of U desired out
+
+		@return uint: the amont of U received by the user
+	*/
 	function SwapFromSpecificYTWithLimit(int128 _amount, uint _minUout) external override returns (uint) {
 		uint ret = SwapFromSpecificYT(_amount);
 		require(ret >= _minUout);
 		return ret;
 	}
 
+	/*
+		@Description: send U to the contract and received a specified amount of YT,
+			revert if the amount of U is greater than a maximum amount of U to send
+
+		@param int128: the amount of YT to receive
+		@param uint _maxUin: the maximum amount of U the user is willing to send
+
+		@return uint: the amount of U sent to the contract
+	*/
 	function SwapToSpecificYTWithLimit(int128 _amount, uint _maxUin) external override returns (uint) {
 		uint ret = SwapToSpecificYT(_amount);
 		require(ret <= _maxUin);
 		return ret;
 	}
 
+	/*
+		@Description: reserve a quote for a swap that sends a specific amount of YT to this contract
+
+		@param int128 _amount: the amount of YT to send in to this contract
+
+		@return uint: the amount of U send out by contract
+	*/
 	function ReserveQuoteFromYT(int128 _amount) external override returns (uint) {
 		require(_amount > 0);
 		uint _TimeRemaining = timeRemaining();
@@ -400,6 +562,13 @@ contract YTamm is IYTamm {
 		return Uout;
 	}
 
+	/*
+		@Description: reserve a quote for a swap in whicht he user receives a specific amount of YT
+
+		@param int128 _amount: the amount of YT out desired
+
+		@return uint: the amount of U sent in to the contract
+	*/
 	function ReserveQuoteToYT(int128 _amount) external override returns (uint) {
 		require(_amount > 0);
 		uint _YTreserves = YTreserves;
@@ -431,6 +600,14 @@ contract YTamm is IYTamm {
 		return Uin;
 	}
 
+	/*
+		@Description: take the quote that was most recently reserved
+
+		@param uint _amountU: the amount of U involved in the swap
+		@param int128: the amount of YT involved in the swap
+		@param bool _YTin: if the quote is for sendingYT to the pool and receiveing U this will be true
+			otherwise it will be false
+	*/
 	function TakeQuote(uint _amountU, int128 _amountYT, bool _YTin) external override verifyQuote(_amountU, _amountYT, _YTin) {
 		uint _quotedTreasuryFee = quotedTreasuryFee;
 		address sendTo = AmmInfoOracle(AmmInfoOracleAddress).sendTo();
@@ -453,6 +630,11 @@ contract YTamm is IYTamm {
 
 
 	//-------------------------implement double asset yield enabled token-------------------------------
+
+	/*
+		@Description: resupply all excess funds (interest generated and funds donated to the contrac) as liquidity
+			for the funds that cannot be supplied as liqudity redistribute them out to LP token holders as dividends
+	*/
 	function contractClaimDividend() external override {
 		require(lastWithdraw + 1 days < block.timestamp, "this function can only be called once every 24 hours");
 
@@ -531,12 +713,18 @@ contract YTamm is IYTamm {
 
 	//------------------------------v-i-e-w-s-----------------------------------------------
 
+	/*
+		@Description: return valuable info about this contract's reserves and time to maturity
+	*/
 	function getReserves() external view override returns (uint _Ureserves, uint _YTreserves, uint _TimeRemaining) {
 		_Ureserves = Ureserves;
 		_YTreserves = YTreserves;
 		_TimeRemaining = timeRemaining();
 	}
 
+	/*
+		@Description: return value of _inflatedTotalSupply externally
+	*/
 	function inflatedTotalSupply() external override view returns (uint) {
 		return _inflatedTotalSupply();
 	}

@@ -180,8 +180,8 @@ contract YTamm is IYTamm {
 	}
 
 	/*
-		@Description: used in swap calculations regular totalSupply is used when minting/
-			when burning LP tokens
+		@Description: used in swap calculations,
+			regular totalSupply is used when minting or when burning LP tokens
 
 		@return uint ret: totalSupply divided by a constant
 	*/
@@ -206,7 +206,7 @@ contract YTamm is IYTamm {
 	/*
 		@Description: write state signature to storage so that quote may be taken later
 
-		@param bool _YTin: if the quote is for sendingYT to the pool and receiveing U this will be true
+		@param bool _YTin: if the quote is for sending YT to the pool and receiveing U this will be true
 			otherwise it will be false
 		@param int128 _amountYT: the amount of YT that is being quoted to be sent or received
 		@param uint _amountU: the amount of U that is being quoted to be sent or received

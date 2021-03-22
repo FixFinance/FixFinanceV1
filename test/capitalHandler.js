@@ -14,7 +14,7 @@ const _10To18 = (new BN('10')).pow(new BN('18'));
 contract('capitalHandler', async function(accounts){
 	it('before each', async () => {
 		dummyATokenInstance = await dummyAToken.new("aCOIN");
-		NGBwrapperInstance = await NGBwrapper.new(dummyATokenInstance.address);
+		NGBwrapperInstance = await NGBwrapper.new(dummyATokenInstance.address, accounts[4]);
 		yieldTokenDeployerInstance = await yieldTokenDeployer.new();
 		timeNow = (await web3.eth.getBlock('latest')).timestamp;
 		capitalHandlerInstance = await capitalHandler.new(NGBwrapperInstance.address, timeNow+86400, yieldTokenDeployerInstance.address);

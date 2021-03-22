@@ -58,7 +58,8 @@ contract('SwapRouter', async function(accounts) {
 			ZCBammDeployerInstance.address,
 			YTammDeployerInstance.address,
 			swapRouterDeployerInstance.address,
-			ammInfoOracleInstance.address
+			ammInfoOracleInstance.address,
+			accounts[4]
 		);
 		await organizerInstance.DeploySwapRouter();
 		router = await SwapRouter.at(await organizerInstance.SwapRouterAddress());

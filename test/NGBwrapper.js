@@ -28,9 +28,10 @@ function AmountError(actual, expected) {
 contract('NGBwrapper', async function(accounts){
 	it('before each', async () => {
 		dummyATokenInstance = await dummyAToken.new("DMY");
-		NGBwrapperInstance = await NGBwrapper.new(dummyATokenInstance.address);
+		NGBwrapperInstance = await NGBwrapper.new(dummyATokenInstance.address, accounts[4]);
 		inflation = await dummyATokenInstance.inflation();
 		treasuryAddress = await NGBwrapperInstance.treasuryAddress();
+		await NGBwrapperInstance.transferOwnership(treasuryAddress);
 		assert.equal(await NGBwrapperInstance.underlyingAssetAddress(), dummyATokenInstance.address, 'correct address for aToken');
 		assert.equal((await NGBwrapperInstance.totalSupply()).toString(), "0", "correct total supply");
 	});

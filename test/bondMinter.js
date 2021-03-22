@@ -60,7 +60,8 @@ contract('BondMinter', async function(accounts) {
 			ZCBammDeployerInstance.address,
 			YTammDeployerInstance.address,
 			nullAddress,
-			ammInfoOracleInstance.address
+			ammInfoOracleInstance.address,
+			accounts[0]
 		);
 
 		maturity = ((await web3.eth.getBlock('latest')).timestamp + _8days).toString();

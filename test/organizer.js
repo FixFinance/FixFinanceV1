@@ -48,7 +48,8 @@ contract('organizer', function(accounts) {
 			ZCBammDeployerInstance.address,
 			YTammDeployerInstance.address,
 			swapRouterDeployerInstance.address,
-			ammInfoOracleInstance.address
+			ammInfoOracleInstance.address,
+			accounts[4]
 		);
 		assert.equal(await organizerInstance.AmmInfoOracleAddress(), ammInfoOracleInstance.address);
 		await organizerInstance.DeploySwapRouter();

@@ -46,7 +46,7 @@ module.exports = async function(deployer) {
 		await factory.createPair(kovanAEthAddress, capitalHandlers[i]);
 	}
 	*/
-
+	accounts = await web3.eth.getAccounts();
 	dummyATokenInstance = await deployer.deploy(dummyAToken, "aETH");
 	dummyATokenInstance = await deployer.deploy(dummyAToken, "aUSDC");
 	yieldTokenDeployerInstance = await deployer.deploy(yieldTokenDeployer);
@@ -69,7 +69,8 @@ module.exports = async function(deployer) {
 		ZCBammDeployerInstance.address,
 		YTammDeployerInstance.address,
 		swapRouterDeployerInstance.address,
-		ammInfoOracle.address
+		ammInfoOracle.address,
+		accounts[0]
 	);
 	await organizerInstance.DeploySwapRouter();
 	let rec = await organizerInstance.deployAssetWrapper(dummyATokenInstance.address);

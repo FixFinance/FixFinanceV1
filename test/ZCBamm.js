@@ -43,7 +43,7 @@ function AmountError(actual, expected) {
 contract('ZCBamm', async function(accounts){
 	it('before each', async () => {
 		aTokenInstance = await aToken.new("aCOIN");
-		NGBwrapperInstance = await NGBwrapper.new(aTokenInstance.address);
+		NGBwrapperInstance = await NGBwrapper.new(aTokenInstance.address, accounts[4]);
 		EiInstance = await Ei.new();
 		await BigMath.link("Ei", EiInstance.address);
 		BigMathInstance = await BigMath.new();

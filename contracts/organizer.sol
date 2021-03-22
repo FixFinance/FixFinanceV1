@@ -34,6 +34,7 @@ contract organizer {
 	address internal SwapRouterDeployerAddress;
 	address public SwapRouterAddress;
 	address public AmmInfoOracleAddress;
+	address public treasuryAddress;
 
 	constructor (
 		address _yieldTokenDeployerAddress,
@@ -41,7 +42,8 @@ contract organizer {
 		address _ZCBammDeployerAddress,
 		address _YTammDeployerAddress,
 		address _SwapRouterDeployerAddress,
-		address _AmmInfoOracleAddress
+		address _AmmInfoOracleAddress,
+		address _treasuryAddress
 		) public {
 		yieldTokenDeployerAddress = _yieldTokenDeployerAddress;	
 		CapitalHandlerDeployerAddress = _CapitalhandlerDeployerAddress;
@@ -49,6 +51,7 @@ contract organizer {
 		YTammDeployerAddress = _YTammDeployerAddress;
 		SwapRouterDeployerAddress = _SwapRouterDeployerAddress;
 		AmmInfoOracleAddress = _AmmInfoOracleAddress;
+		treasuryAddress = _treasuryAddress;
 	}
 
 	function DeploySwapRouter() external {
@@ -57,7 +60,7 @@ contract organizer {
 	}
 
 	function deployAssetWrapper(address _assetAddress) public {
-		NGBwrapper temp = new NGBwrapper(_assetAddress);
+		NGBwrapper temp = new NGBwrapper(_assetAddress, treasuryAddress);
 		temp.transferOwnership(msg.sender);
 		emit WrapperDeployment(address(temp), _assetAddress, 0);
 	}

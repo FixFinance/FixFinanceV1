@@ -49,12 +49,12 @@ contract NGBwrapper is IWrapper, Ownable {
 
 	uint public lastHarvest;
 
-	constructor (address _underlyingAssetAddress) public {
+	constructor (address _underlyingAssetAddress, address _treasuryAddress) public {
 		underlyingAssetAddress = _underlyingAssetAddress;
 		decimals = IERC20(_underlyingAssetAddress).decimals();
 		name = string(abi.encodePacked('wrapped ',IERC20(_underlyingAssetAddress).name()));
 		symbol = string(abi.encodePacked('w', IERC20(_underlyingAssetAddress).symbol()));
-		treasuryAddress = address(0);
+		treasuryAddress = _treasuryAddress;
 	}
 
 	function balanceUnit(address _owner) external view override returns (uint balance) {
@@ -105,11 +105,10 @@ contract NGBwrapper is IWrapper, Ownable {
 		uint contractBalance = IERC20(underlyingAssetAddress).balanceOf(address(this));
 		uint nonFeeAdjustedRatio = uint(1 ether).mul(contractBalance).div(_totalSupply);
 		//handle odd case, most likely only caused by rounding error (off by 1)
-		if (nonFeeAdjustedRatio < _prevRatio) {
-			return nonFeeAdjustedRatio;
+		if (nonFeeAdjustedRatio <= _prevRatio) {
+			return _prevRatio;
 		}
-		uint minNewRatio = nonFeeAdjustedRatio
-			.sub(_prevRatio)
+		uint minNewRatio = (nonFeeAdjustedRatio-_prevRatio)
 			.mul(minHarvestRetention)
 			.div(totalSBPS)
 			.add(_prevRatio);
@@ -129,19 +128,23 @@ contract NGBwrapper is IWrapper, Ownable {
 		uint prevTotalSupply = totalSupply;
 		uint _prevRatio = prevRatio;
 		//time in years
-		int128 time = int128(((block.timestamp - _lastHarvest) << 64)/ BigMath.SecondsPerYear);
 		/*
 			nextBalance = contractBalance * ((totalBips-bipsToTreasury)/totalBips)**t
 			prevTotalSupply*contractBalance/totalSupply = contractBalance * ((totalBips-bipsToTreasury)/totalBips)**t
 			prevTotalSupply/totalSupply = ((totalBips-bipsToTreasury)/totalBips)**t
 			totalSupply = prevTotalSupply*((totalBips-bipsToTreasury)/totalBips)**(-t)
 		*/
-		uint term = uint(BigMath.Exp(int128((uint(SBPSRetained) << 64) / totalSBPS), time.neg()));
-		uint newTotalSupply = prevTotalSupply.mul(term) / ABDK_1;
 		uint effectiveRatio = uint(1 ether).mul(contractBalance);
 		uint nonFeeAdjustedRatio = effectiveRatio.div(prevTotalSupply);
+		if (nonFeeAdjustedRatio <= _prevRatio) {
+			//only continue if yield has been generated
+			return;
+		}
+		uint minNewRatio = (nonFeeAdjustedRatio - _prevRatio).mul(minHarvestRetention).div(totalSBPS).add(_prevRatio);
+		int128 time = int128(((block.timestamp - _lastHarvest) << 64)/ BigMath.SecondsPerYear);
+		uint term = uint(BigMath.Exp(int128((uint(SBPSRetained) << 64) / totalSBPS), time.neg()));
+		uint newTotalSupply = prevTotalSupply.mul(term) / ABDK_1;
 		effectiveRatio = effectiveRatio.div(newTotalSupply);
-		uint minNewRatio = nonFeeAdjustedRatio.sub(_prevRatio).mul(minHarvestRetention).div(totalSBPS).add(_prevRatio);
 		if (effectiveRatio < minNewRatio) {
 			/*
 				ratio == contractBalance/totalSupply
@@ -154,7 +157,9 @@ contract NGBwrapper is IWrapper, Ownable {
 			prevRatio = effectiveRatio;
 		}
 		lastHarvest = block.timestamp;
-		balanceOf[treasuryAddress] += newTotalSupply.sub(prevTotalSupply);
+		uint dividend = newTotalSupply.sub(prevTotalSupply) >> 1;
+		balanceOf[treasuryAddress] += dividend;
+		balanceOf[owner] += dividend;
 		totalSupply = newTotalSupply;
 	}
 

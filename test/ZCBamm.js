@@ -27,6 +27,7 @@ const _2To64BN = (new BN("2")).pow(new BN("64"));
 const DesiredDigitsAccurate = 7;
 const ErrorRange = Math.pow(10,-7);
 const TreasuryErrorRange = Math.pow(10, -5);
+const SBPSretained = 999_000;
 
 function AmountError(actual, expected) {
 	actual = parseInt(actual);
@@ -43,7 +44,7 @@ function AmountError(actual, expected) {
 contract('ZCBamm', async function(accounts){
 	it('before each', async () => {
 		aTokenInstance = await aToken.new("aCOIN");
-		NGBwrapperInstance = await NGBwrapper.new(aTokenInstance.address, accounts[4]);
+		NGBwrapperInstance = await NGBwrapper.new(aTokenInstance.address, accounts[4], SBPSretained);
 		EiInstance = await Ei.new();
 		await BigMath.link("Ei", EiInstance.address);
 		BigMathInstance = await BigMath.new();

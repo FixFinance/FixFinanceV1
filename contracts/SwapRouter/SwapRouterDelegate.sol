@@ -15,6 +15,13 @@ contract SwapRouterDelegate {
 
 	uint private constant RoundingBuffer = 0x10;
 
+	/*
+		@Description: turn underlying asset into ZCB
+	
+		@param address _capitalHandlerAddress: address of the ZCB to which to swap into
+		@param uint _amount: the amount of the underlying asset to swap
+		@param uint _minZCBout
+	*/
 	function UnitToZCB(address _capitalHandlerAddress, uint _amount, uint _minZCBout) external {
 		require(_amount > MinBalance && _amount < uint(MAX));
 		ICapitalHandler ch = ICapitalHandler(_capitalHandlerAddress);
@@ -54,6 +61,14 @@ contract SwapRouterDelegate {
 		ch.transfer(msg.sender, ch.balanceOf(address(this)));
 	}
 
+	/*
+		@Description: turn underlying asset into YT
+
+		@param address _capitalHandlerAddress: address of the capital handler which manages the yield token
+			which we will transform our underlying asset into
+		@param int128 _amountYT: amount of YT which we will swap to
+		@param uint _maxUnitAmount: maximum amount of the underlying asset to use
+	*/
 	function UnitToYT(address _capitalHandlerAddress, int128 _amountYT, uint _maxUnitAmount) external {
 		_amountYT++;	//account for rounding error when transfering funds out of YTamm
 		require(_amountYT > int128(MinBalance));
@@ -89,6 +104,14 @@ contract SwapRouterDelegate {
 		yt.transfer(msg.sender, yt.balanceOf(address(this)));
 	}
 
+	/*
+		@Description: close ZCB and YT positions and return to underlying asset
+
+		@param address _capitalHandlerAddress: the capital handler that manages the ZCB and YT positions that will be exited
+		@param uint _minUOut: the minimum amount of the underlying asset that will be accepted
+		@param bool _unwrap: if true the underlying asset will be unwrapped
+			otherwise after positions are exited the wrapped asset will be returned back to the caller of this function
+	*/
 	function LiquidateAllToUnderlying(address _capitalHandlerAddress, uint _minUout, bool _unwrap) external {
 		ICapitalHandler ch = ICapitalHandler(_capitalHandlerAddress);
 		IYieldToken yt = IYieldToken(ch.yieldTokenAddress());

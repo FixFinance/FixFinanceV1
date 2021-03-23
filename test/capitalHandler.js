@@ -10,11 +10,12 @@ const nullAddress = "0x0000000000000000000000000000000000000000";
 const BN = web3.utils.BN;
 const _10To18 = (new BN('10')).pow(new BN('18'));
 
+const SBPSretained = 999_000;
 
 contract('capitalHandler', async function(accounts){
 	it('before each', async () => {
 		dummyATokenInstance = await dummyAToken.new("aCOIN");
-		NGBwrapperInstance = await NGBwrapper.new(dummyATokenInstance.address, accounts[4]);
+		NGBwrapperInstance = await NGBwrapper.new(dummyATokenInstance.address, accounts[4], SBPSretained);
 		yieldTokenDeployerInstance = await yieldTokenDeployer.new();
 		timeNow = (await web3.eth.getBlock('latest')).timestamp;
 		capitalHandlerInstance = await capitalHandler.new(NGBwrapperInstance.address, timeNow+86400, yieldTokenDeployerInstance.address);

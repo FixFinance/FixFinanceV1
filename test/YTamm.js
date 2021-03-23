@@ -30,6 +30,7 @@ const LENGTH_RATE_SERIES = 31;
 const ErrorRange = Math.pow(10,-7);
 const TreasuryErrorRange = Math.pow(10, -5);
 const wBN = new BN(0);
+const SBPSretained = 999_000;
 
 function AmountError(actual, expected) {
 	actual = parseInt(actual);
@@ -91,7 +92,7 @@ async function setRate(amm, rate, account) {
 contract('YTamm', async function(accounts){
 	it('before each', async () => {
 		aTokenInstance = await aToken.new("aCOIN");
-		NGBwrapperInstance = await NGBwrapper.new(aTokenInstance.address, accounts[4]);
+		NGBwrapperInstance = await NGBwrapper.new(aTokenInstance.address, accounts[4], SBPSretained);
 		EiInstance = await Ei.new();
 		await BigMath.link("Ei", EiInstance.address);
 		BigMathInstance = await BigMath.new();

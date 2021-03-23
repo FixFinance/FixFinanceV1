@@ -23,7 +23,7 @@ contract NGBwrapper is IWrapper, Ownable {
 	uint32 private constant totalSBPS = 1_000_000;
 
 	//totalSBPS - annualTreasuryFee(in sbps)
-	uint32 private constant SBPSRetained = 999_000;
+	uint32 private SBPSRetained = 999_000;
 
 	//minimum amount of interest on each harvest that should be retained for holders
 	//of this token.
@@ -49,12 +49,14 @@ contract NGBwrapper is IWrapper, Ownable {
 
 	uint public lastHarvest;
 
-	constructor (address _underlyingAssetAddress, address _treasuryAddress) public {
+	constructor (address _underlyingAssetAddress, address _treasuryAddress, uint32 _SBPSRetained) public {
+		require(_SBPSRetained > 0 && _SBPSRetained <= totalSBPS);
 		underlyingAssetAddress = _underlyingAssetAddress;
 		decimals = IERC20(_underlyingAssetAddress).decimals();
 		name = string(abi.encodePacked('wrapped ',IERC20(_underlyingAssetAddress).name()));
 		symbol = string(abi.encodePacked('w', IERC20(_underlyingAssetAddress).symbol()));
 		treasuryAddress = _treasuryAddress;
+		SBPSRetained = _SBPSRetained;
 	}
 
 	function balanceUnit(address _owner) external view override returns (uint balance) {
@@ -273,5 +275,14 @@ contract NGBwrapper is IWrapper, Ownable {
         return true;
     }
 
+    //------------------------------------a-d-m-i-n----------------------------
 
+    /*
+		@Description: set the annual wrapper fee in super basis points
+			half of all fees goes to owner, the other half goes to the treasury
+    */
+    function setFee(uint32 _SBPSRetained) external onlyOwner {
+    	require(_SBPSRetained > 0 && _SBPSRetained <= totalSBPS);
+    	SBPSRetained = _SBPSRetained;
+    }
 }

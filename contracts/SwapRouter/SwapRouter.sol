@@ -20,11 +20,21 @@ contract SwapRouter is ISwapRouter {
 
 	uint private constant RoundingBuffer = 0x10;
 
+	/*
+		@Description: init swap router
+	*/
 	constructor(address _organizerAddress, address _delegateAddress) public {
 		org = organizer(_organizerAddress);
 		delegateAddress = _delegateAddress;
 	}
 
+	/*
+		@Description: turn underlying asset into ZCB
+	
+		@param address _capitalHandlerAddress: address of the ZCB to which to swap into
+		@param uint _amount: the amount of the underlying asset to swap
+		@param uint _minZCBout
+	*/
 	function UnitToZCB(address _capitalHandlerAddress, uint _amount, uint _minZCBout) external override {
 		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
 			"UnitToZCB(address,uint256,uint256)",
@@ -35,6 +45,14 @@ contract SwapRouter is ISwapRouter {
 		require(success);
 	}
 
+	/*
+		@Description: turn underlying asset into YT
+
+		@param address _capitalHandlerAddress: address of the capital handler which manages the yield token
+			which we will transform our underlying asset into
+		@param int128 _amountYT: amount of YT which we will swap to
+		@param uint _maxUnitAmount: maximum amount of the underlying asset to use
+	*/
 	function UnitToYT(address _capitalHandlerAddress, int128 _amountYT, uint _maxUnitAmount) external override {
 		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
 			"UnitToYT(address,int128,uint256)",
@@ -45,6 +63,14 @@ contract SwapRouter is ISwapRouter {
 		require(success);
 	}
 
+	/*
+		@Description: close ZCB and YT positions and return to underlying asset
+
+		@param address _capitalHandlerAddress: the capital handler that manages the ZCB and YT positions that will be exited
+		@param uint _minUOut: the minimum amount of the underlying asset that will be accepted
+		@param bool _unwrap: if true the underlying asset will be unwrapped
+			otherwise after positions are exited the wrapped asset will be returned back to the caller of this function
+	*/
 	function LiquidateAllToUnderlying(address _capitalHandlerAddress, uint _minUout, bool _unwrap) external override {
 		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
 			"LiquidateAllToUnderlying(address,uint256,bool)",
@@ -55,13 +81,23 @@ contract SwapRouter is ISwapRouter {
 		require(success);
 	}
 
+	/*
+		@Description: liquidate a specific amount of ZCB and YT and get out the underlying asset
+
+		@param address _capitalHandlerAddress: the capital handler that manages the ZCB and YT positions that will be exited
+		@param uint _amountZCB: the amount of ZCB to exit
+		@param uint _amountYT: the amount of YT to exit
+		@param uint _minUOut: the minimum amount of the underlying asset that will be accepted
+		@param bool _unwrap: if true the underlying asset will be unwrapped
+			otherwise after positions are exited the wrapped asset will be returned back to the caller of this function
+	*/
 	function LiquidateSpecificToUnderlying(
 			address _capitalHandlerAddress,
 			uint _amountZCB,
 			uint _amountYT,
 			uint _minUout,
 			bool _unwrap
-		) external override {
+	) external override {
 		ICapitalHandler ch = ICapitalHandler(_capitalHandlerAddress);
 		IYieldToken yt = IYieldToken(ch.yieldTokenAddress());
 
@@ -101,6 +137,14 @@ contract SwapRouter is ISwapRouter {
 		ch.withdrawAll(msg.sender, _unwrap);
 	}
 
+	/*
+		@Description: exchange ZCB to a specific amount of YT
+			path: ZCB =(ZCBamm)=> U =(YTamm)=> YT
+
+		@param address _capitalHandlerAddress: the capital handler that manages the ZCB and YT to trade between
+		@param uint _amountYT: the amount of YT which will be the final output
+		@param uint _maxZCBin: the maximum amount of ZCB to be used to get out _amountYT YT
+	*/
 	function SwapZCBtoYT(address _capitalHandlerAddress, uint _amountYT, uint _maxZCBin) external override {
 		require(_amountYT < uint(MAX));
 		ICapitalHandler ch = ICapitalHandler(_capitalHandlerAddress);
@@ -122,6 +166,14 @@ contract SwapRouter is ISwapRouter {
 		yt.transfer(msg.sender, yt.balanceOf(address(this)));
 	}
 
+	/*
+		@Description: exchange a specific amount of YT to ZCB
+			path: YT =(YTamm)=> U =(ZCBamm)=> ZCB
+
+		@param address _capitalHandlerAddress: the capital handler that manages the ZCB and YT to trade between
+		@param uint _amountYT: the amount of YT which will be the input
+		@param uint _minZCBout: the minimum amount of ZCB which will be accepted out of the swap
+	*/
 	function SwapYTtoZCB(address _capitalHandlerAddress, uint _amountYT, uint _minZCBout) external override {
 		require(_amountYT < uint(MAX) && _amountYT > RoundingBuffer);
 		ICapitalHandler ch = ICapitalHandler(_capitalHandlerAddress);
@@ -143,6 +195,19 @@ contract SwapRouter is ISwapRouter {
 		ch.transfer(msg.sender, _amtZCB);
 	}
 
+	/*
+		@Description: exchange ZCB to a specific amount of YT
+			path: ZCB =(ZCBamm)=> YT
+			*exclusive use of the ZCBamm may result in greater amounts of slippage*
+
+		@param address _capitalHandlerAddress: the capital handler that manages the ZCB and YT to trade between
+		@param uint _amountYT: the amount of YT which will be the final output
+		@param uint _maxZCBin: the maximum amount of ZCB to be used to get out _amountYT YT
+		@param bool _transferIn: if true call tranferFrom to get all necessary funds from msg.sender
+			otherwise assume that this contract contains enough funds to preform this operation
+		@param bool _tranferOut: if true call transfer to send all funds after swapping to msg.sender
+			otherwise continue to hold all funds in this contract
+	*/
 	function _SwapZCBtoYT_ZCBamm(address _capitalHandlerAddress, uint _amountYT, uint _maxZCBin, bool _transferIn, bool _transferOut) internal returns (uint ZCBin) {
 		require(_amountYT < uint(MAX) && _amountYT > RoundingBuffer);
 		ICapitalHandler ch = ICapitalHandler(_capitalHandlerAddress);
@@ -164,6 +229,19 @@ contract SwapRouter is ISwapRouter {
 		}
 	}
 
+	/*
+		@Description: exchange a specific amount of YT to ZCB
+			path: YT =(ZCBamm)=> ZCB
+			*exclusive use of the ZCBamm may result in greater amounts of slippage*
+
+		@param address _capitalHandlerAddress: the capital handler that manages the ZCB and YT to trade between
+		@param uint _amountYT: the amount of YT which will be the input
+		@param uint _minZCBout: the minimum amount of ZCB which will be accepted out of the swap
+		@param bool _transferIn: if true call tranferFrom to get all necessary funds from msg.sender
+			otherwise assume that this contract contains enough funds to preform this operation
+		@param bool _tranferOut: if true call transfer to send all funds after swapping to msg.sender
+			otherwise continue to hold all funds in this contract
+	*/
 	function _SwapYTtoZCB_ZCBamm(address _capitalHandlerAddress, uint _amountYT, uint _minZCBout, bool _transferIn, bool _transferOut) internal returns (uint ZCBout) {
 		require(_amountYT < uint(MAX) && _amountYT > RoundingBuffer);
 		ICapitalHandler ch = ICapitalHandler(_capitalHandlerAddress);
@@ -186,14 +264,43 @@ contract SwapRouter is ISwapRouter {
 		}
 	}
 
+	/*
+		@Description: exchange ZCB to a specific amount of YT
+			path: ZCB =(ZCBamm)=> YT
+			*exclusive use of the ZCBamm may result in greater amounts of slippage*
+
+		@param address _capitalHandlerAddress: the capital handler that manages the ZCB and YT to trade between
+		@param uint _amountYT: the amount of YT which will be the final output
+		@param uint _maxZCBin: the maximum amount of ZCB to be used to get out _amountYT YT
+	*/
 	function SwapZCBtoYT_ZCBamm(address _capitalHandlerAddress, uint _amountYT, uint _maxZCBin) external override {
 		_SwapZCBtoYT_ZCBamm(_capitalHandlerAddress, _amountYT, _maxZCBin, true, true);
 	}
 
+	/*
+		@Description: exchange a specific amount of YT to ZCB
+			path: YT =(ZCBamm)=> ZCB
+			*exclusive use of the ZCBamm may result in greater amounts of slippage*
+
+		@param address _capitalHandlerAddress: the capital handler that manages the ZCB and YT to trade between
+		@param uint _amountYT: the amount of YT which will be the input
+		@param uint _minZCBout: the minimum amount of ZCB which will be accepted out of the swap
+	*/
 	function SwapYTtoZCB_ZCBamm(address _capitalHandlerAddress, uint _amountYT, uint _minZCBout) external override {
 		_SwapYTtoZCB_ZCBamm(_capitalHandlerAddress, _amountYT, _minZCBout, true, true);
 	}
 
+	/*
+		@Description: exchange U to a specific amount of YT
+			path U =(ZCBamm)=> ZCB =(ZCBamm)=> YT
+			This function is unique in that it takes a specific amount of U in and results in a specific amount
+			of YT out. There will likely be a bit of ZCB that is left over as change, it will be sent back to
+			the caller of this function
+
+		@param address _capitalHandlerAddress: the capital handler that manages the ZCB and YT to trade between
+		@param uint _amountYT: the amount of YT which will be the output
+		@param uint _Uin: the amount of U from which to initially start
+	*/
 	function SwapUtoYT_ZCBamm(address _capitalHandlerAddress, uint _amountYT, int128 _Uin) external override {
 		require(_amountYT <= uint(MAX) && _amountYT > RoundingBuffer);
 		require(_Uin > 0);
@@ -211,6 +318,14 @@ contract SwapRouter is ISwapRouter {
 		_SwapZCBtoYT_ZCBamm(_capitalHandlerAddress, _amountYT, ZCBinMiddle, false, true);
 	}
 
+	/*
+		@Description: exchange a specific amount of YT to a specific amount of U
+			path: YT =(ZCBamm)=> ZCB =(ZCBamm)=> U
+
+		@param address _capitalHandlerAddress: the capital handler that manages the ZCB and YT to trade between
+		@param uint _amountYT: the amount of YT which will be sent in
+		@param uint _minUout: the minimum amount of U out that will be accepted
+	*/
 	function SwapYTtoU_ZCBamm(address _capitalHandlerAddress, uint _amountYT, uint _minUout) external override {
 		uint ZCBout = _SwapYTtoZCB_ZCBamm(_capitalHandlerAddress, _amountYT, _minUout, true, false);
 		ICapitalHandler ch = ICapitalHandler(_capitalHandlerAddress);

@@ -12,6 +12,8 @@ import "./AmmInfoOracle.sol";
 
 contract organizer {
 
+	uint32 private constant DEFAULT_SBPS_RETAINED = 999_000;
+
 	event WrapperDeployment(
 		address wrapperAddress,
 		address underlyingAddress,
@@ -60,7 +62,7 @@ contract organizer {
 	}
 
 	function deployAssetWrapper(address _assetAddress) public {
-		NGBwrapper temp = new NGBwrapper(_assetAddress, treasuryAddress);
+		NGBwrapper temp = new NGBwrapper(_assetAddress, treasuryAddress, DEFAULT_SBPS_RETAINED);
 		temp.transferOwnership(msg.sender);
 		emit WrapperDeployment(address(temp), _assetAddress, 0);
 	}

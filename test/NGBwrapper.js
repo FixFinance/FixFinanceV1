@@ -11,6 +11,8 @@ const ErrorRange = Math.pow(10,-9);
 const annualFee = 0.001;
 const annualRetention = 1 - annualFee;
 
+const SBPSretained = 999_000;
+
 const _1Month = 31*24*60*60;
 
 function AmountError(actual, expected) {
@@ -28,7 +30,7 @@ function AmountError(actual, expected) {
 contract('NGBwrapper', async function(accounts){
 	it('before each', async () => {
 		dummyATokenInstance = await dummyAToken.new("DMY");
-		NGBwrapperInstance = await NGBwrapper.new(dummyATokenInstance.address, accounts[4]);
+		NGBwrapperInstance = await NGBwrapper.new(dummyATokenInstance.address, accounts[4], SBPSretained);
 		inflation = await dummyATokenInstance.inflation();
 		treasuryAddress = await NGBwrapperInstance.treasuryAddress();
 		await NGBwrapperInstance.transferOwnership(treasuryAddress);

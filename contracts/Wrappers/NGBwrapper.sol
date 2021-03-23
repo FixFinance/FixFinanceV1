@@ -49,6 +49,9 @@ contract NGBwrapper is IWrapper, Ownable {
 
 	uint public lastHarvest;
 
+	/*
+		init
+	*/
 	constructor (address _underlyingAssetAddress, address _treasuryAddress, uint32 _SBPSRetained) public {
 		require(_SBPSRetained > 0 && _SBPSRetained <= totalSBPS);
 		underlyingAssetAddress = _underlyingAssetAddress;
@@ -59,48 +62,81 @@ contract NGBwrapper is IWrapper, Ownable {
 		SBPSRetained = _SBPSRetained;
 	}
 
-	function balanceUnit(address _owner) external view override returns (uint balance) {
-		if (balanceOf[_owner] == 0) return 0;
-		return balanceOf[_owner] * IERC20(underlyingAssetAddress).balanceOf(address(this)) / totalSupply;
-	}
+	/*
+		@Description: make first deposit into contract, totalSupply must == 0
+		
+		@param address _to: the address that shall receive the newly minted wrapped tokens
+		@param uint _amountUnit: the amount of underlying asset units to deposit
 
-	function firstDeposit(address _to, uint _amountAToken) internal returns (uint _amountWrappedToken) {
+		@return uint _amountWrappedToken: the amount of wrapped tokens that were minted
+	*/
+	function firstDeposit(address _to, uint _amountUnit) internal returns (uint _amountWrappedToken) {
 		IERC20 _aToken = IERC20(underlyingAssetAddress);
-		_aToken.transferFrom(msg.sender, address(this), _amountAToken);
-		balanceOf[_to] = _amountAToken;
-		totalSupply = _amountAToken;
-		_amountWrappedToken = _amountAToken;
+		_aToken.transferFrom(msg.sender, address(this), _amountUnit);
+		balanceOf[_to] = _amountUnit;
+		totalSupply = _amountUnit;
+		_amountWrappedToken = _amountUnit;
 		lastHarvest = block.timestamp;
 		prevRatio = 1 ether;
 	}
 
-	function deposit(address _to, uint _amountAToken) internal returns (uint _amountWrappedToken) {
+	/*
+		@Description: send in underlying asset, receive wrapped asset
+
+		@param address _to: the address that shall receive the newly minted wrapped tokens
+		@param uint _amountUnit: the amount of underlying asset units to deposit
+
+		@return uint _amountWrappedToken: the amount of wrapped tokens that were minted
+	*/
+	function deposit(address _to, uint _amountUnit) internal returns (uint _amountWrappedToken) {
 		uint _totalSupply = totalSupply;
 		if (_totalSupply == 0) {
-			return firstDeposit(_to, _amountAToken);
+			return firstDeposit(_to, _amountUnit);
 		}
 		harvestToTreasury();
 		IERC20 _aToken = IERC20(underlyingAssetAddress);
 		uint contractBalance = _aToken.balanceOf(address(this));
-		_aToken.transferFrom(msg.sender, address(this), _amountAToken);
-		_amountWrappedToken = totalSupply*_amountAToken/contractBalance;
+		_aToken.transferFrom(msg.sender, address(this), _amountUnit);
+		_amountWrappedToken = totalSupply*_amountUnit/contractBalance;
 		balanceOf[_to] += _amountWrappedToken;
 		totalSupply += _amountWrappedToken;
 	}
 
+	/*
+		@Description: send in a specific amount of underlying asset, receive wrapped asset
+
+		@param address _to: the address that shall receive the newly minted wrapped tokens
+		@param uint _amount: the amount of underlying asset units to deposit
+	*/
 	function depositUnitAmount(address _to, uint _amount) external override returns (uint _amountWrapped) {
 		return deposit(_to, _amount);
 	}
 
+	/*
+		@Description: send in underlying asset, receive a specific amount of wrapped asset
+
+		@param address _to: the address that shall receive the newly minted wrapped tokens
+		@param uint _amount: the amount of wrapped asset units to mint
+	*/
 	function depositWrappedAmount(address _to, uint _amount) external override returns (uint _amountUnit) {
 		_amountUnit = WrappedAmtToUnitAmt_RoundUp(_amount);
 		deposit(_to, _amountUnit);
 	}
 
+	/*
+		@Description: get the time at which the amount of yield generated in this wrapper was last updated
+			because there is a limit of 20% of interest generated since last harvest that may be collected
+			as fees we will always be able to get a wrapped asset to underlying asset ratio that accounts
+			for 80% of interest generated since last harvest thus we return the current timestamp as the
+			last update timestamp
+	*/
 	function lastUpdate() external view override returns (uint) {
 		return block.timestamp;
 	}
 
+	/*
+		@Description: get the ratio of underlyingAsset / wrappedAsset
+	*/
 	function getRatio() internal view returns (uint) {
 		uint _totalSupply = totalSupply;	
 		uint _prevRatio = prevRatio;
@@ -117,10 +153,28 @@ contract NGBwrapper is IWrapper, Ownable {
 		return minNewRatio;
 	}
 
+	/*
+		@Description: this function is called by amms to ensure the state of the wrapper has not changed
+			between registration of a quote and acceptance of a quote.
+			If the values returned by this function change after quote registration the amm quote will no
+			longer be valid
+
+		@return uint updateTimestamp: as long as within same block there is no problem
+		@return uint ratio: as long as no yield is generated between quote registration and acceptance
+			this function will not be responsible for reversion of quote acceptance
+	*/
 	function getStatus() external view override returns (uint updateTimestamp, uint ratio) {
 		return (block.timestamp, getRatio());
 	}
 
+	/*
+		@Description: collect fee, send 50% to owner and 50% to treasury address
+			after the fee is collected the funds that are retained for wrapped asset holders will
+			be == underlyingAsset.balanceOf(this) * (SBPSRetained/totalSBPS)**timeSinceLastHarvest(years)
+			though it should be noted that if the fee is greater than 20% of the total interest
+			generated since the last harvest the fee will be set to 20% of the total interest
+			generated since the last harvest
+	*/
 	function harvestToTreasury() internal {
 		uint _lastHarvest = lastHarvest;
 		if (block.timestamp == _lastHarvest) {
@@ -165,70 +219,118 @@ contract NGBwrapper is IWrapper, Ownable {
 		totalSupply = newTotalSupply;
 	}
 
+	/*
+		@Description: harvest fees to treasury and owner
+	*/
 	function forceHarvest() external override {
 		harvestToTreasury();
 	}
 
-	function withdrawUnitAmount(address _to, uint _amountAToken) public override returns (uint _amountWrappedToken) {
+	/*
+		@Description: burn wrapped asset to receive an amount of underlying asset of _amountUnit
+
+		@param address _to: the address that shall receive the underlying asset
+		@param uint _amountUnit: the amount of underlying asset units to withdraw
+
+		@return uint _amountWrappedToken: the amount of units of wrapped asset that were burned
+	*/
+	function withdrawUnitAmount(address _to, uint _amountUnit) public override returns (uint _amountWrappedToken) {
 		harvestToTreasury();
 		IERC20 _aToken = IERC20(underlyingAssetAddress);
 		uint contractBalance = _aToken.balanceOf(address(this));
-		//_amountWrappedToken == ceil(totalSupply*_amountAToken/contractBalance)
-		_amountWrappedToken = totalSupply*_amountAToken;
+		//_amountWrappedToken == ceil(totalSupply*_amountUnit/contractBalance)
+		_amountWrappedToken = totalSupply*_amountUnit;
 		_amountWrappedToken = (_amountWrappedToken%contractBalance == 0 ? 0 : 1) + (_amountWrappedToken/contractBalance);
 		require(balanceOf[msg.sender] >= _amountWrappedToken);
 		balanceOf[msg.sender] -= _amountWrappedToken;
 		totalSupply -= _amountWrappedToken;
-		_aToken.transfer(_to, _amountAToken);
+		_aToken.transfer(_to, _amountUnit);
 	}
 
-	function withdrawWrappedAmount(address _to, uint _amountWrappedToken) public override returns (uint _amountAToken) {
+	/*
+		@Description: burn a specific amount of wrappet asset to get out underlying asset
+
+		@param address _to: the address that shall receive the underlying asset
+		@param uint _amountWrappedToken: the amount of units of wrappet asset to burn
+
+		@return uint _amountUnit: the amount of underlying asset received
+	*/
+	function withdrawWrappedAmount(address _to, uint _amountWrappedToken) public override returns (uint _amountUnit) {
 		require(balanceOf[msg.sender] >= _amountWrappedToken);
 		harvestToTreasury();
 		IERC20 _aToken = IERC20(underlyingAssetAddress);
 		uint contractBalance = _aToken.balanceOf(address(this));
-		_amountAToken = contractBalance*_amountWrappedToken/totalSupply;
+		_amountUnit = contractBalance*_amountWrappedToken/totalSupply;
 		balanceOf[msg.sender] -= _amountWrappedToken;
 		totalSupply -= _amountWrappedToken;
-		_aToken.transfer(_to, _amountAToken);
+		_aToken.transfer(_to, _amountUnit);
 	}
 
-	function UnitAmtToWrappedAmt_RoundDown(uint _amountAToken) public view override returns (uint _amountWrappedToken) {
+
+	/*
+		@Description: convert an amount of underlying asset to its corresponding amount of wrapped asset, round down
+
+		@param uint _amountUnit: the amount of underlying asset to convert
+
+		@return uint _amountWrappedToken: the greatest amount of wrapped asset that is <= _amountUnit underlying asset
+	*/
+	function UnitAmtToWrappedAmt_RoundDown(uint _amountUnit) public view override returns (uint _amountWrappedToken) {
 		uint ratio = getRatio();
 		/*
 			ratio == amountUnit/amountWrapped
 			amountWrapped == amountUnit/ratio
 		*/
-		_amountWrappedToken = _amountAToken.mul(1 ether).div(ratio);
+		_amountWrappedToken = _amountUnit.mul(1 ether).div(ratio);
 	}
 
-	function UnitAmtToWrappedAmt_RoundUp(uint _amountAToken) public view override returns (uint _amountWrappedToken) {
+	/*
+		@Description: convert an amount of underlying asset to its corresponding amount of wrapped asset, round up
+
+		@param uint _amountUnit: the amount of underlying asset to convert
+
+		@return uint _amountWrappedToken: the smallest amount of wrapped asset that is >= _amountUnit underlying asset
+	*/
+	function UnitAmtToWrappedAmt_RoundUp(uint _amountUnit) public view override returns (uint _amountWrappedToken) {
 		uint ratio = getRatio();
 		/*
 			ratio == amountUnit/amountWrapped
 			amountWrapped == amountUnit/ratio
 		*/
-		_amountWrappedToken = _amountAToken.mul(1 ether);
+		_amountWrappedToken = _amountUnit.mul(1 ether);
 		_amountWrappedToken = _amountWrappedToken/ratio + (_amountWrappedToken%ratio == 0 ? 0 : 1);
 	}
 
-	function WrappedAmtToUnitAmt_RoundDown(uint _amountWrappedToken) public view override returns (uint _amountAToken) {
+	/*
+		@Description: convert an amount of wrapped asset to its corresponding amount of underlying asset, round down
+
+		@oaram unit _amountWrappedToken: the amount of wrapped asset to convert
+
+		@return uint _amountWrappedToken: the greatest amount of underlying asset that is <= _amountWrapped wrapped asset
+	*/
+	function WrappedAmtToUnitAmt_RoundDown(uint _amountWrappedToken) public view override returns (uint _amountUnit) {
 		uint ratio = getRatio();
 		/*
 			ratio == amountUnit/amountWrapped
 			amountUnit == amountWrapped * ratio
 		*/
-		_amountAToken = _amountWrappedToken.mul(ratio)/(1 ether);
+		_amountUnit = _amountWrappedToken.mul(ratio)/(1 ether);
 	}
 
-	function WrappedAmtToUnitAmt_RoundUp(uint _amountWrappedToken) public view override returns (uint _amountAToken) {
+	/*
+		@Description: convert an amount of wrapped asset to its corresponding amount of underlying asset, round up
+
+		@oaram unit _amountWrappedToken: the amount of wrapped asset to convert
+
+		@return uint _amountWrappedToken: the smallest amount of underlying asset that is >= _amountWrapped wrapped asset
+	*/
+	function WrappedAmtToUnitAmt_RoundUp(uint _amountWrappedToken) public view override returns (uint _amountUnit) {
 		uint ratio = getRatio();
 		/*
 			ratio == amountUnit/amountWrapped
 			amountUnit == amountWrapped * ratio
 		*/
-		_amountAToken = _amountWrappedToken.mul(ratio);
-		_amountAToken = _amountAToken/(1 ether) + (_amountAToken%(1 ether) == 0 ? 0 : 1);
+		_amountUnit = _amountWrappedToken.mul(ratio);
+		_amountUnit = _amountUnit/(1 ether) + (_amountUnit%(1 ether) == 0 ? 0 : 1);
 	}
 
 
@@ -280,6 +382,10 @@ contract NGBwrapper is IWrapper, Ownable {
     /*
 		@Description: set the annual wrapper fee in super basis points
 			half of all fees goes to owner, the other half goes to the treasury
+
+		@param uint32 _SBPSRetained: the amount of super bips that are to be retained by
+			the pool. You can think of it as if totalSBPS - _SBPSRetained is the annual
+			asset management fee for a wrapper
     */
     function setFee(uint32 _SBPSRetained) external onlyOwner {
     	require(_SBPSRetained > 0 && _SBPSRetained <= totalSBPS);

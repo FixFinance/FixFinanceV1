@@ -72,7 +72,8 @@ contract NGBwrapper is IWrapper, Ownable {
 	*/
 	function firstDeposit(address _to, uint _amountUnit) internal returns (uint _amountWrappedToken) {
 		IERC20 _aToken = IERC20(underlyingAssetAddress);
-		_aToken.transferFrom(msg.sender, address(this), _amountUnit);
+		bool success = _aToken.transferFrom(msg.sender, address(this), _amountUnit);
+		require(success);
 		balanceOf[_to] = _amountUnit;
 		totalSupply = _amountUnit;
 		_amountWrappedToken = _amountUnit;
@@ -96,7 +97,8 @@ contract NGBwrapper is IWrapper, Ownable {
 		harvestToTreasury();
 		IERC20 _aToken = IERC20(underlyingAssetAddress);
 		uint contractBalance = _aToken.balanceOf(address(this));
-		_aToken.transferFrom(msg.sender, address(this), _amountUnit);
+		bool success = _aToken.transferFrom(msg.sender, address(this), _amountUnit);
+		require(success);
 		_amountWrappedToken = totalSupply*_amountUnit/contractBalance;
 		balanceOf[_to] += _amountWrappedToken;
 		totalSupply += _amountWrappedToken;

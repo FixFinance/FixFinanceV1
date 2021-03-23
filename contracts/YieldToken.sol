@@ -61,6 +61,11 @@ contract YieldToken is IYieldToken {
         return true;
     }
 
+    /*
+        Here we repeat all of the ERC20 functions except we denominate the values in underlying asset rather
+        than wrapped asset amounts and add _2 at the end of the names. We also add bool _roundUp as a parameter
+    */
+
     function balanceOf_2(address _owner, bool _roundUp) external view override returns (uint) {
         return _roundUp ? wrapper.WrappedAmtToUnitAmt_RoundUp(balanceOf(_owner)) : wrapper.WrappedAmtToUnitAmt_RoundDown(balanceOf(_owner));
     }

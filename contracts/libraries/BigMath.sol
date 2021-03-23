@@ -23,8 +23,6 @@ library BigMath {
 
   int128 public constant ABDK_1 = 1<<64;
 
-  uint private constant BONE = 1 ether;
-  
   uint public constant SecondsPerYear = 31556926;
 
 
@@ -34,7 +32,7 @@ library BigMath {
     @param uint Y: amount of pool reserves of Yield Tokens, inflated by 64 bits
     @param uint L: amount of Liquidity tokens, inflated by 64 bits
     @param uint r: amount of time remaining / anchor, inflated by 64 bits
-    @param uint w: slippage minimiser variable inflated by BONE
+    @param uint w: slippage minimiser variable inflated by 1 ether
     @param uint feeConstant: raise APY in differential equation to feeConstant
     @param int128 APYo: the apy returned from the oracle inflated by 64 bits
 
@@ -63,12 +61,12 @@ library BigMath {
       K - U  = term1*Ei(term2) + Y - y_c*e**(term2)
     */
 
-    uint256 c = L.mul(w)/BONE;
+    uint256 c = L.mul(w)/(1 ether);
     uint256 y_c = Y.add(c);
     int128 term1;
     {
       uint256 S = L.add(c);
-      S = S.mul(feeConstant)/BONE;
+      S = S.mul(feeConstant)/(1 ether);
       uint temp = S.mul(r) >> 64;
       require(temp <= uint(MAX));
       int128 term0 = int128(temp).neg();
@@ -89,7 +87,7 @@ library BigMath {
     @param uint Y: amount of pool reserves of Yield Tokens, inflated by 64 bits
     @param uint L: amount of Liquidity tokens, inflated by 64 bits
     @param uint r: amount of time remaining / anchor, inflated by 64 bits
-    @param uint w: slippage minimiser variable inflated by BONE
+    @param uint w: slippage minimiser variable inflated by (1 ether)
     @param uint feeConstant: raise APY in differential equation to feeConstant
     @param int128 APYo: the apy returned from the oracle inflated by 64 bits
     @param int128 changeYreserve: the change in YT reserves due to the swap transaction

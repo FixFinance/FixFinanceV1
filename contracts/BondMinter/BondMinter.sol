@@ -88,6 +88,27 @@ contract BondMinter is BondMinterData, IBondMinter, Ownable {
 
 	//------------------------------------vault management-----------------------------------
 
+	/*
+		@Description: create a new vault, deposit some asset and borrow some ZCB from it
+
+		@param address _assetSupplied: the asset that will be used as collateral
+			this asset may be a ZCB or any other asset that is whitelisted
+		@param address _assetBorrowed: the ZCB that is borrowed from the new vault
+`		@param uint _amountSupplied: the amount of _assetSupplied that is to be posed as collateral
+		@param uint _amountBorrowed: the amount of _assetBorrowed to borrow
+		@param uint _priceMultiplier: a multiplier > 1
+			we ensure the vault will not be sent into the liquidation zone if the cross asset price
+			of _assetBorrowed to _assetSupplied increases by a factor of _priceMultiplier
+			(in terms of basis points)
+		@param int128 _suppliedRateChange: a multiplier > 1
+			we ensure the vault will not be sent into the liquidation zone if the rate on the supplied
+			asset increases by a factor of _suppliedRateChange
+			(in ABDK format)
+		@param int128 _borrowRateChange: a multiplier < 1
+			we ensure the vault will not be sent into the liquidation zone if the rate on the borrow
+			asset decreases by a factor of _borrowRateChange
+			(in ABDK format)
+	*/
 	function openVault(
 		address _assetSupplied,
 		address _assetBorrowed,
@@ -112,6 +133,12 @@ contract BondMinter is BondMinterData, IBondMinter, Ownable {
 		emit OpenVault(_assetSupplied, _assetBorrowed, _amountSupplied, _amountBorrowed);
 	}
 
+	/*
+		@Description: fully repay a vault and withdraw all collateral
+
+		@param uint _index: the vault to close is at vaults[msg.sender][_index]
+		@param address _to: the address to which to send all collateral after closing the vault
+	*/
 	function closeVault(uint _index, address _to) external override {
 		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
 			"closeVault(uint256,address)",
@@ -122,6 +149,25 @@ contract BondMinter is BondMinterData, IBondMinter, Ownable {
 		emit CloseVault(msg.sender, _index);
 	}
 
+	/*
+		@Description: withdraw collateral from an existing vault
+
+		@param uint _index: the vault to close is at vaults[msg.sender][_index]
+		@param uint _amount: the amount of the supplied asset to remove from the vault
+		@param address _to: the address to which to send the removed collateral
+		@param uint _priceMultiplier: a multiplier > 1
+			we ensure that after this action the vault will not be sent into the liquidation zone if the
+			cross asset price of _assetBorrowed to _assetSupplied increases by a factor of _priceMultiplier
+			(in terms of basis points)
+		@param int128 _suppliedRateChange: a multiplier > 1
+			we ensure that after this action the vault will not be sent into the liquidation zone if the
+			rate on the supplied asset increases by a factor of _suppliedRateChange
+			(in ABDK format)
+		@param int128 _borrowRateChange: a multiplier < 1
+			we ensure that after this action the vault will not be sent into the liquidation zone if the
+			rate on the borrow asset decreases by a factor of _borrowRateChange
+			(in ABDK format)
+	*/
 	function remove(
 		uint _index,
 		uint _amount,
@@ -144,6 +190,13 @@ contract BondMinter is BondMinterData, IBondMinter, Ownable {
 		emit Remove(msg.sender, _index, _amount);
 	}
 
+	/*
+		@Description: deposit vollateral into an exiting vault
+
+		@param address _owner: the owner of the vault to which to supply collateral
+		@param uint _index: the index of the vault in vaults[_owner] to which to supply collateral
+		@param uint _amount: the amount of the supplied asset to provide as collateral to the vault
+	*/
 	function deposit(address _owner, uint _index, uint _amount) external override {
 		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
 			"deposit(address,uint256,uint256)",
@@ -155,6 +208,25 @@ contract BondMinter is BondMinterData, IBondMinter, Ownable {
 		emit Deposit(_owner, _index, _amount);
 	}
 
+	/*
+		@Description: withdraw more of the borrowed asset from an existing vault
+
+		@param uint _index: the index of the vault in vaults[msg.sender] to which to supply collateral
+		@param uint _amount: the amount of the borrowed asset to withdraw from the vault
+		@param address _to: the address to which to send the newly borrowed funds
+		@param uint _priceMultiplier: a multiplier > 1
+			we ensure that after this action the vault will not be sent into the liquidation zone if the
+			cross asset price of _assetBorrowed to _assetSupplied increases by a factor of _priceMultiplier
+			(in terms of basis points)
+		@param int128 _suppliedRateChange: a multiplier > 1
+			we ensure that after this action the vault will not be sent into the liquidation zone if the
+			rate on the supplied asset increases by a factor of _suppliedRateChange
+			(in ABDK format)
+		@param int128 _borrowRateChange: a multiplier < 1
+			we ensure that after this action the vault will not be sent into the liquidation zone if the
+			rate on the borrow asset decreases by a factor of _borrowRateChange
+			(in ABDK format)
+	*/
 	function borrow(
 		uint _index,
 		uint _amount,
@@ -177,6 +249,13 @@ contract BondMinter is BondMinterData, IBondMinter, Ownable {
 		emit Borrow(msg.sender, _index, _amount);
 	}
 
+	/*
+		@Description: repay the borrowed asset back into a vault
+
+		@param address _owner: the owner of the vault to which to reapy
+		@param uint _index: the index of the vault in vaults[_owner] to which to repay
+		@param uint _amount: the amount of the borrowed asset to reapy to the vault
+	*/
 	function repay(address _owner, uint _index, uint _amount) external override {
 		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
 			"repay(address,uint256,uint256)",
@@ -190,6 +269,16 @@ contract BondMinter is BondMinterData, IBondMinter, Ownable {
 
 	//----------------------------------------------_Liquidations------------------------------------------
 
+	/*
+		@Description: send a vault that is under the upper collateralization limit to the auction house
+
+		@param address _owner: the owner of the vault to send to auction
+		@param uint _index: the index of the vault in vaults[_owner] to send to auction
+		@param address _assetBorrowed: the address of the expected borrow asset of the vault
+		@param address _assetSupplied: the address of the expected supplied asset of the vault
+		@param uint _bid: the first bid (in _assetBorrowed) made by msg.sender
+		@param uint _minOut: the minimum amount of assetSupplied expected out if msg.sender wins the auction
+	*/
 	function auctionLiquidation(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _bid, uint _minOut) external override {
 		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
 			"auctionLiquidation(address,uint256,address,address,uint256,uint256)",
@@ -203,6 +292,12 @@ contract BondMinter is BondMinterData, IBondMinter, Ownable {
 		require(success);
 	}
 
+	/*
+		@Description: place a new bid on a vault that has already begun an auction
+
+		@param uint _index: the index in _Liquidations[] of the auction
+		@param uint  _bid: the new bid (in the borrowed asset) on the vault
+	*/
 	function bidOnLiquidation(uint _index, uint _bid) external override {
 		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
 			"bidOnLiquidation(uint256,uint256)",
@@ -212,6 +307,12 @@ contract BondMinter is BondMinterData, IBondMinter, Ownable {
 		require(success);
 	}
 
+	/*
+		@Description: claim the collateral of a vault from an auction that was won by msg.sender
+
+		@param uint _index: the index in Liquidations[] of the auction
+		@param address _to: the address to which to send the proceeds
+	*/
 	function claimLiquidation(uint _index, address _to) external override {
 		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
 			"claimLiquidation(uint256,address)",
@@ -222,7 +323,17 @@ contract BondMinter is BondMinterData, IBondMinter, Ownable {
 	}
 
 	/*
-		@Description: when there is less than 1 day until maturity or _vaults are under the lower collateralisation limit _vaults may be liquidated instantly without going through the auction process
+		@Description: when there is less than 1 day until maturity or _vaults are under the lower collateralisation limit 
+			vaults may be liquidated instantly without going through the auction process, this is intended to help the BondMinter
+			keep solvency in the event of a market crisis
+			this function is used when a liquidator would like to liquidate the entire vault
+		@param address _owner: the owner of the vault to send to auction
+		@param uint _index: the index of the vault in vaults[_owner] to send to auction
+		@param address _assetBorrowed: the address of the expected borrow asset of the vault
+		@param address _assetSupplied: the address of the expected supplied asset of the vault
+		@param uint _maxBid: the maximum amount of assetBorrowed that msg.sender is willing to bid on the vault
+		@param uint _minOut: the minimum amount of assetSupplied that msg.sender wants to receive from this liquidation
+		@param address _to: the address to which to send all of the collateral from the vault
 	*/
 	function instantLiquidation(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _maxBid, uint _minOut, address _to) external override {
 		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
@@ -238,6 +349,20 @@ contract BondMinter is BondMinterData, IBondMinter, Ownable {
 		require(success);
 	}
 
+	/*
+		@Description: when there is less than 1 day until maturity or _vaults are under the lower collateralisation limit 
+			vaults may be liquidated instantly without going through the auction process, this is intended to help the BondMinter
+			keep solvency in the event of a market crisis
+			this function is used when a liquidator whould like to only partially liquidate the vault by providing a specific
+			amount of assetBorrowed and receiving the corresponding amount of assetSupplied
+		@param address _owner: the owner of the vault to send to auction
+		@param uint _index: the index of the vault in vaults[_owner] to send to auction
+		@param address _assetBorrowed: the address of the expected borrow asset of the vault
+		@param address _assetSupplied: the address of the expected supplied asset of the vault
+		@param uint _in: the amount of assetBorrowed to supply to the vault
+		@param uint _minOut: the minimum amount of assetSupplied that msg.sender wants to receive from this liquidation
+		@param address _to: the address to which to send all of the collateral from the vault
+	*/
 	function partialLiquidationSpecificIn(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _in, uint _minOut, address _to) external override {
 		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
 			"partialLiquidationSpecificIn(address,uint256,address,address,uint256,uint256,address)",
@@ -252,6 +377,20 @@ contract BondMinter is BondMinterData, IBondMinter, Ownable {
 		require(success);
 	}
 
+	/*
+		@Description: when there is less than 1 day until maturity or _vaults are under the lower collateralisation limit 
+			vaults may be liquidated instantly without going through the auction process, this is intended to help the BondMinter
+			keep solvency in the event of a market crisis
+			this function is used when a liquidator whould like to only partially liquidate the vault by receiving a specific
+			amount of assetSupplied and sending the corresponding amount of assetBorrowed
+		@param address _owner: the owner of the vault to send to auction
+		@param uint _index: the index of the vault in vaults[_owner] to send to auction
+		@param address _assetBorrowed: the address of the expected borrow asset of the vault
+		@param address _assetSupplied: the address of the expected supplied asset of the vault
+		@param uint _ouot: the amount of assetSupplied to receive from the vault
+		@param uint _maxIn: the maximum amount of assetBorrowed that msg.sender is willing to bid on the vault
+		@param address _to: the address to which to send all of the collateral from the vault
+	*/
 	function partialLiquidationSpecificOut(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _out, uint _maxIn, address _to) external override {
 		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
 			"partialLiquidationSpecificOut(address,uint256,address,address,uint256,uint256,address)",
@@ -267,14 +406,40 @@ contract BondMinter is BondMinterData, IBondMinter, Ownable {
 	}
 	//--------------------------------------------management---------------------------------------------
 
+	/*
+		@Description: admin may call this function to allow a specific wrapped asset to be provided as collateral
+
+		@param address _wrapperAddress: address of the wrapper asset to whitelist
+	*/
 	function whitelistWrapper(address _wrapeprAddress) external override onlyOwner {
 		_wrapperToUnderlyingAsset[_wrapeprAddress] = IWrapper(_wrapeprAddress).underlyingAssetAddress();
 	}
 
+	/*
+		@Description: admin may call this function to allow a non wrapped asset to be provided as collateral
+
+		@param address _asset: address of the asset that will be allows to be provided as collateral
+	*/
+	function whitelistAsset(address _assetAddress) external override onlyOwner {
+		//all non wrapped assets have a pair value of address(1) in the _wrapperToUnderlyingAsset mapping
+		_wrapperToUnderlyingAsset[_assetAddress] = address(1);
+	}
+
+	/*
+		@Description: admin may call this function to allow a specific ZCB to be provided as collateral
+
+		@param address _capitalHandlerAddress: address of the ZCB to whitelist
+	*/
 	function whitelistCapitalHandler(address _capitalHandlerAddress) external override onlyOwner {
 		_capitalHandlerToWrapper[_capitalHandlerAddress] = address(ICapitalHandler(_capitalHandlerAddress).wrapper());
 	}
 
+	/*
+		@Description: admin may call this function to claim liquidation revenue
+
+		@address _asset: the address of the asset for which to claim revenue
+		@address _amount: the amount of revenue (in _asset) to claim
+	*/
 	function claimRevenue(address _asset, uint _amount) external override onlyOwner {
 		require(_revenue[_asset] >= _amount);
 		IERC20(_asset).transfer(msg.sender, _amount);

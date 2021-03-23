@@ -63,6 +63,7 @@ interface IBondMinter {
 	function partialLiquidationSpecificOut(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _out, uint _maxIn, address _to) external;
 	//--------------------------------------------a-d-m-i-n---------------------------------------------
 	function whitelistWrapper(address _wrapeprAddress) external;
+	function whitelistAsset(address _assetAddress) external;
 	function whitelistCapitalHandler(address _capitalHandlerAddress) external;
 	function claimRevenue(address _asset, uint _amount) external;
 }

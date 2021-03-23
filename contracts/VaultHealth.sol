@@ -153,6 +153,9 @@ contract VaultHealth is IVaultHealth, Ownable {
 		@Description: returns price of deposited/borrowed
 	*/
 	function crossAssetPrice(address _deposited, address _borrowed) internal view returns(uint) {
+		if (_deposited == _borrowed) {
+			return BONE;
+		}
 		IOracleContainer orc = IOracleContainer(oracleContainerAddress);
 		uint PriceDepositedAsset = orc.getAssetPrice(_deposited);
 		uint PriceBorrowededAsset = orc.getAssetPrice(_borrowed);

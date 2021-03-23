@@ -142,7 +142,7 @@ contract NGBwrapper is IWrapper, Ownable {
 		}
 		uint minNewRatio = (nonFeeAdjustedRatio - _prevRatio).mul(minHarvestRetention).div(totalSBPS).add(_prevRatio);
 		int128 time = int128(((block.timestamp - _lastHarvest) << 64)/ BigMath.SecondsPerYear);
-		uint term = uint(BigMath.Exp(int128((uint(SBPSRetained) << 64) / totalSBPS), time.neg()));
+		uint term = uint(BigMath.Pow(int128((uint(SBPSRetained) << 64) / totalSBPS), time.neg()));
 		uint newTotalSupply = prevTotalSupply.mul(term) / ABDK_1;
 		effectiveRatio = effectiveRatio.div(newTotalSupply);
 		if (effectiveRatio < minNewRatio) {

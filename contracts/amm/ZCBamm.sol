@@ -752,7 +752,7 @@ contract ZCBamm is IZCBamm {
 		uint prevRatio = _ZCBreserves.add(_inflatedTotalSupply()).mul(1 ether).div(_Ureserves);
 
 		int128 prevAnchor = int128(anchor << 64);
-		int128 secondsRemaining = int128(( maturity - block.timestamp ) << 64);
+		int128 secondsRemaining = int128(( maturity - wrapper.lastUpdate() ) << 64);
 		uint newZCBreserves;
 		uint newUreserves;
 		{
@@ -777,8 +777,8 @@ contract ZCBamm is IZCBamm {
 			prevRatio,
 			prevAnchor,
 			secondsRemaining,
-			upperBoundAnchor,
 			lowerBoundAnchor,
+			upperBoundAnchor,
 			newZCBreserves,
 			newUreserves
 		);

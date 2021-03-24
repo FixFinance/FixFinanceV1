@@ -55,28 +55,53 @@ contract VaultHealth is IVaultHealth, Ownable {
 
 	/*
 		When a user deposits bonds we take the Maximum of the rate shown in the oracle +
-		MIN_RATE_BOND_DEPOSITED and the rate shown in the oracle adjusted with the
+		MIN_RATE_ADJUSTMENT and the rate shown in the oracle adjusted with the
+		corresponding rate threshold as the rate for which collateralization requirements
+		will be calculated
+
+		When a user borrowes bonds we take the Maximum of the rate shown in the oracle -
+		MIN_RATE_ADJUSTMENT and the rate shown in the oracle adjusted with the
 		corresponding rate threshold as the rate for which collateralization requirements
 		will be calculated
 	*/
 	int128 constant MIN_RATE_ADJUSTMENT = ABDK_1 / 100;
 
+	/*
+		The Collateralisation Ratio mappings hold information about the % which any vault
+		containing a asset must be overcollateralised.
+
+		For example if
+		UpperCollateralizationRatio[_assetSupplied] == 1.0 and
+		UpperCollateralizationRatio[_assetBorrowed] == 1.5
+
+		the total overcollateralisation % required for the vault due to volatility of asset prices
+		is (1.0 * 1.5 - 1.0) == 50% for the upper collateralization limit
+
+		these mappings take in an underlying asset, they do not account for overcollateralisation
+		required due to rate volatility
+
+		When ZCBs are used in a vault to find the collateralization ratio due to underlying asset
+		you must find UpperCollateralzationRatio[org.capitalHandlerToWrapper(_ZCBaddress)]
+
+		In ABDK64.64 format
+	*/
 	mapping(address => uint120) public LowerCollateralizationRatio;
 
 	mapping(address => uint120) public UpperCollateralizationRatio;
 
 
 	/*
-		Because rates are always over 1.0 the rate thresholds refer to the % change in the rate minus 1.
+		Because rates are always over 1.0 (meaning the % notation of the rate is always positive)
+		the rate thresholds refer to the % change in the rate minus 1.
 		All rate thresholds must be above 1.0 as well,to get the resultant threshold adjusted rate for
 		borrowing we find 1 + (rate - 1)/threshold
 		to get the resultatn threshold adjusted rate for depositing we find
 		1 + (rate - 1)*threshold
 		For example if there is a rate treshold of 1.25 and the current rate for that asset is 
 		3% the rate used when calculating borrow requirements for that asset will be
-		3% / 1.25 == 2.4%
+		(1.03-1) / 1.25 == 3% / 1.25 == 2.4%
 		To calculate the rate for deposit calculations for that asset we would do the following
-		3% * 1.25 == 3.75%
+		(1.03-1) * 1.25 == 3% * 1.25 == 3.75%
 	*/
 	mapping(address => uint120) public LowerRateThreshold;
 

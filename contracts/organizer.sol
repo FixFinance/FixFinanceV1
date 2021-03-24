@@ -12,6 +12,14 @@ import "./AmmInfoOracle.sol";
 
 contract organizer {
 
+	/*
+		100 sbps (super basis points) is 1 bip (basis point)
+		1.0 == 100% == 10_000 bips == 1_000_000 sbps
+
+		DEFAULT_SBPS_RETAINED represents the default value (in super basis points) of
+		1.0 - annualWrapperFee
+		if SBPSRetained == 999_000 == 1_000_000 - 1000, the annual wrapper fee is 1000sbps or 0.1%
+	*/
 	uint32 private constant DEFAULT_SBPS_RETAINED = 999_000;
 
 	event WrapperDeployment(
@@ -26,17 +34,20 @@ contract organizer {
 
 	//acts as a whitelist for capitalHandlers that were deployed using this organiser
 	mapping(address => address) public capitalHandlerToWrapper;
-	mapping(address => address) public YTamms;
+	//CapitalHandler => ZCBamm address
 	mapping(address => address) public ZCBamms;
+	//CapitlHandler => YTamm address
+	mapping(address => address) public YTamms;
 
 	address public yieldTokenDeployerAddress;
 	address public CapitalHandlerDeployerAddress;
 	address public ZCBammDeployerAddress;
 	address public YTammDeployerAddress;
-	address internal SwapRouterDeployerAddress;
 	address public SwapRouterAddress;
 	address public AmmInfoOracleAddress;
 	address public treasuryAddress;
+
+	address internal SwapRouterDeployerAddress;
 
 	/*
 		init

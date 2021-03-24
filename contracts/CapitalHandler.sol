@@ -12,8 +12,11 @@ contract CapitalHandler is ICapitalHandler, Ownable {
 	using SafeMath for uint;
 	using SignedSafeMath for int;
 
+	//set to true after maturity
+	//once true users may redeem ZCBs for underlying
 	bool public override inPayoutPhase;
 
+	//timestamp at which payout phase may be entered
 	uint64 public override maturity;
 
 	//(1 ether) * amountUnit / wrappedToken
@@ -23,8 +26,27 @@ contract CapitalHandler is ICapitalHandler, Ownable {
 
 	address public override underlyingAssetAddress;
 
-	mapping(address => int) public override balanceBonds;
+	/*
+		These 2 mappings along with the conversion ratio between Unit amounts and
+		wrapped amounts keep track of a user's balance of ZCB and YT
 
+		balanceYield refers to the amount of wrapped assets which have been credited to a user.
+		When a user depsoits X amount of wrapped asset balanceYield[user] += X;
+		balanceYield is denominated in wrapped asset amounts
+		balanceBonds refers to the amount of ZCBs that a user is indebted against their 
+		position of wrapped assets stored in balanceYield.
+		The values in balanceBonds may be positive or negative.
+		A positive balance in balanceBonds indicates that a user extra ZCB ontop of
+		how ever much wrapped asset they own in balanceYield.
+		A negative balance in balanceBonds indicates that a user is indebted ZCB against their
+		wrapped assets held in balanceYield.
+		The current value in Uint amount of a user's balance of wrapped asset stored in balanceYield 
+		may never be greater than a user's negatie balance in balanceBonds
+
+		If a user would like to sell more ZCB against the underlying asset than the face unit value of
+		underlying asset they must use open a vault with the BondMinter contract to access margin
+	*/
+	mapping(address => int) public override balanceBonds;
 	mapping(address => uint) public override balanceYield;
 
 	address public override yieldTokenAddress;

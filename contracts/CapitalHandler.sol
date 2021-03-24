@@ -55,9 +55,7 @@ contract CapitalHandler is ICapitalHandler, Ownable {
 		name = string(abi.encodePacked(temp2.name(),' zero coupon bond'));
 		symbol = string(abi.encodePacked(temp2.symbol(), 'zcb'));
 		maturity = _maturity;
-		(bool success , ) = _yieldTokenDeployer.call(abi.encodeWithSignature("deploy(address)", _wrapper));
-		require(success);
-		yieldTokenAddress = YieldTokenDeployer(_yieldTokenDeployer).addr();
+		yieldTokenAddress = YieldTokenDeployer(_yieldTokenDeployer).deploy(_wrapper);
 	}
 
 	/*

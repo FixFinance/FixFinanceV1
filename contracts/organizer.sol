@@ -38,6 +38,9 @@ contract organizer {
 	address public AmmInfoOracleAddress;
 	address public treasuryAddress;
 
+	/*
+		init
+	*/
 	constructor (
 		address _yieldTokenDeployerAddress,
 		address _CapitalhandlerDeployerAddress,
@@ -46,7 +49,7 @@ contract organizer {
 		address _SwapRouterDeployerAddress,
 		address _AmmInfoOracleAddress,
 		address _treasuryAddress
-		) public {
+	) public {
 		yieldTokenDeployerAddress = _yieldTokenDeployerAddress;	
 		CapitalHandlerDeployerAddress = _CapitalhandlerDeployerAddress;
 		ZCBammDeployerAddress = _ZCBammDeployerAddress;
@@ -56,17 +59,32 @@ contract organizer {
 		treasuryAddress = _treasuryAddress;
 	}
 
+	/*
+		@Description: deploy SwapRouter contract,
+			this function only need be called once there is no need to redeploy another SwapRouter
+	*/
 	function DeploySwapRouter() external {
 		require(SwapRouterAddress == address(0));
 		SwapRouterAddress = SwapRouterDeployer(SwapRouterDeployerAddress).deploy(address(this));		
 	}
 
+	/*
+		@Description: deploy a new NGBwrapper and transfer ownership to msg.sender
+		
+		@param address _assetAddress: the NGB asset for which to deploy an NGBwrapper
+	*/
 	function deployAssetWrapper(address _assetAddress) public {
 		NGBwrapper temp = new NGBwrapper(_assetAddress, treasuryAddress, DEFAULT_SBPS_RETAINED);
 		temp.transferOwnership(msg.sender);
 		emit WrapperDeployment(address(temp), _assetAddress, 0);
 	}
 
+	/*
+		@Description: deploy a new CapitalHandler instance, whitelist it in capitalHandlerToWrapper mapping
+
+		@param address _wrapperAddress: the address of the IWrapper for which to deploy the CapitalHandler
+		@param uint64 _maturity: the maturity of the new CapitalHandler to deploy
+	*/
 	function deployCapitalHandlerInstance(address _wrapperAddress, uint64 _maturity) public {
 		require(_maturity > block.timestamp+(1 weeks), "maturity must be at least 1 weeks away");
 		address capitalHandlerAddress = CapitalHandlerDeployer(CapitalHandlerDeployerAddress).deploy(_wrapperAddress, _maturity, yieldTokenDeployerAddress, msg.sender);
@@ -74,12 +92,23 @@ contract organizer {
 		capitalHandlerToWrapper[capitalHandlerAddress] = _wrapperAddress;
 	}
 
+	/*
+		@Description: deploy a ZCBamm for a specific capital handler
+			only one ZCBamm may only be deployed
+
+		@param address _capitalHandlerAddress: the address of the CapitalHandler for which to deploy a ZCBamm
+	*/
 	function deployZCBamm(address _capitalHandlerAddress) public {
 		require(ZCBamms[_capitalHandlerAddress] == address(0));
 		require(capitalHandlerToWrapper[_capitalHandlerAddress] != address(0));
 		ZCBamms[_capitalHandlerAddress] = ZCBammDeployer(ZCBammDeployerAddress).deploy(_capitalHandlerAddress, AmmInfoOracleAddress);
 	}
 
+	/*
+		@Description: deploy a YTamm for a specific capital handler
+			only one YTamm may be deployed, a YTamm cannot be deployed until after the ZCBamm for the same
+			capital handler has been deployed and published the first rate in its native oracle
+	*/
 	function deployYTamm(address _capitalHandlerAddress) public {
 		require(YTamms[_capitalHandlerAddress] == address(0));
 		address ZCBammAddress = ZCBamms[_capitalHandlerAddress];

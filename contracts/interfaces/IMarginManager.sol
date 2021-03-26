@@ -1,10 +1,10 @@
 pragma experimental ABIEncoderV2;
 pragma solidity >=0.6.0;
-import "../BondMinter/BondMinterData.sol";
+import "../MarginManager/MarginManagerData.sol";
 
-interface IBondMinter {
+interface IMarginManager {
 	function vaultsLength(address _owner) external view returns(uint);
-	function allVaults(address _owner) external view returns(BondMinterData.Vault[] memory _vaults);
+	function allVaults(address _owner) external view returns(MarginManagerData.Vault[] memory _vaults);
 	function liquidationsLength() external view returns (uint);
 	//-----------------------------------------V-a-u-l-t---M-a-n-a-g-e-m-e-n-t-----------------------------
 	function openVault(

@@ -7,9 +7,9 @@ import "../interfaces/IVaultHealth.sol";
 import "../interfaces/IWrapper.sol";
 import "../interfaces/IERC20.sol";
 import "../helpers/Ownable.sol";
-import "./BondMinterData.sol";
+import "./MarginManagerData.sol";
 
-contract BondMinterDelegate is BondMinterData {
+contract MarginManagerDelegate is MarginManagerData {
 	using SafeMath for uint;
 
 	/*
@@ -414,7 +414,7 @@ contract BondMinterDelegate is BondMinterData {
 
 	/*
 		@Description: when there is less than 1 day until maturity or _vaults are under the lower collateralisation limit 
-			vaults may be liquidated instantly without going through the auction process, this is intended to help the BondMinter
+			vaults may be liquidated instantly without going through the auction process, this is intended to help the MarginManager
 			keep solvency in the event of a market crisis
 			this function is used when a liquidator would like to liquidate the entire vault
 		@param address _owner: the owner of the vault to send to auction
@@ -445,7 +445,7 @@ contract BondMinterDelegate is BondMinterData {
 
 	/*
 		@Description: when there is less than 1 day until maturity or _vaults are under the lower collateralisation limit 
-			vaults may be liquidated instantly without going through the auction process, this is intended to help the BondMinter
+			vaults may be liquidated instantly without going through the auction process, this is intended to help the MarginManager
 			keep solvency in the event of a market crisis
 			this function is used when a liquidator whould like to only partially liquidate the vault by providing a specific
 			amount of assetBorrowed and receiving the corresponding amount of assetSupplied
@@ -481,7 +481,7 @@ contract BondMinterDelegate is BondMinterData {
 
 	/*
 		@Description: when there is less than 1 day until maturity or _vaults are under the lower collateralisation limit 
-			vaults may be liquidated instantly without going through the auction process, this is intended to help the BondMinter
+			vaults may be liquidated instantly without going through the auction process, this is intended to help the MarginManager
 			keep solvency in the event of a market crisis
 			this function is used when a liquidator whould like to only partially liquidate the vault by receiving a specific
 			amount of assetSupplied and sending the corresponding amount of assetBorrowed

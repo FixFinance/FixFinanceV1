@@ -19,11 +19,11 @@ interface ICapitalHandler is IERC20 {
 	function balanceBonds(address _owner) external view returns(int);
 	function balanceYield(address _owner) external view returns(uint);
 	function yieldTokenAddress() external view returns(address);
-	function bondMinterAddress() external view returns(address);
+	function marginManagerAddress() external view returns(address);
 	function wrapper() external view returns(IWrapper);
 
 	//----------------admin----------------------------
 	function isFinalized() external view returns(bool);
-	function setBondMinterAddress(address _bondMinterAddress) external;
+	function setMarginManagerAddress(address _marginManagerAddress) external;
 	function finalize() external;
 }

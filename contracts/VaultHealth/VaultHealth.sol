@@ -1,12 +1,12 @@
 pragma solidity >=0.6.0;
-import "./organizer.sol";
-import "./helpers/IZCBamm.sol";
-import "./helpers/Ownable.sol";
-import "./interfaces/IVaultHealth.sol";
-import "./interfaces/ICapitalHandler.sol";
-import "./libraries/ABDKMath64x64.sol";
-import "./libraries/SafeMath.sol";
-import "./oracle/interfaces/IOracleContainer.sol";
+import "../organizer.sol";
+import "../helpers/IZCBamm.sol";
+import "../helpers/Ownable.sol";
+import "../interfaces/IVaultHealth.sol";
+import "../interfaces/ICapitalHandler.sol";
+import "../libraries/ABDKMath64x64.sol";
+import "../libraries/SafeMath.sol";
+import "../oracle/interfaces/IOracleContainer.sol";
 
 
 contract VaultHealth is IVaultHealth, Ownable {

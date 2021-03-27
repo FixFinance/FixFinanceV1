@@ -95,8 +95,8 @@ contract('VaultHealth', async function(accounts) {
 		let rec1 = await organizerInstance.deployCapitalHandlerInstance(wAsset1.address, maturity);
 
 		await OracleContainerInstance.addAggregators([aggregator0.address, aggregator1.address]);
-		await OracleContainerInstance.AddAToken(wAsset0.address, 2, 5, symbol0.substring(1));
-		await OracleContainerInstance.AddAToken(wAsset1.address, 2, 6, symbol1.substring(1));
+		await OracleContainerInstance.AddAToken(wAsset0.address, symbol0.substring(1));
+		await OracleContainerInstance.AddAToken(wAsset1.address, symbol1.substring(1));
 
 		await asset0.approve(wAsset0.address, _10To18.toString());
 		await asset1.approve(wAsset1.address, _10To18.toString());

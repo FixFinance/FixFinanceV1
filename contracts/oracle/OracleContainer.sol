@@ -11,8 +11,6 @@ contract OracleContainer is Ownable, IOracleContainer {
 
 	string constant ConcatWith = " / ETH";
 
-	uint constant BONE = 1 ether;
-
 	address immutable aETH;
 
 	mapping(string => address) internal PairInfo;
@@ -32,9 +30,8 @@ contract OracleContainer is Ownable, IOracleContainer {
 		}
 	}
 
-	function AddAToken(address _aTokenAddress, uint8 start, uint8 stop, string calldata claim) external onlyOwner {
+	function AddAToken(address _aTokenAddress, string calldata claim) external onlyOwner {
 		require(abi.encodePacked(Phrases[_aTokenAddress]).length == 0);
-		require(stringEquals(substring(IERC20(_aTokenAddress).symbol(), start, stop),claim));
 		Phrases[_aTokenAddress] = claim;
 	}
 
@@ -58,14 +55,14 @@ contract OracleContainer is Ownable, IOracleContainer {
 	}
 
 	function getAssetPrice(address _assetAddress) external view override returns (uint) {
-		if (_assetAddress == aETH) return BONE;
+		if (_assetAddress == aETH) return (1 ether);
 		address baseAggregatorAddress = PairInfo[toFullPhrase(Phrases[_assetAddress])];
 		require(baseAggregatorAddress != address(0));
 		//we can safely assume that the spot will never be negative and that a conversion to uint will be safe.
 		uint spot = uint(IChainlinkAggregator(baseAggregatorAddress).latestAnswer());
 		require(int(spot) >= 0);
 		uint decimals = IChainlinkAggregator(baseAggregatorAddress).decimals();
-		return BONE.mul(spot).div(10**decimals);
+		return uint(1 ether).mul(spot).div(10**decimals);
 	}
 
 	function toFullPhrase(string memory phrase) internal pure returns (string memory) {

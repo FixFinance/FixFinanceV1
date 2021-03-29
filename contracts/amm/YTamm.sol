@@ -75,7 +75,7 @@ contract YTamm is IYTamm {
 		@param uint _amount: amount of LP tokens to be minted
 	*/
 	function _mint(address _to, uint _amount) internal {
-        claimDividendInternal(_to, _to);
+        claimDividendInternal(_to, _to, true);
 		balanceOf[_to] += _amount;
 		totalSupply += _amount;
 
@@ -90,7 +90,7 @@ contract YTamm is IYTamm {
 	*/
 	function _burn(address _from, uint _amount) internal {
 		require(balanceOf[_from] >= _amount);
-        claimDividendInternal(_from, _from);
+        claimDividendInternal(_from, _from, true);
 		balanceOf[_from] -= _amount;
 		totalSupply -= _amount;
 

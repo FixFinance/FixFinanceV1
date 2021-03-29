@@ -46,8 +46,8 @@ abstract contract doubleAssetYieldEnabledToken is IERC20, IYieldEnabled {
     function transfer(address _to, uint256 _value) public override returns (bool success) {
         require(_value <= balanceOf[msg.sender]);
 
-        claimDividendInternal(msg.sender, msg.sender);
-        claimDividendInternal(_to, _to);
+        claimDividendInternal(msg.sender, msg.sender, false);
+        claimDividendInternal(_to, _to, false);
 
         balanceOf[msg.sender] -= _value;
         balanceOf[_to] += _value;
@@ -69,8 +69,8 @@ abstract contract doubleAssetYieldEnabledToken is IERC20, IYieldEnabled {
         require(_value <= allowance[_from][msg.sender]);
     	require(_value <= balanceOf[_from]);
 
-        claimDividendInternal(_from, _from);
-        claimDividendInternal(_to, _to);
+        claimDividendInternal(_from, _from, false);
+        claimDividendInternal(_to, _to, false);
 
     	balanceOf[_from] -= _value;
     	balanceOf[_to] += _value;
@@ -88,7 +88,7 @@ abstract contract doubleAssetYieldEnabledToken is IERC20, IYieldEnabled {
 		@Description: allows token holders to claim their portion of the cashflow
 	*/
 	function claimDividend(address _to) external override {
-		claimDividendInternal(msg.sender, _to);
+		claimDividendInternal(msg.sender, _to, false);
 	}
 
 	/*
@@ -107,13 +107,17 @@ abstract contract doubleAssetYieldEnabledToken is IERC20, IYieldEnabled {
 
 		@param address _from: address for which to distribute generated dividends
 		@param address _to: address that shall receive all dividends
+		@param bool _postpone: if true _from will not be elidgeble for yield generated in the current round
+			otherwise user will still be able to claim yield generated in the current round
 	*/
-	function claimDividendInternal(address _from, address _to) internal {
+	function claimDividendInternal(address _from, address _to, bool _postpone) internal {
 		uint mostRecent = lastClaim[_from];
 		uint lastIndex = contractBalanceAsset1.length-1;	//gas savings
-		if (mostRecent == lastIndex) return;
+		if (mostRecent >= lastIndex) return;
 		uint _balanceOf = balanceOf[_from];	//gas savings
-		lastClaim[_from] = lastIndex;
+		if (mostRecent < lastIndex) {
+			lastClaim[_from] = lastIndex + (_postpone ? 1 : 0);
+		}
 		if (_balanceOf == 0) return;
 		uint _totalSupply = totalSupply;	//gas savings
 

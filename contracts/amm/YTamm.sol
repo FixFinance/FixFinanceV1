@@ -27,7 +27,6 @@ contract YTamm is IYTamm {
 	string public override symbol;
 
 	address AmmInfoOracleAddress;
-	IWrapper wrapper;
 
 	bytes32 quoteSignature;
 	int128 quotedAmountYT;
@@ -90,9 +89,16 @@ contract YTamm is IYTamm {
 	*/
 	function _burn(address _from, uint _amount) internal {
 		require(balanceOf[_from] >= _amount);
+		uint _lastClaim = lastClaim[_from];
         claimDividendInternal(_from, _from, true);
 		balanceOf[_from] -= _amount;
 		totalSupply -= _amount;
+
+		//if _from is earning yield on LP funds then decrement from activeTotalSupply
+		uint lastIndex = contractZCBDividend.length-1;
+		if (_lastClaim <= lastIndex) {
+			activeTotalSupply -= _amount;
+		}
 
 		emit Burn(_from, _amount);
 	}
@@ -246,6 +252,8 @@ contract YTamm is IYTamm {
 		getZCB(address(this), _Uin);
 
 		_mint(msg.sender, _Uin);
+		//first mint is a special case where funds are elidgeble for earning interest immediately
+		activeTotalSupply = _Uin;
 
 		Ureserves = _Uin;
 		YTreserves = YTin;
@@ -649,15 +657,14 @@ contract YTamm is IYTamm {
 		amtZCB = amtZCB - _Ureserves + ZCBdividendOut;
 		amtYT = amtYT - _YT_Ur + YTdividendOut;
 
-		uint prevAsset1 = contractBalanceAsset1[contractBalanceAsset1.length-1];
-		uint prevAsset2 = contractBalanceAsset2[contractBalanceAsset2.length-1];
+		(uint prevZCBdividend, uint prevYTdividend) = (totalZCBDividend, totalYTDividend);
 
-		require(amtZCB > prevAsset1);
-		require(amtYT > prevAsset2);
+		require(amtZCB > prevZCBdividend);
+		require(amtYT > prevYTdividend);
 
 		{
-			uint ZCBoverReserves = amtZCB - prevAsset1;
-			uint YToverReserves = amtYT - prevAsset2;
+			uint ZCBoverReserves = amtZCB - prevZCBdividend;
+			uint YToverReserves = amtYT - prevYTdividend;
 
 			uint ZCBoverutilization = ZCBoverReserves.mul(1 ether).div(_Ureserves);
 			uint YToverutilization = YToverReserves.mul(1 ether).div(_YT_Ur);
@@ -668,8 +675,8 @@ contract YTamm is IYTamm {
 			if (ZCBoverutilization > YToverutilization) {
 				uint scaledZCBoverReserves = ZCBoverReserves.mul(YToverutilization).div(ZCBoverutilization);
 
-				amtZCB = ZCBoverReserves.sub(scaledZCBoverReserves).add(prevAsset1);
-				amtYT = prevAsset2;
+				amtZCB = ZCBoverReserves.sub(scaledZCBoverReserves);
+				amtYT = 0;
 
 				YTreserves += YToverReserves.sub(scaledZCBoverReserves);
 				Ureserves += scaledZCBoverReserves;
@@ -683,12 +690,13 @@ contract YTamm is IYTamm {
 					YTtoLmultiplier /= 1 + YToverutilization
 				*/
 				YTtoLmultiplier = YTtoLmultiplier.mul(1 ether).div((YToverutilization).add(1 ether));
+				writeNextDividend(ZCBoverReserves.sub(scaledZCBoverReserves), 0);
 			}
 			else {
 				uint scaledYToverReserves = YToverReserves.mul(ZCBoverutilization).div(YToverutilization);
 
-				amtZCB = prevAsset1;
-				amtYT = YToverReserves.sub(scaledYToverReserves).add(prevAsset2);
+				amtZCB = 0;
+				amtYT = YToverReserves.sub(scaledYToverReserves).add(prevYTdividend);
 
 				YTreserves += scaledYToverReserves.sub(ZCBoverReserves);
 				Ureserves += ZCBoverReserves;
@@ -701,11 +709,11 @@ contract YTamm is IYTamm {
 					YTtoLmultiplier /= 1 + ZCBoverutilization
 				*/
 				YTtoLmultiplier = YTtoLmultiplier.mul(1 ether).div((ZCBoverutilization).add(1 ether));
+				writeNextDividend(0, YToverReserves.sub(scaledYToverReserves));
 			}
 		}
-
-		contractBalanceAsset1.push(amtZCB);
-		contractBalanceAsset2.push(amtYT);
+		//contractBalanceAsset1.push(amtZCB);
+		//contractBalanceAsset2.push(amtYT);
 
 		lastWithdraw = block.timestamp;
 	}

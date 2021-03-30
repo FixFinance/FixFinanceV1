@@ -172,7 +172,9 @@ contract('YTamm', async function(accounts){
 		assert.equal(Ureserves, toMint.toString(), "correct value of Ureserves");
 		assert.equal(YTreserves, toMint.mul(YTtoLmultiplierBN).div(_10To18BN).toString(), "correct value of Ureserves");
 		totalSupply = await amm1.totalSupply();
+		activeTotalSupply = await amm1.activeTotalSupply();
 		assert.equal(totalSupply.toString(), toMint.toString(), "correct balance of YTamm liquidity tokens");
+		assert.equal(activeTotalSupply.toString(), totalSupply.toString(), "active total supply is correct on first mint");
 	});
 
 	it('Mint Liquidity Tokens', async () => {
@@ -264,7 +266,7 @@ contract('YTamm', async function(accounts){
 		assert.equal(prevYTbalance.add(ActualUout).sub(YTbalance).toString(), amtIn.toString(), "correct amount U in");
 	});
 
-	it('SwapToSpeciammficYT()', async () => {
+	it('SwapToSpecificYT()', async () => {
 		amtOut = amtIn;
 		let results = await amm1.getReserves();
 		Ureserves = parseInt(results._Ureserves.toString());
@@ -451,6 +453,8 @@ contract('YTamm', async function(accounts){
 	it('Contract Claim Dividend', async () => {
 		prevInflatedTotalSupply = await amm1.inflatedTotalSupply();
 
+		activeTotalSupply = await amm1.activeTotalSupply();
+		totalSupply = await amm1.totalSupply();
 		await amm1.contractClaimDividend();
 
 		let UreservesBN = new BN(Ureserves);
@@ -482,9 +486,16 @@ contract('YTamm', async function(accounts){
 			amtYT = amtYT.sub(scaledAmtYT);
 		}
 
-		assert.equal((await amm1.length()).toString(), "2");
-		assert.equal((await amm1.contractBalanceAsset1(1)).toString(), amtZCB.toString());
-		assert.equal((await amm1.contractBalanceAsset2(1)).toString(), amtYT.toString());
+		assert.equal((await amm1.length()).toString(), "3");
+		let zcbDividendIntegral = await amm1.contractZCBDividend(2);
+		let yieldDividendIntegral = await amm1.contractYieldDividend(2);
+		let ytDividend = await NGBwrapperInstance.WrappedAmtToUnitAmt_RoundDown(yieldDividendIntegral);
+		let zcbDividend = ytDividend.add(zcbDividendIntegral);
+		let ts = activeTotalSupply.toString() === "0" ? totalSupply : activeTotalSupply;
+		let expectedZCBDividend = amtZCB.mul(_10To18BN).div(ts);
+		let expectedYTDividend = amtYT.mul(_10To18BN).div(ts);
+		assert.equal(zcbDividend.toString(), expectedZCBDividend.toString(), "ZCB dividend recorded as expected");
+		assert.equal(ytDividend.toString(), expectedYTDividend.toString(), "YT dividend recorded as expected");
 	})
 
 	it('Yield Generation does not correctly changes pool reserves after contractClaimDividend()', async () => {
@@ -543,6 +554,9 @@ contract('YTamm', async function(accounts){
 		await capitalHandlerInstance.transfer(amm1.address, amtZCB2);
 		await yieldTokenInstance.transfer_2(amm1.address, amtYT2, true);
 
+		activeTotalSupply = await amm1.activeTotalSupply();
+		totalSupply = await amm1.totalSupply();
+
 		await amm1.contractClaimDividend();
 
 		let UreservesBN = new BN(Ureserves);
@@ -570,12 +584,20 @@ contract('YTamm', async function(accounts){
 		}
 
 
-		assert.equal((await amm1.length()).toString(), "3");
-		assert.equal((await amm1.contractBalanceAsset1(2)).toString(), amtZCB.add(amtZCB2).toString());
-		assert.equal((await amm1.contractBalanceAsset2(2)).toString(), amtYT.add(amtYT2).toString());
+		assert.equal((await amm1.length()).toString(), "4");
+		let zcbDividendIntegral = await amm1.contractZCBDividend(3);
+		let yieldDividendIntegral = await amm1.contractYieldDividend(3);
+		let ytDividend = await NGBwrapperInstance.WrappedAmtToUnitAmt_RoundDown(yieldDividendIntegral);
+		let zcbDividend = ytDividend.add(zcbDividendIntegral);
+		let ts = activeTotalSupply.toString() === "0" ? totalSupply : activeTotalSupply;
+		let expectedZCBDividend = amtZCB.add(amtZCB2).mul(_10To18BN).div(ts);
+		let expectedYTDividend = amtYT.add(amtYT2).mul(_10To18BN).div(ts);
+		assert.equal(zcbDividend.toString(), expectedZCBDividend.toString());
+		assert.equal(ytDividend.toString(), expectedYTDividend.toString());
 	});
 
 	it('Cannot call contractClaimDividend() with no yield generation', async () => {
+		//process.exit();
 		//advance 1 day and 1 second
 		await helper.advanceTime(1 + 24*60*60);
 		let caught = false;

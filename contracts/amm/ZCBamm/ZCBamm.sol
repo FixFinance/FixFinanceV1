@@ -1,13 +1,13 @@
 pragma solidity >=0.6.0;
 
-import "../helpers/IZCBamm.sol";
-import "../libraries/ABDKMath64x64.sol";
-import "../libraries/BigMath.sol";
-import "../interfaces/ICapitalHandler.sol";
-import "../interfaces/IYieldToken.sol";
-import "../interfaces/IWrapper.sol";
-import "../interfaces/IERC20.sol";
-import "../AmmInfoOracle.sol";
+import "../../helpers/IZCBamm.sol";
+import "../../libraries/ABDKMath64x64.sol";
+import "../../libraries/BigMath.sol";
+import "../../interfaces/ICapitalHandler.sol";
+import "../../interfaces/IYieldToken.sol";
+import "../../interfaces/IWrapper.sol";
+import "../../interfaces/IERC20.sol";
+import "../../AmmInfoOracle.sol";
 
 contract ZCBamm is IZCBamm {
 

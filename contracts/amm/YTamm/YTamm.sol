@@ -1,15 +1,15 @@
 pragma solidity >=0.6.0;
 
-import "../helpers/IYTamm.sol";
-import "../libraries/ABDKMath64x64.sol";
-import "../libraries/SafeMath.sol";
-import "../libraries/BigMath.sol";
-import "../interfaces/ICapitalHandler.sol";
-import "../interfaces/IYieldToken.sol";
-import "../interfaces/IWrapper.sol";
-import "../interfaces/IERC20.sol";
-import "../helpers/IZCBamm.sol";
-import "../AmmInfoOracle.sol";
+import "../../helpers/IYTamm.sol";
+import "../../libraries/ABDKMath64x64.sol";
+import "../../libraries/SafeMath.sol";
+import "../../libraries/BigMath.sol";
+import "../../interfaces/ICapitalHandler.sol";
+import "../../interfaces/IYieldToken.sol";
+import "../../interfaces/IWrapper.sol";
+import "../../interfaces/IERC20.sol";
+import "../../helpers/IZCBamm.sol";
+import "../../AmmInfoOracle.sol";
 
 
 contract YTamm is IYTamm {

@@ -1,10 +1,8 @@
 pragma solidity >=0.6.0 <0.7.0;
 import "./Wrappers/NGBwrapper.sol";
 import "./CapitalHandler.sol";
-import "./amm/ZCBamm.sol";
-import "./amm/YTamm.sol";
-import "./amm/ZCBammDeployer.sol";
-import "./amm/YTammDeployer.sol";
+import "./amm/ZCBamm/ZCBammDeployer.sol";
+import "./amm/YTamm/YTammDeployer.sol";
 import "./CapitalHandlerDeployer.sol";
 import "./SwapRouter/SwapRouterDeployer.sol";
 import "./SwapRouter/SwapRouter.sol";

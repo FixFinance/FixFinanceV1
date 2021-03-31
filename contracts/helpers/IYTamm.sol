@@ -1,8 +1,9 @@
 pragma solidity >=0.6.0;
 
-import "./doubleAssetYieldEnabledToken.sol";
+import "./DividendEnabled.sol";
+import "./IYTammData.sol";
 
-abstract contract IYTamm is doubleAssetYieldEnabledToken {
+abstract contract IYTamm is DividendEnabled, IYTammData {
 	event Mint(
 		address user,
 		uint amount
@@ -20,8 +21,8 @@ abstract contract IYTamm is doubleAssetYieldEnabledToken {
 		bool YTin
 	);
 
-	function ZCBammAddress() external virtual view returns (address);
-	function maturity() external virtual view returns (uint64);
+	//function ZCBammAddress() external virtual view returns (address);
+	//function maturity() external virtual view returns (uint64);
 	function firstMint(uint128 _Uin) external virtual;
 	function mint(uint _amount, uint _maxUin, uint _maxYTin) external virtual;
 	function burn(uint _amount) external virtual;
@@ -39,4 +40,10 @@ abstract contract IYTamm is doubleAssetYieldEnabledToken {
 		uint _YTreserves,
 		uint _TimeRemaining
 	);
+
+	string public constant override name = "YT amm Liquidity Token";
+	string public constant override symbol = "YTLT";
+	uint internal constant SecondsPerYear = 31556926;
+	int128 internal constant _2WeeksABDK = int128((2 weeks << 64)/SecondsPerYear);
+
 }

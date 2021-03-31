@@ -28,8 +28,8 @@ contract ZCBamm is IZCBamm {
 	uint ZCBreserves;
 	uint Ureserves;
 
-	string public override name;
-	string public override symbol;
+	string public constant override name = "ZCB amm Liquidity Token";
+	string public constant override symbol = "ZCBLT";
 
 	address AmmInfoOracleAddress;
 	IWrapper wrapper;
@@ -53,8 +53,6 @@ contract ZCBamm is IZCBamm {
 		Init AMM
 	*/
 	constructor(address _ZCBaddress, address _feeOracleAddress) public {
-		name = "aZCB amm Liquidity Token";
-		symbol = "aZCBLT";
 		address _YTaddress = ICapitalHandler(_ZCBaddress).yieldTokenAddress();
 		uint64 _maturity = ICapitalHandler(_ZCBaddress).maturity();
 		require(_maturity > block.timestamp + 10 days);

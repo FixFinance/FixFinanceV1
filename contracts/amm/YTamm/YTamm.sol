@@ -11,33 +11,11 @@ import "../../interfaces/IERC20.sol";
 import "../../helpers/IZCBamm.sol";
 import "../../AmmInfoOracle.sol";
 
-
 contract YTamm is IYTamm {
 
 	using ABDKMath64x64 for int128;
 	using SafeMath for uint256;
 
-	address public override ZCBammAddress;
-	uint64 public override maturity;
-
-	uint YTreserves;
-	uint Ureserves;
-
-	string public override name;
-	string public override symbol;
-
-	address AmmInfoOracleAddress;
-
-	bytes32 quoteSignature;
-	int128 quotedAmountYT;
-	uint256 quotedAmountU;
-	uint256 quotedTreasuryFee;
-
-	uint public lastRecalibration;
-	uint public YTtoLmultiplier;
-	uint public SlippageConstant;
-
-	int128 _2WeeksABDK = int128((2 weeks << 64)/BigMath.SecondsPerYear);
 
 	/*
 		Init AMM
@@ -46,8 +24,6 @@ contract YTamm is IYTamm {
 		address _ZCBammAddress,
 		address _feeOracleAddress
 	) public {
-		name = "aYT amm Liquidity Token";
-		symbol = "aYTLT";
 		address _ZCBaddress = IZCBamm(_ZCBammAddress).ZCBaddress();
 		address _YTaddress = IZCBamm(_ZCBammAddress).YTaddress();
 		uint64 _maturity = IZCBamm(_ZCBammAddress).maturity();
@@ -64,7 +40,10 @@ contract YTamm is IYTamm {
 			apy,
 			maturity-block.timestamp
 		);
-		init(_ZCBaddress, _YTaddress);
+		ZCBaddress = _ZCBaddress;
+		YTaddress = _YTaddress;
+		contractZCBDividend.push(0);
+		contractYieldDividend.push(0);
 	}
 
 	/*
@@ -75,8 +54,8 @@ contract YTamm is IYTamm {
 	*/
 	function _mint(address _to, uint _amount) internal {
         claimDividendInternal(_to, _to, true);
-		balanceOf[_to] += _amount;
-		totalSupply += _amount;
+		internalBalanceOf[_to] += _amount;
+		internalTotalSupply += _amount;
 
 		emit Mint(_to, _amount);
 	}
@@ -88,11 +67,11 @@ contract YTamm is IYTamm {
 		@param uint _amount: amount of LP tokens to burn
 	*/
 	function _burn(address _from, uint _amount) internal {
-		require(balanceOf[_from] >= _amount);
+		require(internalBalanceOf[_from] >= _amount);
 		uint _lastClaim = lastClaim[_from];
         claimDividendInternal(_from, _from, true);
-		balanceOf[_from] -= _amount;
-		totalSupply -= _amount;
+		internalBalanceOf[_from] -= _amount;
+		internalTotalSupply -= _amount;
 
 		//if _from is earning yield on LP funds then decrement from activeTotalSupply
 		uint lastIndex = contractZCBDividend.length-1;
@@ -187,12 +166,12 @@ contract YTamm is IYTamm {
 
 	/*
 		@Description: used in swap calculations,
-			regular totalSupply is used when minting or when burning LP tokens
+			regular internalTotalSupply is used when minting or when burning LP tokens
 
-		@return uint ret: totalSupply divided by a constant
+		@return uint ret: internalTotalSupply divided by a constant
 	*/
 	function _inflatedTotalSupply() internal view returns (uint ret) {
-		ret = totalSupply.mul(1 ether) / YTtoLmultiplier;
+		ret = internalTotalSupply.mul(1 ether) / YTtoLmultiplier;
 		require(ret > 0);
 	}
 
@@ -206,7 +185,7 @@ contract YTamm is IYTamm {
 	function getQuoteSignature(bool _YTin) internal view returns (bytes32) {
 		IZCBamm zcbamm = IZCBamm(ZCBammAddress);
 		(uint updateTimestamp, uint ratio) = wrapper.getStatus();
-		return keccak256(abi.encodePacked(totalSupply, YTreserves, zcbamm.getRateFromOracle(), zcbamm.anchor(), _YTin, updateTimestamp, ratio));
+		return keccak256(abi.encodePacked(internalTotalSupply, YTreserves, zcbamm.getRateFromOracle(), zcbamm.anchor(), _YTin, updateTimestamp, ratio));
 	}
 
 	/*
@@ -241,11 +220,11 @@ contract YTamm is IYTamm {
 	}
 
 	/*
-		@Description first deposit of liquidity into this contract, totalSupply must be == 0
+		@Description first deposit of liquidity into this contract, internalTotalSupply must be == 0
 			pool starts at equilibrim this means the implied rate of the pool is the same as the rate fetched from the oracle
 	*/
 	function firstMint(uint128 _Uin) external override {
-		require(totalSupply == 0);
+		require(internalTotalSupply == 0);
 		uint YTin = YTtoLmultiplier.mul(_Uin) / (1 ether);
 
 		getYT(address(this), _Uin + YTin);
@@ -353,13 +332,13 @@ contract YTamm is IYTamm {
 			YTreserves = _YTreserves;
 		}
 		/*
-			L == totalSupply / YTtoLmultiplier
+			L == internalTotalSupply / YTtoLmultiplier
 			L/YTreserves == 1
 			L == YTreserves
-			YTreserves == totalSupply / YTtoLmultiplier
-			YTtoLmultiplier == totalSupply / YTreserves
+			YTreserves == internalTotalSupply / YTtoLmultiplier
+			YTtoLmultiplier == internalTotalSupply / YTreserves
 		*/
-		YTtoLmultiplier = totalSupply.mul(1 ether) / _YTreserves;
+		YTtoLmultiplier = internalTotalSupply.mul(1 ether) / _YTreserves;
 		SlippageConstant = AmmInfoOracle(AmmInfoOracleAddress).getSlippageConstant(ZCBaddress);
 		lastRecalibration = block.timestamp;
 		//ensure noone reserves quote before recalibrating and is then able to take the quote
@@ -374,7 +353,7 @@ contract YTamm is IYTamm {
 		@param uint _maxYTin: the maximum amount of YT to deposit as liquidity
 	*/
 	function mint(uint _amount, uint _maxUin, uint _maxYTin) external override {
-		uint _totalSupply = totalSupply;	//gas savings
+		uint _totalSupply = internalTotalSupply;	//gas savings
 		uint Uin = _amount*Ureserves;
 		Uin = Uin/_totalSupply + (Uin%_totalSupply == 0 ? 0 : 1);
 		require(Uin <= _maxUin);
@@ -398,7 +377,7 @@ contract YTamm is IYTamm {
 		@param uint _amount: the amount of LP tokens to burn
 	*/
 	function burn(uint _amount) external override {
-		uint _totalSupply = totalSupply;	//gas savings
+		uint _totalSupply = internalTotalSupply;	//gas savings
 		uint Uout = _amount*Ureserves/_totalSupply;
 		uint YTout = _amount*YTreserves/_totalSupply;
 
@@ -682,9 +661,9 @@ contract YTamm is IYTamm {
 				Ureserves += scaledZCBoverReserves;
 
 				/*
-					L == effectiveTotalSupply == totalSupply / YTtoLmultiplier
+					L == effectiveTotalSupply == internalTotalSupply / YTtoLmultiplier
 					
-					L * (1 + YToverutilization) == totalSupply / (YTtoLmultiplier / (1 + YToverutilization) )
+					L * (1 + YToverutilization) == internalTotalSupply / (YTtoLmultiplier / (1 + YToverutilization) )
 
 					to increase L by YToverutilization do:
 					YTtoLmultiplier /= 1 + YToverutilization
@@ -701,9 +680,9 @@ contract YTamm is IYTamm {
 				YTreserves += scaledYToverReserves.sub(ZCBoverReserves);
 				Ureserves += ZCBoverReserves;
 				/*
-					L == effectiveTotalSupply == totalSupply / YTtoLmultiplier
+					L == effectiveTotalSupply == internalTotalSupply / YTtoLmultiplier
 					
-					L * (1 + ZCBoverutilization) == totalSupply / (YTtoLmultiplier / (1 + ZCBoverutilization) )
+					L * (1 + ZCBoverutilization) == internalTotalSupply / (YTtoLmultiplier / (1 + ZCBoverutilization) )
 
 					to increase L by ZCBoverutilization do:
 					YTtoLmultiplier /= 1 + ZCBoverutilization

@@ -44,6 +44,7 @@ contract('SwapRouter', async function(accounts) {
 		BigMathInstance = await BigMath.new();
 		await ZCBammDeployer.link("BigMath", BigMathInstance.address);
 		await YTammDeployer.link("BigMath", BigMathInstance.address);
+		await YTammDelegate.link("BigMath", BigMathInstance.address);
 		ZCBammDeployerInstance = await ZCBammDeployer.new();
 		YTammDelegateInstance = await YTammDelegate.new();
 		YTammDeployerInstance = await YTammDeployer.new(YTammDeployerInstance.address);

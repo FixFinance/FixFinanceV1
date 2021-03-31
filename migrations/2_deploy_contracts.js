@@ -60,7 +60,7 @@ module.exports = async function(deployer) {
 	EiInstance = await deployer.deploy(Ei);
 	await deployer.link(Ei, BigMath);
 	bigMathInstance = await deployer.deploy(BigMath);
-	await deployer.link(BigMath, [ZCBammDeployer, YTammDeployer]);
+	await deployer.link(BigMath, [ZCBammDeployer, YTammDeployer, YTammDelegate]);
 	ZCBammDeployerInstance = await deployer.deploy(ZCBammDeployer);
 	YTammDelegateInstance = await deployer.deploy(YTammDelegate);
 	YTammDeployerInstance = await deployer.deploy(YTammDeployer, YTammDelegateInstance.address);

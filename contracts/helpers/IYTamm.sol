@@ -43,7 +43,4 @@ abstract contract IYTamm is DividendEnabled, IYTammData {
 
 	string public constant override name = "YT amm Liquidity Token";
 	string public constant override symbol = "YTLT";
-	uint internal constant SecondsPerYear = 31556926;
-	int128 internal constant _2WeeksABDK = int128((2 weeks << 64)/SecondsPerYear);
-
 }

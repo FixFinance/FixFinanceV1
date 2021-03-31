@@ -105,6 +105,7 @@ contract('YTamm', async function(accounts){
 		yieldTokenInstance = await yieldToken.at(await capitalHandlerInstance.yieldTokenAddress());
 		await ZCBamm.link("BigMath", BigMathInstance.address);
 		await YTamm.link("BigMath", BigMathInstance.address);
+		await YTammDelegate.link("BigMath", BigMathInstance.address);
 		ammInfoOracleInstance = await AmmInfoOracle.new(
 			BipsToTreasury,
 			nullAddress

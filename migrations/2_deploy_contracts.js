@@ -7,6 +7,7 @@ const BondMinterDelegate = artifacts.require("BondMinterDelegate");
 const BondMinter = artifacts.require("BondMinter");
 const CapitalHandlerDeployer = artifacts.require('CapitalHandlerDeployer');
 const ZCBammDeployer = artifacts.require('ZCBammDeployer');
+const YTammDelegate = artifacts.require('YTammDelegate');
 const YTammDeployer = artifacts.require('YTammDeployer');
 const SwapRouterDelegate = artifacts.require('SwapRouterDelegate');
 const SwapRouterDeployer = artifacts.require('SwapRouterDeployer');
@@ -61,7 +62,8 @@ module.exports = async function(deployer) {
 	bigMathInstance = await deployer.deploy(BigMath);
 	await deployer.link(BigMath, [ZCBammDeployer, YTammDeployer]);
 	ZCBammDeployerInstance = await deployer.deploy(ZCBammDeployer);
-	YTammDeployerInstance = await deployer.deploy(YTammDeployer);
+	YTammDelegateInstance = await deployer.deploy(YTammDelegate);
+	YTammDeployerInstance = await deployer.deploy(YTammDeployer, YTammDelegateInstance.address);
 	organizerInstance = await deployer.deploy(
 		organizer,
 		yieldTokenDeployerInstance.address,

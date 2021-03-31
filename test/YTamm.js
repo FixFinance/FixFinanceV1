@@ -7,6 +7,7 @@ const yieldToken = artifacts.require("YieldToken");
 const yieldTokenDeployer = artifacts.require("YieldTokenDeployer");
 const ZCBamm = artifacts.require("ZCBamm");
 const YTamm = artifacts.require("YTamm");
+const YTammDelegate = artifacts.require('YTammDelegate');
 const AmmInfoOracle = artifacts.require("AmmInfoOracle");
 
 const helper = require("../helper/helper.js");
@@ -145,7 +146,8 @@ contract('YTamm', async function(accounts){
 		//burn all our amm0 LP tokens
 		await amm0.burn(await amm0.balanceOf(accounts[0]));
 
-		amm1 = await YTamm.new(amm0.address, ammInfoOracleInstance.address);
+		YTammDelegateInstance = await YTammDelegate.new();
+		amm1 = await YTamm.new(amm0.address, ammInfoOracleInstance.address, YTammDelegateInstance.address);
 		YTtoLmultiplierBN = await amm1.YTtoLmultiplier();
 		YTtoLmultiplierBN_p1 = YTtoLmultiplierBN.add(_10To18BN);
 		YTtoLmultiplier = parseInt(YTtoLmultiplierBN.toString()) * Math.pow(10, -18);

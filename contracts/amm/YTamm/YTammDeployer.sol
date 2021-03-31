@@ -3,6 +3,12 @@ import "./YTamm.sol";
 
 contract YTammDeployer {
 
+	address delegateAddress;
+
+	constructor (address _delegateAddress) public {
+		delegateAddress = _delegateAddress;
+	}
+
 	/*
 		@Description: create a new YTamm contract
 
@@ -12,6 +18,6 @@ contract YTammDeployer {
 		@return address: the address of the new YTamm contract
 	*/
 	function deploy(address _ZCBammAddress, address _feeOracleAddress) external returns (address) {
-		return address(new YTamm(_ZCBammAddress, _feeOracleAddress));
+		return address(new YTamm(_ZCBammAddress, _feeOracleAddress, delegateAddress));
 	}
 }

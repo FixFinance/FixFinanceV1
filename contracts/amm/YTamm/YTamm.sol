@@ -16,13 +16,16 @@ contract YTamm is IYTamm {
 	using ABDKMath64x64 for int128;
 	using SafeMath for uint256;
 
+	address delegateAddress;
+
 
 	/*
 		Init AMM
 	*/
 	constructor(
 		address _ZCBammAddress,
-		address _feeOracleAddress
+		address _feeOracleAddress,
+		address _delegateAddress
 	) public {
 		address _ZCBaddress = IZCBamm(_ZCBammAddress).ZCBaddress();
 		address _YTaddress = IZCBamm(_ZCBammAddress).YTaddress();
@@ -42,6 +45,7 @@ contract YTamm is IYTamm {
 		);
 		ZCBaddress = _ZCBaddress;
 		YTaddress = _YTaddress;
+		delegateAddress = _delegateAddress;
 		contractZCBDividend.push(0);
 		contractYieldDividend.push(0);
 	}

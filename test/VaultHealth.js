@@ -12,6 +12,7 @@ const BigMath = artifacts.require("BigMath");
 const Ei = artifacts.require("Ei");
 const CapitalHandlerDeployer = artifacts.require('CapitalHandlerDeployer');
 const ZCBammDeployer = artifacts.require('ZCBammDeployer');
+const YTammDelegate = artifacts.require('YTammDelegate');
 const YTammDeployer = artifacts.require('YTammDeployer');
 const AmmInfoOracle = artifacts.require("AmmInfoOracle");
 const OracleContainer = artifacts.require("OracleContainer");
@@ -69,7 +70,8 @@ contract('VaultHealth', async function(accounts) {
 		await ZCBammDeployer.link("BigMath", BigMathInstance.address);
 		await YTammDeployer.link("BigMath", BigMathInstance.address);
 		ZCBammDeployerInstance = await ZCBammDeployer.new();
-		YTammDeployerInstance = await YTammDeployer.new();
+		YTammDelegateInstance = await YTammDelegate.new();
+		YTammDeployerInstance = await YTammDeployer.new(YTammDelegateInstance.address);
 		CapitalHandlerDeployerInstance = await CapitalHandlerDeployer.new();
 		ammInfoOracleInstance = await AmmInfoOracle.new("0", nullAddress);
 		organizerInstance = await organizer.new(

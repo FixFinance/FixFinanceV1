@@ -12,6 +12,7 @@ const CapitalHandlerDeployer = artifacts.require('CapitalHandlerDeployer');
 const ZCBamm = artifacts.require('ZCBamm');
 const YTamm = artifacts.require('YTamm');
 const ZCBammDeployer = artifacts.require('ZCBammDeployer');
+const YTammDelegate = artifacts.require('YTammDelegate');
 const YTammDeployer = artifacts.require('YTammDeployer');
 const SwapRouterDeployer = artifacts.require('SwapRouterDeployer');
 const SwapRouterDelegate = artifacts.require('SwapRouterDelegate');
@@ -37,7 +38,8 @@ contract('organizer', function(accounts) {
 		await ZCBammDeployer.link("BigMath", BigMathInstance.address);
 		await YTammDeployer.link("BigMath", BigMathInstance.address);
 		ZCBammDeployerInstance = await ZCBammDeployer.new();
-		YTammDeployerInstance = await YTammDeployer.new();
+		YTammDelegateInstance = await YTammDelegate.new();
+		YTammDeployerInstance = await YTammDeployer.new(YTammDelegateInstance.address);
 		capitalHandlerDeployerInstance = await CapitalHandlerDeployer.new();
 		swapRouterDelegateInstance = await SwapRouterDelegate.new();
 		swapRouterDeployerInstance = await SwapRouterDeployer.new(swapRouterDelegateInstance.address);

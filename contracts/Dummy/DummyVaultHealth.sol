@@ -53,6 +53,27 @@ contract DummyVaultHealth is IVaultHealth {
 		return _amountSupplied * 1e18 / lowerRatio[_assetSupplied][_assetBorrowed];
 	}
 
+	function YTvaultAmountBorrowedAtUpperLimit(address _CHsupplied, address _CHborrowed, uint _amountYield, int _amountBond) external view override returns (uint) {
+		if (
+			_CHsupplied == address(0) ||
+			_CHborrowed == address(0) ||
+			_amountYield == 0 ||
+			_amountBond == 0
+			)
+			return 0;
+		return 1;
+	}
+	function YTvaultAmountBorrowedAtLowerLimit(address _CHsupplied, address _CHborrowed, uint _amountYield, int _amountBond) external view override returns (uint) {
+		if (
+			_CHsupplied == address(0) ||
+			_CHborrowed == address(0) ||
+			_amountYield == 0 ||
+			_amountBond == 0
+			)
+			return 0;
+		return 1;
+	}
+
 	function YTvaultSatisfiesUpperLimit(address _CHsupplied, address _CHborrowed, uint _amountYield, int _amountBond, uint _amountBorrowed) external view override returns (bool) {
 		if (
 			_CHsupplied	== address(0) ||

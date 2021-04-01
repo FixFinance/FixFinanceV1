@@ -314,6 +314,15 @@ contract VaultHealth is IVaultHealth, Ownable {
 		baseBorrowedAsset = org.capitalHandlerToWrapper(_borrowed);
 	}
 
+	/*
+		@Description: take 2 CapitalHandler addresses and find their corresponding base asset addresses
+	*/
+	function bothCHtoBaseAddresses(address _addr0, address _addr1) internal view returns (address baseAddr0, address baseAddr1) {
+		organizer org = organizer(organizerAddress);
+		baseAddr0 = org.capitalHandlerToWrapper(_addr0);
+		baseAddr1 = org.capitalHandlerToWrapper(_addr1);
+	}
+
 
 	/*
 		@Description: find the amount of supplied asset that is required for a vault stay above the upper collateralisation limit
@@ -375,13 +384,13 @@ contract VaultHealth is IVaultHealth, Ownable {
 		@return uint: the maximum amount of ZCB for CapitalHandler _CHborrowed for which the vault will not be forced below
 			the upper collateralization limit
 	*/
-	function YTvaultAmountBorrowedAtUpperLimit(
+	function _YTvaultAmountBorrowedAtUpperLimit(
 		address _CHsupplied,
 		address _CHborrowed,
 		uint _amountYield,
 		int _amountBond
 	) internal view returns (uint) {
-		(address _baseSupplied, address _baseBorrowed) = baseAssetAddresses(_CHsupplied, _CHborrowed);
+		(address _baseSupplied, address _baseBorrowed) = bothCHtoBaseAddresses(_CHsupplied, _CHborrowed);
 
 		bool positiveBond = _amountBond >= 0;
 
@@ -394,7 +403,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 		uint compositeSupplied = positiveBond ? _amountYield.add(ZCBvalue) : _amountYield.sub(ZCBvalue);
 
 		return compositeSupplied
-			.mul(1 ether)
+			.mul((1 ether)**2)
 			.div(crossAssetPrice(_baseSupplied, _baseBorrowed))
 			.mul(1 ether)
 			.div(getRateMultiplier_BaseRate(_CHborrowed, _baseBorrowed, RateAdjuster.UPPER_BORROW))
@@ -415,13 +424,13 @@ contract VaultHealth is IVaultHealth, Ownable {
 		@return uint: the maximum amount of ZCB for CapitalHandler _CHborrowed for which the vault will not be forced below
 			the lower collateralization limit
 	*/
-	function YTvaultAmountBorrowedAtLowerLimit(
+	function _YTvaultAmountBorrowedAtLowerLimit(
 		address _CHsupplied,
 		address _CHborrowed,
 		uint _amountYield,
 		int _amountBond
 	) internal view returns (uint) {
-		(address _baseSupplied, address _baseBorrowed) = baseAssetAddresses(_CHsupplied, _CHborrowed);
+		(address _baseSupplied, address _baseBorrowed) = bothCHtoBaseAddresses(_CHsupplied, _CHborrowed);
 
 		bool positiveBond = _amountBond >= 0;
 
@@ -434,7 +443,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 		uint compositeSupplied = positiveBond ? _amountYield.add(ZCBvalue) : _amountYield.sub(ZCBvalue);
 
 		return compositeSupplied
-			.mul(1 ether)
+			.mul((1 ether)**2)
 			.div(crossAssetPrice(_baseSupplied, _baseBorrowed))
 			.mul(1 ether)
 			.div(getRateMultiplier_BaseRate(_CHborrowed, _baseBorrowed, RateAdjuster.LOW_BORROW))
@@ -489,7 +498,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 			false otherwise
 	*/
 	function YTvaultSatisfiesUpperLimit(address _CHsupplied, address _CHborrowed, uint _amountYield, int _amountBond, uint _amountBorrowed) external override view returns (bool) {
-		return _amountBorrowed < YTvaultAmountBorrowedAtUpperLimit(_CHsupplied, _CHborrowed, _amountYield, _amountBond);
+		return _amountBorrowed < _YTvaultAmountBorrowedAtUpperLimit(_CHsupplied, _CHborrowed, _amountYield, _amountBond);
 	}
 
 	/*
@@ -506,7 +515,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 			false otherwise
 	*/
 	function YTvaultSatisfiesLowerLimit(address _CHsupplied, address _CHborrowed, uint _amountYield, int _amountBond, uint _amountBorrowed) external override view returns (bool) {
-		return _amountBorrowed < YTvaultAmountBorrowedAtLowerLimit(_CHsupplied, _CHborrowed, _amountYield, _amountBond);
+		return _amountBorrowed < _YTvaultAmountBorrowedAtLowerLimit(_CHsupplied, _CHborrowed, _amountYield, _amountBond);
 	}
 
 	/*
@@ -567,6 +576,30 @@ contract VaultHealth is IVaultHealth, Ownable {
 			.mul(1 ether)
 			.div(getRateMultiplier_BaseRate(_assetBorrowed, _baseBorrowed, RateAdjuster.LOW_BORROW))
 			.div(crossCollateralizationRatio(_baseSupplied, _baseBorrowed, Safety.LOW));
+	}
+
+	/*
+		@Description: returns _YTvaultAmountBorrowedAtUpperLimit externally
+	*/
+	function YTvaultAmountBorrowedAtUpperLimit(
+		address _CHsupplied,
+		address _CHborrowed,
+		uint _amountYield,
+		int _amountBond
+	) external view override returns (uint) {
+		return _YTvaultAmountBorrowedAtUpperLimit(_CHsupplied, _CHborrowed, _amountYield, _amountBond);
+	}
+
+	/*
+		@Description: returns _YTvaultAmountBorrowedAtLowerLimit externally
+	*/
+	function YTvaultAmountBorrowedAtLowerLimit(
+		address _CHsupplied,
+		address _CHborrowed,
+		uint _amountYield,
+		int _amountBond
+	) external view override returns (uint) {
+		return _YTvaultAmountBorrowedAtLowerLimit(_CHsupplied, _CHborrowed, _amountYield, _amountBond);
 	}
 
 	/*
@@ -644,7 +677,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 		int128 _suppliedRateChange,
 		int128 _borrowRateChange
 	) external view override returns (bool) {
-		(address _baseSupplied, address _baseBorrowed) = baseAssetAddresses(_CHsupplied, _CHborrowed);
+		(address _baseSupplied, address _baseBorrowed) = bothCHtoBaseAddresses(_CHsupplied, _CHborrowed);
 
 		//after rate adjustments find the effective amount of the underlying asset which may be used in collateralisation calculation
 		uint compositeSupplied;
@@ -660,7 +693,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 		}
 
 		compositeSupplied = compositeSupplied
-			.mul(1 ether)
+			.mul((1 ether)**2)
 			.div(crossAssetPrice(_baseSupplied, _baseBorrowed))
 			.mul((1 ether)*TOTAL_BASIS_POINTS)
 			.div(_priceMultiplier);

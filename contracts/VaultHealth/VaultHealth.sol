@@ -397,7 +397,8 @@ contract VaultHealth is IVaultHealth, Ownable {
 		//if !positiveBond there are essentially 2 ZCBs being borrowed from the vault with _baseSupplied as the supplied asset
 		//thus we change the rate adjuster to borrow if the "supplied" ZCB is negative
 		uint ZCBvalue = uint(positiveBond ? _amountBond : -_amountBond)
-			.mul(getRateMultiplier_BaseRate(_CHsupplied, _baseSupplied, positiveBond ? RateAdjuster.UPPER_DEPOSIT : RateAdjuster.UPPER_BORROW));
+			.mul(getRateMultiplier_BaseRate(_CHsupplied, _baseSupplied, positiveBond ? RateAdjuster.UPPER_DEPOSIT : RateAdjuster.UPPER_BORROW))
+			.div(1 ether);
 
 		//after rate adjustments find the effective amount of the underlying asset which may be used in collateralisation calculation
 		uint compositeSupplied = positiveBond ? _amountYield.add(ZCBvalue) : _amountYield.sub(ZCBvalue);
@@ -437,7 +438,8 @@ contract VaultHealth is IVaultHealth, Ownable {
 		//if !positiveBond there are essentially 2 ZCBs being borrowed from the vault with _baseSupplied as the supplied asset
 		//thus we change the rate adjuster to borrow if the "supplied" ZCB is negative
 		uint ZCBvalue = uint(positiveBond ? _amountBond : -_amountBond)
-			.mul(getRateMultiplier_BaseRate(_CHsupplied, _baseSupplied, positiveBond ? RateAdjuster.LOW_DEPOSIT : RateAdjuster.LOW_BORROW));
+			.mul(getRateMultiplier_BaseRate(_CHsupplied, _baseSupplied, positiveBond ? RateAdjuster.LOW_DEPOSIT : RateAdjuster.LOW_BORROW))
+			.div(1 ether);
 
 		//after rate adjustments find the effective amount of the underlying asset which may be used in collateralisation calculation
 		uint compositeSupplied = positiveBond ? _amountYield.add(ZCBvalue) : _amountYield.sub(ZCBvalue);

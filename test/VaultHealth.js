@@ -524,7 +524,7 @@ contract('VaultHealth', async function(accounts) {
 		let rateMultiplier0 = adjAPY0**(-yearsRemaining);
 		let rateMultiplier1 = 1.0;
 
-		let amountSupplied = 10000000;	//asset0
+		let amountSupplied = 10000000;
 		let collateralizationRatio = upperRatio0*upperRatio1;
 		let expectedAmountBorrowed = Math.floor(amountSupplied * rateMultiplier1/rateMultiplier0/price/collateralizationRatio);
 		let actualBN = await vaultHealthInstance.YTvaultAmountBorrowedAtUpperLimit(zcbAsset1.address, zcbAsset0.address, amountSupplied, 0);
@@ -553,7 +553,7 @@ contract('VaultHealth', async function(accounts) {
 		let rateMultiplier0 = adjAPY0**(-yearsRemaining);
 		let rateMultiplier1 = 1.0;
 
-		let amountSupplied = 10000000;	//asset0
+		let amountSupplied = 10000000;
 		let collateralizationRatio = lowerRatio0*lowerRatio1;
 		let expectedAmountBorrowed = Math.floor(amountSupplied * rateMultiplier1/rateMultiplier0/price/collateralizationRatio);
 		let actualBN = await vaultHealthInstance.YTvaultAmountBorrowedAtLowerLimit(zcbAsset1.address, zcbAsset0.address, amountSupplied, 0);
@@ -567,6 +567,161 @@ contract('VaultHealth', async function(accounts) {
 		assert.equal(await vaultHealthInstance.YTvaultSatisfiesLowerLimit(zcbAsset1.address, zcbAsset0.address, amountSupplied, 0, actualBN.sub(new BN(needed))), true, "correct value returned by satisfiesLowerLimit");
 	});
 
+	it('YTvaultSatisfiesUpperLimit(): ZCB > YT', async () => {
+		await setPrice(_10To18.mul(new BN(3)));
+		let adjAPY0 = (APY0-1)/upperThreshold0 + 1;
+
+		let temp0 = APY0-minRateAdjustment;
+
+		adjAPY0 = Math.min(adjAPY0, temp0);
+
+		adjAPY0 = Math.max(adjAPY0, 1);
+
+		let adjAPY1 = (APY1-1)*upperThreshold1 + 1;
+
+		let temp1 = APY1+minRateAdjustment;
+
+		adjAPY1 = Math.max(adjAPY1, temp1);
+
+		let yearsRemaining = (maturity - (await web3.eth.getBlock('latest')).timestamp)/ SecondsPerYear;
+
+		let rateMultiplier0 = adjAPY0**(-yearsRemaining);
+		let rateMultiplier1 = adjAPY1**(-yearsRemaining);
+
+		let amountSupplied = 10000000
+		let amountBond = 2000000;
+		let collateralizationRatio = upperRatio0*upperRatio1;
+		let expectedBorrowFromUnderlying = Math.floor(amountSupplied/rateMultiplier0/price/collateralizationRatio);
+		let expectedBorrowFromZCB = Math.floor(amountBond*rateMultiplier1/rateMultiplier0/price/collateralizationRatio);
+		let expectedAmountBorrowed = expectedBorrowFromUnderlying+expectedBorrowFromZCB;
+		let actualBN = await vaultHealthInstance.YTvaultAmountBorrowedAtUpperLimit(zcbAsset1.address, zcbAsset0.address, amountSupplied, amountBond);
+		let actual = parseInt(actualBN.toString());
+
+		let error = (expectedAmountBorrowed-actual) / expectedAmountBorrowed;
+		assert.isBelow(error, ErrorRange, "output within acceptable error range");
+
+		let needed = new BN(Math.ceil(actual/(amountSupplied+amountBond)) + 1);
+		assert.equal(await vaultHealthInstance.YTvaultSatisfiesUpperLimit(zcbAsset1.address, zcbAsset0.address, amountSupplied, amountBond, actualBN), false, "correct value returned by satisfiesUpperLimit");
+		assert.equal(await vaultHealthInstance.YTvaultSatisfiesUpperLimit(zcbAsset1.address, zcbAsset0.address, amountSupplied, amountBond, actualBN.sub(new BN(needed))), true, "correct value returned by satisfiesUpperLimit");
+	});
+
+	it('YTvaultSatisfiesLowerLimit(): ZCB > YT', async () => {
+		await setPrice(_10To18.mul(new BN(3)));
+		let adjAPY0 = (APY0-1)/upperThreshold0 + 1;
+
+		let temp0 = APY0-minRateAdjustment;
+
+		adjAPY0 = Math.min(adjAPY0, temp0);
+
+		adjAPY0 = Math.max(adjAPY0, 1);
+
+		let adjAPY1 = (APY1-1)*lowerThreshold1 + 1;
+
+		let temp1 = APY1+minRateAdjustment;
+
+		adjAPY1 = Math.max(adjAPY1, temp1);
+
+		let yearsRemaining = (maturity - (await web3.eth.getBlock('latest')).timestamp)/ SecondsPerYear;
+
+		let rateMultiplier0 = adjAPY0**(-yearsRemaining);
+		let rateMultiplier1 = adjAPY1**(-yearsRemaining);
+
+		let amountSupplied = 10000000
+		let amountBond = 2000000;
+		let collateralizationRatio = lowerRatio0*lowerRatio1;
+		let expectedBorrowFromUnderlying = Math.floor(amountSupplied/rateMultiplier0/price/collateralizationRatio);
+		let expectedBorrowFromZCB = Math.floor(amountBond*rateMultiplier1/rateMultiplier0/price/collateralizationRatio);
+		let expectedAmountBorrowed = expectedBorrowFromUnderlying+expectedBorrowFromZCB;
+		let actualBN = await vaultHealthInstance.YTvaultAmountBorrowedAtLowerLimit(zcbAsset1.address, zcbAsset0.address, amountSupplied, amountBond);
+		let actual = parseInt(actualBN.toString());
+
+		let error = (expectedAmountBorrowed-actual) / expectedAmountBorrowed;
+		assert.isBelow(error, ErrorRange, "output within acceptable error range");
+
+		let needed = new BN(Math.ceil(actual/(amountSupplied+amountBond)) + 1);
+		assert.equal(await vaultHealthInstance.YTvaultSatisfiesLowerLimit(zcbAsset1.address, zcbAsset0.address, amountSupplied, amountBond, actualBN), false, "correct value returned by satisfiesLowerLimit");
+		assert.equal(await vaultHealthInstance.YTvaultSatisfiesLowerLimit(zcbAsset1.address, zcbAsset0.address, amountSupplied, amountBond, actualBN.sub(new BN(needed))), true, "correct value returned by satisfiesLowerLimit");
+	});
+
+	it('YTvaultSatisfiesUpperLimit(): ZCB < YT', async () => {
+		await setPrice(_10To18.mul(new BN(3)));
+		let adjAPY0 = (APY0-1)/upperThreshold0 + 1;
+
+		let temp0 = APY0-minRateAdjustment;
+
+		adjAPY0 = Math.min(adjAPY0, temp0);
+
+		adjAPY0 = Math.max(adjAPY0, 1);
+
+		let adjAPY1 = (APY1-1)/upperThreshold1 + 1;
+
+		let temp1 = APY1-minRateAdjustment;
+
+		adjAPY1 = Math.min(adjAPY1, temp1);
+
+		adjAPY1 = Math.max(adjAPY1, 1);
+
+		let yearsRemaining = (maturity - (await web3.eth.getBlock('latest')).timestamp)/ SecondsPerYear;
+
+		let rateMultiplier0 = adjAPY0**(-yearsRemaining);
+		let rateMultiplier1 = adjAPY1**(-yearsRemaining);
+
+		let amountSupplied = 10000000
+		let amountBond = -2000000;
+		let collateralizationRatio = upperRatio0*upperRatio1;
+		let expectedBorrowFromUnderlying = Math.floor(amountSupplied/rateMultiplier0/price/collateralizationRatio);
+		let expectedBorrowFromZCB = Math.floor(amountBond*rateMultiplier1/rateMultiplier0/price/collateralizationRatio);
+		let expectedAmountBorrowed = expectedBorrowFromUnderlying+expectedBorrowFromZCB;
+		let actualBN = await vaultHealthInstance.YTvaultAmountBorrowedAtUpperLimit(zcbAsset1.address, zcbAsset0.address, amountSupplied, amountBond);
+		let actual = parseInt(actualBN.toString());
+
+		let error = (expectedAmountBorrowed-actual) / expectedAmountBorrowed;
+		assert.isBelow(error, ErrorRange, "output within acceptable error range");
+
+		let needed = new BN(Math.ceil(actual/(amountSupplied-amountBond)) + 1);
+		assert.equal(await vaultHealthInstance.YTvaultSatisfiesUpperLimit(zcbAsset1.address, zcbAsset0.address, amountSupplied, amountBond, actualBN), false, "correct value returned by satisfiesUpperLimit");
+		assert.equal(await vaultHealthInstance.YTvaultSatisfiesUpperLimit(zcbAsset1.address, zcbAsset0.address, amountSupplied, amountBond, actualBN.sub(new BN(needed))), true, "correct value returned by satisfiesUpperLimit");
+	});
+
+	it('YTvaultSatisfiesLowerLimit(): ZCB < YT', async () => {
+		await setPrice(_10To18.mul(new BN(3)));
+		let adjAPY0 = (APY0-1)/lowerThreshold0 + 1;
+
+		let temp0 = APY0-minRateAdjustment;
+
+		adjAPY0 = Math.min(adjAPY0, temp0);
+
+		adjAPY0 = Math.max(adjAPY0, 1);
+
+		let adjAPY1 = (APY1-1)/lowerThreshold1 + 1;
+
+		let temp1 = APY1-minRateAdjustment;
+
+		adjAPY1 = Math.min(adjAPY1, temp1);
+
+		adjAPY1 = Math.max(adjAPY1, 1);
+
+		let yearsRemaining = (maturity - (await web3.eth.getBlock('latest')).timestamp)/ SecondsPerYear;
+
+		let rateMultiplier0 = adjAPY0**(-yearsRemaining);
+		let rateMultiplier1 = adjAPY1**(-yearsRemaining);
+
+		let amountSupplied = 10000000
+		let amountBond = -2000000;
+		let collateralizationRatio = lowerRatio0*lowerRatio1;
+		let expectedBorrowFromUnderlying = Math.floor(amountSupplied/rateMultiplier0/price/collateralizationRatio);
+		let expectedBorrowFromZCB = Math.floor(amountBond*rateMultiplier1/rateMultiplier0/price/collateralizationRatio);
+		let expectedAmountBorrowed = expectedBorrowFromUnderlying+expectedBorrowFromZCB;
+		let actualBN = await vaultHealthInstance.YTvaultAmountBorrowedAtLowerLimit(zcbAsset1.address, zcbAsset0.address, amountSupplied, amountBond);
+		let actual = parseInt(actualBN.toString());
+
+		let error = (expectedAmountBorrowed-actual) / expectedAmountBorrowed;
+		assert.isBelow(error, ErrorRange, "output within acceptable error range");
+
+		let needed = new BN(Math.ceil(actual/(amountSupplied-amountBond)) + 1);
+		assert.equal(await vaultHealthInstance.YTvaultSatisfiesLowerLimit(zcbAsset1.address, zcbAsset0.address, amountSupplied, amountBond, actualBN), false, "correct value returned by satisfiesLowerLimit");
+		assert.equal(await vaultHealthInstance.YTvaultSatisfiesLowerLimit(zcbAsset1.address, zcbAsset0.address, amountSupplied, amountBond, actualBN.sub(new BN(needed))), true, "correct value returned by satisfiesLowerLimit");
+	});
 
 	it('vaultWithstandsChange: aToken deposited', async () => {
 		await setPrice(_10To18.mul(new BN(3)));

@@ -11,6 +11,9 @@ interface IVaultHealth {
 	function amountBorrowedAtUpperLimit(address _assetSupplied, address _assetBorrowed, uint _amountSupplied) external view returns (uint);
 	function amountBorrowedAtLowerLimit(address _assetSupplied, address _assetBorrowed, uint _amountSupplied) external view returns (uint);
 
+	function YTvaultSatisfiesUpperLimit(address _CHsupplied, address _CHborrowed, uint _amountYield, int _amountBond, uint _amountBorrowed) external view returns (bool);
+	function YTvaultSatisfiesLowerLimit(address _CHsupplied, address _CHborrowed, uint _amountYield, int _amountBond, uint _amountBorrowed) external view returns (bool);
+
 	function vaultWithstandsChange(
 		address _assetSupplied,
 		address _assetBorrowed,
@@ -20,5 +23,17 @@ interface IVaultHealth {
 		int128 _suppliedRateChange,
 		int128 _borrowRateChange
 	) external view returns (bool);
+
+	function YTvaultWithstandsChange(
+		address _CHsupplied,
+		address _CHborrowed,
+		uint _amountYield,
+		int _amountBond,
+		uint _amountBorrowed,
+		uint _pctPriceChange,
+		int128 _suppliedRateChange,
+		int128 _borrowRateChange
+	) external view returns (bool);	
+
 	function maximumShortInterest(address _underlyingAssetAddress) external view returns (uint);
 }

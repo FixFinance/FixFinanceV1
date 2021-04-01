@@ -361,6 +361,86 @@ contract VaultHealth is IVaultHealth, Ownable {
 	}
 
 
+	/*
+		@Description: find the maximum amount of borrowed asset that may be borrowed from a vault without going under the
+			upper collateralization limit
+
+		@param address _CHsupplied: the address of the CapitalHandler instance for which a combination of YT & ZCB are being
+			supplied to the vault
+		@param address _CHborrowed: the address of the CapitalHandler instance for which ZCB is being borrowed from the vault
+		@param uint _amountYield: the amount of YT being supplied to the vault (in unit amount)
+		@param int _amountBond: the difference between the amount of ZCB supplied to the vault and the amount of YT supplied
+			amtZCB - amtYT == _amountBond
+
+		@return uint: the maximum amount of ZCB for CapitalHandler _CHborrowed for which the vault will not be forced below
+			the upper collateralization limit
+	*/
+	function YTvaultAmountBorrowedAtUpperLimit(
+		address _CHsupplied,
+		address _CHborrowed,
+		uint _amountYield,
+		int _amountBond
+	) internal view returns (uint) {
+		(address _baseSupplied, address _baseBorrowed) = baseAssetAddresses(_CHsupplied, _CHborrowed);
+
+		bool positiveBond = _amountBond >= 0;
+
+		//if !positiveBond there are essentially 2 ZCBs being borrowed from the vault with _baseSupplied as the supplied asset
+		//thus we change the rate adjuster to borrow if the "supplied" ZCB is negative
+		uint ZCBvalue = uint(positiveBond ? _amountBond : -_amountBond)
+			.mul(getRateMultiplier_BaseRate(_CHsupplied, _baseSupplied, positiveBond ? RateAdjuster.UPPER_DEPOSIT : RateAdjuster.UPPER_BORROW));
+
+		//after rate adjustments find the effective amount of the underlying asset which may be used in collateralisation calculation
+		uint compositeSupplied = positiveBond ? _amountYield.add(ZCBvalue) : _amountYield.sub(ZCBvalue);
+
+		return compositeSupplied
+			.mul(1 ether)
+			.div(crossAssetPrice(_baseSupplied, _baseBorrowed))
+			.mul(1 ether)
+			.div(getRateMultiplier_BaseRate(_CHborrowed, _baseBorrowed, RateAdjuster.UPPER_BORROW))
+			.div(crossCollateralizationRatio(_baseSupplied, _baseBorrowed, Safety.UPPER));
+	}
+
+	/*
+		@Description: find the maximum amount of borrowed asset that may be borrowed from a vault without going under the
+			lower collateralization limit
+
+		@param address _CHsupplied: the address of the CapitalHandler instance for which a combination of YT & ZCB are being
+			supplied to the vault
+		@param address _CHborrowed: the address of the CapitalHandler instance for which ZCB is being borrowed from the vault
+		@param uint _amountYield: the amount of YT being supplied to the vault (in unit amount)
+		@param int _amountBond: the difference between the amount of ZCB supplied to the vault and the amount of YT supplied
+			amtZCB - amtYT == _amountBond
+
+		@return uint: the maximum amount of ZCB for CapitalHandler _CHborrowed for which the vault will not be forced below
+			the lower collateralization limit
+	*/
+	function YTvaultAmountBorrowedAtLowerLimit(
+		address _CHsupplied,
+		address _CHborrowed,
+		uint _amountYield,
+		int _amountBond
+	) internal view returns (uint) {
+		(address _baseSupplied, address _baseBorrowed) = baseAssetAddresses(_CHsupplied, _CHborrowed);
+
+		bool positiveBond = _amountBond >= 0;
+
+		//if !positiveBond there are essentially 2 ZCBs being borrowed from the vault with _baseSupplied as the supplied asset
+		//thus we change the rate adjuster to borrow if the "supplied" ZCB is negative
+		uint ZCBvalue = uint(positiveBond ? _amountBond : -_amountBond)
+			.mul(getRateMultiplier_BaseRate(_CHsupplied, _baseSupplied, positiveBond ? RateAdjuster.LOW_DEPOSIT : RateAdjuster.LOW_BORROW));
+
+		//after rate adjustments find the effective amount of the underlying asset which may be used in collateralisation calculation
+		uint compositeSupplied = positiveBond ? _amountYield.add(ZCBvalue) : _amountYield.sub(ZCBvalue);
+
+		return compositeSupplied
+			.mul(1 ether)
+			.div(crossAssetPrice(_baseSupplied, _baseBorrowed))
+			.mul(1 ether)
+			.div(getRateMultiplier_BaseRate(_CHborrowed, _baseBorrowed, RateAdjuster.LOW_BORROW))
+			.div(crossCollateralizationRatio(_baseSupplied, _baseBorrowed, Safety.LOW));
+	}
+
 
 	//-----------------------i-m-p-l-e-m-e-n-t---I-V-a-u-l-t-H-e-a-l-t-h--------------------------
 
@@ -396,9 +476,43 @@ contract VaultHealth is IVaultHealth, Ownable {
 	}
 
 	/*
+		@Description: check if a YT vault is above the upper collateralisation limit
+
+		@param address _CHsupplied: the address of the Capitalhandler supplied to the vault
+		@param address _CHborrowed: the address of the asset borrowed from the vault
+		@param uint _amountYield: the amount of YT being supplied to the vault (in unit amount)
+		@param int _amountBond: the difference between the amount of ZCB supplied to the vault and the amount of YT supplied
+			amtZCB - amtYT == _amountBond
+		@param uint _amountBorrowed: the amount of ZCB from _CHborrowed that has been borrowed from the vault
+
+		@return bool: returns true if the vault is above the upper collateralisation limit
+			false otherwise
+	*/
+	function YTvaultSatisfiesUpperLimit(address _CHsupplied, address _CHborrowed, uint _amountYield, int _amountBond, uint _amountBorrowed) external override view returns (bool) {
+		return _amountBorrowed < YTvaultAmountBorrowedAtUpperLimit(_CHsupplied, _CHborrowed, _amountYield, _amountBond);
+	}
+
+	/*
+		@Description: check if a YT vault is above the lower collateralisation limit
+
+		@param address _CHsupplied: the address of the Capitalhandler supplied to the vault
+		@param address _CHborrowed: the address of the asset borrowed from the vault
+		@param uint _amountYield: the amount of YT being supplied to the vault (in unit amount)
+		@param int _amountBond: the difference between the amount of ZCB supplied to the vault and the amount of YT supplied
+			amtZCB - amtYT == _amountBond
+		@param uint _amountBorrowed: the amount of ZCB from _CHborrowed that has been borrowed from the vault
+
+		@return bool: returns true if the vault is above the lower collateralisation limit
+			false otherwise
+	*/
+	function YTvaultSatisfiesLowerLimit(address _CHsupplied, address _CHborrowed, uint _amountYield, int _amountBond, uint _amountBorrowed) external override view returns (bool) {
+		return _amountBorrowed < YTvaultAmountBorrowedAtLowerLimit(_CHsupplied, _CHborrowed, _amountYield, _amountBond);
+	}
+
+	/*
 		@Description: returns value from _amountSuppliedAtUpperLimit() externally
 	*/
-	function amountSuppliedAtUpperLimit(address _assetSupplied, address _assetBorrowed, uint _amountBorrowed) public override view returns (uint) {
+	function amountSuppliedAtUpperLimit(address _assetSupplied, address _assetBorrowed, uint _amountBorrowed) external override view returns (uint) {
 		return _amountSuppliedAtUpperLimit(_assetSupplied, _assetBorrowed, _amountBorrowed);
 	}
 
@@ -481,7 +595,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 		uint _priceMultiplier,
 		int128 _suppliedRateChange,
 		int128 _borrowRateChange
-		) public view override returns(bool) {
+	) public view override returns(bool) {
 
 		(address _baseSupplied, address _baseBorrowed) = baseAssetAddresses(_assetSupplied, _assetBorrowed);
 
@@ -498,6 +612,62 @@ contract VaultHealth is IVaultHealth, Ownable {
 			.div((1 ether)*TOTAL_BASIS_POINTS);
 
 		return _amountBorrowed < _amountSupplied;
+	}
+
+	/*
+		@Description: ensure that a vault will not be sent into liquidation zone if price changes a specified amount
+			and rates change by a multiplier
+
+		@param address _CHsupplied: the address of the Capitalhandler supplied to the vault
+		@param address _CHborrowed: the address of the asset borrowed from the vault
+		@param uint _amountYield: the amount of YT being supplied to the vault (in unit amount)
+		@param int _amountBond: the difference between the amount of ZCB supplied to the vault and the amount of YT supplied
+			amtZCB - amtYT == _amountBond
+		@param uint _amountBorrowed: the amount of ZCB from _CHborrowed that has been borrowed from the vault
+		@param uint _priceMultiplier: the multiplier by which cross asset price of deposit versus borrowed asset changes
+			inflated by 1 ether
+		@param int128 _suppliedRateChange: the multiplier by which the rate of the supplied asset will change
+			in ABDK64.64 format
+		@param int128 _borrowRateChange: the multiplier by which the rate of the borrowed asset will change
+			in ABDK64.64 format
+
+		@return bool: returns true if vault will stay above liquidation zone
+			false otherwise
+	*/
+	function YTvaultWithstandsChange(
+		address _CHsupplied,
+		address _CHborrowed,
+		uint _amountYield,
+		int _amountBond,
+		uint _amountBorrowed,
+		uint _priceMultiplier,
+		int128 _suppliedRateChange,
+		int128 _borrowRateChange
+	) external view override returns (bool) {
+		(address _baseSupplied, address _baseBorrowed) = baseAssetAddresses(_CHsupplied, _CHborrowed);
+
+		//after rate adjustments find the effective amount of the underlying asset which may be used in collateralisation calculation
+		uint compositeSupplied;
+		{
+			bool positiveBond = _amountBond >= 0;
+
+			//if !positiveBond there are essentially 2 ZCBs being borrowed from the vault with _baseSupplied as the supplied asset
+			//thus we change the rate adjuster to borrow if the "supplied" ZCB is negative
+			uint ZCBvalue = uint(positiveBond ? _amountBond : -_amountBond)
+				.mul(getRateMultiplier_Changed(_CHsupplied, _baseSupplied, positiveBond ? RateAdjuster.UPPER_DEPOSIT : RateAdjuster.UPPER_BORROW, _suppliedRateChange));
+
+			compositeSupplied = positiveBond ? _amountYield.add(ZCBvalue) : _amountYield.sub(ZCBvalue);
+		}
+
+		compositeSupplied = compositeSupplied
+			.mul(1 ether)
+			.div(crossAssetPrice(_baseSupplied, _baseBorrowed))
+			.mul((1 ether)*TOTAL_BASIS_POINTS)
+			.div(_priceMultiplier);
+		compositeSupplied = compositeSupplied
+			.div(getRateMultiplier_Changed(_CHborrowed, _baseBorrowed, RateAdjuster.UPPER_BORROW, _borrowRateChange))
+			.div(crossCollateralizationRatio(_baseSupplied, _baseBorrowed, Safety.UPPER));
+		return compositeSupplied > _amountBorrowed;
 	}
 
 	//-----------------------a-d-m-i-n---o-p-e-r-a-t-i-o-n-s---------------------------

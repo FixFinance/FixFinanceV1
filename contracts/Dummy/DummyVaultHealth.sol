@@ -53,6 +53,30 @@ contract DummyVaultHealth is IVaultHealth {
 		return _amountSupplied * 1e18 / lowerRatio[_assetSupplied][_assetBorrowed];
 	}
 
+	function YTvaultSatisfiesUpperLimit(address _CHsupplied, address _CHborrowed, uint _amountYield, int _amountBond, uint _amountBorrowed) external view override returns (bool) {
+		if (
+			_CHsupplied	== address(0) ||
+			_CHborrowed == address(0) ||
+			_amountYield == 0 ||
+			_amountBond == 0 ||
+			_amountBorrowed == 0
+			)
+			return false || toReturn;
+		return true && toReturn;
+	}
+	function YTvaultSatisfiesLowerLimit(address _CHsupplied, address _CHborrowed, uint _amountYield, int _amountBond, uint _amountBorrowed) external view override returns (bool) {
+		if (
+			_CHsupplied	== address(0) ||
+			_CHborrowed == address(0) ||
+			_amountYield == 0 ||
+			_amountBond == 0 ||
+			_amountBorrowed == 0
+			)
+			return false || toReturn;
+		return true && toReturn;
+	}
+
+
 
 	bool toReturn;
 	function setToReturn(bool _toReturn) external {
@@ -86,6 +110,33 @@ contract DummyVaultHealth is IVaultHealth {
 			)
 			return false || toReturn;
 		return true && toReturn;
+	}
+
+	function YTvaultWithstandsChange(
+		address _CHsupplied,
+		address _CHborrowed,
+		uint _amountYield,
+		int _amountBond,
+		uint _amountBorrowed,
+		uint _pctPriceChange,
+		int128 _suppliedRateChange,
+		int128 _borrowRateChange
+	) external view override returns (bool) {
+		/*
+			silence warnings about not using parameters
+		*/
+		if (
+			_CHsupplied == address(0) ||
+			_CHborrowed == address(0) ||
+			_amountYield == 0 ||
+			_amountBond == 0 ||
+			_amountBorrowed == 0 ||
+			_pctPriceChange == 0 ||
+			_suppliedRateChange == 0 ||
+			_borrowRateChange == 0
+			)
+			return false || toReturn;
+		return true && toReturn;		
 	}
 
 

@@ -335,7 +335,7 @@ contract('MarginManager', async function(accounts) {
 		
 		let prevRevenue = await marginManagerInstance.revenue(wAsset1.address);
 
-		let rec = await marginManagerInstance.bidOnLiquidation(0, bid.toString(), {from: accounts[1]});
+		let rec = await marginManagerInstance.bidOnLiquidation(0, bid.toString(), liquidation.amountBorrowed, {from: accounts[1]});
 
 		let timestamp = (await web3.eth.getBlock(rec.receipt.blockNumber)).timestamp;
 

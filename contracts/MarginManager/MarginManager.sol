@@ -296,13 +296,16 @@ contract MarginManager is MarginManagerData, IMarginManager, Ownable {
 		@Description: place a new bid on a vault that has already begun an auction
 
 		@param uint _index: the index in _Liquidations[] of the auction
-		@param uint  _bid: the new bid (in the supplied asset) on the vault
+		@param uint  _bid: the amount of the supplied asset that the liquidator wishes to receive
+			in reward if the liquidator wins this auction
+		@param uint _amtIn: the amount of borrowed asset that the liquidator will be sending in
 	*/
-	function bidOnLiquidation(uint _index, uint _bid) external override {
+	function bidOnLiquidation(uint _index, uint _bid, uint _amtIn) external override {
 		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
-			"bidOnLiquidation(uint256,uint256)",
+			"bidOnLiquidation(uint256,uint256,uint256)",
 			_index,
-			_bid
+			_bid,
+			_amtIn
 		));
 		require(success);
 	}

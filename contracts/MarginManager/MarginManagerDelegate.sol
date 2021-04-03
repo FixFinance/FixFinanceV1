@@ -420,19 +420,39 @@ contract MarginManagerDelegate is MarginManagerData {
 		@Description: place a new bid on a vault that has already begun an auction
 
 		@param uint _index: the index in _Liquidations[] of the auction
-		@param uint  _bid: the new bid (in the supplied asset) on the vault
+		@param uint  _bid: the amount of the supplied asset that the liquidator wishes to receive
+			in reward if the liquidator wins this auction
+		@param uint _amtIn: the amount of borrowed asset that the liquidator will be sending in
 	*/
-	function bidOnLiquidation(uint _index, uint _bid) external {
+	function bidOnLiquidation(uint _index, uint _bid, uint _amtIn) external {
 		require(_Liquidations.length > _index);
 		Liquidation memory liq = _Liquidations[_index];
-		require(_bid < liq.bidAmount);
+		require(_amtIn <= liq.amountBorrowed);
+		uint maxBid = liq.bidAmount * _amtIn / liq.amountBorrowed;
+		require(_bid < maxBid);
 
-		refundBid(liq.bidder, liq.assetBorrowed, liq.amountBorrowed);
-		collectBid(msg.sender, liq.assetBorrowed, liq.amountBorrowed);
-		distributeSurplus(liq.vaultOwner, liq.assetSupplied, liq.bidAmount - _bid);
+		refundBid(liq.bidder, liq.assetBorrowed, _amtIn);
+		collectBid(msg.sender, liq.assetBorrowed, _amtIn);
+		distributeSurplus(liq.vaultOwner, liq.assetSupplied, maxBid - _bid);
 
-		_Liquidations[_index].bidAmount = _bid;
-		_Liquidations[_index].bidTimestamp = block.timestamp;
+		if (_amtIn == liq.amountBorrowed) {
+			_Liquidations[_index].bidAmount = _bid;
+			_Liquidations[_index].bidTimestamp = block.timestamp;
+		}
+		else {
+			_Liquidations[_index].bidAmount -= maxBid;
+			_Liquidations[_index].amountBorrowed -= _amtIn;
+
+			_Liquidations.push(Liquidation(
+				liq.vaultOwner,
+				liq.assetSupplied,
+				liq.assetBorrowed,
+				_amtIn,
+				msg.sender,
+				_bid,
+				block.timestamp
+			));
+		}
 	}
 
 	/*

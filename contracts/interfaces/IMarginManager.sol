@@ -58,7 +58,7 @@ interface IMarginManager {
 	//----------------------------------------------L-i-q-u-i-d-a-t-i-o-n-s------------------------------------------
 	function claimRebate(address _asset) external;
 	function auctionLiquidation(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _bid, uint _maxIn) external;
-	function bidOnLiquidation(uint _index, uint _bid) external;
+	function bidOnLiquidation(uint _index, uint _bid, uint _amtIn) external;
 	function claimLiquidation(uint _index, address _to) external;
 	function instantLiquidation(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _maxBid, uint _minOut, address _to) external;
 	function partialLiquidationSpecificIn(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _in, uint _minOut, address _to) external;

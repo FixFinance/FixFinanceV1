@@ -46,22 +46,26 @@ interface IMarginManager {
 		uint amountBorrowed
 	);
 	function Liquidations(uint _index) external view returns (
+		address vaultOwner,
 		address assetSupplied,
 		address assetBorrowed,
 		uint amountSupplied,
+		uint amountBorrowed,
 		address bidder,
 		uint bidAmount,
 		uint bidTimestamp
 	);
 	function VaultHealthAddress() external view returns (address);
 	//----------------------------------------------L-i-q-u-i-d-a-t-i-o-n-s------------------------------------------
-	function auctionLiquidation(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _bid, uint _minOut) external;
+	function claimRebate(address _asset) external;
+	function auctionLiquidation(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _bid, uint _maxIn) external;
 	function bidOnLiquidation(uint _index, uint _bid) external;
 	function claimLiquidation(uint _index, address _to) external;
 	function instantLiquidation(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _maxBid, uint _minOut, address _to) external;
 	function partialLiquidationSpecificIn(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _in, uint _minOut, address _to) external;
 	function partialLiquidationSpecificOut(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _out, uint _maxIn, address _to) external;
 	//--------------------------------------------a-d-m-i-n---------------------------------------------
+	function setLiquidationRebate(uint _rebateBips) external;
 	function whitelistWrapper(address _wrapeprAddress) external;
 	function whitelistAsset(address _assetAddress) external;
 	function whitelistCapitalHandler(address _capitalHandlerAddress) external;

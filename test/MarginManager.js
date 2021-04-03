@@ -32,6 +32,8 @@ function basisPointsToABDKString(bips) {
 
 const ABDK_1 = basisPointsToABDKString(TOTAL_BASIS_POINTS);
 
+const rebate_bips = 120;
+
 contract('MarginManager', async function(accounts) {
 
 	/* 
@@ -91,6 +93,7 @@ contract('MarginManager', async function(accounts) {
 		await zcbAsset1.setMarginManagerAddress(marginManagerInstance.address);
 
 		await marginManagerInstance.whitelistWrapper(wAsset1.address);
+		await marginManagerInstance.setLiquidationRebate(rebate_bips);
 
 		//mint assets to account 0
 		await asset1.mintTo(accounts[0], _10To18.mul(new BN("10")).toString());
@@ -274,11 +277,11 @@ contract('MarginManager', async function(accounts) {
 		/*
 			increase collateralisation ratio limits such that the open vault will be sent to liquidation
 		*/
-		// 1.6 * 10**18
-		upperRatio = "16" + _10To18.toString().substring(2);
+		upperRatio = currentSupplied.mul(_10To18).div(currentBorrowed);
 		await vaultHealthInstance.setUpper(asset1.address, zcbAsset0.address, upperRatio);
 
-		bid = currentBorrowed.sub(new BN("1"));
+		let surplus = new BN("10000");
+		bid = currentSupplied.sub(surplus);
 
 		caught = false;
 		try {
@@ -288,21 +291,20 @@ contract('MarginManager', async function(accounts) {
 		}
 		if (!caught) assert.fail("liquidation was triggered despite vault health being above upper limit");
 
-		//get back to original bid value
-		bid = bid.add(new BN("1"));
+		upperRatio = "16" + _10To18.toString().substring(2);
+		await vaultHealthInstance.setUpper(asset1.address, zcbAsset0.address, upperRatio);
 
-		//increase to new higher bid value
-		bid = bid.add(new BN("1"));
-
-		let prevRevenue = await marginManagerInstance.revenue(zcbAsset0.address);
+		let prevRevenue = await marginManagerInstance.revenue(wAsset1.address);
 		
-		rec = await marginManagerInstance.auctionLiquidation(accounts[0], 0, zcbAsset0.address, wAsset1.address, bid.toString(), currentSupplied.toString(), {from: accounts[1]});
+		let rec = await marginManagerInstance.auctionLiquidation(accounts[0], 0, zcbAsset0.address, wAsset1.address, bid.toString(), currentSupplied.toString(), {from: accounts[1]});
 
 		let timestamp = (await web3.eth.getBlock(rec.receipt.blockNumber)).timestamp;
 
-		let currentRevenue = await marginManagerInstance.revenue(zcbAsset0.address);
+		let currentRevenue = await marginManagerInstance.revenue(wAsset1.address);
 
-		assert.equal(currentRevenue.sub(prevRevenue).toString(), "1", "correct amount of revenue");
+		let rebate = surplus.mul(new BN(rebate_bips)).div(new BN(TOTAL_BASIS_POINTS));
+		let toTreasury = surplus.sub(rebate);
+		assert.equal(currentRevenue.sub(prevRevenue).toString(), toTreasury.toString(), "correct amount of revenue");
 
 		assert.equal((await marginManagerInstance.liquidationsLength()).toString(), "1", "correct length of liquidations array");
 
@@ -313,7 +315,7 @@ contract('MarginManager', async function(accounts) {
 		assert.equal(liquidation.amountSupplied.toString(), currentSupplied.toString(), "correct value of liquidation.amountSupplied");
 		assert.equal(liquidation.bidder, accounts[1], "correct value of liqudiation.bidder");
 		assert.equal(liquidation.bidAmount.toString(), bid.toString(), "correct value of liquidation.bidAmount");
-		assert.equal(liquidation.bidTimestamp.toString(), timestamp, "correct value of liqudiation.bidTimestamp");
+		assert.equal(liquidation.bidTimestamp.toNumber(), timestamp, "correct value of liqudiation.bidTimestamp");
 
 		vault = await marginManagerInstance.vaults(accounts[0], 0);
 
@@ -327,26 +329,31 @@ contract('MarginManager', async function(accounts) {
 		/*
 			bid with account 1
 		*/
-		bid = bid.add(new BN('10'));
+		let surplus = new BN("10");
+		bid = bid.sub(surplus);
 		
-		let prevRevenue = await marginManagerInstance.revenue(zcbAsset0.address);
+		let prevRevenue = await marginManagerInstance.revenue(wAsset1.address);
 
-		rec = await marginManagerInstance.bidOnLiquidation(0, bid.toString(), {from: accounts[1]});
+		let rec = await marginManagerInstance.bidOnLiquidation(0, bid.toString(), {from: accounts[1]});
 
 		let timestamp = (await web3.eth.getBlock(rec.receipt.blockNumber)).timestamp;
 
-		let currentRevenue = await marginManagerInstance.revenue(zcbAsset0.address);
+		let currentRevenue = await marginManagerInstance.revenue(wAsset1.address);
 
-		assert.equal(currentRevenue.sub(prevRevenue).toString(), "10", "correct amount of revenue");
+		let rebate = surplus.mul(new BN(rebate_bips)).div(new BN(TOTAL_BASIS_POINTS));
+		let toTreasury = surplus.sub(rebate);
+		assert.equal(currentRevenue.sub(prevRevenue).toString(), toTreasury.toString(), "correct amount of revenue");
 
 		liquidation = await marginManagerInstance.Liquidations(0);
 
+		assert.equal(liquidation.vaultOwner, accounts[0], "correct value of liquidation.vaultOwner");
 		assert.equal(liquidation.assetBorrowed, zcbAsset0.address, "correct value of liquidation.assetBorrowed");
 		assert.equal(liquidation.assetSupplied, wAsset1.address, "correct value of liquidation.assetSupplied");
 		assert.equal(liquidation.amountSupplied.toString(), currentSupplied.toString(), "correct value of liquidation.amountSupplied");
+		assert.equal(liquidation.amountBorrowed.toString(), currentBorrowed.toString(), "correct value of liquidation.amountBorrowed");
 		assert.equal(liquidation.bidder, accounts[1], "correct value of liqudiation.bidder");
 		assert.equal(liquidation.bidAmount.toString(), bid.toString(), "correct value of liquidation.bidAmount");
-		assert.equal(liquidation.bidTimestamp.toString(), timestamp, "correct value of liqudiation.bidTimestamp");
+		assert.equal(liquidation.bidTimestamp.toNumber(), timestamp, "correct value of liqudiation.bidTimestamp");
 	});
 
 	it('claim liquidation auction rewards', async () => {
@@ -359,7 +366,7 @@ contract('MarginManager', async function(accounts) {
 
 		let newBalW1 = await wAsset1.balanceOf(accounts[1]);
 
-		assert.equal(newBalW1.sub(prevBalW1).toString(), liquidation.amountSupplied);
+		assert.equal(newBalW1.sub(prevBalW1).toString(), liquidation.bidAmount.toString(), "correct payout after winning liquidation");
 	});
 
 	it('instant liquidations upon dropping below lowerCollateralLimit', async () => {
@@ -434,7 +441,7 @@ contract('MarginManager', async function(accounts) {
 		*/
 		await helper.advanceTime(86401)
 
-		rec = await marginManagerInstance.auctionLiquidation(accounts[0], vaultIndex, zcbAsset0.address, wAsset1.address, amountBorrowed.toString(), _10To18.toString(), {from: accounts[1]});
+		let rec = await marginManagerInstance.auctionLiquidation(accounts[0], vaultIndex, zcbAsset0.address, wAsset1.address, amountBorrowed.toString(), _10To18.toString(), {from: accounts[1]});
 		let timestamp = (await web3.eth.getBlock(rec.receipt.blockNumber)).timestamp;
 
 		assert.equal((await marginManagerInstance.liquidationsLength()).toString(), "2", "correct length of liquidations array");

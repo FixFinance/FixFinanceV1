@@ -15,16 +15,21 @@ contract MarginManagerData {
 	}
 
 	struct Liquidation {
+		address vaultOwner;
 		address assetSupplied;
 		address assetBorrowed;
 		uint amountSupplied;
-		/*
-			amountBorrowed is the one value from the Vault object not stored in liquidation
-		*/
+		uint amountBorrowed;
 		address bidder;
 		uint bidAmount;
 		uint bidTimestamp;
 	}
+
+	uint internal constant MAX_TIME_TO_MATURITY = 7 days;
+
+	uint internal constant CRITICAL_TIME_TO_MATURITY = 1 days;
+
+	uint internal constant AUCTION_COOLDOWN = 10 minutes;
 
 	//acts as a wrapper whitelist
 	//wrapper => underlying asset
@@ -37,11 +42,20 @@ contract MarginManagerData {
 	//underlying asset => short interest
 	mapping(address => uint) internal _shortInterestAllDurations;
 
+	//owner => asset => amount
+	mapping(address => mapping(address => uint)) internal _liquidationRebates;
+
 	//asset => amount
 	mapping(address => uint) internal _revenue;
 
 	//user => vault index => vault
 	mapping(address => Vault[]) internal _vaults;
+
+	/*
+		Basis points of surplus collateral over bid which is
+		retained by the owner of the liquidated vault
+	*/
+	uint internal _liquidationRebateBips;
 
 	Liquidation[] internal _Liquidations;
 

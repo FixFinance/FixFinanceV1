@@ -55,8 +55,7 @@ contract MarginManager is MarginManagerData, IMarginManager, Ownable {
 		address assetBorrowed,
 		uint amountSupplied,
 		uint amountBorrowed
-		) {
-
+	) {
 		Vault memory vault = _vaults[_owner][_index];
 		assetSupplied = vault.assetSupplied;
 		assetBorrowed = vault.assetBorrowed;
@@ -65,18 +64,21 @@ contract MarginManager is MarginManagerData, IMarginManager, Ownable {
 	}
 
 	function Liquidations(uint _index) external view override returns (
+		address vaultOwner,
 		address assetSupplied,
 		address assetBorrowed,
 		uint amountSupplied,
+		uint amountBorrowed,
 		address bidder,
 		uint bidAmount,
 		uint bidTimestamp
-		) {
-		
+	) {
 		Liquidation memory lq = _Liquidations[_index];
+		vaultOwner = lq.vaultOwner;
 		assetSupplied = lq.assetSupplied;
 		assetBorrowed = lq.assetBorrowed;
 		amountSupplied = lq.amountSupplied;
+		amountBorrowed = lq.amountBorrowed;
 		bidder = lq.bidder;
 		bidAmount = lq.bidAmount;
 		bidTimestamp = lq.bidTimestamp;
@@ -276,10 +278,10 @@ contract MarginManager is MarginManagerData, IMarginManager, Ownable {
 		@param uint _index: the index of the vault in vaults[_owner] to send to auction
 		@param address _assetBorrowed: the address of the expected borrow asset of the vault
 		@param address _assetSupplied: the address of the expected supplied asset of the vault
-		@param uint _bid: the first bid (in _assetBorrowed) made by msg.sender
-		@param uint _minOut: the minimum amount of assetSupplied expected out if msg.sender wins the auction
+		@param uint _bid: the first bid (in _assetSupplied) made by msg.sender
+		@param uint _maxIn: the maximum amount of _assetBorrowed to send in
 	*/
-	function auctionLiquidation(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _bid, uint _minOut) external override {
+	function auctionLiquidation(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _bid, uint _maxIn) external override {
 		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
 			"auctionLiquidation(address,uint256,address,address,uint256,uint256)",
 			_owner,
@@ -287,7 +289,7 @@ contract MarginManager is MarginManagerData, IMarginManager, Ownable {
 			_assetBorrowed,
 			_assetSupplied,
 			_bid,
-			_minOut
+			_maxIn
 		));
 		require(success);
 	}
@@ -296,7 +298,7 @@ contract MarginManager is MarginManagerData, IMarginManager, Ownable {
 		@Description: place a new bid on a vault that has already begun an auction
 
 		@param uint _index: the index in _Liquidations[] of the auction
-		@param uint  _bid: the new bid (in the borrowed asset) on the vault
+		@param uint  _bid: the new bid (in the supplied asset) on the vault
 	*/
 	function bidOnLiquidation(uint _index, uint _bid) external override {
 		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
@@ -404,7 +406,21 @@ contract MarginManager is MarginManagerData, IMarginManager, Ownable {
 		));
 		require(success);
 	}
-	//--------------------------------------------management---------------------------------------------
+
+
+	/*
+		@Description: allows a user to claim the excess collateral that was received as a rebate
+			when their vault(s) were liquidated
+
+		@param address _asset: the address of the asset for which to claim rebated collateral
+	*/
+	function claimRebate(address _asset) external override {
+		uint amt = _liquidationRebates[msg.sender][_asset];
+		IERC20(_asset).transfer(msg.sender, amt);
+		delete _liquidationRebates[msg.sender][_asset];
+	}
+
+	//-------------------------------------a-d-m-i-n---m-a-n-a-g-e-m-e-n-t----------------------------------------------
 
 	/*
 		@Description: admin may call this function to allow a specific wrapped asset to be provided as collateral
@@ -432,6 +448,18 @@ contract MarginManager is MarginManagerData, IMarginManager, Ownable {
 	*/
 	function whitelistCapitalHandler(address _capitalHandlerAddress) external override onlyOwner {
 		_capitalHandlerToWrapper[_capitalHandlerAddress] = address(ICapitalHandler(_capitalHandlerAddress).wrapper());
+	}
+
+	/*
+		@Description: admin may call this function to set the percentage of excess collateral that is retained
+			by vault owners in the event of a liquidation
+
+		@param uint _rebateBips: the percentage (in basis points) of excess collateral that is retained
+			by vault owners in the event of a liquidation
+	*/
+	function setLiquidationRebate(uint _rebateBips) external override onlyOwner {
+		require(_rebateBips <= TOTAL_BASIS_POINTS);
+		_liquidationRebateBips = _rebateBips;
 	}
 
 	/*

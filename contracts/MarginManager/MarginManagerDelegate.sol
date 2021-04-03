@@ -35,6 +35,42 @@ contract MarginManagerDelegate is MarginManagerData {
 		address underlyingAssetAddress = ICapitalHandler(_capitalHandlerAddress).underlyingAssetAddress();
 		_shortInterestAllDurations[underlyingAssetAddress] = _shortInterestAllDurations[underlyingAssetAddress].sub(_amount);
 	}
+	
+	/*
+		@Description: distribute surplus appropriately between vault owner and contract owner
+			this function is called by other liquidation management functions
+
+		@param address _vaultOwner: the owner of the vault that has between liquidated
+		@param address _asset: the address of the asset for which surplus has been acquired
+		@param uint _amount: the amount of surplus
+	*/
+	function distributeSurplus(address _vaultOwner, address _asset, uint _amount) internal {
+		uint retainedSurplus = _amount * _liquidationRebateBips / TOTAL_BASIS_POINTS;
+		_liquidationRebates[_vaultOwner][_asset] += retainedSurplus;
+		_revenue[_asset] += _amount-retainedSurplus;
+	}
+
+	/*
+		@Description: when a bidder is outbid return their bid
+
+		@param address _bidder: the address of the bidder
+		@param address _asset: the address of the asset that the bidder posted with their bid in
+		@param uint _amount: the amount of _asset that was posted by the bidder
+	*/
+	function refundBid(address _bidder, address _asset, uint _amount) internal {
+		ICapitalHandler(_asset).mintZCBTo(_bidder, _amount);
+	}
+
+	/*
+		@Description: when a bidder makes a bid collect collateral for their bid
+
+		@param address _bidder: the address of the bidder
+		@param address _asset: the address of the asset that the bidder is posing as collateral
+		@param uint _amount: the amount of _asset that the bidder is required to post
+	*/
+	function collectBid(address _bidder, address _asset, uint _amount) internal {
+		ICapitalHandler(_asset).burnZCBFrom(_bidder, _amount);
+	}
 
 	/*
 		@Description: ensure that we pass the address of the underlying asset of wrapper assets to
@@ -340,34 +376,35 @@ contract MarginManagerDelegate is MarginManagerData {
 		@param uint _index: the index of the vault in vaults[_owner] to send to auction
 		@param address _assetBorrowed: the address of the expected borrow asset of the vault
 		@param address _assetSupplied: the address of the expected supplied asset of the vault
-		@param uint _bid: the first bid (in _assetBorrowed) made by msg.sender
-		@param uint _minOut: the minimum amount of assetSupplied expected out if msg.sender wins the auction
+		@param uint _bid: the first bid (in _assetSupplied) made by msg.sender
+		@param uint _maxIn: the maximum amount of _assetBorrowed to send in
 	*/
-	function auctionLiquidation(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _bid, uint _minOut) external {
+	function auctionLiquidation(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _bid, uint _maxIn) external {
 		require(_vaults[_owner].length > _index);
 		Vault memory vault = _vaults[_owner][_index];
 		require(vault.assetBorrowed == _assetBorrowed);
 		require(vault.assetSupplied == _assetSupplied);
-		require(vault.amountBorrowed <= _bid);
-		require(vault.amountSupplied >= _minOut);
+		require(vault.amountSupplied >= _bid);
+		require(vault.amountBorrowed <= _maxIn);
 		if (satisfiesLimit(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied, vault.amountBorrowed, true)) {
 			uint maturity = ICapitalHandler(vault.assetBorrowed).maturity();
-			require(maturity < block.timestamp + (7 days));
+			require(maturity < block.timestamp + MAX_TIME_TO_MATURITY);
 		}
 		//burn borrowed ZCB
 		ICapitalHandler(vault.assetBorrowed).burnZCBFrom(msg.sender, vault.amountBorrowed);
 		lowerShortInterest(vault.assetBorrowed, vault.amountBorrowed);
 		//any surplus in the bid may be added as _revenue
-		if (_bid > vault.amountBorrowed){
-			IERC20(vault.assetBorrowed).transferFrom(msg.sender, address(this), _bid - vault.amountBorrowed);
-			_revenue[vault.assetBorrowed] += _bid - vault.amountBorrowed;
+		if (_bid < vault.amountSupplied){
+			distributeSurplus(_owner, vault.assetSupplied, vault.amountSupplied - _bid);
 		}
 
 		delete _vaults[_owner][_index];
 		_Liquidations.push(Liquidation(
+			_owner,
 			vault.assetSupplied,
 			vault.assetBorrowed,
 			vault.amountSupplied,
+			vault.amountBorrowed,
 			msg.sender,
 			_bid,
 			block.timestamp
@@ -378,21 +415,18 @@ contract MarginManagerDelegate is MarginManagerData {
 		@Description: place a new bid on a vault that has already begun an auction
 
 		@param uint _index: the index in _Liquidations[] of the auction
-		@param uint  _bid: the new bid (in the borrowed asset) on the vault
+		@param uint  _bid: the new bid (in the supplied asset) on the vault
 	*/
 	function bidOnLiquidation(uint _index, uint _bid) external {
 		require(_Liquidations.length > _index);
-		Liquidation memory liquidation = _Liquidations[_index];
-		require(_bid > liquidation.bidAmount);
+		Liquidation memory liq = _Liquidations[_index];
+		require(_bid < liq.bidAmount);
 
-		ICapitalHandler(liquidation.assetBorrowed).burnZCBFrom(msg.sender, _bid);
-		ICapitalHandler(liquidation.assetBorrowed).mintZCBTo(liquidation.bidder, liquidation.bidAmount);
-		ICapitalHandler(liquidation.assetBorrowed).mintZCBTo(address(this), _bid - liquidation.bidAmount);
+		refundBid(liq.bidder, liq.assetBorrowed, liq.amountBorrowed);
+		collectBid(msg.sender, liq.assetBorrowed, liq.amountBorrowed);
+		distributeSurplus(liq.vaultOwner, liq.assetSupplied, liq.bidAmount - _bid);
 
-		_revenue[liquidation.assetBorrowed] += _bid - liquidation.bidAmount;
 		_Liquidations[_index].bidAmount = _bid;
-		_Liquidations[_index].bidder = msg.sender;
-		_Liquidations[_index].bidTimestamp = block.timestamp;
 	}
 
 	/*
@@ -403,13 +437,13 @@ contract MarginManagerDelegate is MarginManagerData {
 	*/
 	function claimLiquidation(uint _index, address _to) external {
 		require(_Liquidations.length > _index);
-		Liquidation memory liquidation = _Liquidations[_index];
-		require(msg.sender == liquidation.bidder);
-		require(block.timestamp - liquidation.bidTimestamp >= 10 minutes);
+		Liquidation memory liq = _Liquidations[_index];
+		require(msg.sender == liq.bidder);
+		require(block.timestamp >= AUCTION_COOLDOWN + liq.bidTimestamp);
 
 		delete _Liquidations[_index];
 
-		IERC20(liquidation.assetSupplied).transfer(_to, liquidation.amountSupplied);
+		IERC20(liq.assetSupplied).transfer(_to, liq.bidAmount);
 	}
 
 	/*
@@ -432,7 +466,7 @@ contract MarginManagerDelegate is MarginManagerData {
 		require(vault.assetSupplied == _assetSupplied);
 		require(vault.amountBorrowed <= _maxBid);
 		require(vault.amountSupplied >= _minOut);
-		require(ICapitalHandler(_assetBorrowed).maturity() < block.timestamp + (1 days) || 
+		require(ICapitalHandler(_assetBorrowed).maturity() < block.timestamp + CRITICAL_TIME_TO_MATURITY || 
 			!satisfiesLimit(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied, vault.amountBorrowed, false));
 
 		//burn borrowed ZCB

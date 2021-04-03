@@ -377,34 +377,39 @@ contract MarginManagerDelegate is MarginManagerData {
 		@param address _assetBorrowed: the address of the expected borrow asset of the vault
 		@param address _assetSupplied: the address of the expected supplied asset of the vault
 		@param uint _bid: the first bid (in _assetSupplied) made by msg.sender
-		@param uint _maxIn: the maximum amount of _assetBorrowed to send in
+		@param uint _amtIn: the amount of _assetBorrowed to send in
 	*/
-	function auctionLiquidation(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _bid, uint _maxIn) external {
+	function auctionLiquidation(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _bid, uint _amtIn) external {
 		require(_vaults[_owner].length > _index);
 		Vault memory vault = _vaults[_owner][_index];
 		require(vault.assetBorrowed == _assetBorrowed);
 		require(vault.assetSupplied == _assetSupplied);
-		require(vault.amountSupplied >= _bid);
-		require(vault.amountBorrowed <= _maxIn);
+		require(vault.amountBorrowed >= _amtIn);
+		uint maxBid = vault.amountSupplied * _amtIn / vault.amountBorrowed;
+		require(maxBid >= _bid);
 		if (satisfiesLimit(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied, vault.amountBorrowed, true)) {
 			uint maturity = ICapitalHandler(vault.assetBorrowed).maturity();
 			require(maturity < block.timestamp + MAX_TIME_TO_MATURITY);
 		}
 		//burn borrowed ZCB
-		ICapitalHandler(vault.assetBorrowed).burnZCBFrom(msg.sender, vault.amountBorrowed);
-		lowerShortInterest(vault.assetBorrowed, vault.amountBorrowed);
+		collectBid(msg.sender, vault.assetBorrowed, _amtIn);
+		lowerShortInterest(vault.assetBorrowed, _amtIn);
 		//any surplus in the bid may be added as _revenue
-		if (_bid < vault.amountSupplied){
-			distributeSurplus(_owner, vault.assetSupplied, vault.amountSupplied - _bid);
+		if (_bid < maxBid){
+			distributeSurplus(_owner, vault.assetSupplied, maxBid - _bid);
 		}
-
-		delete _vaults[_owner][_index];
+		if (_amtIn == vault.amountBorrowed) {
+			delete _vaults[_owner][_index];
+		}
+		else {
+			_vaults[_owner][_index].amountBorrowed -= _amtIn;
+			_vaults[_owner][_index].amountSupplied -= maxBid;
+		}
 		_Liquidations.push(Liquidation(
 			_owner,
 			vault.assetSupplied,
 			vault.assetBorrowed,
-			vault.amountSupplied,
-			vault.amountBorrowed,
+			_amtIn,
 			msg.sender,
 			_bid,
 			block.timestamp
@@ -427,6 +432,7 @@ contract MarginManagerDelegate is MarginManagerData {
 		distributeSurplus(liq.vaultOwner, liq.assetSupplied, liq.bidAmount - _bid);
 
 		_Liquidations[_index].bidAmount = _bid;
+		_Liquidations[_index].bidTimestamp = block.timestamp;
 	}
 
 	/*

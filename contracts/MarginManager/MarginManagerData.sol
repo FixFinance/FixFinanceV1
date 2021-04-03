@@ -18,7 +18,6 @@ contract MarginManagerData {
 		address vaultOwner;
 		address assetSupplied;
 		address assetBorrowed;
-		uint amountSupplied;
 		uint amountBorrowed;
 		address bidder;
 		uint bidAmount;

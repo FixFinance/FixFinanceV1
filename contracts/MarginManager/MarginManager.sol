@@ -67,7 +67,6 @@ contract MarginManager is MarginManagerData, IMarginManager, Ownable {
 		address vaultOwner,
 		address assetSupplied,
 		address assetBorrowed,
-		uint amountSupplied,
 		uint amountBorrowed,
 		address bidder,
 		uint bidAmount,
@@ -77,7 +76,6 @@ contract MarginManager is MarginManagerData, IMarginManager, Ownable {
 		vaultOwner = lq.vaultOwner;
 		assetSupplied = lq.assetSupplied;
 		assetBorrowed = lq.assetBorrowed;
-		amountSupplied = lq.amountSupplied;
 		amountBorrowed = lq.amountBorrowed;
 		bidder = lq.bidder;
 		bidAmount = lq.bidAmount;

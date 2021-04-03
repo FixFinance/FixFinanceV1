@@ -438,6 +438,7 @@ contract MarginManagerDelegate is MarginManagerData {
 		if (_amtIn == liq.amountBorrowed) {
 			_Liquidations[_index].bidAmount = _bid;
 			_Liquidations[_index].bidTimestamp = block.timestamp;
+			_Liquidations[_index].bidder = msg.sender;
 		}
 		else {
 			_Liquidations[_index].bidAmount -= maxBid;

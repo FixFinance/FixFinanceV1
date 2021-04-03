@@ -25,6 +25,7 @@ abstract contract DividendEnabled is IERC20, IDividend, DividendEnabledData {
 
     function transfer(address _to, uint256 _value) public override returns (bool success) {
         require(_value <= internalBalanceOf[msg.sender]);
+        require(lastClaim[msg.sender] <= contractZCBDividend.length-1);
 
         claimDividendInternal(msg.sender, msg.sender, false);
         claimDividendInternal(_to, _to, false);
@@ -48,6 +49,7 @@ abstract contract DividendEnabled is IERC20, IDividend, DividendEnabledData {
     function transferFrom(address _from, address _to, uint256 _value) public override returns (bool success) {
         require(_value <= internalAllowance[_from][msg.sender]);
     	require(_value <= internalBalanceOf[_from]);
+        require(lastClaim[_from] <= contractZCBDividend.length-1);
 
         claimDividendInternal(_from, _from, false);
         claimDividendInternal(_to, _to, false);

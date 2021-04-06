@@ -95,6 +95,16 @@ contract MarginManagerDelegate is MarginManagerData {
 		}
 	}
 
+
+	/*
+		@Description: given a capital handler and a balance from the balanceYield mapping
+			convert the value from wrapped amount to unit amount
+	*/
+	function getUnitValueYield(address _CH, uint _amountYield) internal view returns (uint unitAmountYield) {
+		IWrapper wrapper = ICapitalHandler(_CH).wrapper();
+		unitAmountYield = wrapper.WrappedAmtToUnitAmt_RoundDown(_amountYield);
+	}
+
 	/*
 		@Description: ensure that a vault will not be sent into the liquidation zone if the cross asset price
 			and the borrow and supplied asset rates change a specific amount
@@ -128,7 +138,7 @@ contract MarginManagerDelegate is MarginManagerData {
 		uint _priceMultiplier,
 		int128 _suppliedRateChange,
 		int128 _borrowRateChange
-		) internal view returns (bool) {
+	) internal view returns (bool) {
 
 		require(_priceMultiplier >= TOTAL_BASIS_POINTS);
 		require(_suppliedRateChange >= ABDK_1);
@@ -145,6 +155,39 @@ contract MarginManagerDelegate is MarginManagerData {
 			_suppliedRateChange,
 			_borrowRateChange
 		);
+	}
+
+	/*
+		@Description: ensure that args for YTvaultWithstandsChange() never increase vault health
+			all multipliers should have either no change on vault health or decrease vault health
+
+		@param uint _priceMultiplier: a multiplier > 1
+			we ensure the vault will not be sent into the liquidation zone if the cross asset price
+			of _assetBorrowed to _assetSupplied increases by a factor of _priceMultiplier
+			(in terms of basis points)
+		@param int128 _suppliedRateChange: a multiplier > 1 if _positiveBondSupplied otherwise < 1
+			we ensure the vault will not be sent into the liquidation zone if the rate on the supplied
+			asset increases by a factor of _suppliedRateChange
+			(in ABDK format)
+		@param int128 _borrowRateChange: a multiplier < 1
+			we ensure the vault will not be sent into the liquidation zone if the rate on the borrow
+			asset decreases by a factor of _borrowRateChange
+			(in ABDK format)
+		@param bool _positiveBondSupplied: (ZCB supplied to vault > YT supplied to vault)
+	*/
+	modifier validateYTvaultMultipliers(
+		uint _priceMultiplier,
+		int128 _suppliedRateChange,
+		int128 _borrowRateChange,
+		bool _positiveBondSupplied
+	) {
+		require(_priceMultiplier >= TOTAL_BASIS_POINTS);
+		require(_borrowRateChange <= ABDK_1);
+		require(
+			(_suppliedRateChange == ABDK_1) ||
+			(_positiveBondSupplied ? _suppliedRateChange > ABDK_1: _suppliedRateChange < ABDK_1)
+		);
+		_;
 	}
 
 	/*
@@ -185,7 +228,7 @@ contract MarginManagerDelegate is MarginManagerData {
 		@param address _assetSupplied: the asset that will be used as collateral
 			this asset may be a ZCB or any other asset that is whitelisted
 		@param address _assetBorrowed: the ZCB that is borrowed from the new vault
-`		@param uint _amountSupplied: the amount of _assetSupplied that is to be posed as collateral
+		@param uint _amountSupplied: the amount of _assetSupplied that is to be posed as collateral
 		@param uint _amountBorrowed: the amount of _assetBorrowed to borrow
 		@param uint _priceMultiplier: a multiplier > 1
 			we ensure the vault will not be sent into the liquidation zone if the cross asset price
@@ -367,7 +410,64 @@ contract MarginManagerDelegate is MarginManagerData {
 		_vaults[_owner][_index].amountBorrowed -= _amount;
 	}
 
-	//----------------------------------------------_Liquidations------------------------------------------
+	//----------------------------------------------YT vault management-----------------------------------
+
+	/*
+		@Description: create a new YT vault, deposit some ZCB + YT of a CH and borrow some ZCB from it
+
+		@param address _CHsupplied: the address of the CH contract for which to supply ZCB and YT
+		@param address _CHborrowed: the CH that corresponds to theZCB that is borrowed from the new YTVault
+		@param uint _yieldSupplied: the amount from the balanceYield mapping in the supplied CH contract
+			that is to be supplied to the new YTVault
+		@param int _bondSupplied: the amount from the balanceBonds mapping in the supplied CH contract
+			that is to be supplied to the new YTVault
+		@param uint _amountBorrowed: the amount of ZCB from _CHborrowed to borrow
+		@param uint _priceMultiplier: a multiplier > 1
+			we ensure the vault will not be sent into the liquidation zone if the cross asset price
+			of _assetBorrowed to _assetSupplied increases by a factor of _priceMultiplier
+			(in terms of basis points)
+		@param int128 _suppliedRateChange: a multiplier > 1
+			we ensure the vault will not be sent into the liquidation zone if the rate on the supplied
+			asset increases by a factor of _suppliedRateChange
+			(in ABDK format)
+		@param int128 _borrowRateChange: a multiplier < 1
+			we ensure the vault will not be sent into the liquidation zone if the rate on the borrow
+			asset decreases by a factor of _borrowRateChange
+			(in ABDK format)
+	*/
+	function openYTVault(
+		address _CHsupplied,
+		address _CHborrowed,
+		uint _yieldSupplied,
+		int _bondSupplied,
+		uint _amountBorrowed,
+		uint _priceMultiplier,
+		int128 _suppliedRateChange,
+		int128 _borrowRateChange
+	) external validateYTvaultMultipliers(_priceMultiplier, _suppliedRateChange, _borrowRateChange, _bondSupplied > 0) {
+		uint _unitYieldSupplied = getUnitValueYield(_CHsupplied, _yieldSupplied);
+
+		require(vaultHealthContract.YTvaultWithstandsChange(
+			_CHsupplied,
+			_CHborrowed,
+			_unitYieldSupplied,
+			_bondSupplied,
+			_amountBorrowed,
+			_priceMultiplier,
+			_suppliedRateChange,
+			_borrowRateChange
+		));
+
+		ICapitalHandler(_CHsupplied).burnPositionFrom(msg.sender, _yieldSupplied, _bondSupplied);
+		ICapitalHandler(_CHborrowed).mintZCBTo(msg.sender, _amountBorrowed);
+		raiseShortInterest(_CHborrowed, _amountBorrowed);
+
+		_YTvaults[msg.sender].push(YTVault(_CHsupplied, _CHborrowed, _yieldSupplied, _bondSupplied, _amountBorrowed));
+
+	}
+
+
+	//----------------------------------------------Liquidations------------------------------------------
 
 	/*
 		@Description: send a vault that is under the upper collateralization limit to the auction house

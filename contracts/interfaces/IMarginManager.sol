@@ -7,6 +7,28 @@ interface IMarginManager {
 	function allVaults(address _owner) external view returns(MarginManagerData.Vault[] memory _vaults);
 	function liquidationsLength() external view returns (uint);
 	//-----------------------------------------V-a-u-l-t---M-a-n-a-g-e-m-e-n-t-----------------------------
+	//----------------------------v-i-e-w-s----------------------------
+	function wrapperToUnderlyingAsset(address _wrapeprAddress) external view returns (address);
+	function capitalHandlerToWrapper(address _capitalHandlerAddress) external view returns (address);
+	function shortInterestAllDurations(address _wrapper) external view returns (uint);
+	function revenue(address _asset) external view returns (uint);
+	function VaultHealthAddress() external view returns (address);
+	function vaults(address _owner, uint _index) external view returns (
+		address assetSupplied,
+		address assetBorrowed,
+		uint amountSupplied,
+		uint amountBorrowed
+	);
+	function Liquidations(uint _index) external view returns (
+		address vaultOwner,
+		address assetSupplied,
+		address assetBorrowed,
+		uint amountBorrowed,
+		address bidder,
+		uint bidAmount,
+		uint bidTimestamp
+	);
+	//---------------------------n-o-r-m-a-l---v-a-u-l-t-s--------------------------
 	function openVault(
 		address _assetSupplied,
 		address _assetBorrowed,
@@ -35,26 +57,39 @@ interface IMarginManager {
 		int128 _borrowRateChange
 	) external;
 	function repay(address _owner, uint _index, uint _amount) external;
-	function wrapperToUnderlyingAsset(address _wrapeprAddress) external view returns (address);
-	function capitalHandlerToWrapper(address _capitalHandlerAddress) external view returns (address);
-	function shortInterestAllDurations(address _wrapper) external view returns (uint);
-	function revenue(address _asset) external view returns (uint);
-	function vaults(address _owner, uint _index) external view returns (
-		address assetSupplied,
-		address assetBorrowed,
-		uint amountSupplied,
-		uint amountBorrowed
-	);
-	function Liquidations(uint _index) external view returns (
-		address vaultOwner,
-		address assetSupplied,
-		address assetBorrowed,
-		uint amountBorrowed,
-		address bidder,
-		uint bidAmount,
-		uint bidTimestamp
-	);
-	function VaultHealthAddress() external view returns (address);
+	//---------------------------Y-T---v-a-u-l-t-s---------------------------------
+	function openYTVault(
+		address _CHsupplied,
+		address _CHborrowed,
+		uint _yieldSupplied,
+		int _bondSupplied,
+		uint _amountBorrowed,
+		uint _priceMultiplier,
+		int128 _suppliedRateChange,
+		int128 _borrowRateChange
+	) external;
+	/*
+	function closeYTVault(uint _index, address _to) external;
+	function YTremove(
+		uint _index,
+		uint _amountYield,
+		int _amountBond,
+		address _to,
+		uint _priceMultiplier,
+		int128 _suppliedRateChange,
+		int128 _borrowRateChange
+	) external;
+	function YTdeposit(address _owner, uint _index, uint _amountYield, int _amountBond) external;
+	function YTborrow(
+		uint _index,
+		uint _amount,
+		address _to,
+		uint _priceMultiplier,
+		int128 _suppliedRateChange,
+		int128 _borrowRateChange
+	) external;
+	function YTrepay(address _owner, uint _index, uint _amount) external;
+	*/
 	//----------------------------------------------L-i-q-u-i-d-a-t-i-o-n-s------------------------------------------
 	function claimRebate(address _asset) external;
 	function auctionLiquidation(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _bid, uint _maxIn) external;

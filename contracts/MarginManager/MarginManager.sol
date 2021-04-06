@@ -86,7 +86,7 @@ contract MarginManager is MarginManagerData, IMarginManager, Ownable {
 		return address(vaultHealthContract);
 	}
 
-	//------------------------------------vault management-----------------------------------
+	//--------------------------------standard vault management-----------------------------------
 
 	/*
 		@Description: create a new vault, deposit some asset and borrow some ZCB from it
@@ -94,7 +94,7 @@ contract MarginManager is MarginManagerData, IMarginManager, Ownable {
 		@param address _assetSupplied: the asset that will be used as collateral
 			this asset may be a ZCB or any other asset that is whitelisted
 		@param address _assetBorrowed: the ZCB that is borrowed from the new vault
-`		@param uint _amountSupplied: the amount of _assetSupplied that is to be posed as collateral
+		@param uint _amountSupplied: the amount of _assetSupplied that is to be posed as collateral
 		@param uint _amountBorrowed: the amount of _assetBorrowed to borrow
 		@param uint _priceMultiplier: a multiplier > 1
 			we ensure the vault will not be sent into the liquidation zone if the cross asset price
@@ -265,6 +265,55 @@ contract MarginManager is MarginManagerData, IMarginManager, Ownable {
 		));
 		require(success);
 		emit Repay(_owner, _index, _amount);
+	}
+
+	//--------------------------------------YT vault management-----------------------------------
+
+	/*
+		@Description: create a new YT vault, deposit some ZCB + YT of a CH and borrow some ZCB from it
+
+		@param address _CHsupplied: the address of the CH contract for which to supply ZCB and YT
+		@param address _CHborrowed: the CH that corresponds to theZCB that is borrowed from the new YTVault
+		@param uint _yieldSupplied: the amount from the balanceYield mapping in the supplied CH contract
+			that is to be supplied to the new YTVault
+		@param int _bondSupplied: the amount from the balanceBonds mapping in the supplied CH contract
+			that is to be supplied to the new YTVault
+		@param uint _amountBorrowed: the amount of ZCB from _CHborrowed to borrow
+		@param uint _priceMultiplier: a multiplier > 1
+			we ensure the vault will not be sent into the liquidation zone if the cross asset price
+			of _assetBorrowed to _assetSupplied increases by a factor of _priceMultiplier
+			(in terms of basis points)
+		@param int128 _suppliedRateChange: a multiplier > 1
+			we ensure the vault will not be sent into the liquidation zone if the rate on the supplied
+			asset increases by a factor of _suppliedRateChange
+			(in ABDK format)
+		@param int128 _borrowRateChange: a multiplier < 1
+			we ensure the vault will not be sent into the liquidation zone if the rate on the borrow
+			asset decreases by a factor of _borrowRateChange
+			(in ABDK format)
+	*/
+	function openYTVault(
+		address _CHsupplied,
+		address _CHborrowed,
+		uint _yieldSupplied,
+		int _bondSupplied,
+		uint _amountBorrowed,
+		uint _priceMultiplier,
+		int128 _suppliedRateChange,
+		int128 _borrowRateChange
+	) external override {
+		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
+			"openYTVault(address,address,uint256,int256,uint256,uint256,int128,int128)",
+			_CHsupplied,
+			_CHborrowed,
+			_yieldSupplied,
+			_bondSupplied,
+			_amountBorrowed,
+			_priceMultiplier,
+			_suppliedRateChange,
+			_borrowRateChange
+		));
+		require(success);
 	}
 
 	//----------------------------------------------_Liquidations------------------------------------------

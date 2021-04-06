@@ -24,6 +24,31 @@ contract MarginManagerData {
 		uint bidTimestamp;
 	}
 
+	struct YTVault {
+		address CHsupplied;
+		address CHborrowed;
+		uint yieldSupplied;
+		int bondSupplied;
+		uint amountBorrowed;
+	}
+
+	struct YTLiquidation {
+		address vaultOwner;
+		address CHsupplied;
+		address CHborrowed;
+		//bondSupplied per (1 ether) of yield supplied
+		int bondSupplied;
+		uint amountBorrowed;
+		address bidder;
+		uint bidAmount;
+		uint bidTimestamp;
+	}
+
+	struct YTPosition {
+		uint amountYield;
+		int amountBond;
+	}
+
 	uint internal constant MAX_TIME_TO_MATURITY = 7 days;
 
 	uint internal constant CRITICAL_TIME_TO_MATURITY = 1 days;
@@ -44,11 +69,17 @@ contract MarginManagerData {
 	//owner => asset => amount
 	mapping(address => mapping(address => uint)) internal _liquidationRebates;
 
+	//owner => asset => YTposition
+	mapping(address => mapping(address => YTPosition)) internal _YTLiquidationRebates;
+
 	//asset => amount
 	mapping(address => uint) internal _revenue;
 
 	//user => vault index => vault
 	mapping(address => Vault[]) internal _vaults;
+
+	//user => vault index => vault
+	mapping(address => YTVault[]) internal _YTvaults;
 
 	/*
 		Basis points of surplus collateral over bid which is
@@ -57,6 +88,8 @@ contract MarginManagerData {
 	uint internal _liquidationRebateBips;
 
 	Liquidation[] internal _Liquidations;
+
+	YTLiquidation[] internal _YTLiquidations;
 
 	IVaultHealth internal vaultHealthContract;
 

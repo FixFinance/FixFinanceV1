@@ -9,8 +9,6 @@ interface ICapitalHandler is IERC20 {
 	function withdrawAll(address _to, bool _unwrap) external;
 	function claimBondPayout(address _to) external;
 	function enterPayoutPhase() external;
-	function mintZCBTo(address _owner, uint _amount) external;
-	function burnZCBFrom(address _owner, uint _amount) external;
 	function transferYield(address _from, address _to, uint _amount) external;
 	function inPayoutPhase() external view returns (bool);
 	function maturity() external view returns(uint64);
@@ -21,6 +19,12 @@ interface ICapitalHandler is IERC20 {
 	function yieldTokenAddress() external view returns(address);
 	function marginManagerAddress() external view returns(address);
 	function wrapper() external view returns(IWrapper);
+
+	//---------------Margin-Manager------------------------------
+	function mintZCBTo(address _owner, uint _amount) external;
+	function burnZCBFrom(address _owner, uint _amount) external;
+	function mintPositionTo(address _owner, uint _yield, int _bond) external;
+	function burnPositionFrom(address _owner, uint _yield, int _bond) external;
 
 	//----------------admin----------------------------
 	function isFinalized() external view returns(bool);

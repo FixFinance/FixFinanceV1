@@ -259,6 +259,39 @@ contract CapitalHandler is ICapitalHandler, Ownable {
 		balanceBonds[_owner] -= int(_amount);
 	}
 
+	/*
+		@Description: used by MarginManager to return collateral from YTvault
+
+		@param address _owner: the address to receive position
+		@param uint _yield: the gain in the balanceYield mapping for _owner
+		@param int _bond: the change in the balanceBonds mapping for _owner
+	*/
+	function mintPositionTo(address _owner, uint _yield, int _bond) external override {
+		require(msg.sender == marginManagerAddress);
+		//ensure position has positive minimum value at maturity
+		require(_bond >= 0 || wrapper.WrappedAmtToUnitAmt_RoundDown(_yield) >= uint(_bond));
+		balanceYield[_owner] += _yield;
+		balanceBonds[_owner] += _bond;
+	}
+
+	/*
+		@Description: used by MarginManager to return collateral from YTvault
+
+		@param address _owner: the address to receive position
+		@param uint _yield: the decrease in the balanceYield mapping for _owner
+		@param int _bond: the change in the balanceBonds mapping for _owner
+			>0 means balanceBonds[_owner] decreases
+			<0 means balanceBonds[_owner] increases
+	*/
+	function burnPositionFrom(address _owner, uint _yield, int _bond) external override {
+		require(msg.sender == marginManagerAddress);
+		//ensure position has positive minimum value at maturity
+		require(_bond >= 0 || wrapper.WrappedAmtToUnitAmt_RoundDown(_yield) >= uint(_bond));
+		require(balanceYield[_owner] >= _yield);
+		balanceYield[_owner] -= _yield;
+		balanceBonds[_owner] -= _bond;
+	}
+
 
 	//---------------------------Y-i-e-l-d---T-o-k-e-n-----------------------
 

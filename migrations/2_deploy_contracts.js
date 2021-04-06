@@ -1,10 +1,10 @@
-const aaveWrapper = artifacts.require('AaveWrapper');
+const NGBwrapper = artifacts.require('NGBwrapper');
 const capitalHandler = artifacts.require('CapitalHandler');
 const dummyAToken = artifacts.require('dummyAToken');
 const organizer = artifacts.require('organizer');
 const yieldTokenDeployer = artifacts.require('YieldTokenDeployer');
-const BondMinterDelegate = artifacts.require("BondMinterDelegate");
-const BondMinter = artifacts.require("BondMinter");
+const MarginManagerDelegate = artifacts.require("MarginManagerDelegate");
+const MarginManager = artifacts.require("MarginManager");
 const CapitalHandlerDeployer = artifacts.require('CapitalHandlerDeployer');
 const ZCBammDeployer = artifacts.require('ZCBammDeployer');
 const YTammDelegate = artifacts.require('YTammDelegate');
@@ -51,8 +51,8 @@ module.exports = async function(deployer) {
 	dummyATokenInstance = await deployer.deploy(dummyAToken, "aETH");
 	dummyATokenInstance = await deployer.deploy(dummyAToken, "aUSDC");
 	yieldTokenDeployerInstance = await deployer.deploy(yieldTokenDeployer);
-	bondMinterDelegateInstance = await deployer.deploy(BondMinterDelegate);
-	bondMinterInstance = await deployer.deploy(BondMinter, nullAddress, bondMinterDelegateInstance.address);
+	marginManagerDelegateInstance = await deployer.deploy(MarginManagerDelegate);
+	marginManagerInstance = await deployer.deploy(MarginManager, nullAddress, marginManagerDelegateInstance.address);
 	capitalHandlerDeployerInstance = await deployer.deploy(CapitalHandlerDeployer);
 	swapRouterDelegateInstance = await deployer.deploy(SwapRouterDelegate);
 	swapRouterDeployerInstance = await deployer.deploy(SwapRouterDeployer, swapRouterDelegateInstance.address);
@@ -76,6 +76,6 @@ module.exports = async function(deployer) {
 	);
 	await organizerInstance.DeploySwapRouter();
 	let rec = await organizerInstance.deployAssetWrapper(dummyATokenInstance.address);
-	wAsset = await aaveWrapper.at(rec.receipt.logs[0].args.wrapperAddress);
+	wAsset = await NGBwrapper.at(rec.receipt.logs[0].args.wrapperAddress);
 	await organizerInstance.deployCapitalHandlerInstance(wAsset.address, start2026);
 };

@@ -68,7 +68,6 @@ interface IMarginManager {
 		int128 _suppliedRateChange,
 		int128 _borrowRateChange
 	) external;
-	/*
 	function closeYTVault(uint _index, address _to) external;
 	function YTremove(
 		uint _index,
@@ -89,7 +88,6 @@ interface IMarginManager {
 		int128 _borrowRateChange
 	) external;
 	function YTrepay(address _owner, uint _index, uint _amount) external;
-	*/
 	//----------------------------------------------L-i-q-u-i-d-a-t-i-o-n-s------------------------------------------
 	function claimRebate(address _asset) external;
 	function auctionLiquidation(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _bid, uint _maxIn) external;

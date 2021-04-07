@@ -1,6 +1,7 @@
 pragma solidity >=0.6.5 <0.7.0;
 import "./interfaces/ICapitalHandler.sol";
 import "./interfaces/IWrapper.sol";
+import "./interfaces/IYieldToken.sol";
 import "./interfaces/IERC20.sol";
 import "./ERC20.sol";
 import "./YieldTokenDeployer.sol";
@@ -260,38 +261,55 @@ contract CapitalHandler is ICapitalHandler, Ownable {
 	}
 
 	/*
-		@Description: used by MarginManager to return collateral from YTvault
+		@Description: transfer a ZCB + YT position to another address
 
-		@param address _owner: the address to receive position
-		@param uint _yield: the gain in the balanceYield mapping for _owner
-		@param int _bond: the change in the balanceBonds mapping for _owner
+		@param address _to: the address that shall receive the position
+		@param uint _yield: the amount change in the balanceYield mapping
+		@param int _bond: the amount change in the balanceBonds mapping
 	*/
-	function mintPositionTo(address _owner, uint _yield, int _bond) external override {
-		require(msg.sender == marginManagerAddress);
+	function transferPosition(address _to, uint _yield, int _bond) external override {
 		//ensure position has positive minimum value at maturity
-		require(_bond >= 0 || wrapper.WrappedAmtToUnitAmt_RoundDown(_yield) >= uint(_bond));
-		balanceYield[_owner] += _yield;
-		balanceBonds[_owner] += _bond;
+		uint ratio = inPayoutPhase ? maturityConversionRate : wrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
+		require(_bond >= 0 || _yield.mul(ratio)/(1 ether) >= uint(_bond));
+		uint yieldSender = balanceYield[msg.sender].sub(_yield);
+		int bondSender = balanceBonds[msg.sender].sub(_bond);
+		require(bondSender >= 0 || yieldSender.mul(ratio)/(1 ether) >= uint(bondSender));
+		balanceYield[msg.sender] = yieldSender;
+		balanceBonds[msg.sender] = bondSender;
+		balanceYield[_to] += _yield;
+		balanceBonds[_to] += _bond;
 	}
 
 	/*
-		@Description: used by MarginManager to return collateral from YTvault
+		@Description: transfer a ZCB + YT position from one address to another address
 
-		@param address _owner: the address to receive position
-		@param uint _yield: the decrease in the balanceYield mapping for _owner
-		@param int _bond: the change in the balanceBonds mapping for _owner
-			>0 means balanceBonds[_owner] decreases
-			<0 means balanceBonds[_owner] increases
+		@param address _from: the address that shall send the position
+		@param address _to: the address that shall receive the position
+		@param uint _yield: the amount change in the balanceYield mapping
+		@param int _bond: the amount change in the balanceBonds mapping
 	*/
-	function burnPositionFrom(address _owner, uint _yield, int _bond) external override {
-		require(msg.sender == marginManagerAddress);
+	function transferPositionFrom(address _from, address _to, uint _yield, int _bond) external override {
 		//ensure position has positive minimum value at maturity
-		require(_bond >= 0 || wrapper.WrappedAmtToUnitAmt_RoundDown(_yield) >= uint(_bond));
-		require(balanceYield[_owner] >= _yield);
-		balanceYield[_owner] -= _yield;
-		balanceBonds[_owner] -= _bond;
-	}
+		uint ratio = inPayoutPhase ? maturityConversionRate : wrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
+		uint unitAmtYield = _yield.mul(ratio)/(1 ether);
+		require(_bond >= 0 || unitAmtYield >= uint(_bond));
+		uint yieldFrom = balanceYield[_from].sub(_yield);
+		int bondFrom = balanceBonds[_from].sub(_bond);
+		require(bondFrom >= 0 || yieldFrom.mul(ratio)/(1 ether) >= uint(bondFrom));
 
+		//decrement approval of ZCB
+		uint unitAmtZCB = _bond > 0 ? unitAmtYield.add(uint(_bond)) : unitAmtYield.sub(uint(-_bond));
+		require(allowance[_from][msg.sender] >= unitAmtZCB);
+		allowance[_from][msg.sender] -= unitAmtZCB;
+
+		//decrement approval of YT
+		IYieldToken(yieldTokenAddress).decrementAllowance(_from, msg.sender, _yield);
+
+		balanceYield[_from] = yieldFrom;
+		balanceBonds[_from] = bondFrom;
+		balanceYield[_to] += _yield;
+		balanceBonds[_to] += _bond;
+	}
 
 	//---------------------------Y-i-e-l-d---T-o-k-e-n-----------------------
 

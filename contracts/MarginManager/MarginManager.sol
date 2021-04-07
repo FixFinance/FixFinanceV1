@@ -191,7 +191,7 @@ contract MarginManager is MarginManagerData, IMarginManager, Ownable {
 	}
 
 	/*
-		@Description: deposit vollateral into an exiting vault
+		@Description: deposit collateral into an exiting vault
 
 		@param address _owner: the owner of the vault to which to supply collateral
 		@param uint _index: the index of the vault in vaults[_owner] to which to supply collateral
@@ -283,7 +283,7 @@ contract MarginManager is MarginManagerData, IMarginManager, Ownable {
 			we ensure the vault will not be sent into the liquidation zone if the cross asset price
 			of _assetBorrowed to _assetSupplied increases by a factor of _priceMultiplier
 			(in terms of basis points)
-		@param int128 _suppliedRateChange: a multiplier > 1
+		@param int128 _suppliedRateChange: a multiplier > 1 if _positiveBondSupplied otherwise < 1
 			we ensure the vault will not be sent into the liquidation zone if the rate on the supplied
 			asset increases by a factor of _suppliedRateChange
 			(in ABDK format)
@@ -312,6 +312,84 @@ contract MarginManager is MarginManagerData, IMarginManager, Ownable {
 			_priceMultiplier,
 			_suppliedRateChange,
 			_borrowRateChange
+		));
+		require(success);
+	}
+
+	/*
+		@Description: fully repay a YT vault and withdraw all collateral
+
+		@param uint _index: the YT vault to close is at YTvaults[msg.sender][_index]
+		@param address _to: the address to which to send all collateral after closing the vault
+	*/
+	function closeYTVault(uint _index, address _to) external override {
+		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
+			"closeYTVault(uint256,address)",
+			_index,
+			_to
+		));
+		require(success);
+	}
+
+	function YTremove(
+		uint _index,
+		uint _amountYield,
+		int _amountBond,
+		address _to,
+		uint _priceMultiplier,
+		int128 _suppliedRateChange,
+		int128 _borrowRateChange
+	) external override {
+		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
+			"YTremove(uint256,uint256,int256,address,uint256,int128,int128)",
+			_index,
+			_amountYield,
+			_amountBond,
+			_to,
+			_priceMultiplier,
+			_suppliedRateChange,
+			_borrowRateChange
+		));
+		require(success);
+	}
+
+	function YTdeposit(address _owner, uint _index, uint _amountYield, int _amountBond) external override {
+		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
+			"YTdeposit(address,uint256,uint256,int128)",
+			_owner,
+			_index,
+			_amountYield,
+			_amountBond
+		));
+		require(success);
+	}
+
+	function YTborrow(
+		uint _index,
+		uint _amount,
+		address _to,
+		uint _priceMultiplier,
+		int128 _suppliedRateChange,
+		int128 _borrowRateChange
+	) external override {
+		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
+			"YTborrow(uint256,uint256,address,uint256,int128,int128)",
+			_index,
+			_amount,
+			_to,
+			_priceMultiplier,
+			_suppliedRateChange,
+			_borrowRateChange
+		));
+		require(success);
+	}
+
+	function YTrepay(address _owner, uint _index, uint _amount) external override {
+		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
+			"YTrepay(address,uint256,uint256)",
+			_owner,
+			_index,
+			_amount
 		));
 		require(success);
 	}

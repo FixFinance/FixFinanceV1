@@ -7,4 +7,6 @@ interface IYieldToken is IERC20 {
     function approve_2(address _spender, uint256 _value, bool _roundUp) external;
     function transferFrom_2(address _from, address _to, uint256 _value, bool _roundUp) external;
 
+    //only callable by corresponding CapitalHandler
+    function decrementAllowance(address _owner, address _spender, uint _amount) external;
 }

@@ -23,8 +23,8 @@ interface ICapitalHandler is IERC20 {
 	//---------------Margin-Manager------------------------------
 	function mintZCBTo(address _owner, uint _amount) external;
 	function burnZCBFrom(address _owner, uint _amount) external;
-	function mintPositionTo(address _owner, uint _yield, int _bond) external;
-	function burnPositionFrom(address _owner, uint _yield, int _bond) external;
+	function transferPosition(address _to, uint _yield, int _bond) external;
+	function transferPositionFrom(address _from, address _to, uint _yield, int _bond) external;
 
 	//----------------admin----------------------------
 	function isFinalized() external view returns(bool);

@@ -7,12 +7,12 @@ import "./libraries/SafeMath.sol";
 
 contract YieldToken is IYieldToken {
 
-	ICapitalHandler ch;
-	IWrapper wrapper;
+	ICapitalHandler immutable ch;
+	IWrapper immutable wrapper;
 
     string public override name;
     string public override symbol;
-	uint8 public override decimals;
+	uint8 public immutable override decimals;
 
     mapping(address => mapping(address => uint256)) public override allowance;
 
@@ -59,6 +59,19 @@ contract YieldToken is IYieldToken {
         emit Transfer(_from, _to, _value);
 
         return true;
+    }
+
+    /*
+        @Description: the CapitalHandler contract can decrement approvals by calling this function
+
+        @param address _owner: the owner of the funds that are approved
+        @param address _spender: the spender of the funds that are approved
+        @param uint _amount: the amount by which to decrement the allowance
+    */
+    function decrementAllowance(address _owner, address _spender, uint _amount) external override {
+        require(msg.sender == address(ch));
+        require(allowance[_owner][_spender] >= _amount);
+        allowance[_owner][_spender] -= _amount;
     }
 
     /*

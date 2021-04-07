@@ -2,6 +2,7 @@ pragma experimental ABIEncoderV2;
 pragma solidity >=0.6.5 <0.7.0;
 
 import "../libraries/SafeMath.sol";
+import "../libraries/SignedSafeMath.sol";
 import "../interfaces/ICapitalHandler.sol";
 import "../interfaces/IVaultHealth.sol";
 import "../interfaces/IWrapper.sol";
@@ -11,6 +12,7 @@ import "./MarginManagerData.sol";
 
 contract MarginManagerDelegate is MarginManagerData {
 	using SafeMath for uint;
+	using SignedSafeMath for int;
 
 	/*
 		@Description: ensure that short interst rasing by a specific amount does not push an asset over the debt ceiling
@@ -160,6 +162,8 @@ contract MarginManagerDelegate is MarginManagerData {
 	/*
 		@Description: ensure that args for YTvaultWithstandsChange() never increase vault health
 			all multipliers should have either no change on vault health or decrease vault health
+			we make this a function and not a modifier because we will not always have the
+			necessary data ready before execution of the functions in which we want to use this
 
 		@param uint _priceMultiplier: a multiplier > 1
 			we ensure the vault will not be sent into the liquidation zone if the cross asset price
@@ -175,19 +179,18 @@ contract MarginManagerDelegate is MarginManagerData {
 			(in ABDK format)
 		@param bool _positiveBondSupplied: (ZCB supplied to vault > YT supplied to vault)
 	*/
-	modifier validateYTvaultMultipliers(
+	function validateYTvaultMultipliers(
 		uint _priceMultiplier,
 		int128 _suppliedRateChange,
 		int128 _borrowRateChange,
 		bool _positiveBondSupplied
-	) {
+	) internal pure {
 		require(_priceMultiplier >= TOTAL_BASIS_POINTS);
 		require(_borrowRateChange <= ABDK_1);
 		require(
 			(_suppliedRateChange == ABDK_1) ||
 			(_positiveBondSupplied ? _suppliedRateChange > ABDK_1: _suppliedRateChange < ABDK_1)
 		);
-		_;
 	}
 
 	/*
@@ -334,7 +337,7 @@ contract MarginManagerDelegate is MarginManagerData {
 	}
 
 	/*
-		@Description: deposit vollateral into an exiting vault
+		@Description: deposit collateral into an exiting vault
 
 		@param address _owner: the owner of the vault to which to supply collateral
 		@param uint _index: the index of the vault in vaults[_owner] to which to supply collateral
@@ -426,7 +429,7 @@ contract MarginManagerDelegate is MarginManagerData {
 			we ensure the vault will not be sent into the liquidation zone if the cross asset price
 			of _assetBorrowed to _assetSupplied increases by a factor of _priceMultiplier
 			(in terms of basis points)
-		@param int128 _suppliedRateChange: a multiplier > 1
+		@param int128 _suppliedRateChange: a multiplier > 1 if _positiveBondSupplied otherwise < 1
 			we ensure the vault will not be sent into the liquidation zone if the rate on the supplied
 			asset increases by a factor of _suppliedRateChange
 			(in ABDK format)
@@ -444,7 +447,8 @@ contract MarginManagerDelegate is MarginManagerData {
 		uint _priceMultiplier,
 		int128 _suppliedRateChange,
 		int128 _borrowRateChange
-	) external validateYTvaultMultipliers(_priceMultiplier, _suppliedRateChange, _borrowRateChange, _bondSupplied > 0) {
+	) external {
+		validateYTvaultMultipliers(_priceMultiplier, _suppliedRateChange, _borrowRateChange, _bondSupplied > 0);
 		uint _unitYieldSupplied = getUnitValueYield(_CHsupplied, _yieldSupplied);
 
 		require(vaultHealthContract.YTvaultWithstandsChange(
@@ -458,7 +462,7 @@ contract MarginManagerDelegate is MarginManagerData {
 			_borrowRateChange
 		));
 
-		ICapitalHandler(_CHsupplied).burnPositionFrom(msg.sender, _yieldSupplied, _bondSupplied);
+		ICapitalHandler(_CHsupplied).transferPositionFrom(msg.sender, address(this), _yieldSupplied, _bondSupplied);
 		ICapitalHandler(_CHborrowed).mintZCBTo(msg.sender, _amountBorrowed);
 		raiseShortInterest(_CHborrowed, _amountBorrowed);
 
@@ -466,6 +470,180 @@ contract MarginManagerDelegate is MarginManagerData {
 
 	}
 
+	/*
+		@Description: fully repay a YT vault and withdraw all collateral
+
+		@param uint _index: the YT vault to close is at YTvaults[msg.sender][_index]
+		@param address _to: the address to which to send all collateral after closing the vault
+	*/
+	function closeYTVault(uint _index, address _to) external {
+		uint len = _YTvaults[msg.sender].length;
+		require(_index < len);
+		YTVault memory vault = _YTvaults[msg.sender][_index];
+
+		//burn borrowed ZCB
+		if (vault.amountBorrowed > 0) {
+			ICapitalHandler(vault.CHborrowed).burnZCBFrom(msg.sender, vault.amountBorrowed);
+			lowerShortInterest(vault.CHborrowed, vault.amountBorrowed);
+		}
+		if (vault.yieldSupplied > 0 || vault.bondSupplied != 0) {
+			//we already know the vault would pass the check so no need to check
+			ICapitalHandler(vault.CHsupplied).transferPosition(_to, vault.yieldSupplied, vault.bondSupplied);
+		}
+
+		if (len - 1 != _index)
+			_YTvaults[msg.sender][_index] = _YTvaults[msg.sender][len - 1];
+		delete _YTvaults[msg.sender][len - 1];
+	}
+
+	/*
+		@Description: withdraw collateral from an existing vault
+
+		@param uint _index: the vault to close is at vaults[msg.sender][_index]
+		@param uint _amountYield: the amount to decrease from vault.yieldSupplied
+		@param int _amountBond: the amount to decrease from vault.bondSupplied
+		@param address _to: the address to which to send the removed collateral
+		@param uint _priceMultiplier: a multiplier > 1
+			we ensure that after this action the vault will not be sent into the liquidation zone if the
+			cross asset price of _assetBorrowed to _assetSupplied increases by a factor of _priceMultiplier
+			(in terms of basis points)
+		@param int128 _suppliedRateChange: a multiplier > 1 if vault.amountBond is positive after change
+			otherwise < 1
+			we ensure the vault will not be sent into the liquidation zone if the rate on the supplied
+			asset increases by a factor of _suppliedRateChange
+			(in ABDK format)
+		@param int128 _borrowRateChange: a multiplier < 1
+			we ensure that after this action the vault will not be sent into the liquidation zone if the
+			rate on the borrow asset decreases by a factor of _borrowRateChange
+			(in ABDK format)
+	*/
+	function YTremove(
+		uint _index,
+		uint _amountYield,
+		int _amountBond,
+		address _to,
+		uint _priceMultiplier,
+		int128 _suppliedRateChange,
+		int128 _borrowRateChange
+	) external {
+		require(_YTvaults[msg.sender].length > _index);
+		YTVault memory vault = _YTvaults[msg.sender][_index];
+
+		//vault is stored in memory does not change state
+		vault.yieldSupplied = vault.yieldSupplied.sub(_amountYield);
+		vault.bondSupplied = vault.bondSupplied.sub(_amountBond);
+
+		uint unitAmountYield = getUnitValueYield(vault.CHsupplied, vault.yieldSupplied);
+
+		//ensure resultant collateral in vault has valid minimum possible value at maturity
+		require(vault.bondSupplied >= 0 || unitAmountYield >= uint(-vault.bondSupplied));
+
+		validateYTvaultMultipliers(_priceMultiplier, _suppliedRateChange, _borrowRateChange, vault.bondSupplied > 0);
+		require(vaultHealthContract.YTvaultWithstandsChange(
+			vault.CHsupplied,
+			vault.CHborrowed,
+			unitAmountYield,
+			vault.bondSupplied,
+			vault.amountBorrowed,
+			_priceMultiplier,
+			_suppliedRateChange,
+			_borrowRateChange
+		));
+
+		_YTvaults[msg.sender][_index].yieldSupplied = vault.yieldSupplied;
+		_YTvaults[msg.sender][_index].bondSupplied = vault.bondSupplied;
+		ICapitalHandler(vault.CHsupplied).transferPosition(_to, _amountYield, _amountBond);
+	}
+
+	/*
+		@Description: deposit collateral into an exiting YT vault
+
+		@param address _owner: the owner of the YT vault to which to supply collateral
+		@param uint _index: the index of the vault in YTvaults[_owner] to which to supply collateral
+		@param uint _amountYield: the amount to increase vault.yieldSupplied
+		@param int _amountBond: the amount to increase vault.bondSupplied
+	*/
+	function YTdeposit(address _owner, uint _index, uint _amountYield, int _amountBond) external {
+		require(_YTvaults[_owner].length > _index);
+		YTVault storage storageVault =  _YTvaults[_owner][_index];
+		uint resultantYield = storageVault.yieldSupplied.add(_amountYield);
+		int resultantBond = storageVault.bondSupplied.add(_amountBond);
+		address _CHsupplied = storageVault.CHsupplied;
+		uint unitAmountYield = getUnitValueYield(_CHsupplied, resultantYield);
+		//ensure vault collateral has positive minimum possible value at maturity
+		require(resultantBond >= 0 || unitAmountYield >= uint(-resultantBond));
+		//we ensure that the vault has valid balances thus it does not matter if the position passes the check
+		ICapitalHandler(_CHsupplied).transferPositionFrom(msg.sender, address(this), _amountYield, _amountBond);
+		storageVault.yieldSupplied = resultantYield;
+		storageVault.bondSupplied = resultantBond;
+	}
+
+
+	/*
+		@Description: withdraw more of the borrowed asset from an existing vault
+
+		@param uint _index: the index of the vault in vaults[msg.sender] to which to supply collateral
+		@param uint _amount: the amount of the borrowed asset to withdraw from the vault
+		@param address _to: the address to which to send the newly borrowed funds
+		@param uint _priceMultiplier: a multiplier > 1
+			we ensure that after this action the vault will not be sent into the liquidation zone if the
+			cross asset price of _assetBorrowed to _assetSupplied increases by a factor of _priceMultiplier
+			(in terms of basis points)
+		@param int128 _suppliedRateChange: a multiplier > 1
+			we ensure that after this action the vault will not be sent into the liquidation zone if the
+			rate on the supplied asset increases by a factor of _suppliedRateChange
+			(in ABDK format)
+		@param int128 _borrowRateChange: a multiplier < 1
+			we ensure that after this action the vault will not be sent into the liquidation zone if the
+			rate on the borrow asset decreases by a factor of _borrowRateChange
+			(in ABDK format)
+	*/
+	function YTborrow(
+		uint _index,
+		uint _amount,
+		address _to,
+		uint _priceMultiplier,
+		int128 _suppliedRateChange,
+		int128 _borrowRateChange
+	) external {
+		require(_YTvaults[msg.sender].length > _index);
+		YTVault memory vault = _YTvaults[msg.sender][_index];
+
+		uint resultantBorrowed = vault.amountBorrowed.add(_amount);
+
+		validateYTvaultMultipliers(_priceMultiplier, _suppliedRateChange, _borrowRateChange, vault.bondSupplied > 0);
+		require(vaultHealthContract.YTvaultWithstandsChange(
+			vault.CHsupplied,
+			vault.CHborrowed,
+			vault.yieldSupplied,
+			vault.bondSupplied,
+			resultantBorrowed,
+			_priceMultiplier,
+			_suppliedRateChange,
+			_borrowRateChange
+		));
+
+		_YTvaults[msg.sender][_index].amountBorrowed = resultantBorrowed;
+
+		ICapitalHandler(vault.CHborrowed).mintZCBTo(_to, _amount);
+		raiseShortInterest(vault.CHborrowed, _amount);
+	}
+
+	/*
+		@Description: repay the borrowed asset back into a YT vault
+
+		@param address _owner: the owner of the YT vault to which to reapy
+		@param uint _index: the index of the YT vault in YTvaults[_owner] to which to repay
+		@param uint _amount: the amount of the borrowed asset to reapy to the YT vault
+	*/
+	function YTrepay(address _owner, uint _index, uint _amount) external {
+		require(_YTvaults[_owner].length > _index);
+		require(_YTvaults[_owner][_index].amountBorrowed >= _amount);
+		address CHborrowed = _YTvaults[_owner][_index].CHborrowed;
+		ICapitalHandler(CHborrowed).burnZCBFrom(msg.sender, _amount);
+		lowerShortInterest(CHborrowed, _amount);
+		_vaults[_owner][_index].amountBorrowed -= _amount;
+	}
 
 	//----------------------------------------------Liquidations------------------------------------------
 

@@ -548,6 +548,22 @@ contract MarginManager is MarginManagerData, IMarginManager, Ownable {
 		delete _liquidationRebates[msg.sender][_asset];
 	}
 
+	//------------------------------------Y-T---v-a-u-l-t---L-i-q-u-i-d-a-t-i-o-n-s-------------------------------------
+
+
+	/*
+		@Description: allows a user to claim the excess collateral that was received as a rebate
+			when their YT vault(s) were liquidated
+	
+		@param address _asset: the address of the CH contract for which to claim the rebate
+	*/
+	function claimYTRebate(address _asset) external override {
+		YTPosition memory position = _YTLiquidationRebates[msg.sender][_asset];
+		ICapitalHandler(_asset).transferPosition(msg.sender, position.amountYield, position.amountBond);
+		delete _YTLiquidationRebates[msg.sender][_asset];
+	}
+
+
 	//-------------------------------------a-d-m-i-n---m-a-n-a-g-e-m-e-n-t----------------------------------------------
 
 	/*

@@ -852,4 +852,66 @@ contract MarginManagerDelegate is MarginManagerData {
 		_vaults[_owner][_index].amountSupplied -= _out;
 	}
 
+
+	//----------------------------------------------------Y-T-V-a-u-l-t---L-i-q-u-i-d-a-t-i-o-n-s-------------------------------------
+
+	/*
+		@Description: send a vault that is under the upper collateralization limit to the auction house
+
+		@param address _owner: the owner of the vault to send to auction
+		@param uint _index: the index of the vault in vaults[_owner] to send to auction
+		@param address _CHborrowed: the address of the CH contract corresponding to the borrowed ZCB
+		@param address _CHsupplied: the address of the CH contract corresponding to the supplied ZCB & YT
+		@param uint _bidYield: the first bid (in YT corresponding _CHsupplied) made by msg.sender on the vault
+			ZCB of bid is calculated by finding the corresponding amount of ZCB based on the ratio of YT to ZCB
+		@param int _minBondRatio: the miniumum value of vault.bondSupplied/vault.yieldSupplied inflated by (1 ether)
+			if ratio is below _minBondRatio tx will revert
+		@param uint _amtIn: the amount of the borrowed ZCB to send in
+	*/
+	function auctionYTLiquidation(address _owner, uint _index, address _CHborrowed, address _CHsupplied, uint _bidYield, int _minBondRatio, uint _amtIn) external {
+		require(_YTvaults[_owner].length > _index);
+		YTVault memory vault = _YTvaults[_owner][_index];
+		require(vault.CHborrowed == _CHborrowed);
+		require(vault.CHsupplied == _CHsupplied);
+		require(vault.amountBorrowed >= _amtIn);
+		uint maxBid = vault.yieldSupplied * _amtIn / vault.amountBorrowed;
+		require(maxBid >= _bidYield);
+
+		int bondRatio = vault.bondSupplied.mul(1 ether).div(int(vault.yieldSupplied));
+		require(bondRatio >= _minBondRatio);
+		int bondBid = bondRatio.mul(int(_bidYield)) / (1 ether);
+
+
+		if (vaultHealthContract.YTvaultSatisfiesUpperLimit(vault.CHsupplied, vault.CHborrowed, vault.yieldSupplied, vault.bondSupplied, vault.amountBorrowed)) {
+			uint maturity = ICapitalHandler(vault.CHborrowed).maturity();
+			require(maturity < block.timestamp + MAX_TIME_TO_MATURITY);
+		}
+		//burn borrowed ZCB
+		collectBid(msg.sender, vault.CHborrowed, _amtIn);
+		lowerShortInterest(vault.CHborrowed, _amtIn);
+		//any surplus in the bid may be added as _revenue
+		if (_bidYield < maxBid){
+			distributeSurplus(_owner, vault.CHsupplied, maxBid - _bidYield);
+		}
+		if (_amtIn == vault.amountBorrowed) {
+			delete _YTvaults[_owner][_index];
+		}
+		else {
+			_YTvaults[_owner][_index].amountBorrowed -= _amtIn;
+			_YTvaults[_owner][_index].yieldSupplied -= maxBid;
+			int maxBidBond = bondRatio.mul(int(maxBid)) / (1 ether);
+			_YTvaults[_owner][_index].bondSupplied -= maxBidBond;
+		}
+		_YTLiquidations.push(YTLiquidation(
+			_owner,
+			vault.CHsupplied,
+			vault.CHborrowed,
+			bondBid,
+			_amtIn,
+			msg.sender,
+			_bidYield,
+			block.timestamp
+		));
+	}
+
 }

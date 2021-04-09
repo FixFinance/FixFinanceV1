@@ -14,10 +14,12 @@ contract MarginManager is MarginManagerData, IMarginManager, Ownable {
 	using SafeMath for uint;
 
 	address delegateAddress;
+	address delegate2Address;
 
-	constructor(address _vaultHealthContract, address _delegateAddress) public {
+	constructor(address _vaultHealthContract, address _delegateAddress, address _delegate2Address) public {
 		vaultHealthContract = IVaultHealth(_vaultHealthContract);
 		delegateAddress = _delegateAddress;
+		delegate2Address = _delegate2Address;
 	}
 
 	//-----------------------------------views-------------------------------------
@@ -302,7 +304,7 @@ contract MarginManager is MarginManagerData, IMarginManager, Ownable {
 		int128 _suppliedRateChange,
 		int128 _borrowRateChange
 	) external override {
-		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
+		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
 			"openYTVault(address,address,uint256,int256,uint256,uint256,int128,int128)",
 			_CHsupplied,
 			_CHborrowed,
@@ -323,7 +325,7 @@ contract MarginManager is MarginManagerData, IMarginManager, Ownable {
 		@param address _to: the address to which to send all collateral after closing the vault
 	*/
 	function closeYTVault(uint _index, address _to) external override {
-		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
+		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
 			"closeYTVault(uint256,address)",
 			_index,
 			_to
@@ -340,7 +342,7 @@ contract MarginManager is MarginManagerData, IMarginManager, Ownable {
 		int128 _suppliedRateChange,
 		int128 _borrowRateChange
 	) external override {
-		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
+		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
 			"YTremove(uint256,uint256,int256,address,uint256,int128,int128)",
 			_index,
 			_amountYield,
@@ -354,7 +356,7 @@ contract MarginManager is MarginManagerData, IMarginManager, Ownable {
 	}
 
 	function YTdeposit(address _owner, uint _index, uint _amountYield, int _amountBond) external override {
-		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
+		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
 			"YTdeposit(address,uint256,uint256,int128)",
 			_owner,
 			_index,
@@ -372,7 +374,7 @@ contract MarginManager is MarginManagerData, IMarginManager, Ownable {
 		int128 _suppliedRateChange,
 		int128 _borrowRateChange
 	) external override {
-		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
+		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
 			"YTborrow(uint256,uint256,address,uint256,int128,int128)",
 			_index,
 			_amount,
@@ -385,7 +387,7 @@ contract MarginManager is MarginManagerData, IMarginManager, Ownable {
 	}
 
 	function YTrepay(address _owner, uint _index, uint _amount) external override {
-		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
+		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
 			"YTrepay(address,uint256,uint256)",
 			_owner,
 			_index,
@@ -578,7 +580,7 @@ contract MarginManager is MarginManagerData, IMarginManager, Ownable {
 		@param uint _amtIn: the amount of the borrowed ZCB to send in
 	*/
 	function auctionYTLiquidation(address _owner, uint _index, address _CHborrowed, address _CHsupplied, uint _bidYield, int _minBondRatio, uint _amtIn) external override {
-		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
+		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
 			"auctionYTLiquidation(address,uint256,address,address,uint256,int256,uint256)",
 			_owner,
 			_index,
@@ -592,7 +594,7 @@ contract MarginManager is MarginManagerData, IMarginManager, Ownable {
 	}
 
 	function bidOnYTLiquidation(uint _index, uint _bidYield, uint _amtIn) external override {
-		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
+		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
 			"bidOnYTLiquidation(uint256,uint256,uint256)",
 			_index,
 			_bidYield,
@@ -602,15 +604,16 @@ contract MarginManager is MarginManagerData, IMarginManager, Ownable {
 	}
 
 	function claimYTLiquidation(uint _index, address _to) external override {
-		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
+		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
 			"claimYTLiquidation(uint256,address)",
 			_index,
 			_to
 		));
+		require(success);
 	}
 
 	function instantYTLiquidation(address _owner, uint _index, address _CHborrowed, address _CHsupplied, uint _maxIn, uint _minOut, int _minBondRatio, address _to) external override {
-		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
+		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
 			"instantYTLiquidation(address,uint256,address,address,uint256,uint256,int256,address)",
 			_owner,
 			_index,
@@ -625,7 +628,7 @@ contract MarginManager is MarginManagerData, IMarginManager, Ownable {
 	}
 
 	function partialYTLiquidationSpecificIn(address _owner, uint _index, address _CHborrowed, address _CHsupplied, uint _in, uint _minOut, int _minBondRatio, address _to) external override {
-		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
+		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
 			"partialYTLiquidationSpecificIn(address,uint256,address,address,uint256,uint256,int256,address)",
 			_owner,
 			_index,
@@ -640,7 +643,7 @@ contract MarginManager is MarginManagerData, IMarginManager, Ownable {
 	}
 
 	function partialYTLiquidationSpecificOut(address _owner, uint _index, address _CHborrowed, address _CHsupplied, uint _out, int _minBondRatio, uint _maxIn, address _to) external override {
-		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
+		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
 			"partialYTLiquidationSpecificOut(address,uint256,address,address,uint256,int256,uint256,address)",
 			_owner,
 			_index,

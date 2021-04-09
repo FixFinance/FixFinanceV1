@@ -5,6 +5,7 @@ const capitalHandler = artifacts.require('CapitalHandler');
 const yieldTokenDeployer = artifacts.require('YieldTokenDeployer');
 const organizer = artifacts.require('organizer');
 const MarginManagerDelegate = artifacts.require("MarginManagerDelegate");
+const MarginManagerDelegate2 = artifacts.require("MarginManagerDelegate2");
 const MarginManager = artifacts.require('MarginManager');
 const IERC20 = artifacts.require("IERC20");
 const BigMath = artifacts.require("BigMath");
@@ -47,7 +48,12 @@ contract('MarginManager', async function(accounts) {
 		yieldTokenDeployerInstance = await yieldTokenDeployer.new();
 		vaultHealthInstance = await dummyVaultHealth.new();
 		marginManagerDelegateInstance = await MarginManagerDelegate.new();
-		marginManagerInstance = await MarginManager.new(vaultHealthInstance.address, marginManagerDelegateInstance.address);
+		marginManagerDelegate2Instance = await MarginManagerDelegate2.new();
+		marginManagerInstance = await MarginManager.new(
+			vaultHealthInstance.address,
+			marginManagerDelegateInstance.address,
+			marginManagerDelegate2Instance.address
+		);
 		EiInstance = await Ei.new();
 		await BigMath.link("Ei", EiInstance.address);
 		BigMathInstance = await BigMath.new();

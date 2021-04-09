@@ -4,6 +4,7 @@ const dummyAToken = artifacts.require('dummyAToken');
 const organizer = artifacts.require('organizer');
 const yieldTokenDeployer = artifacts.require('YieldTokenDeployer');
 const MarginManagerDelegate = artifacts.require("MarginManagerDelegate");
+const MarginManagerDelegate2 = artifacts.require("MarginManagerDelegate2");
 const MarginManager = artifacts.require("MarginManager");
 const CapitalHandlerDeployer = artifacts.require('CapitalHandlerDeployer');
 const ZCBammDeployer = artifacts.require('ZCBammDeployer');
@@ -52,7 +53,13 @@ module.exports = async function(deployer) {
 	dummyATokenInstance = await deployer.deploy(dummyAToken, "aUSDC");
 	yieldTokenDeployerInstance = await deployer.deploy(yieldTokenDeployer);
 	marginManagerDelegateInstance = await deployer.deploy(MarginManagerDelegate);
-	marginManagerInstance = await deployer.deploy(MarginManager, nullAddress, marginManagerDelegateInstance.address);
+	marginManagerDelegate2Instance = await deployer.deploy(MarginManagerDelegate2);
+	marginManagerInstance = await deployer.deploy(
+		MarginManager,
+		nullAddress,
+		marginManagerDelegateInstance.address,
+		marginManagerDelegate2Instance.address
+	);
 	capitalHandlerDeployerInstance = await deployer.deploy(CapitalHandlerDeployer);
 	swapRouterDelegateInstance = await deployer.deploy(SwapRouterDelegate);
 	swapRouterDeployerInstance = await deployer.deploy(SwapRouterDeployer, swapRouterDelegateInstance.address);

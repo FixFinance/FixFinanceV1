@@ -9,12 +9,14 @@ contract MarginManagerDeployer {
 	);
 
 	address delegate;
+	address delegate2;
 
 	/*
 		init
 	*/
-	constructor(address _delegate) public {
+	constructor(address _delegate, address _delegate2) public {
 		delegate = _delegate;
+		delegate2 = _delegate2;
 	}
 
 	/*
@@ -25,7 +27,7 @@ contract MarginManagerDeployer {
 		@return address: the address of the new MarginManager contract
 	*/
 	function deploy(address _vaultHealthAddress) external returns(address) {
-		MarginManager temp = new MarginManager(_vaultHealthAddress, delegate);
+		MarginManager temp = new MarginManager(_vaultHealthAddress, delegate, delegate2);
 		temp.transferOwnership(msg.sender);
 		emit Deploy(address(temp));
 		return address(temp);

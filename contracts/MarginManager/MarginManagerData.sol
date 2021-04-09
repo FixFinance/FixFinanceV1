@@ -36,8 +36,8 @@ contract MarginManagerData {
 		address vaultOwner;
 		address CHsupplied;
 		address CHborrowed;
-		//bondSupplied per (1 ether) of yield supplied
-		int bondSupplied;
+		//bondSupplied / yieldSupplied inflated by (1 ether)
+		int bondRatio;
 		uint amountBorrowed;
 		address bidder;
 		uint bidAmount;
@@ -71,6 +71,9 @@ contract MarginManagerData {
 
 	//owner => asset => YTposition
 	mapping(address => mapping(address => YTPosition)) internal _YTLiquidationRebates;
+
+	//CH => YTPosition
+	mapping(address => YTPosition) internal _YTRevenue;
 
 	//asset => amount
 	mapping(address => uint) internal _revenue;

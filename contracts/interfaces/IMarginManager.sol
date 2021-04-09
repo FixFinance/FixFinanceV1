@@ -90,21 +90,20 @@ interface IMarginManager {
 	function YTrepay(address _owner, uint _index, uint _amount) external;
 	//----------------------------------------------L-i-q-u-i-d-a-t-i-o-n-s------------------------------------------
 	function claimRebate(address _asset) external;
-	function auctionLiquidation(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _bid, uint _maxIn) external;
+	function auctionLiquidation(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _bid, uint _amtIn) external;
 	function bidOnLiquidation(uint _index, uint _bid, uint _amtIn) external;
 	function claimLiquidation(uint _index, address _to) external;
-	function instantLiquidation(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _maxBid, uint _minOut, address _to) external;
+	function instantLiquidation(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _maxIn, uint _minOut, address _to) external;
 	function partialLiquidationSpecificIn(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _in, uint _minOut, address _to) external;
 	function partialLiquidationSpecificOut(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _out, uint _maxIn, address _to) external;
 	//----------------------------------------------Y-T-V-a-u-l-t--L-i-q-u-i-d-a-t-i-o-n-s------------------------------------------
 	function claimYTRebate(address _asset) external;
-/*	function auctionYTLiquidation(address _owner, uint _index, address _CHborrowed, address _CHsupplied, uint _bidYield, int _minBondRatio, uint _maxIn) external;
+	function auctionYTLiquidation(address _owner, uint _index, address _CHborrowed, address _CHsupplied, uint _bidYield, int _minBondRatio, uint _amtIn) external;
 	function bidOnYTLiquidation(uint _index, uint _bidYield, uint _amtIn) external;
 	function claimYTLiquidation(uint _index, address _to) external;
-	function instantYTLiquidation(address _owner, uint _index, address _CHborrowed, address _CHsupplied, uint _maxBid, int _minBondRatio, uint _minOut, address _to) external;
+	function instantYTLiquidation(address _owner, uint _index, address _CHborrowed, address _CHsupplied, uint _maxIn, uint _minOut, int _minBondRatio, address _to) external;
 	function partialYTLiquidationSpecificIn(address _owner, uint _index, address _CHborrowed, address _CHsupplied, uint _in, uint _minOut, int _minBondRatio, address _to) external;
 	function partialYTLiquidationSpecificOut(address _owner, uint _index, address _CHborrowed, address _CHsupplied, uint _out, int _minBondRatio, uint _maxIn, address _to) external;
-*/
 	//--------------------------------------------a-d-m-i-n---------------------------------------------
 	function setLiquidationRebate(uint _rebateBips) external;
 	function whitelistWrapper(address _wrapeprAddress) external;

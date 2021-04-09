@@ -461,18 +461,18 @@ contract MarginManager is MarginManagerData, IMarginManager, Ownable {
 		@param uint _index: the index of the vault in vaults[_owner] to send to auction
 		@param address _assetBorrowed: the address of the expected borrow asset of the vault
 		@param address _assetSupplied: the address of the expected supplied asset of the vault
-		@param uint _maxBid: the maximum amount of assetBorrowed that msg.sender is willing to bid on the vault
+		@param uint _maxIn: the maximum amount of assetBorrowed that msg.sender is willing to bid on the vault
 		@param uint _minOut: the minimum amount of assetSupplied that msg.sender wants to receive from this liquidation
 		@param address _to: the address to which to send all of the collateral from the vault
 	*/
-	function instantLiquidation(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _maxBid, uint _minOut, address _to) external override {
+	function instantLiquidation(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _maxIn, uint _minOut, address _to) external override {
 		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
 			"instantLiquidation(address,uint256,address,address,uint256,uint256,address)",
 			_owner,
 			_index,
 			_assetBorrowed,
 			_assetSupplied,
-			_maxBid,
+			_maxIn,
 			_minOut,
 			_to
 		));
@@ -561,6 +561,97 @@ contract MarginManager is MarginManagerData, IMarginManager, Ownable {
 		YTPosition memory position = _YTLiquidationRebates[msg.sender][_asset];
 		ICapitalHandler(_asset).transferPosition(msg.sender, position.amountYield, position.amountBond);
 		delete _YTLiquidationRebates[msg.sender][_asset];
+	}
+
+
+	/*
+		@Description: send a vault that is under the upper collateralization limit to the auction house
+
+		@param address _owner: the owner of the vault to send to auction
+		@param uint _index: the index of the vault in vaults[_owner] to send to auction
+		@param address _CHborrowed: the address of the CH contract corresponding to the borrowed ZCB
+		@param address _CHsupplied: the address of the CH contract corresponding to the supplied ZCB & YT
+		@param uint _bidYield: the first bid (in YT corresponding _CHsupplied) made by msg.sender on the vault
+			ZCB of bid is calculated by finding the corresponding amount of ZCB based on the ratio of YT to ZCB
+		@param int _minBondRatio: the miniumum value of vault.bondSupplied/vault.yieldSupplied inflated by (1 ether)
+			if ratio is below _minBondRatio tx will revert
+		@param uint _amtIn: the amount of the borrowed ZCB to send in
+	*/
+	function auctionYTLiquidation(address _owner, uint _index, address _CHborrowed, address _CHsupplied, uint _bidYield, int _minBondRatio, uint _amtIn) external override {
+		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
+			"auctionYTLiquidation(address,uint256,address,address,uint256,int256,uint256)",
+			_owner,
+			_index,
+			_CHborrowed,
+			_CHsupplied,
+			_bidYield,
+			_minBondRatio,
+			_amtIn
+		));
+		require(success);
+	}
+
+	function bidOnYTLiquidation(uint _index, uint _bidYield, uint _amtIn) external override {
+		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
+			"bidOnYTLiquidation(uint256,uint256,uint256)",
+			_index,
+			_bidYield,
+			_amtIn
+		));
+		require(success);
+	}
+
+	function claimYTLiquidation(uint _index, address _to) external override {
+		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
+			"claimYTLiquidation(uint256,address)",
+			_index,
+			_to
+		));
+	}
+
+	function instantYTLiquidation(address _owner, uint _index, address _CHborrowed, address _CHsupplied, uint _maxIn, uint _minOut, int _minBondRatio, address _to) external override {
+		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
+			"instantYTLiquidation(address,uint256,address,address,uint256,uint256,int256,address)",
+			_owner,
+			_index,
+			_CHborrowed,
+			_CHsupplied,
+			_maxIn,
+			_minOut,
+			_minBondRatio,
+			_to
+		));
+		require(success);
+	}
+
+	function partialYTLiquidationSpecificIn(address _owner, uint _index, address _CHborrowed, address _CHsupplied, uint _in, uint _minOut, int _minBondRatio, address _to) external override {
+		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
+			"partialYTLiquidationSpecificIn(address,uint256,address,address,uint256,uint256,int256,address)",
+			_owner,
+			_index,
+			_CHborrowed,
+			_CHsupplied,
+			_in,
+			_minOut,
+			_minBondRatio,
+			_to
+		));
+		require(success);
+	}
+
+	function partialYTLiquidationSpecificOut(address _owner, uint _index, address _CHborrowed, address _CHsupplied, uint _out, int _minBondRatio, uint _maxIn, address _to) external override {
+		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
+			"partialYTLiquidationSpecificOut(address,uint256,address,address,uint256,int256,uint256,address)",
+			_owner,
+			_index,
+			_CHborrowed,
+			_CHsupplied,
+			_out,
+			_minBondRatio,
+			_maxIn,
+			_to
+		));
+		require(success);
 	}
 
 

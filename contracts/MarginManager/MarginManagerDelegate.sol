@@ -53,6 +53,27 @@ contract MarginManagerDelegate is MarginManagerData {
 	}
 
 	/*
+		@Description: distribute surplus appropriately between vault owner and contract owner
+			this function is called by other liquidation management functions
+
+		@param address _vaultOwner: the owner of the vault that has between liquidated
+		@param address _CHaddr: the address of the capital handler for which to distribte surplus
+		@param uint _yieldAmount: value to add to rebate.amountYield
+		@param int _bondAmount: value to add to rebate.amountBond
+	*/
+	function distributeYTSurplus(address _vaultOwner, address _CHaddr, uint _yieldAmount, int _bondAmount) internal {
+		YTPosition storage rebate = _YTLiquidationRebates[_vaultOwner][_CHaddr];
+		YTPosition storage revenue = _YTRevenue[_CHaddr];
+		uint _rebateBips = _liquidationRebateBips;
+		uint yieldRebate = _yieldAmount * _rebateBips / TOTAL_BASIS_POINTS;
+		int bondRebate = _bondAmount * int(_rebateBips) / int(TOTAL_BASIS_POINTS);
+		rebate.amountYield += yieldRebate;
+		rebate.amountBond += bondRebate;
+		revenue.amountYield += _yieldAmount - yieldRebate;
+		revenue.amountBond += _bondAmount - bondRebate;
+	}
+
+	/*
 		@Description: when a bidder is outbid return their bid
 
 		@param address _bidder: the address of the bidder
@@ -760,16 +781,16 @@ contract MarginManagerDelegate is MarginManagerData {
 		@param uint _index: the index of the vault in vaults[_owner] to send to auction
 		@param address _assetBorrowed: the address of the expected borrow asset of the vault
 		@param address _assetSupplied: the address of the expected supplied asset of the vault
-		@param uint _maxBid: the maximum amount of assetBorrowed that msg.sender is willing to bid on the vault
+		@param uint _maxIn: the maximum amount of assetBorrowed that msg.sender is willing to bid on the vault
 		@param uint _minOut: the minimum amount of assetSupplied that msg.sender wants to receive from this liquidation
 		@param address _to: the address to which to send all of the collateral from the vault
 	*/
-	function instantLiquidation(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _maxBid, uint _minOut, address _to) external {
+	function instantLiquidation(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _maxIn, uint _minOut, address _to) external {
 		require(_vaults[_owner].length > _index);
 		Vault memory vault = _vaults[_owner][_index];
 		require(vault.assetBorrowed == _assetBorrowed);
 		require(vault.assetSupplied == _assetSupplied);
-		require(vault.amountBorrowed <= _maxBid);
+		require(vault.amountBorrowed <= _maxIn);
 		require(vault.amountSupplied >= _minOut);
 		require(ICapitalHandler(_assetBorrowed).maturity() < block.timestamp + CRITICAL_TIME_TO_MATURITY || 
 			!satisfiesLimit(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied, vault.amountBorrowed, false));
@@ -803,7 +824,6 @@ contract MarginManagerDelegate is MarginManagerData {
 		require(vault.assetSupplied == _assetSupplied);
 		require(_in <= vault.amountBorrowed);
 		uint amtOut = _in*vault.amountSupplied/vault.amountBorrowed;
-		require(vault.amountSupplied >= amtOut);
 		require(amtOut >= _minOut);
 		require(ICapitalHandler(_assetBorrowed).maturity() < block.timestamp + (1 days) || 
 			!satisfiesLimit(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied, vault.amountBorrowed, false));
@@ -828,7 +848,7 @@ contract MarginManagerDelegate is MarginManagerData {
 		@param uint _index: the index of the vault in vaults[_owner] to send to auction
 		@param address _assetBorrowed: the address of the expected borrow asset of the vault
 		@param address _assetSupplied: the address of the expected supplied asset of the vault
-		@param uint _ouot: the amount of assetSupplied to receive from the vault
+		@param uint _out: the amount of assetSupplied to receive from the vault
 		@param uint _maxIn: the maximum amount of assetBorrowed that msg.sender is willing to bid on the vault
 		@param address _to: the address to which to send all of the collateral from the vault
 	*/
@@ -877,9 +897,9 @@ contract MarginManagerDelegate is MarginManagerData {
 		uint maxBid = vault.yieldSupplied * _amtIn / vault.amountBorrowed;
 		require(maxBid >= _bidYield);
 
-		int bondRatio = vault.bondSupplied.mul(1 ether).div(int(vault.yieldSupplied));
+		//add 1 to ratio to account for rounding error
+		int bondRatio = vault.bondSupplied.mul(1 ether).div(int(vault.yieldSupplied)) + 1;
 		require(bondRatio >= _minBondRatio);
-		int bondBid = bondRatio.mul(int(_bidYield)) / (1 ether);
 
 
 		if (vaultHealthContract.YTvaultSatisfiesUpperLimit(vault.CHsupplied, vault.CHborrowed, vault.yieldSupplied, vault.bondSupplied, vault.amountBorrowed)) {
@@ -891,7 +911,8 @@ contract MarginManagerDelegate is MarginManagerData {
 		lowerShortInterest(vault.CHborrowed, _amtIn);
 		//any surplus in the bid may be added as _revenue
 		if (_bidYield < maxBid){
-			distributeSurplus(_owner, vault.CHsupplied, maxBid - _bidYield);
+			int bondBid = bondRatio.mul(int(_bidYield)) / (1 ether);
+			distributeYTSurplus(_owner, vault.CHsupplied, maxBid - _bidYield, bondBid);
 		}
 		if (_amtIn == vault.amountBorrowed) {
 			delete _YTvaults[_owner][_index];
@@ -899,19 +920,226 @@ contract MarginManagerDelegate is MarginManagerData {
 		else {
 			_YTvaults[_owner][_index].amountBorrowed -= _amtIn;
 			_YTvaults[_owner][_index].yieldSupplied -= maxBid;
-			int maxBidBond = bondRatio.mul(int(maxBid)) / (1 ether);
-			_YTvaults[_owner][_index].bondSupplied -= maxBidBond;
+			int maxBondBid = bondRatio.mul(int(maxBid)) / (1 ether);
+			_YTvaults[_owner][_index].bondSupplied -= maxBondBid;
 		}
 		_YTLiquidations.push(YTLiquidation(
 			_owner,
 			vault.CHsupplied,
 			vault.CHborrowed,
-			bondBid,
+			bondRatio,
 			_amtIn,
 			msg.sender,
 			_bidYield,
 			block.timestamp
 		));
+	}
+
+	/*
+		@Description: place a new bid on a YT vault that has already begun an auction
+
+		@param uint _index: the index in _YTLiquidations[] of the auction
+		@param uint _bidYield: the bid (in YT corresponding _CHsupplied) made by msg.sender on the vault
+			ZCB of bid is calculated by finding the corresponding amount of ZCB based on the ratio of YT to ZCB
+		@param uint _amtIn: the amount of borrowed asset that the liquidator will be sending in
+	*/
+	function bidOnYTLiquidation(uint _index, uint _bidYield, uint _amtIn) external {
+		require(_YTLiquidations.length > _index);
+		YTLiquidation memory liq = _YTLiquidations[_index];
+		require(_amtIn <= liq.amountBorrowed);
+		uint maxBid = liq.bidAmount * _amtIn / liq.amountBorrowed;
+		require(_bidYield < maxBid);
+
+		refundBid(liq.bidder, liq.CHborrowed, _amtIn);
+		collectBid(msg.sender, liq.CHborrowed, _amtIn);
+
+		int bondBid = (liq.bondRatio.mul(int(_bidYield)) / (1 ether)) + 1;
+		distributeYTSurplus(liq.vaultOwner, liq.CHsupplied, maxBid - _bidYield, bondBid);
+
+		if (_amtIn == liq.amountBorrowed) {
+			_YTLiquidations[_index].bidAmount = _bidYield;
+			_YTLiquidations[_index].bidTimestamp = block.timestamp;
+			_YTLiquidations[_index].bidder = msg.sender;
+		}
+		else {
+			_YTLiquidations[_index].amountBorrowed -= _amtIn;
+			_YTLiquidations[_index].bidAmount -= maxBid;
+
+			_YTLiquidations.push(YTLiquidation(
+				liq.vaultOwner,
+				liq.CHsupplied,
+				liq.CHborrowed,
+				liq.bondRatio,
+				_amtIn,
+				msg.sender,
+				_bidYield,
+				block.timestamp
+			));
+		}
+	}
+
+	/*
+		@Description: claim the collateral of a YT vault from an auction that was won by msg.sender
+
+		@param uint _index: the index in YTLiquidations[] of the auction
+		@param address _to: the address to which to send the proceeds
+	*/
+	function claimYTLiquidation(uint _index, address _to) external {
+		require(_YTLiquidations.length > _index);
+		YTLiquidation storage liq = _YTLiquidations[_index];
+		require(msg.sender == liq.bidder);
+		require(block.timestamp >= AUCTION_COOLDOWN + liq.bidTimestamp);
+		uint bidAmt = liq.bidAmount;
+		int bondBid = liq.bondRatio.mul(int(bidAmt)) / (1 ether);
+		ICapitalHandler(liq.CHsupplied).transferPosition(_to, bidAmt, bondBid);
+
+		delete _YTLiquidations[_index];
+	}
+
+	/*
+		@Description: when there is less than 1 day until maturity or _vaults are under the lower collateralisation limit 
+			vaults may be liquidated instantly without going through the auction process, this is intended to help the MarginManager
+			keep solvency in the event of a market crisis
+			this function is used when a liquidator would like to liquidate the entire vault
+		@param address _owner: the owner of the vault to send to auction
+		@param uint _index: the index of the vault in vaults[_owner] to send to auction
+		@param address _CHborrowed: the address of the CH contract corresponding to the borrowed ZCB
+		@param address _CHsupplied: the address of the CH contract corresponding to the supplied ZCB & YT
+		@param uint _maxIn: the maximum amount of the borrowed asset that msg.sender is willing to send in
+		@param int _minBondRatio: the minimum value of vault.bondSupplied / vault.yieldSupplied inflated by (1 ether)
+			if the actual bond ratio of the vault is < _minBondRatio tx will revert
+		@param uint _minOut: the minimum amount of YT from _CHsupplied that msg.sender wants to receive from this liquidation
+		@param address _to: the address to which to send all of the collateral from the vault
+	*/
+	function instantYTLiquidation(address _owner, uint _index, address _CHborrowed, address _CHsupplied, uint _maxIn, uint _minOut, int _minBondRatio, address _to) external {
+		require(_YTvaults[_owner].length > _index);
+		YTVault memory vault = _YTvaults[_owner][_index];
+		require(vault.CHborrowed == _CHborrowed);
+		require(vault.CHsupplied == _CHsupplied);
+		require(vault.amountBorrowed <= _maxIn);
+		require(vault.yieldSupplied >= _minOut);
+
+		//when we find bondRatio here we don't need to account for the rounding error because the only prupose of this variable is 
+		//the require statement below, other than that it has no impact on the distribution of funds
+		int bondRatio = vault.bondSupplied.mul(1 ether).div(int(vault.yieldSupplied));
+		require(bondRatio >= _minBondRatio);
+
+		if (ICapitalHandler(_CHborrowed).maturity() >= block.timestamp + CRITICAL_TIME_TO_MATURITY) {
+			require(!vaultHealthContract.YTvaultSatisfiesLowerLimit(
+				vault.CHsupplied,
+				vault.CHborrowed,
+				vault.yieldSupplied,
+				vault.bondSupplied,
+				vault.amountBorrowed
+			));
+		}
+
+		//burn borrowed ZCB
+		ICapitalHandler(_CHborrowed).burnZCBFrom(_to, vault.amountBorrowed);
+		lowerShortInterest(_CHborrowed, vault.amountBorrowed);
+		ICapitalHandler(_CHsupplied).transferPosition(_to, vault.yieldSupplied, vault.bondSupplied);
+
+		delete _YTvaults[_owner][_index];
+	}
+
+
+
+	/*
+		@Description: when there is less than 1 day until maturity or _vaults are under the lower collateralisation limit 
+			vaults may be liquidated instantly without going through the auction process, this is intended to help the MarginManager
+			keep solvency in the event of a market crisis
+			this function is used when a liquidator whould like to only partially liquidate the vault by providing a specific
+			amount of the borrowed asset and receiving the corresponding percentage of the vault's collateral
+		@param address _owner: the owner of the vault to send to auction
+		@param uint _index: the index of the vault in vaults[_owner] to send to auction
+		@param address _CHborrowed: the address of the CH contract corresponding to the borrowed ZCB
+		@param address _CHsupplied: the address of the CH contract corresponding to the supplied ZCB & YT
+		@param uint _in: the amount of the borrowed asset to supply to the vault
+		@param int _minBondRatio: the minimum value of vault.bondSupplied / vault.yieldSupplied inflated by (1 ether)
+			if the actual bond ratio of the vault is < _minBondRatio tx will revert
+		@param uint _minOut: the minimum amount of YT from _CHsupplied that msg.sender wants to receive from this liquidation
+		@param address _to: the address to which to send all of the collateral from the vault
+	*/
+	function partialYTLiquidationSpecificIn(address _owner, uint _index, address _CHborrowed, address _CHsupplied, uint _in, uint _minOut, int _minBondRatio, address _to) external {
+		require(_YTvaults[_owner].length > _index);
+		YTVault memory vault = _YTvaults[_owner][_index];
+		require(vault.CHborrowed == _CHborrowed);
+		require(vault.CHsupplied == _CHsupplied);
+		require(_in <= vault.amountBorrowed);
+
+		//when we find bondRatio here we don't need to account for the rounding error because the only prupose of this variable is 
+		//the require statement below, other than that it has no impact on the distribution of funds
+		int bondRatio = vault.bondSupplied.mul(1 ether).div(int(vault.yieldSupplied));
+		require(bondRatio >= _minBondRatio);
+		uint yieldOut = vault.yieldSupplied.mul(_in).div(vault.amountBorrowed);
+		require(yieldOut >= _minOut);
+		int bondOut = vault.bondSupplied.mul(int(_in)).div(int(vault.amountBorrowed));
+
+		if (ICapitalHandler(_CHborrowed).maturity() >= block.timestamp + CRITICAL_TIME_TO_MATURITY) {
+			require(!vaultHealthContract.YTvaultSatisfiesLowerLimit(
+				vault.CHsupplied,
+				vault.CHborrowed,
+				vault.yieldSupplied,
+				vault.bondSupplied,
+				vault.amountBorrowed
+			));
+		}
+		//burn borrowed ZCB
+		ICapitalHandler(_CHborrowed).burnZCBFrom(_to, _in);
+		lowerShortInterest(_CHborrowed, _in);
+		ICapitalHandler(_CHsupplied).transferPosition(_to, yieldOut, bondOut);
+
+		_YTvaults[_owner][_index].amountBorrowed -= _in;
+		_YTvaults[_owner][_index].yieldSupplied -= yieldOut;
+		_YTvaults[_owner][_index].bondSupplied -= bondOut;
+	}
+
+	/*
+		@Description: when there is less than 1 day until maturity or _vaults are under the lower collateralisation limit 
+			vaults may be liquidated instantly without going through the auction process, this is intended to help the MarginManager
+			keep solvency in the event of a market crisis
+			this function is used when a liquidator whould like to only partially liquidate the vault by receiving a specific
+			amount of YT corresponding to _CHsupplied and sending the corresponding amount of assetBorrowed
+		@param address _owner: the owner of the vault to send to auction
+		@param uint _index: the index of the vault in vaults[_owner] to send to auction
+		@param address _CHborrowed: the address of the CH contract corresponding to the borrowed ZCB
+		@param address _CHsupplied: the address of the CH contract corresponding to the supplied ZCB & YT
+		@param uint _out: the amount of YT corresponding to _CHsupplied to receive from the vault
+		@param int _minBondOut: the minimum value of bond when transferPosition is called to payout liquidator
+			if the actual bond out is < _minBondOut tx will revert
+		@param uint _maxIn: the maximum amount of assetBorrowed that msg.sender is willing to bid on the vault
+		@param address _to: the address to which to send all of the collateral from the vault
+	*/
+	function partialYTLiquidationSpecificOut(address _owner, uint _index, address _CHborrowed, address _CHsupplied, uint _out, int _minBondOut, uint _maxIn, address _to) external {
+		require(_YTvaults[_owner].length > _index);
+		YTVault memory vault = _YTvaults[_owner][_index];
+		require(vault.CHborrowed == _CHborrowed);
+		require(vault.CHsupplied == _CHsupplied);
+		require(vault.yieldSupplied >= _out);
+		uint amtIn = _out*vault.amountBorrowed;
+		amtIn = amtIn/vault.yieldSupplied + (amtIn%vault.yieldSupplied == 0 ? 0 : 1);
+		require(amtIn <= _maxIn);
+
+		int bondOut = vault.bondSupplied.mul(int(_out)).div(int(vault.yieldSupplied));
+		require(bondOut >= _minBondOut);
+
+		if (ICapitalHandler(_CHborrowed).maturity() >= block.timestamp + CRITICAL_TIME_TO_MATURITY) {
+			require(!vaultHealthContract.YTvaultSatisfiesLowerLimit(
+				vault.CHsupplied,
+				vault.CHborrowed,
+				vault.yieldSupplied,
+				vault.bondSupplied,
+				vault.amountBorrowed
+			));
+		}
+
+		//burn borrowed ZCB
+		IERC20(_CHborrowed).transferFrom(msg.sender, address(0), amtIn);
+		IERC20(_CHsupplied).transfer(_to, _out);
+
+		_YTvaults[_owner][_index].amountBorrowed -= amtIn;
+		_YTvaults[_owner][_index].yieldSupplied -= _out;
+		_YTvaults[_owner][_index].bondSupplied -= bondOut;
 	}
 
 }

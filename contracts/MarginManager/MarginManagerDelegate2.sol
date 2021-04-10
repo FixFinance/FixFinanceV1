@@ -112,8 +112,9 @@ contract MarginManagerDelegate2 is MarginManagerData {
 			convert the value from wrapped amount to unit amount
 	*/
 	function getUnitValueYield(address _CH, uint _amountYield) internal view returns (uint unitAmountYield) {
-		IWrapper wrapper = ICapitalHandler(_CH).wrapper();
-		unitAmountYield = wrapper.WrappedAmtToUnitAmt_RoundDown(_amountYield);
+		address wrapperAddr = _capitalHandlerToWrapper[_CH];
+		require(wrapperAddr != address(0));
+		unitAmountYield = IWrapper(wrapperAddr).WrappedAmtToUnitAmt_RoundDown(_amountYield);
 	}
 
 	/*
@@ -146,7 +147,7 @@ contract MarginManagerDelegate2 is MarginManagerData {
 		require(_borrowRateChange <= ABDK_1);
 		require(
 			(_suppliedRateChange == ABDK_1) ||
-			(_positiveBondSupplied ? _suppliedRateChange > ABDK_1: _suppliedRateChange < ABDK_1)
+			(_positiveBondSupplied ? _suppliedRateChange > ABDK_1 : _suppliedRateChange < ABDK_1)
 		);
 	}
 

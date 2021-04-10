@@ -52,6 +52,12 @@ contract MarginManager is MarginManagerData, IMarginManager, Ownable {
 		return _revenue[_asset];
 	}
 
+	function YTrevenue(address _asset) external view override returns (uint yield, int bond) {
+		YTPosition memory pos = _YTRevenue[_asset];
+		yield = pos.amountYield;
+		bond = pos.amountBond;
+	}
+
 	function vaults(address _owner, uint _index) external view override returns (
 		address assetSupplied,
 		address assetBorrowed,
@@ -82,6 +88,42 @@ contract MarginManager is MarginManagerData, IMarginManager, Ownable {
 		bidder = lq.bidder;
 		bidAmount = lq.bidAmount;
 		bidTimestamp = lq.bidTimestamp;
+	}
+
+	function YTvaults(address _owner, uint _index) external view override returns (
+		address CHsupplied,
+		address CHborrowed,
+		uint yieldSupplied,
+		int bondSupplied,
+		uint amountBorrowed
+	) {
+		YTVault memory vault = _YTvaults[_owner][_index];
+		CHsupplied = vault.CHsupplied;
+		CHborrowed = vault.CHborrowed;
+		yieldSupplied = vault.yieldSupplied;
+		bondSupplied = vault.bondSupplied;
+		amountBorrowed = vault.amountBorrowed;
+	}
+
+	function YTLiquidations(uint _index) external view override returns (
+		address vaultOwner,
+		address CHsupplied,
+		address CHborrowed,
+		int bondRatio,
+		uint amountBorrowed,
+		address bidder,
+		uint bidAmount,
+		uint bidTimestamp
+	) {
+		YTLiquidation memory liq = _YTLiquidations[_index];
+		vaultOwner = liq.vaultOwner;
+		CHsupplied = liq.CHsupplied;
+		CHborrowed = liq.CHborrowed;
+		bondRatio = liq.bondRatio;
+		amountBorrowed = liq.amountBorrowed;
+		bidder = liq.bidder;
+		bidAmount = liq.bidAmount;
+		bidTimestamp = liq.bidTimestamp;
 	}
 
 	function VaultHealthAddress() external view override returns (address) {

@@ -292,10 +292,10 @@ contract CapitalHandler is ICapitalHandler, Ownable {
 		//ensure position has positive minimum value at maturity
 		uint ratio = inPayoutPhase ? maturityConversionRate : wrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
 		uint unitAmtYield = _yield.mul(ratio)/(1 ether);
-		require(_bond >= 0 || unitAmtYield >= uint(_bond));
+		require(_bond >= 0 || unitAmtYield >= uint(-_bond));
 		uint yieldFrom = balanceYield[_from].sub(_yield);
 		int bondFrom = balanceBonds[_from].sub(_bond);
-		require(bondFrom >= 0 || yieldFrom.mul(ratio)/(1 ether) >= uint(bondFrom));
+		require(bondFrom >= 0 || yieldFrom.mul(ratio)/(1 ether) >= uint(-bondFrom));
 
 		//decrement approval of ZCB
 		uint unitAmtZCB = _bond > 0 ? unitAmtYield.add(uint(_bond)) : unitAmtYield.sub(uint(-_bond));

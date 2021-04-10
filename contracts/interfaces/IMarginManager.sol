@@ -11,8 +11,28 @@ interface IMarginManager {
 	function wrapperToUnderlyingAsset(address _wrapeprAddress) external view returns (address);
 	function capitalHandlerToWrapper(address _capitalHandlerAddress) external view returns (address);
 	function shortInterestAllDurations(address _wrapper) external view returns (uint);
-	function revenue(address _asset) external view returns (uint);
 	function VaultHealthAddress() external view returns (address);
+	//-----------vault-related-views-----
+	function YTrevenue(address _asset) external view returns (uint yield, int bond);
+	function YTvaults(address _owner, uint _index) external view returns (
+		address CHsupplied,
+		address CHborrowed,
+		uint yieldSupplied,
+		int bondSupplied,
+		uint amountBorrowed
+	);
+	function YTLiquidations(uint _index) external view returns (
+		address vaultOwner,
+		address CHsupplied,
+		address CHborrowed,
+		int bondRatio,
+		uint amountBorrowed,
+		address bidder,
+		uint bidAmount,
+		uint bidTimestamp
+	);
+	//-------------YT-vault-related-views-----------
+	function revenue(address _asset) external view returns (uint);
 	function vaults(address _owner, uint _index) external view returns (
 		address assetSupplied,
 		address assetBorrowed,

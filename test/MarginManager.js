@@ -2,6 +2,7 @@ const dummyAToken = artifacts.require('dummyAToken');
 const dummyVaultHealth = artifacts.require('DummyVaultHealth');
 const NGBwrapper = artifacts.require('NGBwrapper');
 const capitalHandler = artifacts.require('CapitalHandler');
+const IYieldToken = artifacts.require("IYieldToken");
 const yieldTokenDeployer = artifacts.require('YieldTokenDeployer');
 const organizer = artifacts.require('organizer');
 const MarginManagerDelegate = artifacts.require("MarginManagerDelegate");
@@ -94,6 +95,9 @@ contract('MarginManager', async function(accounts) {
 
 		zcbAsset0 = await capitalHandler.at(rec0.receipt.logs[0].args.addr);
 		zcbAsset1 = await capitalHandler.at(rec1.receipt.logs[0].args.addr);
+
+		ytAsset0 = await IYieldToken.at(await zcbAsset0.yieldTokenAddress());
+		ytAsset1 = await IYieldToken.at(await zcbAsset1.yieldTokenAddress());
 
 		await zcbAsset0.setMarginManagerAddress(marginManagerInstance.address);
 		await zcbAsset1.setMarginManagerAddress(marginManagerInstance.address);
@@ -398,7 +402,7 @@ contract('MarginManager', async function(accounts) {
 		assert.equal(vault.amountSupplied.toString(), "0", "amountSupplied is null");
 	});
 
-	it('partial liquidations Specific In', async () => {
+	it('partial vault liquidations Specific In', async () => {
 		vaultIndex++;
 
 		await marginManagerInstance.partialLiquidationSpecificIn(accounts[0], vaultIndex, zcbAsset0.address, wAsset1.address,
@@ -412,7 +416,7 @@ contract('MarginManager', async function(accounts) {
 		assert.equal(vault.amountSupplied.toString(), _10To18.div(new BN(2)).add(new BN(1)).toString(), "amountSupplied is correct");
 	});
 
-	it('partial liquidation Specific Out', async () => {
+	it('partial vault liquidation Specific Out', async () => {
 		await marginManagerInstance.partialLiquidationSpecificOut(accounts[0], vaultIndex, zcbAsset0.address, wAsset1.address,
 			vault.amountSupplied.toString(), vault.amountBorrowed.toString(), accounts[1], {from: accounts[1]});
 
@@ -472,7 +476,7 @@ contract('MarginManager', async function(accounts) {
 		assert.equal(vault.amountSupplied.toString(), "0", "amountSupplied is null");
 	});
 
-	it('instant liquidations due to time to maturity', async () => {
+	it('instant vault liquidations due to time to maturity', async () => {
 		vaultIndex++;
 		let caught = false;
 
@@ -532,6 +536,115 @@ contract('MarginManager', async function(accounts) {
 
 		assert.equal(newRevenue.toString(), "0", "revenue storage value reduced to 0 after all is withdrawn");
 		assert.equal(newBalance.sub(prevBalance).toString(), revenue.toString(), "correct amount paid to contract owner");
+	});
+
+	/*
+		-------------------------------------------------Y-T---V-a-u-l-t-s-----------------------------------------------------
+	*/
+
+
+
+	it('cannot open YT vault without whitelisting supplied asset', async () => {
+		//mint ZCB to accounts[0]
+		let toMint = _10To18.mul(new BN(10));
+		await asset1.mintTo(accounts[0], toMint);
+		await asset1.approve(wAsset1.address, toMint);
+		await wAsset1.depositUnitAmount(accounts[0], toMint);
+		let wBalance = await wAsset1.balanceOf(accounts[0]);
+		await wAsset1.approve(zcbAsset1.address, wBalance);
+		await zcbAsset1.depositWrappedToken(accounts[0], wBalance);
+		await zcbAsset1.approve(marginManagerInstance.address, toMint);
+		await ytAsset1.approve(marginManagerInstance.address, toMint);
+
+		let caught = false;
+
+		yieldSupplied = _10To18;
+		bondSupplied = _10To18.neg();
+		adjYieldSupplied = await wAsset1.WrappedAmtToUnitAmt_RoundDown(yieldSupplied);
+		amountBorrowed = _10To18.mul(_10To18).div(new BN(upperRatio));
+		await vaultHealthInstance.setToReturn(true);
+		maxShortInterest0 = _10To18.mul(_10To18).toString();
+		await vaultHealthInstance.setMaximumShortInterest(asset0.address, maxShortInterest0);
+		try {
+			await marginManagerInstance.openYTVault(zcbAsset1.address, zcbAsset0.address, yieldSupplied, bondSupplied, amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
+		} catch (err) {
+			caught = true;
+		}
+		if (!caught) assert.fail('only whitelisted assets may be supplied');
+		await marginManagerInstance.whitelistCapitalHandler(zcbAsset1.address);
+	});
+
+	it('opens YT vault', async () => {
+		let caught = false;
+		maxShortInterest0 = "0";
+		await vaultHealthInstance.setMaximumShortInterest(asset0.address, maxShortInterest0);
+		//we are usign a dummy vault health contract, we need to set the value which it will return on vaultWithstandsChange() call
+		await vaultHealthInstance.setToReturn(true);
+		try {
+			await marginManagerInstance.openYTVault(zcbAsset1.address, zcbAsset0.address, yieldSupplied, bondSupplied, amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
+		} catch (err) {
+			caught = true;
+		}
+		if (!caught) assert.fail('borrowing must be limited by the short interest cap');
+
+		//set max short interest super high so that we will not need to worry about it later in our tests
+		maxShortInterest0 = _10To18.mul(_10To18).toString();
+		await vaultHealthInstance.setMaximumShortInterest(asset0.address, maxShortInterest0);
+
+		await vaultHealthInstance.setToReturn(false);
+		caught = false;
+		try {
+			await marginManagerInstance.openYTVault(zcbAsset1.address, zcbAsset0.address, yieldSupplied, bondSupplied, amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
+		} catch (err) {
+			caught = true;
+		}
+		if (!caught) assert.fail('open vault fails when vaultWithstandsChange() returns false');
+
+		await vaultHealthInstance.setToReturn(true);
+		caught = false;
+		try {
+			await marginManagerInstance.openYTVault(zcbAsset1.address, zcbAsset0.address, yieldSupplied, bondSupplied, amountBorrowed, TOTAL_BASIS_POINTS-1, ABDK_1, ABDK_1);
+		} catch (err) {
+			caught = true;
+		}
+		if (!caught) assert.fail('for call to openVault(), remove(), or borrow() to be sucessful priceChange parameter must be >= TOTAL_BASIS_POINTS');
+
+		caught = false;
+		try {
+			const over1ABDK = (new BN(ABDK_1)).add(new BN(1));
+			await marginManagerInstance.openYTVault(zcbAsset1.address, zcbAsset0.address, yieldSupplied, bondSupplied, amountBorrowed, TOTAL_BASIS_POINTS, over1ABDK, ABDK_1);
+		} catch (err) {
+			caught = true;
+		}
+		if (!caught) assert.fail('for call to openVault(), remove(), or borrow() to be sucessful suppliedRateChange parameter must be <= ABDK_1');
+
+		caught = false;
+		try {
+			const over1ABDK = (new BN(ABDK_1)).add(new BN(1));
+			await marginManagerInstance.openYTVault(zcbAsset1.address, zcbAsset0.address, yieldSupplied, bondSupplied, amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, over1ABDK);
+		} catch (err) {
+			caught = true;
+		}
+		if (!caught) assert.fail('for call to openVault(), remove(), or borrow() to be sucessful borrowedRateChange parameter must be <= ABDK_1');
+
+		var prevBalanceZCB0 = await zcbAsset0.balanceOf(accounts[0]);
+		var prevBalanceZCB1 = await zcbAsset1.balanceOf(accounts[0]);
+		var prevYield1 = await zcbAsset1.balanceYield(accounts[0]);
+
+		await marginManagerInstance.openYTVault(zcbAsset1.address, zcbAsset0.address, yieldSupplied, bondSupplied, amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
+
+		assert.equal((await zcbAsset0.balanceOf(accounts[0])).toString(), prevBalanceZCB0.add(amountBorrowed).toString(), "correct amount of zcb credited to vault owner");
+		assert.equal((await zcbAsset1.balanceOf(accounts[0])).toString(), prevBalanceZCB1.sub(adjYieldSupplied).sub(bondSupplied).toString(), "correct amount of ZCB 1 supplied");
+		assert.equal((await zcbAsset1.balanceYield(accounts[0])).toString(), prevYield1.sub(yieldSupplied).toString(), "correct new value of balanceYield");
+
+		vault = await marginManagerInstance.YTvaults(accounts[0], 0);
+
+		assert.equal(vault.CHsupplied, zcbAsset1.address, "correct address for assetSupplied in vault");
+		assert.equal(vault.CHborrowed, zcbAsset0.address, "correct address for assetBorrowed in vault");
+		assert.equal(vault.yieldSupplied.toString(), yieldSupplied.toString(), "correct vaule of yieldSupplied in vault");
+		assert.equal(vault.bondSupplied.toString(), bondSupplied.toString(), "correct vaule of bondSupplied in vault");
+		assert.equal(vault.amountBorrowed.toString(), amountBorrowed, "correct vaule of amountBorrowed in vault");
+
 	});
 
 });

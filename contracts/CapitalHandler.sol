@@ -270,10 +270,10 @@ contract CapitalHandler is ICapitalHandler, Ownable {
 	function transferPosition(address _to, uint _yield, int _bond) external override {
 		//ensure position has positive minimum value at maturity
 		uint ratio = inPayoutPhase ? maturityConversionRate : wrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
-		require(_bond >= 0 || _yield.mul(ratio)/(1 ether) >= uint(_bond));
+		require(_bond >= 0 || _yield.mul(ratio)/(1 ether) >= uint(-_bond));
 		uint yieldSender = balanceYield[msg.sender].sub(_yield);
 		int bondSender = balanceBonds[msg.sender].sub(_bond);
-		require(bondSender >= 0 || yieldSender.mul(ratio)/(1 ether) >= uint(bondSender));
+		require(bondSender >= 0 || yieldSender.mul(ratio)/(1 ether) >= uint(-bondSender));
 		balanceYield[msg.sender] = yieldSender;
 		balanceBonds[msg.sender] = bondSender;
 		balanceYield[_to] += _yield;

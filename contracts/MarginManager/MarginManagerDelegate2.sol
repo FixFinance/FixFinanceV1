@@ -378,7 +378,7 @@ contract MarginManagerDelegate2 is MarginManagerData {
 		address CHborrowed = _YTvaults[_owner][_index].CHborrowed;
 		ICapitalHandler(CHborrowed).burnZCBFrom(msg.sender, _amount);
 		lowerShortInterest(CHborrowed, _amount);
-		_vaults[_owner][_index].amountBorrowed -= _amount;
+		_YTvaults[_owner][_index].amountBorrowed -= _amount;
 	}
 
 
@@ -506,7 +506,7 @@ contract MarginManagerDelegate2 is MarginManagerData {
 	}
 
 	/*
-		@Description: when there is less than 1 day until maturity or _vaults are under the lower collateralisation limit 
+		@Description: when there is less than 1 day until maturity or vaults are under the lower collateralisation limit 
 			vaults may be liquidated instantly without going through the auction process, this is intended to help the MarginManager
 			keep solvency in the event of a market crisis
 			this function is used when a liquidator would like to liquidate the entire vault
@@ -554,7 +554,7 @@ contract MarginManagerDelegate2 is MarginManagerData {
 
 
 	/*
-		@Description: when there is less than 1 day until maturity or _vaults are under the lower collateralisation limit 
+		@Description: when there is less than 1 day until maturity or vaults are under the lower collateralisation limit 
 			vaults may be liquidated instantly without going through the auction process, this is intended to help the MarginManager
 			keep solvency in the event of a market crisis
 			this function is used when a liquidator whould like to only partially liquidate the vault by providing a specific
@@ -604,7 +604,7 @@ contract MarginManagerDelegate2 is MarginManagerData {
 	}
 
 	/*
-		@Description: when there is less than 1 day until maturity or _vaults are under the lower collateralisation limit 
+		@Description: when there is less than 1 day until maturity or vaults are under the lower collateralisation limit 
 			vaults may be liquidated instantly without going through the auction process, this is intended to help the MarginManager
 			keep solvency in the event of a market crisis
 			this function is used when a liquidator whould like to only partially liquidate the vault by receiving a specific

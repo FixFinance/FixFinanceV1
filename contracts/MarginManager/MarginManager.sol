@@ -399,7 +399,7 @@ contract MarginManager is MarginManagerData, IMarginManager, Ownable {
 
 	function YTdeposit(address _owner, uint _index, uint _amountYield, int _amountBond) external override {
 		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
-			"YTdeposit(address,uint256,uint256,int128)",
+			"YTdeposit(address,uint256,uint256,int256)",
 			_owner,
 			_index,
 			_amountYield,

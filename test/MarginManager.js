@@ -644,7 +644,77 @@ contract('MarginManager', async function(accounts) {
 		assert.equal(vault.yieldSupplied.toString(), yieldSupplied.toString(), "correct vaule of yieldSupplied in vault");
 		assert.equal(vault.bondSupplied.toString(), bondSupplied.toString(), "correct vaule of bondSupplied in vault");
 		assert.equal(vault.amountBorrowed.toString(), amountBorrowed, "correct vaule of amountBorrowed in vault");
+	});
 
+	it('deposits into YT vault', async () => {
+		var prevBalanceZCB1 = await zcbAsset1.balanceOf(accounts[0]);
+		var prevYield1 = await zcbAsset1.balanceYield(accounts[0]);
+		prevVaultState = vault;
+		let toSupplyYield = _10To18;
+		let adjSuppliedYield = await wAsset1.WrappedAmtToUnitAmt_RoundDown(toSupplyYield);
+		let toSupplyBond = _10To18.neg();
+		await marginManagerInstance.YTdeposit(accounts[0], 0, toSupplyYield, toSupplyBond);
+		vault = await marginManagerInstance.YTvaults(accounts[0], 0);
+
+		assert.equal((await zcbAsset1.balanceOf(accounts[0])).toString(), prevBalanceZCB1.sub(adjSuppliedYield).sub(toSupplyBond), "correct amount of ZCB supplied");
+		assert.equal((await zcbAsset1.balanceYield(accounts[0])).toString(), prevYield1.sub(toSupplyYield).toString(), "correct amount of yield supplied");
+	});
+
+	it('removes from YT vault', async () => {
+		var toRemove = currentSupplied.sub(prevSupplied);
+		var prevBalanceZCB1 = await zcbAsset1.balanceOf(accounts[0]);
+		var prevYield1 = await zcbAsset1.balanceYield(accounts[0]);
+		prevVaultState = vault;
+		let amountYield = _10To18;
+		let adjAmountYield = await wAsset1.WrappedAmtToUnitAmt_RoundDown(amountYield);
+		let amountBond = _10To18.neg();
+
+		await vaultHealthInstance.setToReturn(false);
+		let caught = false;
+		try {
+			await marginManagerInstance.YTremove(0, amountYield, amountBond, accounts[0], TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
+		} catch (err) {
+			caught = true;
+		}
+		if (!caught) assert.fail("call to remove() should fail when vaultWithstandsChange() returns false");
+
+		await vaultHealthInstance.setToReturn(true);
+
+		await marginManagerInstance.YTremove(0, amountYield, amountBond, accounts[0], TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
+
+		vault = await marginManagerInstance.YTvaults(accounts[0], 0);
+
+		assert.equal((await zcbAsset1.balanceOf(accounts[0])).toString(), prevBalanceZCB1.add(adjAmountYield).add(amountBond), "correct amount of ZCB received");
+		assert.equal(prevVaultState.yieldSupplied.sub(vault.yieldSupplied).toString(), amountYield.toString(), "correct amount of yield removed from vault");
+	});
+
+
+	it('repays YT vault', async () => {
+		toRepay = vault.amountBorrowed.div(new BN('2'));
+
+		prevVaultState = vault;
+		var prevBalanceZCB0 = await zcbAsset0.balanceOf(accounts[0]);
+		await marginManagerInstance.YTrepay(accounts[0], 0, toRepay);
+
+		vault = await marginManagerInstance.YTvaults(accounts[0], 0);
+		var currentBalanceZCB0 = await zcbAsset0.balanceOf(accounts[0]);
+
+		assert.equal(prevBalanceZCB0.sub(currentBalanceZCB0).toString(), toRepay.toString(), "correct amount ZCB transferedFrom sender");
+		assert.equal(prevVaultState.amountBorrowed.sub(vault.amountBorrowed).toString(), toRepay.toString(), "correct amount repaid");
+	});
+
+	it('borrows from YT vault', async () => {
+		toBorrow = toRepay;
+
+		prevVaultState = vault;
+		var prevBalanceZCB0 = await zcbAsset0.balanceOf(accounts[0]);
+		await marginManagerInstance.YTborrow(0, toBorrow, accounts[0], TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
+
+		vault = await marginManagerInstance.YTvaults(accounts[0], 0);
+		var currentBalanceZCB0 = await zcbAsset0.balanceOf(accounts[0]);
+
+		assert.equal(currentBalanceZCB0.sub(prevBalanceZCB0).toString(), toBorrow.toString(), "correct amount of borrowed asset transfered to _to");
+		assert.equal(vault.amountBorrowed.sub(prevVaultState.amountBorrowed).toString(), toBorrow.toString(), "correct amount borrowed");
 	});
 
 });

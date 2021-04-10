@@ -593,6 +593,14 @@ contract MarginManager is MarginManagerData, IMarginManager, Ownable {
 		require(success);
 	}
 
+	/*
+		@Description: place a new bid on a YT vault that has already begun an auction
+
+		@param uint _index: the index in _YTLiquidations[] of the auction
+		@param uint _bidYield: the bid (in YT corresponding _CHsupplied) made by msg.sender on the vault
+			ZCB of bid is calculated by finding the corresponding amount of ZCB based on the ratio of YT to ZCB
+		@param uint _amtIn: the amount of borrowed asset that the liquidator will be sending in
+	*/
 	function bidOnYTLiquidation(uint _index, uint _bidYield, uint _amtIn) external override {
 		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
 			"bidOnYTLiquidation(uint256,uint256,uint256)",
@@ -603,6 +611,12 @@ contract MarginManager is MarginManagerData, IMarginManager, Ownable {
 		require(success);
 	}
 
+	/*
+		@Description: claim the collateral of a YT vault from an auction that was won by msg.sender
+
+		@param uint _index: the index in YTLiquidations[] of the auction
+		@param address _to: the address to which to send the proceeds
+	*/
 	function claimYTLiquidation(uint _index, address _to) external override {
 		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
 			"claimYTLiquidation(uint256,address)",
@@ -612,6 +626,21 @@ contract MarginManager is MarginManagerData, IMarginManager, Ownable {
 		require(success);
 	}
 
+	/*
+		@Description: when there is less than 1 day until maturity or _vaults are under the lower collateralisation limit 
+			vaults may be liquidated instantly without going through the auction process, this is intended to help the MarginManager
+			keep solvency in the event of a market crisis
+			this function is used when a liquidator would like to liquidate the entire vault
+		@param address _owner: the owner of the vault to send to auction
+		@param uint _index: the index of the vault in vaults[_owner] to send to auction
+		@param address _CHborrowed: the address of the CH contract corresponding to the borrowed ZCB
+		@param address _CHsupplied: the address of the CH contract corresponding to the supplied ZCB & YT
+		@param uint _maxIn: the maximum amount of the borrowed asset that msg.sender is willing to send in
+		@param int _minBondRatio: the minimum value of vault.bondSupplied / vault.yieldSupplied inflated by (1 ether)
+			if the actual bond ratio of the vault is < _minBondRatio tx will revert
+		@param uint _minOut: the minimum amount of YT from _CHsupplied that msg.sender wants to receive from this liquidation
+		@param address _to: the address to which to send all of the collateral from the vault
+	*/
 	function instantYTLiquidation(address _owner, uint _index, address _CHborrowed, address _CHsupplied, uint _maxIn, uint _minOut, int _minBondRatio, address _to) external override {
 		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
 			"instantYTLiquidation(address,uint256,address,address,uint256,uint256,int256,address)",
@@ -627,6 +656,22 @@ contract MarginManager is MarginManagerData, IMarginManager, Ownable {
 		require(success);
 	}
 
+	/*
+		@Description: when there is less than 1 day until maturity or _vaults are under the lower collateralisation limit 
+			vaults may be liquidated instantly without going through the auction process, this is intended to help the MarginManager
+			keep solvency in the event of a market crisis
+			this function is used when a liquidator whould like to only partially liquidate the vault by providing a specific
+			amount of the borrowed asset and receiving the corresponding percentage of the vault's collateral
+		@param address _owner: the owner of the vault to send to auction
+		@param uint _index: the index of the vault in vaults[_owner] to send to auction
+		@param address _CHborrowed: the address of the CH contract corresponding to the borrowed ZCB
+		@param address _CHsupplied: the address of the CH contract corresponding to the supplied ZCB & YT
+		@param uint _in: the amount of the borrowed asset to supply to the vault
+		@param int _minBondRatio: the minimum value of vault.bondSupplied / vault.yieldSupplied inflated by (1 ether)
+			if the actual bond ratio of the vault is < _minBondRatio tx will revert
+		@param uint _minOut: the minimum amount of YT from _CHsupplied that msg.sender wants to receive from this liquidation
+		@param address _to: the address to which to send all of the collateral from the vault
+	*/
 	function partialYTLiquidationSpecificIn(address _owner, uint _index, address _CHborrowed, address _CHsupplied, uint _in, uint _minOut, int _minBondRatio, address _to) external override {
 		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
 			"partialYTLiquidationSpecificIn(address,uint256,address,address,uint256,uint256,int256,address)",
@@ -642,6 +687,22 @@ contract MarginManager is MarginManagerData, IMarginManager, Ownable {
 		require(success);
 	}
 
+	/*
+		@Description: when there is less than 1 day until maturity or _vaults are under the lower collateralisation limit 
+			vaults may be liquidated instantly without going through the auction process, this is intended to help the MarginManager
+			keep solvency in the event of a market crisis
+			this function is used when a liquidator whould like to only partially liquidate the vault by receiving a specific
+			amount of YT corresponding to _CHsupplied and sending the corresponding amount of assetBorrowed
+		@param address _owner: the owner of the vault to send to auction
+		@param uint _index: the index of the vault in vaults[_owner] to send to auction
+		@param address _CHborrowed: the address of the CH contract corresponding to the borrowed ZCB
+		@param address _CHsupplied: the address of the CH contract corresponding to the supplied ZCB & YT
+		@param uint _out: the amount of YT corresponding to _CHsupplied to receive from the vault
+		@param int _minBondOut: the minimum value of bond when transferPosition is called to payout liquidator
+			if the actual bond out is < _minBondOut tx will revert
+		@param uint _maxIn: the maximum amount of assetBorrowed that msg.sender is willing to bid on the vault
+		@param address _to: the address to which to send all of the collateral from the vault
+	*/
 	function partialYTLiquidationSpecificOut(address _owner, uint _index, address _CHborrowed, address _CHsupplied, uint _out, int _minBondRatio, uint _maxIn, address _to) external override {
 		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
 			"partialYTLiquidationSpecificOut(address,uint256,address,address,uint256,int256,uint256,address)",

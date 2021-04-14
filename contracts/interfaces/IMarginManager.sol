@@ -4,8 +4,10 @@ import "../MarginManager/MarginManagerData.sol";
 
 interface IMarginManager {
 	function vaultsLength(address _owner) external view returns(uint);
+	function YTvaultsLength(address _owner) external view returns(uint);
 	function allVaults(address _owner) external view returns(MarginManagerData.Vault[] memory _vaults);
 	function liquidationsLength() external view returns (uint);
+	function YTLiquidationsLength() external view returns (uint);
 	//-----------------------------------------V-a-u-l-t---M-a-n-a-g-e-m-e-n-t-----------------------------
 	//----------------------------v-i-e-w-s----------------------------
 	function wrapperToUnderlyingAsset(address _wrapeprAddress) external view returns (address);
@@ -13,6 +15,23 @@ interface IMarginManager {
 	function shortInterestAllDurations(address _wrapper) external view returns (uint);
 	function VaultHealthAddress() external view returns (address);
 	//-----------vault-related-views-----
+	function revenue(address _asset) external view returns (uint);
+	function vaults(address _owner, uint _index) external view returns (
+		address assetSupplied,
+		address assetBorrowed,
+		uint amountSupplied,
+		uint amountBorrowed
+	);
+	function Liquidations(uint _index) external view returns (
+		address vaultOwner,
+		address assetSupplied,
+		address assetBorrowed,
+		uint amountBorrowed,
+		address bidder,
+		uint bidAmount,
+		uint bidTimestamp
+	);
+	//-------------YT-vault-related-views-----------
 	function YTrevenue(address _asset) external view returns (uint yield, int bond);
 	function YTvaults(address _owner, uint _index) external view returns (
 		address CHsupplied,
@@ -26,23 +45,6 @@ interface IMarginManager {
 		address CHsupplied,
 		address CHborrowed,
 		int bondRatio,
-		uint amountBorrowed,
-		address bidder,
-		uint bidAmount,
-		uint bidTimestamp
-	);
-	//-------------YT-vault-related-views-----------
-	function revenue(address _asset) external view returns (uint);
-	function vaults(address _owner, uint _index) external view returns (
-		address assetSupplied,
-		address assetBorrowed,
-		uint amountSupplied,
-		uint amountBorrowed
-	);
-	function Liquidations(uint _index) external view returns (
-		address vaultOwner,
-		address assetSupplied,
-		address assetBorrowed,
 		uint amountBorrowed,
 		address bidder,
 		uint bidAmount,
@@ -129,5 +131,6 @@ interface IMarginManager {
 	function whitelistWrapper(address _wrapeprAddress) external;
 	function whitelistAsset(address _assetAddress) external;
 	function whitelistCapitalHandler(address _capitalHandlerAddress) external;
-	function claimRevenue(address _asset, uint _amount) external;
+	function claimRevenue(address _asset) external;
+	function claimYTRevenue(address _CH, int _bondIn) external;
 }

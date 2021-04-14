@@ -2,6 +2,7 @@ pragma experimental ABIEncoderV2;
 pragma solidity >=0.6.5 <0.7.0;
 
 import "../libraries/SafeMath.sol";
+import "../libraries/SignedSafeMath.sol";
 import "../interfaces/ICapitalHandler.sol";
 import "../interfaces/IVaultHealth.sol";
 import "../interfaces/IMarginManager.sol";
@@ -12,6 +13,7 @@ import "./MarginManagerData.sol";
 
 contract MarginManager is MarginManagerData, IMarginManager, Ownable {
 	using SafeMath for uint;
+	using SignedSafeMath for int;
 
 	address delegateAddress;
 	address delegate2Address;
@@ -28,12 +30,20 @@ contract MarginManager is MarginManagerData, IMarginManager, Ownable {
 		return _vaults[_owner].length;
 	}
 
+	function YTvaultsLength(address _owner) external view override returns(uint) {
+		return _YTvaults[_owner].length;
+	}
+
 	function allVaults(address _owner) external view override returns(Vault[] memory __vaults) {
 		__vaults = _vaults[_owner];
 	}
 
 	function liquidationsLength() external view override returns (uint) {
 		return _Liquidations.length;
+	}
+
+	function YTLiquidationsLength() external view override returns (uint) {
+		return _YTLiquidations.length;
 	}
 
 	function wrapperToUnderlyingAsset(address _wrapeprAddress) external view override returns (address) {
@@ -807,12 +817,26 @@ contract MarginManager is MarginManagerData, IMarginManager, Ownable {
 		@Description: admin may call this function to claim liquidation revenue
 
 		@address _asset: the address of the asset for which to claim revenue
-		@address _amount: the amount of revenue (in _asset) to claim
 	*/
-	function claimRevenue(address _asset, uint _amount) external override onlyOwner {
-		require(_revenue[_asset] >= _amount);
-		IERC20(_asset).transfer(msg.sender, _amount);
-		_revenue[_asset] -= _amount;
+	function claimRevenue(address _asset) external override onlyOwner {
+		uint rev = _revenue[_asset];
+		IERC20(_asset).transfer(msg.sender, rev);
+		delete _revenue[_asset];
+	}
+
+	/*
+		@Description: admin may call this function to claim YT liquidation revenue
+
+		@param address _CH: the address of the CH contract for which to claim revenue
+		@param int _bondIn: the amount of bond to send in to make the transfer position have a
+			positive minimum value at maturity
+	*/
+	function claimYTRevenue(address _CH, int _bondIn) external override onlyOwner {
+		require(_bondIn > -1);
+		YTPosition memory pos = _YTRevenue[_CH];
+		ICapitalHandler(_CH).burnZCBFrom(msg.sender, uint(_bondIn));
+		ICapitalHandler(_CH).transferPosition(msg.sender, pos.amountYield, pos.amountBond.add(_bondIn));
+		delete _YTRevenue[_CH];
 	}
 }
 

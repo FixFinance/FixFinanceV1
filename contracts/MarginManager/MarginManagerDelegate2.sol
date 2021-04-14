@@ -17,6 +17,15 @@ contract MarginManagerDelegate2 is MarginManagerData {
 	using SignedSafeMath for int;
 
 	/*
+		YTVaults must have at least MIN_YIELD_SUPPLIED yield supplied
+		This ensures that there are no problems liquidating vaults
+
+		if a user wishes to have no yield supplied to a vault said user
+		should use a normal vault and not use a YTvault
+	*/
+	uint internal constant MIN_YIELD_SUPPLIED = 1e6;
+
+	/*
 		@Description: ensure that short interst rasing by a specific amount does not push an asset over the debt ceiling
 
 		@param address _capitalHandlerAddress: address of the ZCB for which to raise short interst
@@ -184,6 +193,7 @@ contract MarginManagerDelegate2 is MarginManagerData {
 		int128 _suppliedRateChange,
 		int128 _borrowRateChange
 	) external {
+		require(_yieldSupplied >= MIN_YIELD_SUPPLIED);
 		validateYTvaultMultipliers(_priceMultiplier, _suppliedRateChange, _borrowRateChange, _bondSupplied > 0);
 		uint _unitYieldSupplied = getUnitValueYield(_CHsupplied, _yieldSupplied);
 
@@ -269,6 +279,8 @@ contract MarginManagerDelegate2 is MarginManagerData {
 		vault.yieldSupplied = vault.yieldSupplied.sub(_amountYield);
 		vault.bondSupplied = vault.bondSupplied.sub(_amountBond);
 
+		require(vault.yieldSupplied >= MIN_YIELD_SUPPLIED || (vault.yieldSupplied == 0 && vault.bondSupplied == 0));
+
 		uint unitAmountYield = getUnitValueYield(vault.CHsupplied, vault.yieldSupplied);
 
 		//ensure resultant collateral in vault has valid minimum possible value at maturity
@@ -302,8 +314,11 @@ contract MarginManagerDelegate2 is MarginManagerData {
 	function YTdeposit(address _owner, uint _index, uint _amountYield, int _amountBond) external {
 		require(_YTvaults[_owner].length > _index);
 		YTVault storage storageVault =  _YTvaults[_owner][_index];
+
 		uint resultantYield = storageVault.yieldSupplied.add(_amountYield);
+		require(resultantYield >= MIN_YIELD_SUPPLIED);
 		int resultantBond = storageVault.bondSupplied.add(_amountBond);
+
 		address _CHsupplied = storageVault.CHsupplied;
 		uint unitAmountYield = getUnitValueYield(_CHsupplied, resultantYield);
 		//ensure vault collateral has positive minimum possible value at maturity
@@ -421,7 +436,9 @@ contract MarginManagerDelegate2 is MarginManagerData {
 		//any surplus in the bid may be added as _revenue
 		if (_bidYield < maxBid){
 			int bondBid = bondRatio.mul(int(_bidYield)) / (1 ether);
-			distributeYTSurplus(_owner, vault.CHsupplied, maxBid - _bidYield, bondBid);
+			//int bondCorrespondingToMaxBid = bondRatio.mul(int(maxBid)) / (1 ether);
+			int bondCorrespondingToMaxBid = vault.bondSupplied.mul(int(_amtIn)).div(int(vault.amountBorrowed));
+			distributeYTSurplus(_owner, vault.CHsupplied, maxBid - _bidYield, bondCorrespondingToMaxBid - bondBid);
 		}
 		if (_amtIn == vault.amountBorrowed) {
 			delete _YTvaults[_owner][_index];
@@ -429,8 +446,8 @@ contract MarginManagerDelegate2 is MarginManagerData {
 		else {
 			_YTvaults[_owner][_index].amountBorrowed -= _amtIn;
 			_YTvaults[_owner][_index].yieldSupplied -= maxBid;
-			int maxBondBid = bondRatio.mul(int(maxBid)) / (1 ether);
-			_YTvaults[_owner][_index].bondSupplied -= maxBondBid;
+			int bondCorrespondingToMaxBid = bondRatio.mul(int(maxBid)) / (1 ether);
+			_YTvaults[_owner][_index].bondSupplied -= bondCorrespondingToMaxBid;
 		}
 		_YTLiquidations.push(YTLiquidation(
 			_owner,
@@ -462,8 +479,9 @@ contract MarginManagerDelegate2 is MarginManagerData {
 		refundBid(liq.bidder, liq.CHborrowed, _amtIn);
 		collectBid(msg.sender, liq.CHborrowed, _amtIn);
 
+		int bondCorrespondingToMaxBid = liq.bondRatio.mul(int(maxBid)) / (1 ether);
 		int bondBid = (liq.bondRatio.mul(int(_bidYield)) / (1 ether)) + 1;
-		distributeYTSurplus(liq.vaultOwner, liq.CHsupplied, maxBid - _bidYield, bondBid);
+		distributeYTSurplus(liq.vaultOwner, liq.CHsupplied, maxBid - _bidYield, bondCorrespondingToMaxBid - bondBid);
 
 		if (_amtIn == liq.amountBorrowed) {
 			_YTLiquidations[_index].bidAmount = _bidYield;
@@ -499,7 +517,7 @@ contract MarginManagerDelegate2 is MarginManagerData {
 		require(msg.sender == liq.bidder);
 		require(block.timestamp >= AUCTION_COOLDOWN + liq.bidTimestamp);
 		uint bidAmt = liq.bidAmount;
-		int bondBid = liq.bondRatio.mul(int(bidAmt)) / (1 ether);
+		int bondBid = (liq.bondRatio-1).mul(int(bidAmt)) / (1 ether);
 		ICapitalHandler(liq.CHsupplied).transferPosition(_to, bidAmt, bondBid);
 
 		delete _YTLiquidations[_index];
@@ -643,8 +661,9 @@ contract MarginManagerDelegate2 is MarginManagerData {
 		}
 
 		//burn borrowed ZCB
-		IERC20(_CHborrowed).transferFrom(msg.sender, address(0), amtIn);
-		IERC20(_CHsupplied).transfer(_to, _out);
+		ICapitalHandler(_CHborrowed).burnZCBFrom(_to, amtIn);
+		lowerShortInterest(_CHborrowed, amtIn);
+		ICapitalHandler(_CHsupplied).transferPosition(_to, _out, bondOut);
 
 		_YTvaults[_owner][_index].amountBorrowed -= amtIn;
 		_YTvaults[_owner][_index].yieldSupplied -= _out;

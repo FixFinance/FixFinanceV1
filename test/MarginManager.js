@@ -367,8 +367,8 @@ contract('MarginManager', async function(accounts) {
 	});
 
 	it('claim liquidation auction rewards', async () => {
-		//go 30 minuites into the future to claim liquidation
-		await helper.advanceTime(30*60 + 1);
+		//go 10 minuites into the future to claim liquidation
+		await helper.advanceTime(10*60 + 1);
 
 		let prevBalW1 = await wAsset1.balanceOf(accounts[1]);
 
@@ -410,8 +410,8 @@ contract('MarginManager', async function(accounts) {
 
 		vault = await marginManagerInstance.vaults(accounts[0], vaultIndex);
 
-		assert.equal(vault.assetBorrowed, zcbAsset0.address, "assetBorrowed is null");
-		assert.equal(vault.assetSupplied, wAsset1.address, "assetSupplied is null");
+		assert.equal(vault.assetBorrowed, zcbAsset0.address, "assetBorrowed is correct");
+		assert.equal(vault.assetSupplied, wAsset1.address, "assetSupplied is correct");
 		assert.equal(vault.amountBorrowed.toString(), (new BN(amountBorrowed)).div(new BN(2)).add(new BN(1)).toString(), "amountBorrowed is correct");
 		assert.equal(vault.amountSupplied.toString(), _10To18.div(new BN(2)).add(new BN(1)).toString(), "amountSupplied is correct");
 	});
@@ -422,8 +422,8 @@ contract('MarginManager', async function(accounts) {
 
 		vault = await marginManagerInstance.vaults(accounts[0], vaultIndex);
 
-		assert.equal(vault.assetBorrowed, zcbAsset0.address, "assetBorrowed is null");
-		assert.equal(vault.assetSupplied, wAsset1.address, "assetSupplied is null");
+		assert.equal(vault.assetBorrowed, zcbAsset0.address, "assetBorrowed is correct");
+		assert.equal(vault.assetSupplied, wAsset1.address, "assetSupplied is correct");
 		assert.equal(vault.amountBorrowed.toString(), "0", "amountBorrowed is correct");
 		assert.equal(vault.amountSupplied.toString(), "0", "amountSupplied is correct");
 	});
@@ -510,25 +510,9 @@ contract('MarginManager', async function(accounts) {
 	it('contract owner withdraws revenue', async () => {
 		let revenue = await marginManagerInstance.revenue(zcbAsset0.address);
 
-		let caught = false;
-		try {
-			await marginManagerInstance.claimRevenue(zcbAsset0.address, revenue.add(new BN("1")).toString());
-		} catch (err) {
-			caught = true;
-		}
-		if (!caught) assert.fail("more revenue was claimed than is allowed in the revenue[] mapping");
-
-		caught = false;
-		try {
-			await marginManagerInstance.claimRevenue(zcbAsset0.address, revenue.toString(), {from: accounts[1]});
-		} catch (err) {
-			caught = true;
-		}
-		if (!caught) assert.fail("only contract owner should be able to claim revenue");
-
 		let prevBalance = await zcbAsset0.balanceOf(accounts[0]);
 
-		await marginManagerInstance.claimRevenue(zcbAsset0.address, revenue.toString());
+		await marginManagerInstance.claimRevenue(zcbAsset0.address);
 
 		let newRevenue = await marginManagerInstance.revenue(zcbAsset0.address);
 
@@ -538,9 +522,46 @@ contract('MarginManager', async function(accounts) {
 		assert.equal(newBalance.sub(prevBalance).toString(), revenue.toString(), "correct amount paid to contract owner");
 	});
 
+
+
 	/*
 		-------------------------------------------------Y-T---V-a-u-l-t-s-----------------------------------------------------
 	*/
+
+
+	it('before YT testing', async () => {
+		maturity = ((await web3.eth.getBlock('latest')).timestamp + _8days).toString();
+
+		let rec0 = await organizerInstance.deployCapitalHandlerInstance(wAsset0.address, maturity);
+		let rec1 = await organizerInstance.deployCapitalHandlerInstance(wAsset1.address, maturity);
+
+		//reset zcbAssets with new assets that are yet to reach maturity
+		zcbAsset0 = await capitalHandler.at(rec0.receipt.logs[0].args.addr);
+		zcbAsset1 = await capitalHandler.at(rec1.receipt.logs[0].args.addr);
+
+		ytAsset0 = await IYieldToken.at(await zcbAsset0.yieldTokenAddress());
+		ytAsset1 = await IYieldToken.at(await zcbAsset1.yieldTokenAddress());
+
+		await zcbAsset0.setMarginManagerAddress(marginManagerInstance.address);
+		await zcbAsset1.setMarginManagerAddress(marginManagerInstance.address);
+
+		//mint assets to account 0
+		await asset1.mintTo(accounts[0], _10To18.mul(new BN("10")).toString());
+		await asset1.approve(wAsset1.address, _10To18.mul(new BN("10")).toString());
+		await wAsset1.depositUnitAmount(accounts[0], _10To18.mul(new BN("10")).toString());
+		await wAsset1.approve(marginManagerInstance.address, _10To18.mul(new BN("10")).toString());
+		await wAsset1.approve(zcbAsset1.address, _10To18.mul(new BN("10")).toString());
+		await zcbAsset1.depositWrappedToken(accounts[0], _10To18.mul(new BN("10")).toString());
+		await zcbAsset1.approve(marginManagerInstance.address, _10To18.mul(new BN("10")).toString());
+
+		//mint assets to account 1
+		await asset0.mintTo(accounts[1], _10To18.mul(new BN("10")).toString());
+		await asset0.approve(wAsset0.address, _10To18.mul(new BN("10")).toString(), {from: accounts[1]});
+		await wAsset0.depositUnitAmount(accounts[1], _10To18.mul(new BN("10")).toString(), {from: accounts[1]});
+		await wAsset0.approve(zcbAsset0.address, _10To18.mul(new BN("10")).toString(), {from: accounts[1]});
+		await zcbAsset0.depositWrappedToken(accounts[1], _10To18.mul(new BN("10")).toString(), {from: accounts[1]});
+		await zcbAsset0.approve(marginManagerInstance.address, _10To18.mul(new BN("10")).toString(), {from: accounts[1]});
+	});
 
 
 
@@ -715,6 +736,308 @@ contract('MarginManager', async function(accounts) {
 
 		assert.equal(currentBalanceZCB0.sub(prevBalanceZCB0).toString(), toBorrow.toString(), "correct amount of borrowed asset transfered to _to");
 		assert.equal(vault.amountBorrowed.sub(prevVaultState.amountBorrowed).toString(), toBorrow.toString(), "correct amount borrowed");
+	});
+
+	it('send undercollateralised YT vaults to liquidation', async () => {
+		//tx should revert when vault satisfies limit
+		await vaultHealthInstance.setToReturn(true);
+		let surplusYield = new BN("10000");
+		let amtIn = vault.amountBorrowed;
+		bid = vault.yieldSupplied.sub(surplusYield);
+		bondCorrespondingToBid = vault.bondSupplied.mul(amtIn).mul(bid).div(vault.amountBorrowed).div(vault.yieldSupplied);
+		let minBondRatio = _10To18.mul(vault.bondSupplied).div(vault.yieldSupplied).sub(new BN(10));
+		actualBondRatio = _10To18.mul(vault.bondSupplied).div(vault.yieldSupplied).add(new BN(1));
+		let surplusBond = vault.bondSupplied.sub(bondCorrespondingToBid);
+
+		caught = false;
+		try {
+			await marginManagerInstance.auctionYTLiquidation(accounts[0], 0, zcbAsset0.address, zcbAsset1.address, bid, minBondRatio, vault.amountBorrowed, {from: accounts[1]});
+		} catch (err) {
+			caught = true;
+		}
+		if (!caught) assert.fail("liquidation was triggered despite vault health being above upper limit");
+
+		await vaultHealthInstance.setToReturn(false);
+
+		let prevRevenue = await marginManagerInstance.YTrevenue(zcbAsset1.address);
+
+		let rec = await marginManagerInstance.auctionYTLiquidation(accounts[0], 0, zcbAsset0.address, zcbAsset1.address, bid, minBondRatio, vault.amountBorrowed, {from: accounts[1]});
+
+		let timestamp = (await web3.eth.getBlock(rec.receipt.blockNumber)).timestamp;
+
+		let currentRevenue = await marginManagerInstance.YTrevenue(zcbAsset1.address);
+
+		let rebateYield = surplusYield.mul(new BN(rebate_bips)).div(new BN(TOTAL_BASIS_POINTS));
+		let toTreasuryYield = surplusYield.sub(rebateYield);
+
+		let rebateBond = surplusBond.mul(new BN(rebate_bips)).div(new BN(TOTAL_BASIS_POINTS));
+		let toTreasuryBond = surplusBond.sub(rebateBond).sub(new BN(1));
+
+		assert.equal(currentRevenue.yield.sub(prevRevenue.yield).toString(), toTreasuryYield.toString(), "correct amount of yield revenue");
+		assert.equal(currentRevenue.bond.sub(prevRevenue.bond).toString(), toTreasuryBond.toString(), "correct amount of bond revenue");
+
+		assert.equal((await marginManagerInstance.YTLiquidationsLength()).toString(), "1", "correct length of liquidations array");
+
+		liquidation = await marginManagerInstance.YTLiquidations(0);
+
+		assert.equal(liquidation.vaultOwner, accounts[0], "correct value of liquidation.vaultOwner");
+		assert.equal(liquidation.CHborrowed, zcbAsset0.address, "correct value of liquidation.CHborrowed");
+		assert.equal(liquidation.CHsupplied, zcbAsset1.address, "correct value of liquidation.CHsupplied");
+		assert.equal(liquidation.amountBorrowed.toString(), vault.amountBorrowed.toString(), "correct value of liquidation.amountBorrowed");
+		assert.equal(liquidation.bidder, accounts[1], "correct value of liqudiation.bidder");
+		assert.equal(liquidation.bondRatio.toString(), actualBondRatio.toString(), "correct value of liquidation.bondRatio");
+		assert.equal(liquidation.bidAmount.toString(), bid.toString(), "correct value of liquidation.bidAmount");
+		assert.equal(liquidation.bidTimestamp.toNumber(), timestamp, "correct value of liqudiation.bidTimestamp");
+
+		vault = await marginManagerInstance.YTvaults(accounts[0], 0);
+
+		assert.equal(vault.CHborrowed, nullAddress, "CHborrowed is null");
+		assert.equal(vault.CHsupplied, nullAddress, "CHsupplied is null");
+		assert.equal(vault.yieldSupplied.toString(), "0", "yieldSupplied is null");
+		assert.equal(vault.bondSupplied.toString(), "0", "bondSupplied is null");
+		assert.equal(vault.amountBorrowed.toString(), "0", "amountBorrowed is null");
+	});
+
+
+	it('bid on YT liquidation auctions', async () => {
+		/*
+			bid with account 1
+		*/
+		let surplusYield = new BN("10");
+		bid = bid.sub(surplusYield);
+		bondCorrespondingToPrevBid = liquidation.bondRatio.mul(liquidation.bidAmount).div(_10To18);
+		bondCorrespondingToBid = liquidation.bondRatio.mul(bid).div(_10To18).add(new BN(1));
+		let surplusBond = bondCorrespondingToPrevBid.sub(bondCorrespondingToBid);
+
+		let prevRevenue = await marginManagerInstance.YTrevenue(zcbAsset1.address);
+
+		let rec = await marginManagerInstance.bidOnYTLiquidation(0, bid.toString(), liquidation.amountBorrowed, {from: accounts[1]});
+
+		let timestamp = (await web3.eth.getBlock(rec.receipt.blockNumber)).timestamp;
+
+		let currentRevenue = await marginManagerInstance.YTrevenue(zcbAsset1.address);
+
+		let rebateYield = surplusYield.mul(new BN(rebate_bips)).div(new BN(TOTAL_BASIS_POINTS));
+		let toTreasuryYield = surplusYield.sub(rebateYield);
+
+		let rebateBond = surplusBond.mul(new BN(rebate_bips)).div(new BN(TOTAL_BASIS_POINTS));
+		let toTreasuryBond = surplusBond.sub(rebateBond);
+
+		assert.equal(currentRevenue.yield.sub(prevRevenue.yield).toString(), toTreasuryYield.toString(), "correct amount of yield revenue");
+		assert.equal(currentRevenue.bond.sub(prevRevenue.bond).toString(), toTreasuryBond.toString(), "correct amount of bond revenue");
+
+		let prevBorrowed = liquidation.amountBorrowed;
+
+		liquidation = await marginManagerInstance.YTLiquidations(0);
+
+		assert.equal(liquidation.vaultOwner, accounts[0], "correct value of liquidation.vaultOwner");
+		assert.equal(liquidation.CHborrowed, zcbAsset0.address, "correct value of liquidation.CHborrowed");
+		assert.equal(liquidation.CHsupplied, zcbAsset1.address, "correct value of liquidation.CHsupplied");
+		assert.equal(liquidation.amountBorrowed.toString(), prevBorrowed.toString(), "correct value of liquidation.amountBorrowed");
+		assert.equal(liquidation.bidder, accounts[1], "correct value of liqudiation.bidder");
+		assert.equal(liquidation.bondRatio.toString(), actualBondRatio.toString(), "correct value of liquidation.bondRatio");
+		assert.equal(liquidation.bidAmount.toString(), bid.toString(), "correct value of liquidation.bidAmount");
+		assert.equal(liquidation.bidTimestamp.toNumber(), timestamp, "correct value of liqudiation.bidTimestamp");
+	});
+
+
+	it('claim YT liquidation auction rewards', async () => {
+		//go 10 minuites into the future to claim liquidation
+		await helper.advanceTime(10*60 + 1);
+
+		let prevBalYield = await zcbAsset1.balanceYield(accounts[1]);
+		let prevBalBonds = await zcbAsset1.balanceBonds(accounts[1]);
+
+		await marginManagerInstance.claimYTLiquidation(0, accounts[1], {from: accounts[1]});
+
+		let newBalYield = await zcbAsset1.balanceYield(accounts[1]);
+		let newBalBonds = await zcbAsset1.balanceBonds(accounts[1]);
+
+		let expectedBondChange = liquidation.bondRatio.sub(new BN(1)).mul(liquidation.bidAmount).div(_10To18);
+		assert.equal(newBalYield.sub(prevBalYield).toString(), liquidation.bidAmount.toString(), "correct payout yield after winning YTLiquidation auction");
+		assert.equal(newBalBonds.sub(prevBalBonds).toString(), expectedBondChange.toString(), "correct payout bond after winning YTLiquidation auction");
+	});
+
+	it('instant YT liquidations upon dropping below lowerCollateralLimit', async () => {
+		/*
+			first open vaults
+		*/
+		await vaultHealthInstance.setToReturn(true);
+		yieldSupplied = _10To18;
+		bondSupplied = _10To18.neg();
+		amountBorrowed = _10To18;
+		await marginManagerInstance.openYTVault(zcbAsset1.address, zcbAsset0.address, yieldSupplied, bondSupplied, amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
+		await marginManagerInstance.openYTVault(zcbAsset1.address, zcbAsset0.address, yieldSupplied, bondSupplied, amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
+
+		minBondRatio = bondSupplied.mul(_10To18).div(yieldSupplied).sub(new BN(10));
+		vaultIndex = (await marginManagerInstance.YTvaultsLength(accounts[0])).toNumber() - 2;
+		let caught = false;
+		try {
+			await marginManagerInstance.instantYTLiquidation(accounts[0], vaultIndex, zcbAsset0.address, zcbAsset1.address, amountBorrowed, yieldSupplied, minBondRatio, accounts[1], {from: accounts[1]});
+		}
+		catch (err) {
+			caught = true;
+		}
+		if (!caught) assert.fail("liquidation tx should revert if vault is in good health");
+
+		await vaultHealthInstance.setToReturn(false);
+		await marginManagerInstance.instantYTLiquidation(accounts[0], vaultIndex, zcbAsset0.address, zcbAsset1.address, amountBorrowed, yieldSupplied, minBondRatio, accounts[1], {from: accounts[1]});
+
+		vault = await marginManagerInstance.YTvaults(accounts[0], vaultIndex);
+
+		assert.equal(vault.CHborrowed, nullAddress, "CHborrowed is null");
+		assert.equal(vault.CHsupplied, nullAddress, "CHsupplied is null");
+		assert.equal(vault.yieldSupplied.toString(), "0", "yieldSupplied is null");
+		assert.equal(vault.bondSupplied.toString(), "0", "bondSupplied is null");
+		assert.equal(vault.amountBorrowed.toString(), "0", "amountBorrowed is null");
+	});
+
+
+	it('partial vault YT liquidations Specific In', async () => {
+		vaultIndex++;
+		vault = await marginManagerInstance.YTvaults(accounts[0], vaultIndex);
+
+		let amtIn = vault.amountBorrowed.div(new BN(2));
+		let expectedYieldOut = vault.yieldSupplied.mul(amtIn).div(vault.amountBorrowed);
+		let expectedBondOut = vault.bondSupplied.mul(amtIn).div(vault.amountBorrowed);
+		let minYieldOut = expectedYieldOut.sub(new BN(1));
+		await marginManagerInstance.partialYTLiquidationSpecificIn(accounts[0], vaultIndex, zcbAsset0.address, zcbAsset1.address,
+			amtIn, minYieldOut, minBondRatio, accounts[1], {from: accounts[1]});
+
+		prevVaultState = vault;
+		vault = await marginManagerInstance.YTvaults(accounts[0], vaultIndex);
+
+		assert.equal(vault.CHborrowed, zcbAsset0.address, "CHborrowed is correct");
+		assert.equal(vault.CHsupplied, zcbAsset1.address, "CHsupplied is correct");
+		assert.equal(vault.amountBorrowed.toString(), prevVaultState.amountBorrowed.sub(amtIn).toString(), "amountBorrowed is correct");
+		assert.equal(vault.yieldSupplied.toString(), prevVaultState.yieldSupplied.sub(expectedYieldOut).toString(), "yieldSupplied is correct");
+		assert.equal(vault.bondSupplied.toString(), prevVaultState.bondSupplied.sub(expectedBondOut).toString(), "bondSupplied is correct");
+	});
+
+	it('partial vault YT liquidation Specific Out', async () => {
+		await marginManagerInstance.partialYTLiquidationSpecificOut(accounts[0], vaultIndex, zcbAsset0.address, zcbAsset1.address,
+			vault.yieldSupplied, minBondRatio, vault.amountBorrowed, accounts[1], {from: accounts[1]});
+
+		vault = await marginManagerInstance.YTvaults(accounts[0], vaultIndex);
+
+		assert.equal(vault.CHborrowed, zcbAsset0.address, "CHborrowed is correct");
+		assert.equal(vault.CHsupplied, zcbAsset1.address, "CHsupplied is correct");
+		assert.equal(vault.amountBorrowed.toString(), "0", "amountBorrowed is correct");
+		assert.equal(vault.yieldSupplied.toString(), "0", "yieldSupplied is correct");
+		assert.equal(vault.bondSupplied.toString(), "0", "bondSupplied is correct");
+	});
+
+	it('liquidates vaults due to time', async () => {
+		//process.exit();
+		let amountSupplied = _10To18;
+
+		await vaultHealthInstance.setToReturn(true);
+		await marginManagerInstance.openYTVault(zcbAsset1.address, zcbAsset0.address, yieldSupplied, bondSupplied, amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
+		await marginManagerInstance.openYTVault(zcbAsset1.address, zcbAsset0.address, yieldSupplied, bondSupplied, amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
+
+		vaultIndex = (await marginManagerInstance.YTvaultsLength(accounts[0])).toNumber() - 2;
+
+		bid = amountSupplied;
+
+		let caught = false;
+		//test for when vaults are in good health
+		await vaultHealthInstance.setToReturn(true);
+		try {
+			await marginManagerInstance.auctionYTLiquidation(accounts[0], vaultIndex, zcbAsset0.address, zcbAsset1.address, bid, minBondRatio, amountBorrowed, {from: accounts[1]});
+		} catch (err) {
+			caught = true;
+		}
+		if (!caught) assert.fail("vault was liquidated while above upper health limit before time liquidation period");
+
+
+		/*
+			advance 1 day to move into 7 day from maturity window
+			this allows us to liquidate vaults on the premise of low time to maturity
+		*/
+		await helper.advanceTime(86401)
+
+		let rec = await marginManagerInstance.auctionYTLiquidation(accounts[0], vaultIndex, zcbAsset0.address, zcbAsset1.address, bid, minBondRatio, amountBorrowed, {from: accounts[1]});
+		let timestamp = (await web3.eth.getBlock(rec.receipt.blockNumber)).timestamp;
+
+		assert.equal((await marginManagerInstance.YTLiquidationsLength()).toString(), "2", "correct length of liquidations array");
+
+		let expectedBondRatio = bondSupplied.mul(_10To18).div(yieldSupplied).add(new BN(1));
+
+		liquidation = await marginManagerInstance.YTLiquidations(1);
+
+		assert.equal(liquidation.vaultOwner, accounts[0], "correct value of liquidation.vaultOwner");
+		assert.equal(liquidation.CHborrowed, zcbAsset0.address, "correct value of liquidation.CHborrowed");
+		assert.equal(liquidation.CHsupplied, zcbAsset1.address, "correct value of liquidation.CHsupplied");
+		assert.equal(liquidation.amountBorrowed.toString(), amountBorrowed.toString(), "correct value of liquidation.amountBorrowed");
+		assert.equal(liquidation.bondRatio.toString(), expectedBondRatio.toString(), "correct value of liquidation.bondRatio")
+		assert.equal(liquidation.bidder, accounts[1], "correct value of liqudiation.bidder");
+		assert.equal(liquidation.bidAmount.toString(), bid.toString(), "correct value of liquidation.bidAmount");
+		assert.equal(liquidation.bidTimestamp.toString(), timestamp, "correct value of liqudiation.bidTimestamp");
+
+		vault = await marginManagerInstance.YTvaults(accounts[0], 1);
+
+		assert.equal(vault.CHborrowed, nullAddress, "CHborrowed is null");
+		assert.equal(vault.CHsupplied, nullAddress, "CHsupplied is null");
+		assert.equal(vault.amountBorrowed.toString(), "0", "amountBorrowed is correct");
+		assert.equal(vault.yieldSupplied.toString(), "0", "yieldSupplied is correct");
+		assert.equal(vault.bondSupplied.toString(), "0", "bondSupplied is correct");
+	});
+
+	it('instant vault YT liquidations due to time to maturity', async () => {
+		vaultIndex++;
+		let caught = false;
+
+		try {
+			await marginManagerInstance.instantYTLiquidation(accounts[0], vaultIndex, zcbAsset0.address, zcbAsset1.address, amountBorrowed, yieldSupplied, minBondRatio, accounts[1], {from: accounts[1]});
+		} catch (err) {
+			caught = true;
+		}
+		if (!caught) assert.fail("vault was subject to instant liquidation with more than 1 day to maturity");
+
+		/*
+			first advance 6 days into future so that instant liquidations are allowed because of 1 day to maturity rule
+		*/
+		let _6days = _8days*3/4;
+		await helper.advanceTime(_6days);
+
+		await marginManagerInstance.instantYTLiquidation(accounts[0], vaultIndex, zcbAsset0.address, zcbAsset1.address, amountBorrowed, yieldSupplied, minBondRatio, accounts[1], {from: accounts[1]});
+
+		vault = await marginManagerInstance.YTvaults(accounts[0], vaultIndex);
+
+		assert.equal(vault.CHborrowed, nullAddress, "CHborrowed is correct");
+		assert.equal(vault.CHsupplied, nullAddress, "CHsupplied is correct");
+		assert.equal(vault.amountBorrowed.toString(), "0", "amountBorrowed is correct");
+		assert.equal(vault.yieldSupplied.toString(), "0", "yieldSupplied is correct");
+		assert.equal(vault.bondSupplied.toString(), "0", "bondSupplied is correct");
+	});
+
+
+	it('contract owner withdraws YT revenue', async () => {
+		let revenue = await marginManagerInstance.YTrevenue(zcbAsset1.address);
+
+		let caught = false;
+		let bondIn = "2";
+		try {
+			await marginManagerInstance.claimYTRevenue(zcbAsset1.address, bondIn, {from: accounts[1]});
+		} catch (err) {
+			caught = true;
+		}
+		if (!caught) assert.fail("only contract owner should be able to claim revenue");
+
+		let prevBalanceYield = await zcbAsset1.balanceYield(accounts[0]);
+		let prevBalanceBond = await zcbAsset1.balanceBonds(accounts[0]);
+
+		await marginManagerInstance.claimYTRevenue(zcbAsset1.address, bondIn);
+
+		let newRevenue = await marginManagerInstance.YTrevenue(zcbAsset1.address);
+
+		let newBalanceYield = await zcbAsset1.balanceYield(accounts[0]);
+		let newBalanceBond = await zcbAsset1.balanceBonds(accounts[0]);
+
+		assert.equal(newRevenue.yield.toString(), "0", "revenue yield value reduced to 0 after all is withdrawn");
+		assert.equal(newRevenue.bond.toString(), "0", "revenue bond value reduced to 0 after all is withdrawn");
+		assert.equal(newBalanceYield.sub(prevBalanceYield).toString(), revenue.yield.toString(), "correct amount yield paid to contract owner");
+		assert.equal(newBalanceBond.sub(prevBalanceBond).toString(), revenue.bond.toString(), "correct amount bond paid to contract owner");
 	});
 
 });

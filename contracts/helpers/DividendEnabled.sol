@@ -74,6 +74,36 @@ abstract contract DividendEnabled is IERC20, IDividend, DividendEnabledData {
 	//10 ** decimals == the amount of sub units in a whole coin
 	uint8 public constant override decimals = 18;
 
+	//-----------------i-n-e-l-i-g-i-b-l-e---L-P---t-o-k-e-n-s---a-r-e---t-r-a-n-s-f-e-r-r-a-b-l-e-------------
+
+    function transferIneligible(address _to, uint256 _value) external returns (bool success) {
+        claimDividendInternal(msg.sender, msg.sender);
+        claimDividendInternal(_to, _to);
+
+        ineligibleBalanceOf[msg.sender] = ineligibleBalanceOf[msg.sender].sub(_value);
+        ineligibleBalanceOf[_to] = ineligibleBalanceOf[_to].add(_value);
+
+        emit Transfer(msg.sender, _to, _value);
+
+        return true;
+    }
+
+    function transferIneligibleFrom(address _from, address _to, uint256 _value) external returns (bool success) {
+        require(_value <= internalAllowance[_from][msg.sender]);
+
+        claimDividendInternal(_from, _from);
+        claimDividendInternal(_to, _to);
+
+        ineligibleBalanceOf[_from] = ineligibleBalanceOf[_from].sub(_value);
+        ineligibleBalanceOf[_to] = ineligibleBalanceOf[_to].add(_value);
+
+        internalAllowance[_from][msg.sender] -= _value;
+
+        emit Transfer(_from, _to, _value);
+
+        return true;
+    }
+
     //-----------------i-m-p-l-e-m-e-n-t-s---y-i-e-l-d----------------
 
 	/*

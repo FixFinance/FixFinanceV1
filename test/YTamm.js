@@ -164,7 +164,10 @@ contract('YTamm', async function(accounts){
 	it('First Liquidity Token Mint', async () => {
 		toMint = balance.div((new BN("100")));
 		await amm1.firstMint(toMint);
-		assert.equal((await amm1.balanceOf(accounts[0])).toString(), toMint.toString(), "correct balance of YTamm liquidity tokens");
+		let ineligibleLPBal = await amm1.ineligibleBalanceOf(accounts[0]);
+		let lpBal = await amm1.balanceOf(accounts[0]);
+		assert.equal(ineligibleLPBal.toString(), "0", "correct ineligible balance of YTamm liquidity tokens");
+		assert.equal(lpBal.toString(), toMint.toString(), "correct balance of YTamm liquidity tokens");
 		expectedZCBbalance = balance.sub(toMint).toString();
 		expectedYTbalance = balance.sub(toMint.mul(YTtoLmultiplierBN_p1).div(_10To18BN)).toString();
 		assert.equal((await capitalHandlerInstance.balanceOf(accounts[0])).toString(), expectedZCBbalance, "correct balance ZCB");
@@ -176,7 +179,7 @@ contract('YTamm', async function(accounts){
 		assert.equal(YTreserves, toMint.mul(YTtoLmultiplierBN).div(_10To18BN).toString(), "correct value of Ureserves");
 		totalSupply = await amm1.totalSupply();
 		activeTotalSupply = await amm1.activeTotalSupply();
-		assert.equal(totalSupply.toString(), toMint.toString(), "correct balance of YTamm liquidity tokens");
+		assert.equal(totalSupply.toString(), toMint.toString(), "correct total supply YTamm liquidity tokens");
 		assert.equal(activeTotalSupply.toString(), totalSupply.toString(), "active total supply is correct on first mint");
 	});
 
@@ -189,7 +192,8 @@ contract('YTamm', async function(accounts){
 
 		expectedZCBbalance = (new BN(expectedZCBbalance)).sub(expectedUin).toString();
 		expectedYTbalance = (new BN(expectedYTbalance)).sub(expectedUin).sub(expectedYTin).toString();
-		assert.equal((await amm1.balanceOf(accounts[0])).toString(), toMint.mul(new BN(2)).toString(), "correct balance of YTamm liquidity tokens");
+		assert.equal((await amm1.ineligibleBalanceOf(accounts[0])).toString(), toMint.toString(), "correct ineligible balance of YTamm liquidity tokens");
+		assert.equal((await amm1.balanceOf(accounts[0])).toString(), toMint.toString(), "correct balance of YTamm liquidity tokens");
 		assert.equal((await capitalHandlerInstance.balanceOf(accounts[0])).toString(), expectedZCBbalance, "correct balance ZCB");
 		assert.equal((await yieldTokenInstance.balanceOf_2(accounts[0], false)).toString(), expectedYTbalance, "correct balance YT");
 		let expectedUreserves = (new BN(Ureserves)).add(expectedUin).toString();
@@ -213,10 +217,12 @@ contract('YTamm', async function(accounts){
 		expectedZCBbalance = (new BN(expectedZCBbalance)).add(expectedUout).toString();
 		expectedYTbalance = (new BN(expectedYTbalance)).add(expectedUout).add(expectedYTout).toString();
 
-		amm1balance = await amm1.balanceOf(accounts[0]);
+		let amm1balance = await amm1.balanceOf(accounts[0]);
+		let amm1IneligibleBalance = await amm1.ineligibleBalanceOf(accounts[0]);
 		ZCBbalance = await capitalHandlerInstance.balanceOf(accounts[0]);
 		YTbalance = await yieldTokenInstance.balanceOf_2(accounts[0], false);
 		assert.equal(amm1balance.toString(), toMint, "correct balance of YTamm liquidity tokens");
+		assert.equal(amm1IneligibleBalance.toString(), "0", "correct ineligible balance of YTamm liquidity tokens");
 		assert.equal(ZCBbalance.toString(), expectedZCBbalance, "correct balance ZCB");
 		assert.equal(YTbalance.toString(), expectedYTbalance, "correct balance YT");
 

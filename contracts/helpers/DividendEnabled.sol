@@ -24,14 +24,11 @@ abstract contract DividendEnabled is IERC20, IDividend, DividendEnabledData {
 	);
 
     function transfer(address _to, uint256 _value) public override returns (bool success) {
-        require(_value <= internalBalanceOf[msg.sender]);
-        require(lastClaim[msg.sender] <= contractZCBDividend.length-1);
+        claimDividendInternal(msg.sender, msg.sender);
+        claimDividendInternal(_to, _to);
 
-        claimDividendInternal(msg.sender, msg.sender, false);
-        claimDividendInternal(_to, _to, false);
-
-        internalBalanceOf[msg.sender] -= _value;
-        internalBalanceOf[_to] += _value;
+        internalBalanceOf[msg.sender] = internalBalanceOf[msg.sender].sub(_value);
+        internalBalanceOf[_to] = internalBalanceOf[_to].add(_value);
 
         emit Transfer(msg.sender, _to, _value);
 
@@ -48,14 +45,12 @@ abstract contract DividendEnabled is IERC20, IDividend, DividendEnabledData {
 
     function transferFrom(address _from, address _to, uint256 _value) public override returns (bool success) {
         require(_value <= internalAllowance[_from][msg.sender]);
-    	require(_value <= internalBalanceOf[_from]);
-        require(lastClaim[_from] <= contractZCBDividend.length-1);
 
-        claimDividendInternal(_from, _from, false);
-        claimDividendInternal(_to, _to, false);
+        claimDividendInternal(_from, _from);
+        claimDividendInternal(_to, _to);
 
-    	internalBalanceOf[_from] -= _value;
-    	internalBalanceOf[_to] += _value;
+        internalBalanceOf[_from] = internalBalanceOf[_from].sub(_value);
+        internalBalanceOf[_to] = internalBalanceOf[_to].add(_value);
 
         internalAllowance[_from][msg.sender] -= _value;
 
@@ -85,7 +80,7 @@ abstract contract DividendEnabled is IERC20, IDividend, DividendEnabledData {
 		@Description: allows token holders to claim their portion of the cashflow
 	*/
 	function claimDividend(address _to) external override {
-		claimDividendInternal(msg.sender, _to, false);
+		claimDividendInternal(msg.sender, _to);
 	}
 
 	/*
@@ -107,24 +102,36 @@ abstract contract DividendEnabled is IERC20, IDividend, DividendEnabledData {
 		@param bool _postpone: if true _from will not be elidgeble for yield generated in the current round
 			otherwise user will still be able to claim yield generated in the current round
 	*/
-	function claimDividendInternal(address _from, address _to, bool _postpone) internal {
+	function claimDividendInternal(address _from, address _to) internal {
 		uint mostRecent = lastClaim[_from];
 		uint lastIndex = contractZCBDividend.length - 1;	//gas savings
 		if (mostRecent >= lastIndex) return;
 		uint _balanceOf = internalBalanceOf[_from];	//gas savings
-		lastClaim[_from] = lastIndex + (_postpone ? 1 : 0);
+		lastClaim[_from] = lastIndex;
 		if (_balanceOf == 0) return;
 
 		uint ZCBtoSend;
 		uint YTtoSend;
+		uint lastYieldDividend = contractYieldDividend[lastIndex];
+		int lastZCBDividend = contractZCBDividend[lastIndex];
 		{
-			uint BalanceYieldChange = contractYieldDividend[lastIndex] - contractYieldDividend[mostRecent];
-			int BalanceZCBChange = contractZCBDividend[lastIndex] - contractZCBDividend[mostRecent];
-			uint nonBalanceNormalYT = wrapper.WrappedAmtToUnitAmt_RoundDown(BalanceYieldChange);
-			//YTtoSend = wrapper.WrappedAmtToUnitAmt_RoundDown(BalanceYieldChange);
-			ZCBtoSend = uint(int(nonBalanceNormalYT) + BalanceZCBChange).mul(_balanceOf).div(1 ether);
-			YTtoSend = nonBalanceNormalYT.mul(_balanceOf).div(1 ether);
-
+			uint BalanceYieldChange = lastYieldDividend - contractYieldDividend[mostRecent];
+			int BalanceZCBChange = lastZCBDividend - contractZCBDividend[mostRecent];
+			uint unitAmountYield = wrapper.WrappedAmtToUnitAmt_RoundDown(BalanceYieldChange);
+			ZCBtoSend = uint(int(unitAmountYield) + BalanceZCBChange).mul(_balanceOf).div(1 ether);
+			YTtoSend = unitAmountYield.mul(_balanceOf).div(1 ether);
+		}
+		uint ineligibleBal = ineligibleBalanceOf[_from];
+		if (ineligibleBal != 0) {
+			if (mostRecent+1 < lastIndex) {
+				uint BalanceYieldChange = lastYieldDividend - contractYieldDividend[mostRecent+1];
+				int BalanceZCBChange = lastZCBDividend - contractZCBDividend[mostRecent+1];
+				uint unitAmountYield = wrapper.WrappedAmtToUnitAmt_RoundDown(BalanceYieldChange);
+				ZCBtoSend += uint(int(unitAmountYield) + BalanceZCBChange).mul(_balanceOf).div(1 ether);
+				YTtoSend += unitAmountYield.mul(_balanceOf).div(1 ether);
+			}
+			internalBalanceOf[_from] += ineligibleBal;
+			ineligibleBalanceOf[_from] = 0;
 		}
 
 		IERC20(ZCBaddress).transfer(_to, ZCBtoSend);

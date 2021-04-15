@@ -14,8 +14,9 @@ contract DividendEnabledData {
 	uint public lastWithdraw;
 	//total amount of smallest denomination units of coin in this smart contract
 	uint internal internalTotalSupply;
-	//each user's balance of coins
 	mapping(address => uint) internal internalBalanceOf;
+	//LP shares that are not elidgeble to earn dividends
+	mapping(address => uint) public ineligibleBalanceOf;
 	//the amount of funds each address has allowed other addresses to spend on the first address's behalf
 	//holderOfFunds => spender => amountOfFundsAllowed
 	mapping(address => mapping(address => uint)) internal internalAllowance;

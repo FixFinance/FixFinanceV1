@@ -52,13 +52,29 @@ contract YTamm is IYTamm {
 
 	/*
 		@Description: mint LP tokens
+			minted LP tokens are eligible to start earning interest immediately
+
+		@param address _to: address that shall receive LP tokens
+		@param uint _amount: amount of LP tokens to be minted
+	*/
+	function _firstMint(address _to, uint _amount) internal {
+		internalBalanceOf[_to] += _amount;
+		activeTotalSupply += _amount;
+		internalTotalSupply += _amount;
+
+		emit Mint(_to, _amount);
+	}
+
+	/*
+		@Description: mint LP tokens
+			minted tokens are not eligible to earn interest until next dividend collection
 
 		@param address _to: address that shall receive LP tokens
 		@param uint _amount: amount of LP tokens to be minted
 	*/
 	function _mint(address _to, uint _amount) internal {
-        claimDividendInternal(_to, _to, true);
-		internalBalanceOf[_to] += _amount;
+        claimDividendInternal(_to, _to);
+		ineligibleBalanceOf[_to] += _amount;
 		internalTotalSupply += _amount;
 
 		emit Mint(_to, _amount);
@@ -66,15 +82,30 @@ contract YTamm is IYTamm {
 
 	/*
 		@Description: burn LP tokens
+			first burn ineligible LP tokens that are not earning interest
+			next burn LP tokens that are earning interest
 
 		@param address _from: address that is burning LP tokenns
 		@param uint _amount: amount of LP tokens to burn
 	*/
 	function _burn(address _from, uint _amount) internal {
-		require(internalBalanceOf[_from] >= _amount);
+        claimDividendInternal(_from, _from);
+		uint _balance = internalBalanceOf[_from];
+		uint _ineligibleBalance = ineligibleBalanceOf[_from];
+		uint combinedBal = _balance + _ineligibleBalance;
+		require(combinedBal >= _amount);
 		uint _lastClaim = lastClaim[_from];
-        claimDividendInternal(_from, _from, true);
-		internalBalanceOf[_from] -= _amount;
+		if (_ineligibleBalance < _amount) {
+			uint decreaseInterestEarningBalance = _amount - _ineligibleBalance;
+			if (_ineligibleBalance != 0) {
+				ineligibleBalanceOf[_from] = 0;
+			}
+			internalBalanceOf[_from] -= decreaseInterestEarningBalance;
+			activeTotalSupply -= decreaseInterestEarningBalance;
+		}
+		else {
+			ineligibleBalanceOf[_from] -= _amount;
+		}
 		internalTotalSupply -= _amount;
 
 		//if _from is earning yield on LP funds then decrement from activeTotalSupply
@@ -234,7 +265,7 @@ contract YTamm is IYTamm {
 		getYT(address(this), _Uin + YTin);
 		getZCB(address(this), _Uin);
 
-		_mint(msg.sender, _Uin);
+		_firstMint(msg.sender, _Uin);
 		//first mint is a special case where funds are elidgeble for earning interest immediately
 		activeTotalSupply = _Uin;
 

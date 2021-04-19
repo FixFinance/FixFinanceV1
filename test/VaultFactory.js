@@ -5,9 +5,9 @@ const capitalHandler = artifacts.require('CapitalHandler');
 const IYieldToken = artifacts.require("IYieldToken");
 const yieldTokenDeployer = artifacts.require('YieldTokenDeployer');
 const organizer = artifacts.require('organizer');
-const MarginManagerDelegate = artifacts.require("MarginManagerDelegate");
-const MarginManagerDelegate2 = artifacts.require("MarginManagerDelegate2");
-const MarginManager = artifacts.require('MarginManager');
+const VaultFactoryDelegate = artifacts.require("VaultFactoryDelegate");
+const VaultFactoryDelegate2 = artifacts.require("VaultFactoryDelegate2");
+const VaultFactory = artifacts.require('VaultFactory');
 const IERC20 = artifacts.require("IERC20");
 const BigMath = artifacts.require("BigMath");
 const Ei = artifacts.require("Ei");
@@ -36,7 +36,7 @@ const ABDK_1 = basisPointsToABDKString(TOTAL_BASIS_POINTS);
 
 const rebate_bips = 120;
 
-contract('MarginManager', async function(accounts) {
+contract('VaultFactory', async function(accounts) {
 
 	/* 
 		for simplicity of testing in this contract we assume that 1 unit of each asset is equal in vaulue to 1 unit of any other asset
@@ -48,12 +48,12 @@ contract('MarginManager', async function(accounts) {
 		asset1 = await dummyAToken.new("aTOKEN");
 		yieldTokenDeployerInstance = await yieldTokenDeployer.new();
 		vaultHealthInstance = await dummyVaultHealth.new();
-		marginManagerDelegateInstance = await MarginManagerDelegate.new();
-		marginManagerDelegate2Instance = await MarginManagerDelegate2.new();
-		marginManagerInstance = await MarginManager.new(
+		vaultFactoryDelegateInstance = await VaultFactoryDelegate.new();
+		vaultFactoryDelegate2Instance = await VaultFactoryDelegate2.new();
+		vaultFactoryInstance = await VaultFactory.new(
 			vaultHealthInstance.address,
-			marginManagerDelegateInstance.address,
-			marginManagerDelegate2Instance.address
+			vaultFactoryDelegateInstance.address,
+			vaultFactoryDelegate2Instance.address
 		);
 		EiInstance = await Ei.new();
 		await BigMath.link("Ei", EiInstance.address);
@@ -99,20 +99,20 @@ contract('MarginManager', async function(accounts) {
 		ytAsset0 = await IYieldToken.at(await zcbAsset0.yieldTokenAddress());
 		ytAsset1 = await IYieldToken.at(await zcbAsset1.yieldTokenAddress());
 
-		await zcbAsset0.setMarginManagerAddress(marginManagerInstance.address);
-		await zcbAsset1.setMarginManagerAddress(marginManagerInstance.address);
+		await zcbAsset0.setVaultFactoryAddress(vaultFactoryInstance.address);
+		await zcbAsset1.setVaultFactoryAddress(vaultFactoryInstance.address);
 
-		await marginManagerInstance.whitelistWrapper(wAsset1.address);
-		await marginManagerInstance.setLiquidationRebate(rebate_bips);
+		await vaultFactoryInstance.whitelistWrapper(wAsset1.address);
+		await vaultFactoryInstance.setLiquidationRebate(rebate_bips);
 
 		//mint assets to account 0
 		await asset1.mintTo(accounts[0], _10To18.mul(new BN("10")).toString());
 		await asset1.approve(wAsset1.address, _10To18.mul(new BN("10")).toString());
 		await wAsset1.depositUnitAmount(accounts[0], _10To18.mul(new BN("10")).toString());
-		await wAsset1.approve(marginManagerInstance.address, _10To18.mul(new BN("10")).toString());
+		await wAsset1.approve(vaultFactoryInstance.address, _10To18.mul(new BN("10")).toString());
 		await wAsset1.approve(zcbAsset1.address, _10To18.mul(new BN("10")).toString());
 		await zcbAsset1.depositWrappedToken(accounts[0], _10To18.mul(new BN("10")).toString());
-		await zcbAsset1.approve(marginManagerInstance.address, _10To18.mul(new BN("10")).toString());
+		await zcbAsset1.approve(vaultFactoryInstance.address, _10To18.mul(new BN("10")).toString());
 
 		//mint assets to account 1
 		await asset0.mintTo(accounts[1], _10To18.mul(new BN("10")).toString());
@@ -120,7 +120,7 @@ contract('MarginManager', async function(accounts) {
 		await wAsset0.depositUnitAmount(accounts[1], _10To18.mul(new BN("10")).toString(), {from: accounts[1]});
 		await wAsset0.approve(zcbAsset0.address, _10To18.mul(new BN("10")).toString(), {from: accounts[1]});
 		await zcbAsset0.depositWrappedToken(accounts[1], _10To18.mul(new BN("10")).toString(), {from: accounts[1]});
-		await zcbAsset0.approve(marginManagerInstance.address, _10To18.mul(new BN("10")).toString(), {from: accounts[1]});
+		await zcbAsset0.approve(vaultFactoryInstance.address, _10To18.mul(new BN("10")).toString(), {from: accounts[1]});
 	});
 
 	it('assign ratios', async () => {
@@ -143,7 +143,7 @@ contract('MarginManager', async function(accounts) {
 		maxShortInterest0 = _10To18.mul(_10To18).toString();
 		await vaultHealthInstance.setMaximumShortInterest(asset0.address, maxShortInterest0);
 		try {
-			await marginManagerInstance.openVault(zcbAsset1.address, zcbAsset0.address, _10To18.toString(), amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
+			await vaultFactoryInstance.openVault(zcbAsset1.address, zcbAsset0.address, _10To18.toString(), amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
 		} catch (err) {
 			caught = true;
 		}
@@ -159,7 +159,7 @@ contract('MarginManager', async function(accounts) {
 		//we are usign a dummy vault health contract, we need to set the value which it will return on vaultWithstandsChange() call
 		await vaultHealthInstance.setToReturn(true);
 		try {
-			await marginManagerInstance.openVault(wAsset1.address, zcbAsset0.address, _10To18.toString(), amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
+			await vaultFactoryInstance.openVault(wAsset1.address, zcbAsset0.address, _10To18.toString(), amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
 		} catch (err) {
 			caught = true;
 		}
@@ -172,7 +172,7 @@ contract('MarginManager', async function(accounts) {
 		await vaultHealthInstance.setToReturn(false);
 		caught = false;
 		try {
-			await marginManagerInstance.openVault(wAsset1.address, zcbAsset0.address, _10To18.toString(), amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
+			await vaultFactoryInstance.openVault(wAsset1.address, zcbAsset0.address, _10To18.toString(), amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
 		} catch (err) {
 			caught = true;
 		}
@@ -181,7 +181,7 @@ contract('MarginManager', async function(accounts) {
 		await vaultHealthInstance.setToReturn(true);
 		caught = false;
 		try {
-			await marginManagerInstance.openVault(wAsset1.address, zcbAsset0.address, _10To18.toString(), amountBorrowed, TOTAL_BASIS_POINTS-1, ABDK_1, ABDK_1);
+			await vaultFactoryInstance.openVault(wAsset1.address, zcbAsset0.address, _10To18.toString(), amountBorrowed, TOTAL_BASIS_POINTS-1, ABDK_1, ABDK_1);
 		} catch (err) {
 			caught = true;
 		}
@@ -190,7 +190,7 @@ contract('MarginManager', async function(accounts) {
 		caught = false;
 		try {
 			const sub1ABDK = (new BN(ABDK_1)).sub(new BN(1));
-			await marginManagerInstance.openVault(wAsset1.address, zcbAsset0.address, _10To18.toString(), amountBorrowed, TOTAL_BASIS_POINTS, sub1ABDK, ABDK_1);
+			await vaultFactoryInstance.openVault(wAsset1.address, zcbAsset0.address, _10To18.toString(), amountBorrowed, TOTAL_BASIS_POINTS, sub1ABDK, ABDK_1);
 		} catch (err) {
 			caught = true;
 		}
@@ -199,7 +199,7 @@ contract('MarginManager', async function(accounts) {
 		caught = false;
 		try {
 			const over1ABDK = (new BN(ABDK_1)).add(new BN(1));
-			await marginManagerInstance.openVault(wAsset1.address, zcbAsset0.address, _10To18.toString(), amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, over1ABDK);
+			await vaultFactoryInstance.openVault(wAsset1.address, zcbAsset0.address, _10To18.toString(), amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, over1ABDK);
 		} catch (err) {
 			caught = true;
 		}
@@ -208,13 +208,13 @@ contract('MarginManager', async function(accounts) {
 		amountBorrowed = (new BN(amountBorrowed)).sub(new BN('1')).toString();
 		var prevBalanceW1 = await wAsset1.balanceOf(accounts[0]);
 
-		await marginManagerInstance.openVault(wAsset1.address, zcbAsset0.address, _10To18.toString(), amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
+		await vaultFactoryInstance.openVault(wAsset1.address, zcbAsset0.address, _10To18.toString(), amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
 
 		assert.equal((await zcbAsset0.balanceOf(accounts[0])).toString(), amountBorrowed, "correct amount of zcb credited to vault owner");
 		assert.equal((await wAsset1.balanceOf(accounts[0])).toString(), prevBalanceW1.sub(_10To18), "correct amount of wAsset1 supplied");
 
 
-		vaults = await marginManagerInstance.allVaults(accounts[0]);
+		vaults = await vaultFactoryInstance.allVaults(accounts[0]);
 		assert.equal(vaults.length, 1, "correct amount of vaults");
 		vault = vaults[0];
 
@@ -227,8 +227,8 @@ contract('MarginManager', async function(accounts) {
 	it('deposits into vault', async () => {
 		var prevBalanceW1 = await wAsset1.balanceOf(accounts[0]);
 		prevSupplied = new BN(vaults[0].amountSupplied);
-		await marginManagerInstance.deposit(accounts[0], 0, _10To18.toString());
-		currentSupplied = new BN((await marginManagerInstance.vaults(accounts[0], 0)).amountSupplied);
+		await vaultFactoryInstance.deposit(accounts[0], 0, _10To18.toString());
+		currentSupplied = new BN((await vaultFactoryInstance.vaults(accounts[0], 0)).amountSupplied);
 
 		assert.equal((await wAsset1.balanceOf(accounts[0])).toString(), prevBalanceW1.sub(_10To18).toString(), "correct amount of wAsset1 supplied");
 		assert.equal(currentSupplied.sub(_10To18).toString(), prevSupplied.toString(), "correct increase in supplied asset in vault");
@@ -242,7 +242,7 @@ contract('MarginManager', async function(accounts) {
 		await vaultHealthInstance.setToReturn(false);
 		let caught = false;
 		try {
-			await marginManagerInstance.remove(0, toRemove.toString(), accounts[0], TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
+			await vaultFactoryInstance.remove(0, toRemove.toString(), accounts[0], TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
 		} catch (err) {
 			caught = true;
 		}
@@ -250,9 +250,9 @@ contract('MarginManager', async function(accounts) {
 
 		await vaultHealthInstance.setToReturn(true);
 
-		await marginManagerInstance.remove(0, toRemove.toString(), accounts[0], TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
+		await vaultFactoryInstance.remove(0, toRemove.toString(), accounts[0], TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
 
-		currentSupplied = new BN((await marginManagerInstance.vaults(accounts[0], 0)).amountSupplied);
+		currentSupplied = new BN((await vaultFactoryInstance.vaults(accounts[0], 0)).amountSupplied);
 		assert.equal((await wAsset1.balanceOf(accounts[0])).toString(), prevBalanceW1.add(toRemove), "correct amount of wAsset1 supplied");
 		assert.equal(prevSupplied.sub(currentSupplied).toString(), toRemove.toString(), "correct increase in supplied asset in vault");
 	});
@@ -263,10 +263,10 @@ contract('MarginManager', async function(accounts) {
 
 		var prevBalanceZCB = await zcbAsset0.balanceOf(accounts[0]);
 		var prevBorrowed = new BN(vault.amountBorrowed);
-		await marginManagerInstance.repay(accounts[0], 0, toRepay.toString());
+		await vaultFactoryInstance.repay(accounts[0], 0, toRepay.toString());
 
 		var currentBalanceZCB = await zcbAsset0.balanceOf(accounts[0]);
-		var currentBorrowed = new BN((await marginManagerInstance.vaults(accounts[0], 0)).amountBorrowed);
+		var currentBorrowed = new BN((await vaultFactoryInstance.vaults(accounts[0], 0)).amountBorrowed);
 		assert.equal(prevBalanceZCB.sub(currentBalanceZCB).toString(), toRepay.toString(), "correct amount repaid");
 		assert.equal(prevBorrowed.sub(currentBorrowed).toString(), toRepay.toString(), "correct amount repaid");
 	});
@@ -274,11 +274,11 @@ contract('MarginManager', async function(accounts) {
 	it('borrows from vault', async () => {
 		toBorrow = toRepay;
 		var prevBalanceZCB = await zcbAsset0.balanceOf(accounts[0]);
-		var prevBorrowed = new BN((await marginManagerInstance.vaults(accounts[0], 0)).amountBorrowed);
-		await marginManagerInstance.borrow(0, toBorrow.toString(), accounts[0], TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
+		var prevBorrowed = new BN((await vaultFactoryInstance.vaults(accounts[0], 0)).amountBorrowed);
+		await vaultFactoryInstance.borrow(0, toBorrow.toString(), accounts[0], TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
 
 		var currentBalanceZCB = await zcbAsset0.balanceOf(accounts[0]);
-		currentBorrowed = new BN((await marginManagerInstance.vaults(accounts[0], 0)).amountBorrowed);
+		currentBorrowed = new BN((await vaultFactoryInstance.vaults(accounts[0], 0)).amountBorrowed);
 		assert.equal(currentBalanceZCB.sub(prevBalanceZCB).toString(), toBorrow.toString(), "correct amount repaid");
 		assert.equal(currentBorrowed.sub(prevBorrowed).toString(), toBorrow.toString(), "correct amount repaid");
 	});
@@ -295,7 +295,7 @@ contract('MarginManager', async function(accounts) {
 
 		caught = false;
 		try {
-			await marginManagerInstance.auctionLiquidation(accounts[0], 0, zcbAsset0.address, wAsset1.address, bid.toString(), currentBorrowed.toString(), {from: accounts[1]});
+			await vaultFactoryInstance.auctionLiquidation(accounts[0], 0, zcbAsset0.address, wAsset1.address, bid.toString(), currentBorrowed.toString(), {from: accounts[1]});
 		} catch (err) {
 			caught = true;
 		}
@@ -304,21 +304,21 @@ contract('MarginManager', async function(accounts) {
 		upperRatio = "16" + _10To18.toString().substring(2);
 		await vaultHealthInstance.setUpper(asset1.address, zcbAsset0.address, upperRatio);
 
-		let prevRevenue = await marginManagerInstance.revenue(wAsset1.address);
+		let prevRevenue = await vaultFactoryInstance.revenue(wAsset1.address);
 		
-		let rec = await marginManagerInstance.auctionLiquidation(accounts[0], 0, zcbAsset0.address, wAsset1.address, bid.toString(), currentBorrowed.toString(), {from: accounts[1]});
+		let rec = await vaultFactoryInstance.auctionLiquidation(accounts[0], 0, zcbAsset0.address, wAsset1.address, bid.toString(), currentBorrowed.toString(), {from: accounts[1]});
 
 		let timestamp = (await web3.eth.getBlock(rec.receipt.blockNumber)).timestamp;
 
-		let currentRevenue = await marginManagerInstance.revenue(wAsset1.address);
+		let currentRevenue = await vaultFactoryInstance.revenue(wAsset1.address);
 
 		let rebate = surplus.mul(new BN(rebate_bips)).div(new BN(TOTAL_BASIS_POINTS));
 		let toTreasury = surplus.sub(rebate);
 		assert.equal(currentRevenue.sub(prevRevenue).toString(), toTreasury.toString(), "correct amount of revenue");
 
-		assert.equal((await marginManagerInstance.liquidationsLength()).toString(), "1", "correct length of liquidations array");
+		assert.equal((await vaultFactoryInstance.liquidationsLength()).toString(), "1", "correct length of liquidations array");
 
-		liquidation = await marginManagerInstance.Liquidations(0);
+		liquidation = await vaultFactoryInstance.Liquidations(0);
 
 		assert.equal(liquidation.vaultOwner, accounts[0], "correct value of liquidation.vaultOwner");
 		assert.equal(liquidation.assetBorrowed, zcbAsset0.address, "correct value of liquidation.assetBorrowed");
@@ -328,7 +328,7 @@ contract('MarginManager', async function(accounts) {
 		assert.equal(liquidation.bidAmount.toString(), bid.toString(), "correct value of liquidation.bidAmount");
 		assert.equal(liquidation.bidTimestamp.toNumber(), timestamp, "correct value of liqudiation.bidTimestamp");
 
-		vault = await marginManagerInstance.vaults(accounts[0], 0);
+		vault = await vaultFactoryInstance.vaults(accounts[0], 0);
 
 		assert.equal(vault.assetBorrowed, nullAddress, "assetBorrowed is null");
 		assert.equal(vault.assetSupplied, nullAddress, "assetSupplied is null");
@@ -343,19 +343,19 @@ contract('MarginManager', async function(accounts) {
 		let surplus = new BN("10");
 		bid = bid.sub(surplus);
 		
-		let prevRevenue = await marginManagerInstance.revenue(wAsset1.address);
+		let prevRevenue = await vaultFactoryInstance.revenue(wAsset1.address);
 
-		let rec = await marginManagerInstance.bidOnLiquidation(0, bid.toString(), liquidation.amountBorrowed, {from: accounts[1]});
+		let rec = await vaultFactoryInstance.bidOnLiquidation(0, bid.toString(), liquidation.amountBorrowed, {from: accounts[1]});
 
 		let timestamp = (await web3.eth.getBlock(rec.receipt.blockNumber)).timestamp;
 
-		let currentRevenue = await marginManagerInstance.revenue(wAsset1.address);
+		let currentRevenue = await vaultFactoryInstance.revenue(wAsset1.address);
 
 		let rebate = surplus.mul(new BN(rebate_bips)).div(new BN(TOTAL_BASIS_POINTS));
 		let toTreasury = surplus.sub(rebate);
 		assert.equal(currentRevenue.sub(prevRevenue).toString(), toTreasury.toString(), "correct amount of revenue");
 
-		liquidation = await marginManagerInstance.Liquidations(0);
+		liquidation = await vaultFactoryInstance.Liquidations(0);
 
 		assert.equal(liquidation.vaultOwner, accounts[0], "correct value of liquidation.vaultOwner");
 		assert.equal(liquidation.assetBorrowed, zcbAsset0.address, "correct value of liquidation.assetBorrowed");
@@ -372,7 +372,7 @@ contract('MarginManager', async function(accounts) {
 
 		let prevBalW1 = await wAsset1.balanceOf(accounts[1]);
 
-		await marginManagerInstance.claimLiquidation(0, accounts[1], {from: accounts[1]});
+		await vaultFactoryInstance.claimLiquidation(0, accounts[1], {from: accounts[1]});
 
 		let newBalW1 = await wAsset1.balanceOf(accounts[1]);
 
@@ -384,17 +384,17 @@ contract('MarginManager', async function(accounts) {
 			first open vaults
 		*/
 		amountBorrowed = _10To18.mul(_10To18).div(new BN(upperRatio)).sub(new BN(1)).toString();
-		await marginManagerInstance.openVault(wAsset1.address, zcbAsset0.address, _10To18.toString(), amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
-		await marginManagerInstance.openVault(wAsset1.address, zcbAsset0.address, _10To18.toString(), amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
+		await vaultFactoryInstance.openVault(wAsset1.address, zcbAsset0.address, _10To18.toString(), amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
+		await vaultFactoryInstance.openVault(wAsset1.address, zcbAsset0.address, _10To18.toString(), amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
 
 		lowerRatio =  _10To18.mul(_10To18).div(new BN(amountBorrowed)).add(new BN(10000)).toString();
 		await vaultHealthInstance.setLower(asset1.address, zcbAsset0.address, lowerRatio);
 
-		vaultIndex = (await marginManagerInstance.vaultsLength(accounts[0])).toNumber() - 2;
+		vaultIndex = (await vaultFactoryInstance.vaultsLength(accounts[0])).toNumber() - 2;
 
-		await marginManagerInstance.instantLiquidation(accounts[0], vaultIndex, zcbAsset0.address, wAsset1.address, amountBorrowed.toString(), _10To18.toString(), accounts[1], {from: accounts[1]});
+		await vaultFactoryInstance.instantLiquidation(accounts[0], vaultIndex, zcbAsset0.address, wAsset1.address, amountBorrowed.toString(), _10To18.toString(), accounts[1], {from: accounts[1]});
 
-		vault = await marginManagerInstance.vaults(accounts[0], vaultIndex);
+		vault = await vaultFactoryInstance.vaults(accounts[0], vaultIndex);
 
 		assert.equal(vault.assetBorrowed, nullAddress, "assetBorrowed is null");
 		assert.equal(vault.assetSupplied, nullAddress, "assetSupplied is null");
@@ -405,10 +405,10 @@ contract('MarginManager', async function(accounts) {
 	it('partial vault liquidations Specific In', async () => {
 		vaultIndex++;
 
-		await marginManagerInstance.partialLiquidationSpecificIn(accounts[0], vaultIndex, zcbAsset0.address, wAsset1.address,
+		await vaultFactoryInstance.partialLiquidationSpecificIn(accounts[0], vaultIndex, zcbAsset0.address, wAsset1.address,
 			(new BN(amountBorrowed)).div(new BN(2)).toString(), _10To18.div(new BN(3)).toString(), accounts[1], {from: accounts[1]});
 
-		vault = await marginManagerInstance.vaults(accounts[0], vaultIndex);
+		vault = await vaultFactoryInstance.vaults(accounts[0], vaultIndex);
 
 		assert.equal(vault.assetBorrowed, zcbAsset0.address, "assetBorrowed is correct");
 		assert.equal(vault.assetSupplied, wAsset1.address, "assetSupplied is correct");
@@ -417,10 +417,10 @@ contract('MarginManager', async function(accounts) {
 	});
 
 	it('partial vault liquidation Specific Out', async () => {
-		await marginManagerInstance.partialLiquidationSpecificOut(accounts[0], vaultIndex, zcbAsset0.address, wAsset1.address,
+		await vaultFactoryInstance.partialLiquidationSpecificOut(accounts[0], vaultIndex, zcbAsset0.address, wAsset1.address,
 			vault.amountSupplied.toString(), vault.amountBorrowed.toString(), accounts[1], {from: accounts[1]});
 
-		vault = await marginManagerInstance.vaults(accounts[0], vaultIndex);
+		vault = await vaultFactoryInstance.vaults(accounts[0], vaultIndex);
 
 		assert.equal(vault.assetBorrowed, zcbAsset0.address, "assetBorrowed is correct");
 		assert.equal(vault.assetSupplied, wAsset1.address, "assetSupplied is correct");
@@ -431,16 +431,16 @@ contract('MarginManager', async function(accounts) {
 	it('liquidates vaults due to time', async () => {
 		let amountSupplied = _10To18;
 
-		await marginManagerInstance.openVault(wAsset1.address, zcbAsset0.address, amountSupplied, amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
-		await marginManagerInstance.openVault(wAsset1.address, zcbAsset0.address, amountSupplied, amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
+		await vaultFactoryInstance.openVault(wAsset1.address, zcbAsset0.address, amountSupplied, amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
+		await vaultFactoryInstance.openVault(wAsset1.address, zcbAsset0.address, amountSupplied, amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
 
-		vaultIndex = (await marginManagerInstance.vaultsLength(accounts[0])).toNumber() - 2;
+		vaultIndex = (await vaultFactoryInstance.vaultsLength(accounts[0])).toNumber() - 2;
 
 		bid = amountSupplied;
 
 		let caught = false;
 		try {
-			await marginManagerInstance.auctionLiquidation(accounts[0], vaultIndex, zcbAsset0.address, wAsset1.address, bid, amountBorrowed, {from: accounts[1]});
+			await vaultFactoryInstance.auctionLiquidation(accounts[0], vaultIndex, zcbAsset0.address, wAsset1.address, bid, amountBorrowed, {from: accounts[1]});
 		} catch (err) {
 			caught = true;
 		}
@@ -453,12 +453,12 @@ contract('MarginManager', async function(accounts) {
 		*/
 		await helper.advanceTime(86401)
 
-		let rec = await marginManagerInstance.auctionLiquidation(accounts[0], vaultIndex, zcbAsset0.address, wAsset1.address, bid, amountBorrowed, {from: accounts[1]});
+		let rec = await vaultFactoryInstance.auctionLiquidation(accounts[0], vaultIndex, zcbAsset0.address, wAsset1.address, bid, amountBorrowed, {from: accounts[1]});
 		let timestamp = (await web3.eth.getBlock(rec.receipt.blockNumber)).timestamp;
 
-		assert.equal((await marginManagerInstance.liquidationsLength()).toString(), "2", "correct length of liquidations array");
+		assert.equal((await vaultFactoryInstance.liquidationsLength()).toString(), "2", "correct length of liquidations array");
 
-		liquidation = await marginManagerInstance.Liquidations(1);
+		liquidation = await vaultFactoryInstance.Liquidations(1);
 
 		assert.equal(liquidation.vaultOwner, accounts[0], "correct value of liquidation.vaultOwner");
 		assert.equal(liquidation.assetBorrowed, zcbAsset0.address, "correct value of liquidation.assetBorrowed");
@@ -468,7 +468,7 @@ contract('MarginManager', async function(accounts) {
 		assert.equal(liquidation.bidAmount.toString(), bid.toString(), "correct value of liquidation.bidAmount");
 		assert.equal(liquidation.bidTimestamp.toString(), timestamp, "correct value of liqudiation.bidTimestamp");
 
-		vault = await marginManagerInstance.vaults(accounts[0], 1);
+		vault = await vaultFactoryInstance.vaults(accounts[0], 1);
 
 		assert.equal(vault.assetBorrowed, nullAddress, "assetBorrowed is null");
 		assert.equal(vault.assetSupplied, nullAddress, "assetSupplied is null");
@@ -485,7 +485,7 @@ contract('MarginManager', async function(accounts) {
 		await vaultHealthInstance.setLower(asset1.address, zcbAsset0.address, lowerRatio);
 
 		try {
-			await marginManagerInstance.instantLiquidation(accounts[0], vaultIndex, zcbAsset0.address, wAsset1.address, amountBorrowed.toString(), _10To18.toString(), accounts[1], {from: accounts[1]});
+			await vaultFactoryInstance.instantLiquidation(accounts[0], vaultIndex, zcbAsset0.address, wAsset1.address, amountBorrowed.toString(), _10To18.toString(), accounts[1], {from: accounts[1]});
 		} catch (err) {
 			caught = true;
 		}
@@ -497,9 +497,9 @@ contract('MarginManager', async function(accounts) {
 		let _6days = _8days*3/4;
 		await helper.advanceTime(_6days);
 
-		await marginManagerInstance.instantLiquidation(accounts[0], vaultIndex, zcbAsset0.address, wAsset1.address, amountBorrowed.toString(), _10To18.toString(), accounts[1], {from: accounts[1]});
+		await vaultFactoryInstance.instantLiquidation(accounts[0], vaultIndex, zcbAsset0.address, wAsset1.address, amountBorrowed.toString(), _10To18.toString(), accounts[1], {from: accounts[1]});
 
-		vault = await marginManagerInstance.vaults(accounts[0], vaultIndex);
+		vault = await vaultFactoryInstance.vaults(accounts[0], vaultIndex);
 
 		assert.equal(vault.assetBorrowed, nullAddress, "assetBorrowed is null");
 		assert.equal(vault.assetSupplied, nullAddress, "assetSupplied is null");
@@ -508,13 +508,13 @@ contract('MarginManager', async function(accounts) {
 	});
 
 	it('contract owner withdraws revenue', async () => {
-		let revenue = await marginManagerInstance.revenue(zcbAsset0.address);
+		let revenue = await vaultFactoryInstance.revenue(zcbAsset0.address);
 
 		let prevBalance = await zcbAsset0.balanceOf(accounts[0]);
 
-		await marginManagerInstance.claimRevenue(zcbAsset0.address);
+		await vaultFactoryInstance.claimRevenue(zcbAsset0.address);
 
-		let newRevenue = await marginManagerInstance.revenue(zcbAsset0.address);
+		let newRevenue = await vaultFactoryInstance.revenue(zcbAsset0.address);
 
 		let newBalance = await zcbAsset0.balanceOf(accounts[0]);
 
@@ -542,17 +542,17 @@ contract('MarginManager', async function(accounts) {
 		ytAsset0 = await IYieldToken.at(await zcbAsset0.yieldTokenAddress());
 		ytAsset1 = await IYieldToken.at(await zcbAsset1.yieldTokenAddress());
 
-		await zcbAsset0.setMarginManagerAddress(marginManagerInstance.address);
-		await zcbAsset1.setMarginManagerAddress(marginManagerInstance.address);
+		await zcbAsset0.setVaultFactoryAddress(vaultFactoryInstance.address);
+		await zcbAsset1.setVaultFactoryAddress(vaultFactoryInstance.address);
 
 		//mint assets to account 0
 		await asset1.mintTo(accounts[0], _10To18.mul(new BN("10")).toString());
 		await asset1.approve(wAsset1.address, _10To18.mul(new BN("10")).toString());
 		await wAsset1.depositUnitAmount(accounts[0], _10To18.mul(new BN("10")).toString());
-		await wAsset1.approve(marginManagerInstance.address, _10To18.mul(new BN("10")).toString());
+		await wAsset1.approve(vaultFactoryInstance.address, _10To18.mul(new BN("10")).toString());
 		await wAsset1.approve(zcbAsset1.address, _10To18.mul(new BN("10")).toString());
 		await zcbAsset1.depositWrappedToken(accounts[0], _10To18.mul(new BN("10")).toString());
-		await zcbAsset1.approve(marginManagerInstance.address, _10To18.mul(new BN("10")).toString());
+		await zcbAsset1.approve(vaultFactoryInstance.address, _10To18.mul(new BN("10")).toString());
 
 		//mint assets to account 1
 		await asset0.mintTo(accounts[1], _10To18.mul(new BN("10")).toString());
@@ -560,7 +560,7 @@ contract('MarginManager', async function(accounts) {
 		await wAsset0.depositUnitAmount(accounts[1], _10To18.mul(new BN("10")).toString(), {from: accounts[1]});
 		await wAsset0.approve(zcbAsset0.address, _10To18.mul(new BN("10")).toString(), {from: accounts[1]});
 		await zcbAsset0.depositWrappedToken(accounts[1], _10To18.mul(new BN("10")).toString(), {from: accounts[1]});
-		await zcbAsset0.approve(marginManagerInstance.address, _10To18.mul(new BN("10")).toString(), {from: accounts[1]});
+		await zcbAsset0.approve(vaultFactoryInstance.address, _10To18.mul(new BN("10")).toString(), {from: accounts[1]});
 	});
 
 
@@ -574,8 +574,8 @@ contract('MarginManager', async function(accounts) {
 		let wBalance = await wAsset1.balanceOf(accounts[0]);
 		await wAsset1.approve(zcbAsset1.address, wBalance);
 		await zcbAsset1.depositWrappedToken(accounts[0], wBalance);
-		await zcbAsset1.approve(marginManagerInstance.address, toMint);
-		await ytAsset1.approve(marginManagerInstance.address, toMint);
+		await zcbAsset1.approve(vaultFactoryInstance.address, toMint);
+		await ytAsset1.approve(vaultFactoryInstance.address, toMint);
 
 		let caught = false;
 
@@ -587,12 +587,12 @@ contract('MarginManager', async function(accounts) {
 		maxShortInterest0 = _10To18.mul(_10To18).toString();
 		await vaultHealthInstance.setMaximumShortInterest(asset0.address, maxShortInterest0);
 		try {
-			await marginManagerInstance.openYTVault(zcbAsset1.address, zcbAsset0.address, yieldSupplied, bondSupplied, amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
+			await vaultFactoryInstance.openYTVault(zcbAsset1.address, zcbAsset0.address, yieldSupplied, bondSupplied, amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
 		} catch (err) {
 			caught = true;
 		}
 		if (!caught) assert.fail('only whitelisted assets may be supplied');
-		await marginManagerInstance.whitelistCapitalHandler(zcbAsset1.address);
+		await vaultFactoryInstance.whitelistCapitalHandler(zcbAsset1.address);
 	});
 
 	it('opens YT vault', async () => {
@@ -602,7 +602,7 @@ contract('MarginManager', async function(accounts) {
 		//we are usign a dummy vault health contract, we need to set the value which it will return on vaultWithstandsChange() call
 		await vaultHealthInstance.setToReturn(true);
 		try {
-			await marginManagerInstance.openYTVault(zcbAsset1.address, zcbAsset0.address, yieldSupplied, bondSupplied, amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
+			await vaultFactoryInstance.openYTVault(zcbAsset1.address, zcbAsset0.address, yieldSupplied, bondSupplied, amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
 		} catch (err) {
 			caught = true;
 		}
@@ -615,7 +615,7 @@ contract('MarginManager', async function(accounts) {
 		await vaultHealthInstance.setToReturn(false);
 		caught = false;
 		try {
-			await marginManagerInstance.openYTVault(zcbAsset1.address, zcbAsset0.address, yieldSupplied, bondSupplied, amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
+			await vaultFactoryInstance.openYTVault(zcbAsset1.address, zcbAsset0.address, yieldSupplied, bondSupplied, amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
 		} catch (err) {
 			caught = true;
 		}
@@ -624,7 +624,7 @@ contract('MarginManager', async function(accounts) {
 		await vaultHealthInstance.setToReturn(true);
 		caught = false;
 		try {
-			await marginManagerInstance.openYTVault(zcbAsset1.address, zcbAsset0.address, yieldSupplied, bondSupplied, amountBorrowed, TOTAL_BASIS_POINTS-1, ABDK_1, ABDK_1);
+			await vaultFactoryInstance.openYTVault(zcbAsset1.address, zcbAsset0.address, yieldSupplied, bondSupplied, amountBorrowed, TOTAL_BASIS_POINTS-1, ABDK_1, ABDK_1);
 		} catch (err) {
 			caught = true;
 		}
@@ -633,7 +633,7 @@ contract('MarginManager', async function(accounts) {
 		caught = false;
 		try {
 			const over1ABDK = (new BN(ABDK_1)).add(new BN(1));
-			await marginManagerInstance.openYTVault(zcbAsset1.address, zcbAsset0.address, yieldSupplied, bondSupplied, amountBorrowed, TOTAL_BASIS_POINTS, over1ABDK, ABDK_1);
+			await vaultFactoryInstance.openYTVault(zcbAsset1.address, zcbAsset0.address, yieldSupplied, bondSupplied, amountBorrowed, TOTAL_BASIS_POINTS, over1ABDK, ABDK_1);
 		} catch (err) {
 			caught = true;
 		}
@@ -642,7 +642,7 @@ contract('MarginManager', async function(accounts) {
 		caught = false;
 		try {
 			const over1ABDK = (new BN(ABDK_1)).add(new BN(1));
-			await marginManagerInstance.openYTVault(zcbAsset1.address, zcbAsset0.address, yieldSupplied, bondSupplied, amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, over1ABDK);
+			await vaultFactoryInstance.openYTVault(zcbAsset1.address, zcbAsset0.address, yieldSupplied, bondSupplied, amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, over1ABDK);
 		} catch (err) {
 			caught = true;
 		}
@@ -652,13 +652,13 @@ contract('MarginManager', async function(accounts) {
 		var prevBalanceZCB1 = await zcbAsset1.balanceOf(accounts[0]);
 		var prevYield1 = await zcbAsset1.balanceYield(accounts[0]);
 
-		await marginManagerInstance.openYTVault(zcbAsset1.address, zcbAsset0.address, yieldSupplied, bondSupplied, amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
+		await vaultFactoryInstance.openYTVault(zcbAsset1.address, zcbAsset0.address, yieldSupplied, bondSupplied, amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
 
 		assert.equal((await zcbAsset0.balanceOf(accounts[0])).toString(), prevBalanceZCB0.add(amountBorrowed).toString(), "correct amount of zcb credited to vault owner");
 		assert.equal((await zcbAsset1.balanceOf(accounts[0])).toString(), prevBalanceZCB1.sub(adjYieldSupplied).sub(bondSupplied).toString(), "correct amount of ZCB 1 supplied");
 		assert.equal((await zcbAsset1.balanceYield(accounts[0])).toString(), prevYield1.sub(yieldSupplied).toString(), "correct new value of balanceYield");
 
-		vault = await marginManagerInstance.YTvaults(accounts[0], 0);
+		vault = await vaultFactoryInstance.YTvaults(accounts[0], 0);
 
 		assert.equal(vault.CHsupplied, zcbAsset1.address, "correct address for assetSupplied in vault");
 		assert.equal(vault.CHborrowed, zcbAsset0.address, "correct address for assetBorrowed in vault");
@@ -674,8 +674,8 @@ contract('MarginManager', async function(accounts) {
 		let toSupplyYield = _10To18;
 		let adjSuppliedYield = await wAsset1.WrappedAmtToUnitAmt_RoundDown(toSupplyYield);
 		let toSupplyBond = _10To18.neg();
-		await marginManagerInstance.YTdeposit(accounts[0], 0, toSupplyYield, toSupplyBond);
-		vault = await marginManagerInstance.YTvaults(accounts[0], 0);
+		await vaultFactoryInstance.YTdeposit(accounts[0], 0, toSupplyYield, toSupplyBond);
+		vault = await vaultFactoryInstance.YTvaults(accounts[0], 0);
 
 		assert.equal((await zcbAsset1.balanceOf(accounts[0])).toString(), prevBalanceZCB1.sub(adjSuppliedYield).sub(toSupplyBond), "correct amount of ZCB supplied");
 		assert.equal((await zcbAsset1.balanceYield(accounts[0])).toString(), prevYield1.sub(toSupplyYield).toString(), "correct amount of yield supplied");
@@ -693,7 +693,7 @@ contract('MarginManager', async function(accounts) {
 		await vaultHealthInstance.setToReturn(false);
 		let caught = false;
 		try {
-			await marginManagerInstance.YTremove(0, amountYield, amountBond, accounts[0], TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
+			await vaultFactoryInstance.YTremove(0, amountYield, amountBond, accounts[0], TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
 		} catch (err) {
 			caught = true;
 		}
@@ -701,9 +701,9 @@ contract('MarginManager', async function(accounts) {
 
 		await vaultHealthInstance.setToReturn(true);
 
-		await marginManagerInstance.YTremove(0, amountYield, amountBond, accounts[0], TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
+		await vaultFactoryInstance.YTremove(0, amountYield, amountBond, accounts[0], TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
 
-		vault = await marginManagerInstance.YTvaults(accounts[0], 0);
+		vault = await vaultFactoryInstance.YTvaults(accounts[0], 0);
 
 		assert.equal((await zcbAsset1.balanceOf(accounts[0])).toString(), prevBalanceZCB1.add(adjAmountYield).add(amountBond), "correct amount of ZCB received");
 		assert.equal(prevVaultState.yieldSupplied.sub(vault.yieldSupplied).toString(), amountYield.toString(), "correct amount of yield removed from vault");
@@ -715,9 +715,9 @@ contract('MarginManager', async function(accounts) {
 
 		prevVaultState = vault;
 		var prevBalanceZCB0 = await zcbAsset0.balanceOf(accounts[0]);
-		await marginManagerInstance.YTrepay(accounts[0], 0, toRepay);
+		await vaultFactoryInstance.YTrepay(accounts[0], 0, toRepay);
 
-		vault = await marginManagerInstance.YTvaults(accounts[0], 0);
+		vault = await vaultFactoryInstance.YTvaults(accounts[0], 0);
 		var currentBalanceZCB0 = await zcbAsset0.balanceOf(accounts[0]);
 
 		assert.equal(prevBalanceZCB0.sub(currentBalanceZCB0).toString(), toRepay.toString(), "correct amount ZCB transferedFrom sender");
@@ -729,9 +729,9 @@ contract('MarginManager', async function(accounts) {
 
 		prevVaultState = vault;
 		var prevBalanceZCB0 = await zcbAsset0.balanceOf(accounts[0]);
-		await marginManagerInstance.YTborrow(0, toBorrow, accounts[0], TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
+		await vaultFactoryInstance.YTborrow(0, toBorrow, accounts[0], TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
 
-		vault = await marginManagerInstance.YTvaults(accounts[0], 0);
+		vault = await vaultFactoryInstance.YTvaults(accounts[0], 0);
 		var currentBalanceZCB0 = await zcbAsset0.balanceOf(accounts[0]);
 
 		assert.equal(currentBalanceZCB0.sub(prevBalanceZCB0).toString(), toBorrow.toString(), "correct amount of borrowed asset transfered to _to");
@@ -751,7 +751,7 @@ contract('MarginManager', async function(accounts) {
 
 		caught = false;
 		try {
-			await marginManagerInstance.auctionYTLiquidation(accounts[0], 0, zcbAsset0.address, zcbAsset1.address, bid, minBondRatio, vault.amountBorrowed, {from: accounts[1]});
+			await vaultFactoryInstance.auctionYTLiquidation(accounts[0], 0, zcbAsset0.address, zcbAsset1.address, bid, minBondRatio, vault.amountBorrowed, {from: accounts[1]});
 		} catch (err) {
 			caught = true;
 		}
@@ -759,13 +759,13 @@ contract('MarginManager', async function(accounts) {
 
 		await vaultHealthInstance.setToReturn(false);
 
-		let prevRevenue = await marginManagerInstance.YTrevenue(zcbAsset1.address);
+		let prevRevenue = await vaultFactoryInstance.YTrevenue(zcbAsset1.address);
 
-		let rec = await marginManagerInstance.auctionYTLiquidation(accounts[0], 0, zcbAsset0.address, zcbAsset1.address, bid, minBondRatio, vault.amountBorrowed, {from: accounts[1]});
+		let rec = await vaultFactoryInstance.auctionYTLiquidation(accounts[0], 0, zcbAsset0.address, zcbAsset1.address, bid, minBondRatio, vault.amountBorrowed, {from: accounts[1]});
 
 		let timestamp = (await web3.eth.getBlock(rec.receipt.blockNumber)).timestamp;
 
-		let currentRevenue = await marginManagerInstance.YTrevenue(zcbAsset1.address);
+		let currentRevenue = await vaultFactoryInstance.YTrevenue(zcbAsset1.address);
 
 		let rebateYield = surplusYield.mul(new BN(rebate_bips)).div(new BN(TOTAL_BASIS_POINTS));
 		let toTreasuryYield = surplusYield.sub(rebateYield);
@@ -776,9 +776,9 @@ contract('MarginManager', async function(accounts) {
 		assert.equal(currentRevenue.yield.sub(prevRevenue.yield).toString(), toTreasuryYield.toString(), "correct amount of yield revenue");
 		assert.equal(currentRevenue.bond.sub(prevRevenue.bond).toString(), toTreasuryBond.toString(), "correct amount of bond revenue");
 
-		assert.equal((await marginManagerInstance.YTLiquidationsLength()).toString(), "1", "correct length of liquidations array");
+		assert.equal((await vaultFactoryInstance.YTLiquidationsLength()).toString(), "1", "correct length of liquidations array");
 
-		liquidation = await marginManagerInstance.YTLiquidations(0);
+		liquidation = await vaultFactoryInstance.YTLiquidations(0);
 
 		assert.equal(liquidation.vaultOwner, accounts[0], "correct value of liquidation.vaultOwner");
 		assert.equal(liquidation.CHborrowed, zcbAsset0.address, "correct value of liquidation.CHborrowed");
@@ -789,7 +789,7 @@ contract('MarginManager', async function(accounts) {
 		assert.equal(liquidation.bidAmount.toString(), bid.toString(), "correct value of liquidation.bidAmount");
 		assert.equal(liquidation.bidTimestamp.toNumber(), timestamp, "correct value of liqudiation.bidTimestamp");
 
-		vault = await marginManagerInstance.YTvaults(accounts[0], 0);
+		vault = await vaultFactoryInstance.YTvaults(accounts[0], 0);
 
 		assert.equal(vault.CHborrowed, nullAddress, "CHborrowed is null");
 		assert.equal(vault.CHsupplied, nullAddress, "CHsupplied is null");
@@ -809,13 +809,13 @@ contract('MarginManager', async function(accounts) {
 		bondCorrespondingToBid = liquidation.bondRatio.mul(bid).div(_10To18).add(new BN(1));
 		let surplusBond = bondCorrespondingToPrevBid.sub(bondCorrespondingToBid);
 
-		let prevRevenue = await marginManagerInstance.YTrevenue(zcbAsset1.address);
+		let prevRevenue = await vaultFactoryInstance.YTrevenue(zcbAsset1.address);
 
-		let rec = await marginManagerInstance.bidOnYTLiquidation(0, bid.toString(), liquidation.amountBorrowed, {from: accounts[1]});
+		let rec = await vaultFactoryInstance.bidOnYTLiquidation(0, bid.toString(), liquidation.amountBorrowed, {from: accounts[1]});
 
 		let timestamp = (await web3.eth.getBlock(rec.receipt.blockNumber)).timestamp;
 
-		let currentRevenue = await marginManagerInstance.YTrevenue(zcbAsset1.address);
+		let currentRevenue = await vaultFactoryInstance.YTrevenue(zcbAsset1.address);
 
 		let rebateYield = surplusYield.mul(new BN(rebate_bips)).div(new BN(TOTAL_BASIS_POINTS));
 		let toTreasuryYield = surplusYield.sub(rebateYield);
@@ -828,7 +828,7 @@ contract('MarginManager', async function(accounts) {
 
 		let prevBorrowed = liquidation.amountBorrowed;
 
-		liquidation = await marginManagerInstance.YTLiquidations(0);
+		liquidation = await vaultFactoryInstance.YTLiquidations(0);
 
 		assert.equal(liquidation.vaultOwner, accounts[0], "correct value of liquidation.vaultOwner");
 		assert.equal(liquidation.CHborrowed, zcbAsset0.address, "correct value of liquidation.CHborrowed");
@@ -848,7 +848,7 @@ contract('MarginManager', async function(accounts) {
 		let prevBalYield = await zcbAsset1.balanceYield(accounts[1]);
 		let prevBalBonds = await zcbAsset1.balanceBonds(accounts[1]);
 
-		await marginManagerInstance.claimYTLiquidation(0, accounts[1], {from: accounts[1]});
+		await vaultFactoryInstance.claimYTLiquidation(0, accounts[1], {from: accounts[1]});
 
 		let newBalYield = await zcbAsset1.balanceYield(accounts[1]);
 		let newBalBonds = await zcbAsset1.balanceBonds(accounts[1]);
@@ -866,14 +866,14 @@ contract('MarginManager', async function(accounts) {
 		yieldSupplied = _10To18;
 		bondSupplied = _10To18.neg();
 		amountBorrowed = _10To18;
-		await marginManagerInstance.openYTVault(zcbAsset1.address, zcbAsset0.address, yieldSupplied, bondSupplied, amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
-		await marginManagerInstance.openYTVault(zcbAsset1.address, zcbAsset0.address, yieldSupplied, bondSupplied, amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
+		await vaultFactoryInstance.openYTVault(zcbAsset1.address, zcbAsset0.address, yieldSupplied, bondSupplied, amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
+		await vaultFactoryInstance.openYTVault(zcbAsset1.address, zcbAsset0.address, yieldSupplied, bondSupplied, amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
 
 		minBondRatio = bondSupplied.mul(_10To18).div(yieldSupplied).sub(new BN(10));
-		vaultIndex = (await marginManagerInstance.YTvaultsLength(accounts[0])).toNumber() - 2;
+		vaultIndex = (await vaultFactoryInstance.YTvaultsLength(accounts[0])).toNumber() - 2;
 		let caught = false;
 		try {
-			await marginManagerInstance.instantYTLiquidation(accounts[0], vaultIndex, zcbAsset0.address, zcbAsset1.address, amountBorrowed, yieldSupplied, minBondRatio, accounts[1], {from: accounts[1]});
+			await vaultFactoryInstance.instantYTLiquidation(accounts[0], vaultIndex, zcbAsset0.address, zcbAsset1.address, amountBorrowed, yieldSupplied, minBondRatio, accounts[1], {from: accounts[1]});
 		}
 		catch (err) {
 			caught = true;
@@ -881,9 +881,9 @@ contract('MarginManager', async function(accounts) {
 		if (!caught) assert.fail("liquidation tx should revert if vault is in good health");
 
 		await vaultHealthInstance.setToReturn(false);
-		await marginManagerInstance.instantYTLiquidation(accounts[0], vaultIndex, zcbAsset0.address, zcbAsset1.address, amountBorrowed, yieldSupplied, minBondRatio, accounts[1], {from: accounts[1]});
+		await vaultFactoryInstance.instantYTLiquidation(accounts[0], vaultIndex, zcbAsset0.address, zcbAsset1.address, amountBorrowed, yieldSupplied, minBondRatio, accounts[1], {from: accounts[1]});
 
-		vault = await marginManagerInstance.YTvaults(accounts[0], vaultIndex);
+		vault = await vaultFactoryInstance.YTvaults(accounts[0], vaultIndex);
 
 		assert.equal(vault.CHborrowed, nullAddress, "CHborrowed is null");
 		assert.equal(vault.CHsupplied, nullAddress, "CHsupplied is null");
@@ -895,17 +895,17 @@ contract('MarginManager', async function(accounts) {
 
 	it('partial vault YT liquidations Specific In', async () => {
 		vaultIndex++;
-		vault = await marginManagerInstance.YTvaults(accounts[0], vaultIndex);
+		vault = await vaultFactoryInstance.YTvaults(accounts[0], vaultIndex);
 
 		let amtIn = vault.amountBorrowed.div(new BN(2));
 		let expectedYieldOut = vault.yieldSupplied.mul(amtIn).div(vault.amountBorrowed);
 		let expectedBondOut = vault.bondSupplied.mul(amtIn).div(vault.amountBorrowed);
 		let minYieldOut = expectedYieldOut.sub(new BN(1));
-		await marginManagerInstance.partialYTLiquidationSpecificIn(accounts[0], vaultIndex, zcbAsset0.address, zcbAsset1.address,
+		await vaultFactoryInstance.partialYTLiquidationSpecificIn(accounts[0], vaultIndex, zcbAsset0.address, zcbAsset1.address,
 			amtIn, minYieldOut, minBondRatio, accounts[1], {from: accounts[1]});
 
 		prevVaultState = vault;
-		vault = await marginManagerInstance.YTvaults(accounts[0], vaultIndex);
+		vault = await vaultFactoryInstance.YTvaults(accounts[0], vaultIndex);
 
 		assert.equal(vault.CHborrowed, zcbAsset0.address, "CHborrowed is correct");
 		assert.equal(vault.CHsupplied, zcbAsset1.address, "CHsupplied is correct");
@@ -915,10 +915,10 @@ contract('MarginManager', async function(accounts) {
 	});
 
 	it('partial vault YT liquidation Specific Out', async () => {
-		await marginManagerInstance.partialYTLiquidationSpecificOut(accounts[0], vaultIndex, zcbAsset0.address, zcbAsset1.address,
+		await vaultFactoryInstance.partialYTLiquidationSpecificOut(accounts[0], vaultIndex, zcbAsset0.address, zcbAsset1.address,
 			vault.yieldSupplied, minBondRatio, vault.amountBorrowed, accounts[1], {from: accounts[1]});
 
-		vault = await marginManagerInstance.YTvaults(accounts[0], vaultIndex);
+		vault = await vaultFactoryInstance.YTvaults(accounts[0], vaultIndex);
 
 		assert.equal(vault.CHborrowed, zcbAsset0.address, "CHborrowed is correct");
 		assert.equal(vault.CHsupplied, zcbAsset1.address, "CHsupplied is correct");
@@ -932,10 +932,10 @@ contract('MarginManager', async function(accounts) {
 		let amountSupplied = _10To18;
 
 		await vaultHealthInstance.setToReturn(true);
-		await marginManagerInstance.openYTVault(zcbAsset1.address, zcbAsset0.address, yieldSupplied, bondSupplied, amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
-		await marginManagerInstance.openYTVault(zcbAsset1.address, zcbAsset0.address, yieldSupplied, bondSupplied, amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
+		await vaultFactoryInstance.openYTVault(zcbAsset1.address, zcbAsset0.address, yieldSupplied, bondSupplied, amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
+		await vaultFactoryInstance.openYTVault(zcbAsset1.address, zcbAsset0.address, yieldSupplied, bondSupplied, amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
 
-		vaultIndex = (await marginManagerInstance.YTvaultsLength(accounts[0])).toNumber() - 2;
+		vaultIndex = (await vaultFactoryInstance.YTvaultsLength(accounts[0])).toNumber() - 2;
 
 		bid = amountSupplied;
 
@@ -943,7 +943,7 @@ contract('MarginManager', async function(accounts) {
 		//test for when vaults are in good health
 		await vaultHealthInstance.setToReturn(true);
 		try {
-			await marginManagerInstance.auctionYTLiquidation(accounts[0], vaultIndex, zcbAsset0.address, zcbAsset1.address, bid, minBondRatio, amountBorrowed, {from: accounts[1]});
+			await vaultFactoryInstance.auctionYTLiquidation(accounts[0], vaultIndex, zcbAsset0.address, zcbAsset1.address, bid, minBondRatio, amountBorrowed, {from: accounts[1]});
 		} catch (err) {
 			caught = true;
 		}
@@ -956,14 +956,14 @@ contract('MarginManager', async function(accounts) {
 		*/
 		await helper.advanceTime(86401)
 
-		let rec = await marginManagerInstance.auctionYTLiquidation(accounts[0], vaultIndex, zcbAsset0.address, zcbAsset1.address, bid, minBondRatio, amountBorrowed, {from: accounts[1]});
+		let rec = await vaultFactoryInstance.auctionYTLiquidation(accounts[0], vaultIndex, zcbAsset0.address, zcbAsset1.address, bid, minBondRatio, amountBorrowed, {from: accounts[1]});
 		let timestamp = (await web3.eth.getBlock(rec.receipt.blockNumber)).timestamp;
 
-		assert.equal((await marginManagerInstance.YTLiquidationsLength()).toString(), "2", "correct length of liquidations array");
+		assert.equal((await vaultFactoryInstance.YTLiquidationsLength()).toString(), "2", "correct length of liquidations array");
 
 		let expectedBondRatio = bondSupplied.mul(_10To18).div(yieldSupplied).add(new BN(1));
 
-		liquidation = await marginManagerInstance.YTLiquidations(1);
+		liquidation = await vaultFactoryInstance.YTLiquidations(1);
 
 		assert.equal(liquidation.vaultOwner, accounts[0], "correct value of liquidation.vaultOwner");
 		assert.equal(liquidation.CHborrowed, zcbAsset0.address, "correct value of liquidation.CHborrowed");
@@ -974,7 +974,7 @@ contract('MarginManager', async function(accounts) {
 		assert.equal(liquidation.bidAmount.toString(), bid.toString(), "correct value of liquidation.bidAmount");
 		assert.equal(liquidation.bidTimestamp.toString(), timestamp, "correct value of liqudiation.bidTimestamp");
 
-		vault = await marginManagerInstance.YTvaults(accounts[0], 1);
+		vault = await vaultFactoryInstance.YTvaults(accounts[0], 1);
 
 		assert.equal(vault.CHborrowed, nullAddress, "CHborrowed is null");
 		assert.equal(vault.CHsupplied, nullAddress, "CHsupplied is null");
@@ -988,7 +988,7 @@ contract('MarginManager', async function(accounts) {
 		let caught = false;
 
 		try {
-			await marginManagerInstance.instantYTLiquidation(accounts[0], vaultIndex, zcbAsset0.address, zcbAsset1.address, amountBorrowed, yieldSupplied, minBondRatio, accounts[1], {from: accounts[1]});
+			await vaultFactoryInstance.instantYTLiquidation(accounts[0], vaultIndex, zcbAsset0.address, zcbAsset1.address, amountBorrowed, yieldSupplied, minBondRatio, accounts[1], {from: accounts[1]});
 		} catch (err) {
 			caught = true;
 		}
@@ -1000,9 +1000,9 @@ contract('MarginManager', async function(accounts) {
 		let _6days = _8days*3/4;
 		await helper.advanceTime(_6days);
 
-		await marginManagerInstance.instantYTLiquidation(accounts[0], vaultIndex, zcbAsset0.address, zcbAsset1.address, amountBorrowed, yieldSupplied, minBondRatio, accounts[1], {from: accounts[1]});
+		await vaultFactoryInstance.instantYTLiquidation(accounts[0], vaultIndex, zcbAsset0.address, zcbAsset1.address, amountBorrowed, yieldSupplied, minBondRatio, accounts[1], {from: accounts[1]});
 
-		vault = await marginManagerInstance.YTvaults(accounts[0], vaultIndex);
+		vault = await vaultFactoryInstance.YTvaults(accounts[0], vaultIndex);
 
 		assert.equal(vault.CHborrowed, nullAddress, "CHborrowed is correct");
 		assert.equal(vault.CHsupplied, nullAddress, "CHsupplied is correct");
@@ -1013,12 +1013,12 @@ contract('MarginManager', async function(accounts) {
 
 
 	it('contract owner withdraws YT revenue', async () => {
-		let revenue = await marginManagerInstance.YTrevenue(zcbAsset1.address);
+		let revenue = await vaultFactoryInstance.YTrevenue(zcbAsset1.address);
 
 		let caught = false;
 		let bondIn = "2";
 		try {
-			await marginManagerInstance.claimYTRevenue(zcbAsset1.address, bondIn, {from: accounts[1]});
+			await vaultFactoryInstance.claimYTRevenue(zcbAsset1.address, bondIn, {from: accounts[1]});
 		} catch (err) {
 			caught = true;
 		}
@@ -1027,9 +1027,9 @@ contract('MarginManager', async function(accounts) {
 		let prevBalanceYield = await zcbAsset1.balanceYield(accounts[0]);
 		let prevBalanceBond = await zcbAsset1.balanceBonds(accounts[0]);
 
-		await marginManagerInstance.claimYTRevenue(zcbAsset1.address, bondIn);
+		await vaultFactoryInstance.claimYTRevenue(zcbAsset1.address, bondIn);
 
-		let newRevenue = await marginManagerInstance.YTrevenue(zcbAsset1.address);
+		let newRevenue = await vaultFactoryInstance.YTrevenue(zcbAsset1.address);
 
 		let newBalanceYield = await zcbAsset1.balanceYield(accounts[0]);
 		let newBalanceBond = await zcbAsset1.balanceBonds(accounts[0]);

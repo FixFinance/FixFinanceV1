@@ -5,13 +5,13 @@ import "../libraries/SafeMath.sol";
 import "../libraries/SignedSafeMath.sol";
 import "../interfaces/ICapitalHandler.sol";
 import "../interfaces/IVaultHealth.sol";
-import "../interfaces/IMarginManager.sol";
+import "../interfaces/IVaultFactory.sol";
 import "../interfaces/IWrapper.sol";
 import "../interfaces/IERC20.sol";
 import "../helpers/Ownable.sol";
-import "./MarginManagerData.sol";
+import "./VaultFactoryData.sol";
 
-contract MarginManager is MarginManagerData, IMarginManager, Ownable {
+contract VaultFactory is VaultFactoryData, IVaultFactory, Ownable {
 	using SafeMath for uint;
 	using SignedSafeMath for int;
 
@@ -508,7 +508,7 @@ contract MarginManager is MarginManagerData, IMarginManager, Ownable {
 
 	/*
 		@Description: when there is less than 1 day until maturity or _vaults are under the lower collateralisation limit 
-			vaults may be liquidated instantly without going through the auction process, this is intended to help the MarginManager
+			vaults may be liquidated instantly without going through the auction process, this is intended to help the VaultFactory
 			keep solvency in the event of a market crisis
 			this function is used when a liquidator would like to liquidate the entire vault
 		@param address _owner: the owner of the vault to send to auction
@@ -535,7 +535,7 @@ contract MarginManager is MarginManagerData, IMarginManager, Ownable {
 
 	/*
 		@Description: when there is less than 1 day until maturity or _vaults are under the lower collateralisation limit 
-			vaults may be liquidated instantly without going through the auction process, this is intended to help the MarginManager
+			vaults may be liquidated instantly without going through the auction process, this is intended to help the VaultFactory
 			keep solvency in the event of a market crisis
 			this function is used when a liquidator whould like to only partially liquidate the vault by providing a specific
 			amount of assetBorrowed and receiving the corresponding amount of assetSupplied
@@ -563,7 +563,7 @@ contract MarginManager is MarginManagerData, IMarginManager, Ownable {
 
 	/*
 		@Description: when there is less than 1 day until maturity or _vaults are under the lower collateralisation limit 
-			vaults may be liquidated instantly without going through the auction process, this is intended to help the MarginManager
+			vaults may be liquidated instantly without going through the auction process, this is intended to help the VaultFactory
 			keep solvency in the event of a market crisis
 			this function is used when a liquidator whould like to only partially liquidate the vault by receiving a specific
 			amount of assetSupplied and sending the corresponding amount of assetBorrowed
@@ -680,7 +680,7 @@ contract MarginManager is MarginManagerData, IMarginManager, Ownable {
 
 	/*
 		@Description: when there is less than 1 day until maturity or _vaults are under the lower collateralisation limit 
-			vaults may be liquidated instantly without going through the auction process, this is intended to help the MarginManager
+			vaults may be liquidated instantly without going through the auction process, this is intended to help the VaultFactory
 			keep solvency in the event of a market crisis
 			this function is used when a liquidator would like to liquidate the entire vault
 		@param address _owner: the owner of the vault to send to auction
@@ -710,7 +710,7 @@ contract MarginManager is MarginManagerData, IMarginManager, Ownable {
 
 	/*
 		@Description: when there is less than 1 day until maturity or _vaults are under the lower collateralisation limit 
-			vaults may be liquidated instantly without going through the auction process, this is intended to help the MarginManager
+			vaults may be liquidated instantly without going through the auction process, this is intended to help the VaultFactory
 			keep solvency in the event of a market crisis
 			this function is used when a liquidator whould like to only partially liquidate the vault by providing a specific
 			amount of the borrowed asset and receiving the corresponding percentage of the vault's collateral
@@ -741,7 +741,7 @@ contract MarginManager is MarginManagerData, IMarginManager, Ownable {
 
 	/*
 		@Description: when there is less than 1 day until maturity or _vaults are under the lower collateralisation limit 
-			vaults may be liquidated instantly without going through the auction process, this is intended to help the MarginManager
+			vaults may be liquidated instantly without going through the auction process, this is intended to help the VaultFactory
 			keep solvency in the event of a market crisis
 			this function is used when a liquidator whould like to only partially liquidate the vault by receiving a specific
 			amount of YT corresponding to _CHsupplied and sending the corresponding amount of assetBorrowed

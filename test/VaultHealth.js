@@ -5,9 +5,9 @@ const capitalHandler = artifacts.require('CapitalHandler');
 const YieldToken = artifacts.require("YieldToken");
 const yieldTokenDeployer = artifacts.require('YieldTokenDeployer');
 const organizer = artifacts.require('organizer');
-const MarginManagerDelegate = artifacts.require('MarginManagerDelegate');
-const MarginManagerDelegate2 = artifacts.require('MarginManagerDelegate2');
-const MarginManager = artifacts.require('MarginManager');
+const VaultFactoryDelegate = artifacts.require('VaultFactoryDelegate');
+const VaultFactoryDelegate2 = artifacts.require('VaultFactoryDelegate2');
+const VaultFactory = artifacts.require('VaultFactory');
 const IERC20 = artifacts.require("IERC20");
 const BigMath = artifacts.require("BigMath");
 const Ei = artifacts.require("Ei");
@@ -63,12 +63,12 @@ contract('VaultHealth', async function(accounts) {
 		OracleContainerInstance = await OracleContainer.new(nullAddress.substring(0, nullAddress.length-1)+"1");
 		yieldTokenDeployerInstance = await yieldTokenDeployer.new();
 		vaultHealthInstance = await VaultHealth.new(OracleContainerInstance.address);
-		marginManagerDelegateInstance = await MarginManagerDelegate.new();
-		marginManagerDelegate2Instance = await MarginManagerDelegate2.new();
-		marginManagerInstance = await MarginManager.new(
+		vaultFactoryDelegateInstance = await VaultFactoryDelegate.new();
+		vaultFactoryDelegate2Instance = await VaultFactoryDelegate2.new();
+		vaultFactoryInstance = await VaultFactory.new(
 			vaultHealthInstance.address,
-			marginManagerDelegateInstance.address,
-			marginManagerDelegate2Instance.address
+			vaultFactoryDelegateInstance.address,
+			vaultFactoryDelegate2Instance.address
 		);
 		EiInstance = await Ei.new();
 		await BigMath.link("Ei", EiInstance.address);
@@ -130,8 +130,8 @@ contract('VaultHealth', async function(accounts) {
 		await wAsset0.depositUnitAmount(accounts[0], _10To19.mul(_10));
 		await wAsset0.approve(zcbAsset0.address, _10To19);
 		await zcbAsset0.depositWrappedToken(accounts[0], _10To19);
-		await wAsset0.approve(marginManagerInstance.address, _10To19);
-		await zcbAsset0.approve(marginManagerInstance.address, _10To19);
+		await wAsset0.approve(vaultFactoryInstance.address, _10To19);
+		await zcbAsset0.approve(vaultFactoryInstance.address, _10To19);
 		await zcbAsset0.approve(amm0.address, _10To19);
 		await ytAsset0.approve(amm0.address, _10To19);
 
@@ -141,8 +141,8 @@ contract('VaultHealth', async function(accounts) {
 		await wAsset1.depositUnitAmount(accounts[0], _10To19.mul(_10));
 		await wAsset1.approve(zcbAsset1.address, _10To19);
 		await zcbAsset1.depositWrappedToken(accounts[0], _10To19);
-		await wAsset1.approve(marginManagerInstance.address, _10To19);
-		await zcbAsset1.approve(marginManagerInstance.address, _10To19);
+		await wAsset1.approve(vaultFactoryInstance.address, _10To19);
+		await zcbAsset1.approve(vaultFactoryInstance.address, _10To19);
 		await zcbAsset1.approve(amm1.address, _10To19);
 		await ytAsset1.approve(amm1.address, _10To19);
 
@@ -152,8 +152,8 @@ contract('VaultHealth', async function(accounts) {
 		await wAsset0.depositUnitAmount(accounts[1], _10To19.mul(_10), {from: accounts[1]});
 		await wAsset0.approve(zcbAsset0.address, _10To19, {from: accounts[1]});
 		await zcbAsset0.depositWrappedToken(accounts[1], _10To19, {from: accounts[1]});
-		await zcbAsset0.approve(marginManagerInstance.address, _10To19, {from: accounts[1]});
-		await wAsset0.approve(marginManagerInstance.address, _10To19, {from: accounts[1]});
+		await zcbAsset0.approve(vaultFactoryInstance.address, _10To19, {from: accounts[1]});
+		await wAsset0.approve(vaultFactoryInstance.address, _10To19, {from: accounts[1]});
 
 		//add liquidity to amms
 		let toSend = _10To18.div(_10).div(_10);

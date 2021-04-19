@@ -17,7 +17,7 @@ interface ICapitalHandler is IERC20 {
 	function balanceBonds(address _owner) external view returns(int);
 	function balanceYield(address _owner) external view returns(uint);
 	function yieldTokenAddress() external view returns(address);
-	function marginManagerAddress() external view returns(address);
+	function vaultFactoryAddress() external view returns(address);
 	function wrapper() external view returns(IWrapper);
 
 	//---------------Margin-Manager------------------------------
@@ -28,6 +28,6 @@ interface ICapitalHandler is IERC20 {
 
 	//----------------admin----------------------------
 	function isFinalized() external view returns(bool);
-	function setMarginManagerAddress(address _marginManagerAddress) external;
+	function setVaultFactoryAddress(address _vaultFactoryAddress) external;
 	function finalize() external;
 }

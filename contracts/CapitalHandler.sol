@@ -45,14 +45,14 @@ contract CapitalHandler is ICapitalHandler, Ownable {
 		may never be greater than a user's negatie balance in balanceBonds
 
 		If a user would like to sell more ZCB against the underlying asset than the face unit value of
-		underlying asset they must use open a vault with the MarginManager contract to access margin
+		underlying asset they must use open a vault with the VaultFactory contract to access margin
 	*/
 	mapping(address => int) public override balanceBonds;
 	mapping(address => uint) public override balanceYield;
 
 	address public override yieldTokenAddress;
 
-	address public override marginManagerAddress;
+	address public override vaultFactoryAddress;
 
 //--------ERC 20 Storage---------------
 
@@ -236,26 +236,26 @@ contract CapitalHandler is ICapitalHandler, Ownable {
     //--------------------M-a-r-g-i-n---F-u-n-c-t-i-o-n-a-l-i-t-y--------------------------------
 
     /*
-		@Description: MarginManager contract may mint new ZCB against collateral, to mint new ZCB the MarginManager
+		@Description: VaultFactory contract may mint new ZCB against collateral, to mint new ZCB the VaultFactory
 			calls this function
 	
 		@param address _owner: address to credit new ZCB to
 		@param uint _amount: amount of ZCB to credit to _owner
     */
 	function mintZCBTo(address _owner, uint _amount) external override {
-		require(msg.sender == marginManagerAddress);
+		require(msg.sender == vaultFactoryAddress);
 		balanceBonds[_owner] += int(_amount);
 	}
 
 	/*
-		@Description: when margin position is closed/liquidated MarginManager contract calls this function to
+		@Description: when margin position is closed/liquidated VaultFactory contract calls this function to
 			remove ZCB from circulation
 
 		@param address _owner: address to take ZCB from
 		@param uint _amount: the amount of ZCB to remove from cirulation		
 	*/
 	function burnZCBFrom(address _owner, uint _amount) external override {
-		require(msg.sender == marginManagerAddress);
+		require(msg.sender == vaultFactoryAddress);
 		require(minimumUnitAmountAtMaturity(_owner) >= _amount);
 		balanceBonds[_owner] -= int(_amount);
 	}
@@ -336,23 +336,23 @@ contract CapitalHandler is ICapitalHandler, Ownable {
 	}
 
 	//---------------------------------a-d-m-i-n------------------------------
-	//when isFinalized, marginManagerAddress may not be changed
+	//when isFinalized, vaultFactoryAddress may not be changed
 	bool public override isFinalized;
 
 	/*
-		@Description: before isFinalized admin may change the MarginManager contract address
-			the marginManagerAddress is allowed to mint and burn ZCB so users should be careful and observant of this
+		@Description: before isFinalized admin may change the VaultFactory contract address
+			the vaultFactoryAddress is allowed to mint and burn ZCB so users should be careful and observant of this
 
-		@param address _marginManagerAddress: the address of the new bond minter contract that this capital handler
+		@param address _vaultFactoryAddress: the address of the new bond minter contract that this capital handler
 			will adhere to
 	*/
-	function setMarginManagerAddress(address _marginManagerAddress) external override onlyOwner {
+	function setVaultFactoryAddress(address _vaultFactoryAddress) external override onlyOwner {
 		require(!isFinalized);
-		marginManagerAddress = _marginManagerAddress;
+		vaultFactoryAddress = _vaultFactoryAddress;
 	}
 
 	/*
-		@Description: after this function is called by owner, the marginManagerAddress cannot be changed
+		@Description: after this function is called by owner, the vaultFactoryAddress cannot be changed
 	*/
 	function finalize() external override onlyOwner {
 		isFinalized = true;

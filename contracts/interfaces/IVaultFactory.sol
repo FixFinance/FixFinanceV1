@@ -1,11 +1,11 @@
 pragma experimental ABIEncoderV2;
 pragma solidity >=0.6.0;
-import "../MarginManager/MarginManagerData.sol";
+import "../VaultFactory/VaultFactoryData.sol";
 
-interface IMarginManager {
+interface IVaultFactory {
 	function vaultsLength(address _owner) external view returns(uint);
 	function YTvaultsLength(address _owner) external view returns(uint);
-	function allVaults(address _owner) external view returns(MarginManagerData.Vault[] memory _vaults);
+	function allVaults(address _owner) external view returns(VaultFactoryData.Vault[] memory _vaults);
 	function liquidationsLength() external view returns (uint);
 	function YTLiquidationsLength() external view returns (uint);
 	//-----------------------------------------V-a-u-l-t---M-a-n-a-g-e-m-e-n-t-----------------------------

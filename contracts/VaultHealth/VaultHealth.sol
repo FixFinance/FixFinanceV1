@@ -109,7 +109,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 
 	/*
 		Set by contract owner this mapping shows the maximum amount of any underlying asset (at all durations combined)
-		that may be shorted via the MarginManager contract
+		that may be shorted via the VaultFactory contract
 	*/
 	mapping(address => uint) public override maximumShortInterest;
 

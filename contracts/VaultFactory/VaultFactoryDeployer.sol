@@ -1,8 +1,8 @@
 pragma solidity >=0.6.0;
 
-import "./MarginManager.sol";
+import "./VaultFactory.sol";
 
-contract MarginManagerDeployer {
+contract VaultFactoryDeployer {
 
 	event Deploy(
 		address addr
@@ -20,14 +20,14 @@ contract MarginManagerDeployer {
 	}
 
 	/*
-		@Description: deploy new MarginManager contract
+		@Description: deploy new VaultFactory contract
 
-		@param address _vaultHealthAddress: 1st param to be passed to MarginManager constructor
+		@param address _vaultHealthAddress: 1st param to be passed to VaultFactory constructor
 
-		@return address: the address of the new MarginManager contract
+		@return address: the address of the new VaultFactory contract
 	*/
 	function deploy(address _vaultHealthAddress) external returns(address) {
-		MarginManager temp = new MarginManager(_vaultHealthAddress, delegate, delegate2);
+		VaultFactory temp = new VaultFactory(_vaultHealthAddress, delegate, delegate2);
 		temp.transferOwnership(msg.sender);
 		emit Deploy(address(temp));
 		return address(temp);

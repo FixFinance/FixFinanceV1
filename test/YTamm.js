@@ -4,7 +4,7 @@ const BigMath = artifacts.require("BigMath");
 const Ei = artifacts.require("Ei");
 const capitalHandler = artifacts.require("CapitalHandler");
 const yieldToken = artifacts.require("YieldToken");
-const yieldTokenDeployer = artifacts.require("YieldTokenDeployer");
+const zcbYtDeployer = artifacts.require("ZCB_YT_Deployer");
 const ZCBamm = artifacts.require("ZCBamm");
 const YTamm = artifacts.require("YTamm");
 const YTammDelegate = artifacts.require('YTammDelegate');
@@ -97,11 +97,11 @@ contract('YTamm', async function(accounts){
 		EiInstance = await Ei.new();
 		await BigMath.link("Ei", EiInstance.address);
 		BigMathInstance = await BigMath.new();
-		yieldTokenDeployerInstance = await yieldTokenDeployer.new();
+		zcbYtDeployerInstance = await zcbYtDeployer.new();
 		let timestamp = (await web3.eth.getBlock('latest')).timestamp;
 		//maturity is 110 days out
 		maturity = timestamp + 110*24*60*60;
-		capitalHandlerInstance = await capitalHandler.new(NGBwrapperInstance.address, maturity, yieldTokenDeployerInstance.address);
+		capitalHandlerInstance = await capitalHandler.new(NGBwrapperInstance.address, maturity, zcbYtDeployerInstance.address);
 		yieldTokenInstance = await yieldToken.at(await capitalHandlerInstance.yieldTokenAddress());
 		await ZCBamm.link("BigMath", BigMathInstance.address);
 		await YTamm.link("BigMath", BigMathInstance.address);

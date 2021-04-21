@@ -125,6 +125,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 			in ABDK64.64 format
 		
 		@param address _capitalHandlerAddress: the capital handler for which to get the years remaining to maturity
+			this param could alternatively be the address of a ZCB contract and the same effect would be achived
 
 		@return int128: years to maturity in ABDK64.64 format
 	*/

@@ -27,6 +27,7 @@ contract YTamm is IYTamm {
 		address _feeOracleAddress,
 		address _delegateAddress
 	) public {
+		address _CHaddress = IZCBamm(_ZCBammAddress).CHaddress();
 		address _ZCBaddress = IZCBamm(_ZCBammAddress).ZCBaddress();
 		address _YTaddress = IZCBamm(_ZCBammAddress).YTaddress();
 		uint64 _maturity = IZCBamm(_ZCBammAddress).maturity();
@@ -37,8 +38,8 @@ contract YTamm is IYTamm {
 		maturity = _maturity;
 		ZCBammAddress = _ZCBammAddress;
 		AmmInfoOracleAddress = _feeOracleAddress;
-		SlippageConstant = AmmInfoOracle(_feeOracleAddress).getSlippageConstant(_ZCBaddress);
-		wrapper = ICapitalHandler(_ZCBaddress).wrapper();
+		SlippageConstant = AmmInfoOracle(_feeOracleAddress).getSlippageConstant(_CHaddress);
+		wrapper = ICapitalHandler(_CHaddress).wrapper();
 		YTtoLmultiplier = BigMath.YT_U_ratio(
 			apy,
 			maturity-block.timestamp
@@ -362,7 +363,7 @@ contract YTamm is IYTamm {
 			inflTotalSupply,
 			_TimeRemaining,
 			SlippageConstant,
-			(1 ether)**2 / AmmInfoOracle(AmmInfoOracleAddress).getYTammFeeConstant(ZCBaddress),
+			(1 ether)**2 / AmmInfoOracle(AmmInfoOracleAddress).getYTammFeeConstant(CHaddress),
 			OracleRate,
 			_amount
 		));
@@ -408,7 +409,7 @@ contract YTamm is IYTamm {
 			inflTotalSupply,
 			_TimeRemaining,
 			SlippageConstant,
-			AmmInfoOracle(AmmInfoOracleAddress).getYTammFeeConstant(ZCBaddress),
+			AmmInfoOracle(AmmInfoOracleAddress).getYTammFeeConstant(CHaddress),
 			OracleRate,
 			-_amount
 		));
@@ -481,7 +482,7 @@ contract YTamm is IYTamm {
 			inflTotalSupply,
 			_TimeRemaining,
 			SlippageConstant,
-			(1 ether)**2 / AmmInfoOracle(AmmInfoOracleAddress).getYTammFeeConstant(ZCBaddress),
+			(1 ether)**2 / AmmInfoOracle(AmmInfoOracleAddress).getYTammFeeConstant(CHaddress),
 			OracleRate,
 			_amount
 		));
@@ -521,7 +522,7 @@ contract YTamm is IYTamm {
 			inflTotalSupply,
 			_TimeRemaining,
 			SlippageConstant,
-			AmmInfoOracle(AmmInfoOracleAddress).getYTammFeeConstant(ZCBaddress),
+			AmmInfoOracle(AmmInfoOracleAddress).getYTammFeeConstant(CHaddress),
 			OracleRate,
 			-_amount
 		));

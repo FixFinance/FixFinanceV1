@@ -2,9 +2,10 @@ pragma solidity >=0.6.5 <0.7.0;
 import "./interfaces/ICapitalHandler.sol";
 import "./interfaces/IWrapper.sol";
 import "./interfaces/IYieldToken.sol";
+import "./interfaces/IZeroCouponBond.sol";
 import "./interfaces/IERC20.sol";
 import "./ERC20.sol";
-import "./YieldTokenDeployer.sol";
+import "./ZCB_YT_Deployer.sol";
 import "./libraries/SafeMath.sol";
 import "./libraries/SignedSafeMath.sol";
 import "./helpers/Ownable.sol";
@@ -51,16 +52,9 @@ contract CapitalHandler is ICapitalHandler, Ownable {
 	mapping(address => uint) public override balanceYield;
 
 	address public override yieldTokenAddress;
+	address public override zeroCouponBondAddress;
 
 	address public override vaultFactoryAddress;
-
-//--------ERC 20 Storage---------------
-
-	uint8 public override decimals;
-    mapping(address => mapping(address => uint256)) public override allowance;
-    string public override name;
-    string public override symbol;
-
 
     /*
 		init
@@ -68,17 +62,15 @@ contract CapitalHandler is ICapitalHandler, Ownable {
 	constructor(
 		address _wrapper,
 		uint64 _maturity,
-		address _yieldTokenDeployer
+		address _ZCB_YTdeployerAddr
 	) public {
 		IWrapper temp = IWrapper(_wrapper);
 		wrapper = temp;
-		decimals = temp.decimals();
 		IERC20 temp2 = IERC20(temp.underlyingAssetAddress());
 		underlyingAssetAddress = address(temp2);
-		name = string(abi.encodePacked(temp2.name(),' zero coupon bond'));
-		symbol = string(abi.encodePacked(temp2.symbol(), 'zcb'));
 		maturity = _maturity;
-		yieldTokenAddress = YieldTokenDeployer(_yieldTokenDeployer).deploy(_wrapper);
+		yieldTokenAddress = ZCB_YT_Deployer(_ZCB_YTdeployerAddr).deployYT(_wrapper, _maturity);
+		zeroCouponBondAddress = ZCB_YT_Deployer(_ZCB_YTdeployerAddr).deployZCB(_wrapper, _maturity);
 	}
 
 	/*
@@ -187,52 +179,6 @@ contract CapitalHandler is ICapitalHandler, Ownable {
 			balance = balance.sub(uint(-bondBal));
 	}
 
-//-------------ERC20 Implementation----------------
-
-
-	function balanceOf(address _owner) public view override returns (uint balance) {
-		balance = minimumUnitAmountAtMaturity(_owner);
-	}
-
-    function transfer(address _to, uint256 _value) public override returns (bool success) {
-
-        balanceBonds[msg.sender] -= int(_value);
-        balanceBonds[_to] += int(_value);
-
-        minimumUnitAmountAtMaturity(msg.sender);
-
-        emit Transfer(msg.sender, _to, _value);
-
-        return true;
-    }
-
-    function approve(address _spender, uint256 _value) public override returns (bool success) {
-        allowance[msg.sender][_spender] = _value;
-
-        emit Approval(msg.sender, _spender, _value);
-
-        return true;
-    }
-
-    function transferFrom(address _from, address _to, uint256 _value) public override returns (bool success) {
-        require(_value <= allowance[_from][msg.sender]);
-
-    	balanceBonds[_from] -= int(_value);
-    	balanceBonds[_to] += int(_value);
-
-        minimumUnitAmountAtMaturity(_from);
-
-        allowance[_from][msg.sender] -= _value;
-
-        emit Transfer(_from, _to, _value);
-
-        return true;
-    }
-
-    function totalSupply() public view override returns (uint _supply) {
-    	_supply = wrapper.WrappedAmtToUnitAmt_RoundDown(wrapper.balanceOf(address(this)));
-    }
-
     //--------------------M-a-r-g-i-n---F-u-n-c-t-i-o-n-a-l-i-t-y--------------------------------
 
     /*
@@ -299,8 +245,7 @@ contract CapitalHandler is ICapitalHandler, Ownable {
 
 		//decrement approval of ZCB
 		uint unitAmtZCB = _bond > 0 ? unitAmtYield.add(uint(_bond)) : unitAmtYield.sub(uint(-_bond));
-		require(allowance[_from][msg.sender] >= unitAmtZCB);
-		allowance[_from][msg.sender] -= unitAmtZCB;
+		IZeroCouponBond(zeroCouponBondAddress).decrementAllowance(_from, msg.sender, unitAmtZCB);
 
 		//decrement approval of YT
 		IYieldToken(yieldTokenAddress).decrementAllowance(_from, msg.sender, _yield);
@@ -309,6 +254,38 @@ contract CapitalHandler is ICapitalHandler, Ownable {
 		balanceBonds[_from] = bondFrom;
 		balanceYield[_to] += _yield;
 		balanceBonds[_to] += _bond;
+	}
+
+	//---------------------------Z-e-r-o---C-o-u-p-o-n---B-o-n-d----------------
+
+	/*
+		@Description: this fucntion is used to get balance of ZCB
+
+		@param address _owner: the account for which to find zcb balance
+
+		@return uint: the balance of ZCB of _owner
+	*/
+	function totalBalanceZCB(address _owner) external view override returns (uint) {
+		return minimumUnitAmountAtMaturity(_owner);
+	}
+
+	/*
+		@Description: zero coupon bond contract must call this function to transfer zcb between addresses
+
+		@param address _from: the address to deduct ZCB from
+		@param address _to: the address to send 
+	*/
+	function transferZCB(address _from, address _to, uint _amount) external override {
+		require(msg.sender == zeroCouponBondAddress);
+
+		int intAmount = int(_amount);
+		require(intAmount >= 0);
+		balanceBonds[_to] = balanceBonds[_to].add(intAmount);
+		balanceBonds[_from] = balanceBonds[_from].sub(intAmount);
+
+		//ensure that _from address's position may be cashed out to a positive amount of wrappedToken
+		//if it cannot the following call will revert this tx
+		minimumUnitAmountAtMaturity(_from);
 	}
 
 	//---------------------------Y-i-e-l-d---T-o-k-e-n-----------------------

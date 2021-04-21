@@ -2,6 +2,7 @@ pragma solidity >=0.6.0;
 import "../helpers/IZCBamm.sol";
 import "../helpers/IYTamm.sol";
 import "../interfaces/ICapitalHandler.sol";
+import "../interfaces/IZeroCouponBond.sol";
 import "../interfaces/IYieldToken.sol";
 import "../interfaces/IWrapper.sol";
 import "../interfaces/ISwapRouter.sol";
@@ -100,15 +101,16 @@ contract SwapRouter is ISwapRouter {
 	) external override {
 		ICapitalHandler ch = ICapitalHandler(_capitalHandlerAddress);
 		IYieldToken yt = IYieldToken(ch.yieldTokenAddress());
+		IZeroCouponBond zcb = IZeroCouponBond(ch.zeroCouponBondAddress());
 
 		yt.transferFrom_2(msg.sender, address(this), _amountYT, false);
-		ch.transferFrom(msg.sender, address(this), _amountZCB);
+		zcb.transferFrom(msg.sender, address(this), _amountZCB);
 
 		int _bondBal = ch.balanceBonds(address(this));
 
 		if (_bondBal < -int(MinBalance)) {
 			require(_bondBal >= -int(MAX));
-			uint totalBalance = ch.balanceOf(address(this));
+			uint totalBalance = zcb.balanceOf(address(this));
 			//yAmm swap
 			IYTamm yAmm = IYTamm(org.YTamms(_capitalHandlerAddress));
 			yt.approve_2(address(yAmm), uint(-_bondBal), true);
@@ -125,7 +127,7 @@ contract SwapRouter is ISwapRouter {
 			uint totalBalance = yt.balanceOf_2(address(this), false);
 			//zAmm swap
 			IZCBamm zAmm = IZCBamm(org.ZCBamms(_capitalHandlerAddress));
-			ch.approve(address(zAmm), uint(_bondBal));
+			zcb.approve(address(zAmm), uint(_bondBal));
 			if (_minUout + RoundingBuffer > totalBalance) {
 				zAmm.SwapFromSpecificTokensWithLimit(int128(_bondBal), true, _minUout-totalBalance+RoundingBuffer);
 			}
@@ -152,15 +154,16 @@ contract SwapRouter is ISwapRouter {
 		organizer _org = org;
 		IZCBamm zAmm = IZCBamm(_org.ZCBamms(_capitalHandlerAddress));
 		IYTamm yAmm = IYTamm(_org.YTamms(_capitalHandlerAddress));
+		IZeroCouponBond zcb = IZeroCouponBond(ch.zeroCouponBondAddress());
 
 		uint _amtU = yAmm.ReserveQuoteToYT(int128(_amountYT+RoundingBuffer));
 		uint _amtZCB = zAmm.ReserveQuoteToSpecificTokens(int128(_amtU+RoundingBuffer), true);
 		require(_amtZCB <= _maxZCBin);
-		ch.transferFrom(msg.sender, address(this), _amtZCB);
-		ch.approve(address(zAmm), _amtZCB);
+		zcb.transferFrom(msg.sender, address(this), _amtZCB);
+		zcb.approve(address(zAmm), _amtZCB);
 		zAmm.TakeQuote(_amtZCB, _amtU+RoundingBuffer, true, true);
 		//approvals for before yAmm swap
-		ch.approve(address(yAmm), _amtU);
+		zcb.approve(address(yAmm), _amtU);
 		yt.approve_2(address(yAmm), _amtU, true);
 		yAmm.TakeQuote(_amtU, int128(_amountYT+RoundingBuffer), false);
 		yt.transfer(msg.sender, yt.balanceOf(address(this)));
@@ -178,6 +181,7 @@ contract SwapRouter is ISwapRouter {
 		require(_amountYT < uint(MAX) && _amountYT > RoundingBuffer);
 		ICapitalHandler ch = ICapitalHandler(_capitalHandlerAddress);
 		IYieldToken yt = IYieldToken(ch.yieldTokenAddress());
+		IZeroCouponBond zcb = IZeroCouponBond(ch.zeroCouponBondAddress());
 		organizer _org = org;
 		IZCBamm zAmm = IZCBamm(_org.ZCBamms(_capitalHandlerAddress));
 		IYTamm yAmm = IYTamm(_org.YTamms(_capitalHandlerAddress));
@@ -188,11 +192,11 @@ contract SwapRouter is ISwapRouter {
 		uint _amtU = yAmm.SwapFromSpecificYTWithLimit(int128(_amountYT-RoundingBuffer), RoundingBuffer);
 		require(_amtU < uint(MAX));
 
-		ch.approve(address(zAmm), _amtU);
+		zcb.approve(address(zAmm), _amtU);
 		yt.approve_2(address(zAmm), _amtU+RoundingBuffer, false);
 		uint _amtZCB = zAmm.SwapFromSpecificTokensWithLimit(int128(_amtU), false, _minZCBout);
 
-		ch.transfer(msg.sender, _amtZCB);
+		zcb.transfer(msg.sender, _amtZCB);
 	}
 
 	/*
@@ -212,6 +216,7 @@ contract SwapRouter is ISwapRouter {
 		require(_amountYT < uint(MAX) && _amountYT > RoundingBuffer);
 		ICapitalHandler ch = ICapitalHandler(_capitalHandlerAddress);
 		IYieldToken yt = IYieldToken(ch.yieldTokenAddress());
+		IZeroCouponBond zcb = IZeroCouponBond(ch.zeroCouponBondAddress());
 		IZCBamm zAmm = IZCBamm(org.ZCBamms(_capitalHandlerAddress));
 
 		uint quotedAmtIn = zAmm.ReserveQuoteToSpecificTokens(int128(_amountYT), true);
@@ -219,13 +224,13 @@ contract SwapRouter is ISwapRouter {
 		require(ZCBin <= _maxZCBin);
 
 		if (_transferIn) {
-			ch.transferFrom(msg.sender, address(this), ZCBin);
+			zcb.transferFrom(msg.sender, address(this), ZCBin);
 		}
-		ch.approve(address(zAmm), _maxZCBin);
+		zcb.approve(address(zAmm), _maxZCBin);
 		zAmm.TakeQuote(quotedAmtIn, _amountYT, true, true);
 		if (_transferOut) {
 			yt.transfer(msg.sender, yt.balanceOf(address(this)));
-			ch.transfer(msg.sender, ch.balanceOf(address(this)));
+			zcb.transfer(msg.sender, zcb.balanceOf(address(this)));
 		}
 	}
 
@@ -246,6 +251,7 @@ contract SwapRouter is ISwapRouter {
 		require(_amountYT < uint(MAX) && _amountYT > RoundingBuffer);
 		ICapitalHandler ch = ICapitalHandler(_capitalHandlerAddress);
 		IYieldToken yt = IYieldToken(ch.yieldTokenAddress());
+		IZeroCouponBond zcb = IZeroCouponBond(ch.zeroCouponBondAddress());
 		IZCBamm zAmm = IZCBamm(org.ZCBamms(_capitalHandlerAddress));
 
 		uint quotedAmtOut = zAmm.ReserveQuoteFromSpecificTokens(int128(_amountYT), false);
@@ -260,7 +266,7 @@ contract SwapRouter is ISwapRouter {
 		zAmm.TakeQuote(_amountYT, quotedAmtOut, false, false);
 		if (_transferOut) {
 			yt.transfer(msg.sender, yt.balanceOf(address(this)));
-			ch.transfer(msg.sender, ch.balanceOf(address(this)));
+			zcb.transfer(msg.sender, zcb.balanceOf(address(this)));
 		}
 	}
 
@@ -306,12 +312,13 @@ contract SwapRouter is ISwapRouter {
 		require(_Uin > 0);
 		ICapitalHandler ch = ICapitalHandler(_capitalHandlerAddress);
 		IYieldToken yt = IYieldToken(ch.yieldTokenAddress());
+		IZeroCouponBond zcb = IZeroCouponBond(ch.zeroCouponBondAddress());
 		IZCBamm zAmm = IZCBamm(org.ZCBamms(_capitalHandlerAddress));
 
 		uint ZCBinMiddle = zAmm.ReserveQuoteFromSpecificTokens(_Uin, false);
 
 		yt.transferFrom_2(msg.sender, address(this), uint(_Uin), true);
-		ch.transferFrom(msg.sender, address(this), uint(_Uin));
+		zcb.transferFrom(msg.sender, address(this), uint(_Uin));
 		yt.approve_2(address(zAmm), uint(_Uin), true);
 		zAmm.TakeQuote(uint(_Uin), ZCBinMiddle, false, false);
 
@@ -330,17 +337,18 @@ contract SwapRouter is ISwapRouter {
 		uint ZCBout = _SwapYTtoZCB_ZCBamm(_capitalHandlerAddress, _amountYT, _minUout, true, false);
 		ICapitalHandler ch = ICapitalHandler(_capitalHandlerAddress);
 		IYieldToken yt = IYieldToken(ch.yieldTokenAddress());
+		IZeroCouponBond zcb = IZeroCouponBond(ch.zeroCouponBondAddress());
 		IZCBamm zAmm = IZCBamm(org.ZCBamms(_capitalHandlerAddress));
 		require(ZCBout <= uint(MAX));
 
 		//now we will use ZCBout as the input to the next trade
 		uint Uout = zAmm.ReserveQuoteFromSpecificTokens(int128(ZCBout), true);
 		require(Uout >= _minUout);
-		ch.approve(address(zAmm), ZCBout);
+		zcb.approve(address(zAmm), ZCBout);
 		zAmm.TakeQuote(ZCBout, Uout, true, false);
 
 		yt.transfer(msg.sender, yt.balanceOf(address(this)));
-		ch.transfer(msg.sender, ch.balanceOf(address(this)));
+		zcb.transfer(msg.sender, zcb.balanceOf(address(this)));
 	}
 
 }

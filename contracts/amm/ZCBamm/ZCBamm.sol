@@ -4,6 +4,7 @@ import "../../helpers/IZCBamm.sol";
 import "../../libraries/ABDKMath64x64.sol";
 import "../../libraries/BigMath.sol";
 import "../../interfaces/ICapitalHandler.sol";
+import "../../interfaces/IZeroCouponBond.sol";
 import "../../interfaces/IYieldToken.sol";
 import "../../interfaces/IWrapper.sol";
 import "../../interfaces/IERC20.sol";
@@ -52,9 +53,10 @@ contract ZCBamm is IZCBamm {
 	/*
 		Init AMM
 	*/
-	constructor(address _ZCBaddress, address _feeOracleAddress) public {
-		address _YTaddress = ICapitalHandler(_ZCBaddress).yieldTokenAddress();
-		uint64 _maturity = ICapitalHandler(_ZCBaddress).maturity();
+	constructor(address _CHaddress, address _feeOracleAddress) public {
+		address _YTaddress = ICapitalHandler(_CHaddress).yieldTokenAddress();
+		address _ZCBaddress = ICapitalHandler(_CHaddress).zeroCouponBondAddress();
+		uint64 _maturity = ICapitalHandler(_CHaddress).maturity();
 		require(_maturity > block.timestamp + 10 days);
 		maturity = _maturity;
 		//we want time remaining / anchor to be less than 1, thus make anchor greater than time remaining
@@ -62,10 +64,11 @@ contract ZCBamm is IZCBamm {
 		anchor = temp;
 		nextAnchor = temp;
 		AmmInfoOracleAddress = _feeOracleAddress;
-		wrapper = ICapitalHandler(_ZCBaddress).wrapper();
+		wrapper = ICapitalHandler(_CHaddress).wrapper();
 		lastRecalibration = block.timestamp;
 		ZCBaddress = _ZCBaddress;
 		YTaddress = _YTaddress;
+		CHaddress = _CHaddress;
 	}
 
 	/*
@@ -143,7 +146,7 @@ contract ZCBamm is IZCBamm {
 		@param uint _amount: amount of ZCB for pool to receive
 	*/
 	function getZCB(address _to, uint _amount) internal {
-		ICapitalHandler(ZCBaddress).transferFrom(msg.sender, _to, _amount);
+		IZeroCouponBond(ZCBaddress).transferFrom(msg.sender, _to, _amount);
 	}
 
 	/*
@@ -163,7 +166,7 @@ contract ZCBamm is IZCBamm {
 		@param uint _amount: amount of ZCB to transfer
 	*/
 	function sendZCB(address _to, uint _amount) internal {
-		ICapitalHandler(ZCBaddress).transfer(_to, _amount);
+		IZeroCouponBond(ZCBaddress).transfer(_to, _amount);
 	}
 
 	/*

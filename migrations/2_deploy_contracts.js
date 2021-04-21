@@ -2,7 +2,7 @@ const NGBwrapper = artifacts.require('NGBwrapper');
 const capitalHandler = artifacts.require('CapitalHandler');
 const dummyAToken = artifacts.require('dummyAToken');
 const organizer = artifacts.require('organizer');
-const yieldTokenDeployer = artifacts.require('YieldTokenDeployer');
+const zcbYtDeployer = artifacts.require('ZCB_YT_Deployer');
 const VaultFactoryDelegate = artifacts.require("VaultFactoryDelegate");
 const VaultFactoryDelegate2 = artifacts.require("VaultFactoryDelegate2");
 const VaultFactory = artifacts.require("VaultFactory");
@@ -51,7 +51,7 @@ module.exports = async function(deployer) {
 	accounts = await web3.eth.getAccounts();
 	dummyATokenInstance = await deployer.deploy(dummyAToken, "aETH");
 	dummyATokenInstance = await deployer.deploy(dummyAToken, "aUSDC");
-	yieldTokenDeployerInstance = await deployer.deploy(yieldTokenDeployer);
+	zcbYtDeployerInstance = await deployer.deploy(zcbYtDeployer);
 	vaultFactoryDelegateInstance = await deployer.deploy(VaultFactoryDelegate);
 	vaultFactoryDelegate2Instance = await deployer.deploy(VaultFactoryDelegate2);
 	vaultFactoryInstance = await deployer.deploy(
@@ -73,7 +73,7 @@ module.exports = async function(deployer) {
 	YTammDeployerInstance = await deployer.deploy(YTammDeployer, YTammDelegateInstance.address);
 	organizerInstance = await deployer.deploy(
 		organizer,
-		yieldTokenDeployerInstance.address,
+		zcbYtDeployerInstance.address,
 		capitalHandlerDeployerInstance.address,
 		ZCBammDeployerInstance.address,
 		YTammDeployerInstance.address,

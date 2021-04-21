@@ -3,7 +3,7 @@ const dummyVaultHealth = artifacts.require('DummyVaultHealth');
 const NGBwrapper = artifacts.require('NGBwrapper');
 const CapitalHandler = artifacts.require('CapitalHandler');
 const YieldToken = artifacts.require('YieldToken');
-const yieldTokenDeployer = artifacts.require('YieldTokenDeployer');
+const zcbYtDeployer = artifacts.require('ZCB_YT_Deployer');
 const organizer = artifacts.require('organizer');
 const IERC20 = artifacts.require("IERC20");
 const BigMath = artifacts.require("BigMath");
@@ -30,7 +30,7 @@ contract('organizer', function(accounts) {
 
 	it('before each', async () => {
 
-		yieldTokenDeployerInstance = await yieldTokenDeployer.new();
+		zcbYtDeployerInstance = await zcbYtDeployer.new();
 		vaultHealthInstance = await dummyVaultHealth.new();
 		EiInstance = await Ei.new();
 		await BigMath.link("Ei", EiInstance.address);
@@ -46,7 +46,7 @@ contract('organizer', function(accounts) {
 		swapRouterDeployerInstance = await SwapRouterDeployer.new(swapRouterDelegateInstance.address);
 		ammInfoOracleInstance = await AmmInfoOracle.new("0", nullAddress);
 		organizerInstance = await organizer.new(
-			yieldTokenDeployerInstance.address,
+			zcbYtDeployerInstance.address,
 			capitalHandlerDeployerInstance.address,
 			ZCBammDeployerInstance.address,
 			YTammDeployerInstance.address,
@@ -74,6 +74,7 @@ contract('organizer', function(accounts) {
 		let rec = await organizerInstance.deployCapitalHandlerInstance(wAsset0.address, maturity);
 		capitalHandlerInstance = await CapitalHandler.at(rec.receipt.logs[0].args.addr);
 		yieldTokenInstance = await YieldToken.at(await capitalHandlerInstance.yieldTokenAddress());
+		zcbInstance = await IERC20.at(await capitalHandlerInstance.zeroCouponBondAddress());
 		assert.notEqual(capitalHandlerInstance.address, nullAddress, "organizer::capitalHandlerMapping[asset0] must be non-null");
 	});
 
@@ -100,7 +101,7 @@ contract('organizer', function(accounts) {
 		await wAsset0.depositUnitAmount(accounts[0], balance);
 		await wAsset0.approve(capitalHandlerInstance.address, balance);
 		await capitalHandlerInstance.depositWrappedToken(accounts[0], balance);
-		await capitalHandlerInstance.approve(amm0.address, balance);
+		await zcbInstance.approve(amm0.address, balance);
 		await yieldTokenInstance.approve(amm0.address, balance);
 
 		Uin = balance.div(new BN("10"));

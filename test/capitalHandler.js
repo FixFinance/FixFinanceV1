@@ -1,7 +1,7 @@
 const dummyAToken = artifacts.require('dummyAToken');
 const NGBwrapper = artifacts.require('NGBwrapper');
 const capitalHandler = artifacts.require('CapitalHandler');
-const yieldTokenDeployer = artifacts.require('YieldTokenDeployer');
+const zcbYtDeployer = artifacts.require('ZCB_YT_Deployer');
 const IERC20 = artifacts.require("IERC20");
 
 const helper = require("../helper/helper.js");
@@ -16,11 +16,12 @@ contract('capitalHandler', async function(accounts){
 	it('before each', async () => {
 		dummyATokenInstance = await dummyAToken.new("aCOIN");
 		NGBwrapperInstance = await NGBwrapper.new(dummyATokenInstance.address, accounts[4], SBPSretained);
-		yieldTokenDeployerInstance = await yieldTokenDeployer.new();
+		zcbYtDeployerInstance = await zcbYtDeployer.new();
 		timeNow = (await web3.eth.getBlock('latest')).timestamp;
-		capitalHandlerInstance = await capitalHandler.new(NGBwrapperInstance.address, timeNow+86400, yieldTokenDeployerInstance.address);
+		capitalHandlerInstance = await capitalHandler.new(NGBwrapperInstance.address, timeNow+86400, zcbYtDeployerInstance.address);
 		inflation = await dummyATokenInstance.inflation();
 		yieldTokenInstance = await IERC20.at(await capitalHandlerInstance.yieldTokenAddress());
+		zcbInstance = await IERC20.at(await capitalHandlerInstance.zeroCouponBondAddress());
 		//wrap aTokens
 		amount = '100000';
 		await dummyATokenInstance.approve(NGBwrapperInstance.address, amount);
@@ -36,16 +37,16 @@ contract('capitalHandler', async function(accounts){
 	it('has correct bond sending limits', async () => {
 		amountPlusOne = '100001';
 		caught = false;
-		await capitalHandlerInstance.transfer(accounts[1], amountPlusOne).catch(() => {
+		await zcbInstance.transfer(accounts[1], amountPlusOne).catch(() => {
 			caught = true;
 		}).then(() => {
 			assert.equal(caught, true, "cannot send more bonds than one has collateral for");
 		});
-		await capitalHandlerInstance.transfer(accounts[1], amount);
+		await zcbInstance.transfer(accounts[1], amount);
 		assert.equal((await capitalHandlerInstance.balanceBonds(accounts[0])).toString(), '-'+amount, "correct bond balance for account 0");
 		assert.equal((await capitalHandlerInstance.balanceBonds(accounts[1])).toString(), amount, "correct bond balance for account 1");
-		assert.equal((await capitalHandlerInstance.balanceOf(accounts[0])).toString(), '0', "correct val returned by minimumATokensAtMaturity()");
-		assert.equal((await capitalHandlerInstance.balanceOf(accounts[1])).toString(), amount, "correct val returned by minimumATokensAtMaturity()");
+		assert.equal((await zcbInstance.balanceOf(accounts[0])).toString(), '0', "correct val returned by minimumATokensAtMaturity()");
+		assert.equal((await zcbInstance.balanceOf(accounts[1])).toString(), amount, "correct val returned by minimumATokensAtMaturity()");
 		assert.equal((await capitalHandlerInstance.wrappedTokenFree(accounts[0])).toString(), '0', 'correct val returned by wrappedTokenFree()');
 		assert.equal((await capitalHandlerInstance.wrappedTokenFree(accounts[1])).toString(), '0', 'correct val returned by wrappedTokenFree()');
 	});
@@ -59,7 +60,7 @@ contract('capitalHandler', async function(accounts){
 		inflation = inflation.mul(new BN(2));
 		await dummyATokenInstance.setInflation(inflation.toString());
 		assert.equal((await capitalHandlerInstance.balanceBonds(accounts[0])).toString(), '-'+amount, "correct bond balance for account 0");
-		assert.equal((await capitalHandlerInstance.balanceOf(accounts[0])).toString(), yieldGenerated, "correct val returned by minimumATokensAtMaturity()");
+		assert.equal((await zcbInstance.balanceOf(accounts[0])).toString(), yieldGenerated, "correct val returned by minimumATokensAtMaturity()");
 		assert.equal((await capitalHandlerInstance.wrappedTokenFree(accounts[0])).toString(), expectedWrappedFree, 'correct val returned by wrappedTokenFree()');
 	});
 
@@ -76,19 +77,17 @@ contract('capitalHandler', async function(accounts){
 		toTransferATkn = adjustedInflation.mul(new BN(toTransferYield)).div(_10To18).toString();
 		prevBalanceBond = await capitalHandlerInstance.balanceBonds(accounts[0]);
 		prevBalanceYield = await capitalHandlerInstance.balanceYield(accounts[0]);
-		prevBalanceOf = await capitalHandlerInstance.balanceOf(accounts[0]);
+		prevBalanceOf = await zcbInstance.balanceOf(accounts[0]);
 		await yieldTokenInstance.transfer(accounts[2], toTransferYield);
-		//await yieldTokenInstance.transfer_2(accounts[2], toTransferYield, true);
-		//let expectedBondChange = (new BN(toTransferATkn)).mul(adjustedInflation).div(_10To18).toString();
 		let expectedBondChange = toTransferATkn;
 		let expectedYieldChange = toTransferYield;
 		let expectedBalance0 = prevBalanceOf.toString();
 		assert.equal((await capitalHandlerInstance.balanceBonds(accounts[0])).sub(prevBalanceBond).toString(), expectedBondChange, "correct balance bonds account 0");
 		assert.equal(prevBalanceYield.sub(await capitalHandlerInstance.balanceYield(accounts[0])).toString(), expectedYieldChange, "correct balance yield account 0")
-		assert.equal((await capitalHandlerInstance.balanceOf(accounts[0])).toString(), expectedBalance0, "correct minimum aTkn balance at maturity account 0");
+		assert.equal((await zcbInstance.balanceOf(accounts[0])).toString(), expectedBalance0, "correct minimum aTkn balance at maturity account 0");
 		assert.equal((await capitalHandlerInstance.balanceBonds(accounts[2])).toString(), "-"+toTransferATkn, "correct balance bonds account 2");
 		assert.equal((await capitalHandlerInstance.balanceYield(accounts[2])).toString(), toTransferYield, "correct balance yield account 2");
-		assert.equal((await capitalHandlerInstance.balanceOf(accounts[2])).toString(), "0", "correct minimum aTkn balance at maturity account 2");
+		assert.equal((await zcbInstance.balanceOf(accounts[2])).toString(), "0", "correct minimum aTkn balance at maturity account 2");
 	});
 
 	it('withdraws funds unwrap:true', async () => {
@@ -137,10 +136,10 @@ contract('capitalHandler', async function(accounts){
 	});
 
 	it('does not reward bond sellers with yield after payout', async () => {
-		minATknAtMaturity = await capitalHandlerInstance.balanceOf(accounts[0]);
+		minATknAtMaturity = await zcbInstance.balanceOf(accounts[0]);
 		postMaturityInflation = inflation.mul(new BN(2));
 		await dummyATokenInstance.setInflation(postMaturityInflation.toString());
-		assert.equal((await capitalHandlerInstance.balanceOf(accounts[0])).toString(), minATknAtMaturity,
+		assert.equal((await zcbInstance.balanceOf(accounts[0])).toString(), minATknAtMaturity,
 			"yield holders not rewarded by yield generated on lent out funds after maturity");
 	});
 

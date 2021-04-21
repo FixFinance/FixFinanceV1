@@ -164,7 +164,7 @@ contract VaultFactoryDelegate2 is VaultFactoryData {
 		@Description: create a new YT vault, deposit some ZCB + YT of a CH and borrow some ZCB from it
 
 		@param address _CHsupplied: the address of the CH contract for which to supply ZCB and YT
-		@param address _CHborrowed: the CH that corresponds to theZCB that is borrowed from the new YTVault
+		@param address _CHborrowed: the CH that corresponds to the ZCB that is borrowed from the new YTVault
 		@param uint _yieldSupplied: the amount from the balanceYield mapping in the supplied CH contract
 			that is to be supplied to the new YTVault
 		@param int _bondSupplied: the amount from the balanceBonds mapping in the supplied CH contract

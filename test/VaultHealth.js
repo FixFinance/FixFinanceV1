@@ -3,7 +3,7 @@ const VaultHealth = artifacts.require('VaultHealth');
 const NGBwrapper = artifacts.require('NGBwrapper');
 const capitalHandler = artifacts.require('CapitalHandler');
 const YieldToken = artifacts.require("YieldToken");
-const yieldTokenDeployer = artifacts.require('YieldTokenDeployer');
+const zcbYtDeployer = artifacts.require('ZCB_YT_Deployer');
 const organizer = artifacts.require('organizer');
 const VaultFactoryDelegate = artifacts.require('VaultFactoryDelegate');
 const VaultFactoryDelegate2 = artifacts.require('VaultFactoryDelegate2');
@@ -61,7 +61,7 @@ contract('VaultHealth', async function(accounts) {
 		await aggregator0.addRound(_10To18);
 		price = 0;
 		OracleContainerInstance = await OracleContainer.new(nullAddress.substring(0, nullAddress.length-1)+"1");
-		yieldTokenDeployerInstance = await yieldTokenDeployer.new();
+		zcbYtDeployerInstance = await zcbYtDeployer.new();
 		vaultHealthInstance = await VaultHealth.new(OracleContainerInstance.address);
 		vaultFactoryDelegateInstance = await VaultFactoryDelegate.new();
 		vaultFactoryDelegate2Instance = await VaultFactoryDelegate2.new();
@@ -81,7 +81,7 @@ contract('VaultHealth', async function(accounts) {
 		CapitalHandlerDeployerInstance = await CapitalHandlerDeployer.new();
 		ammInfoOracleInstance = await AmmInfoOracle.new("0", nullAddress);
 		organizerInstance = await organizer.new(
-			yieldTokenDeployerInstance.address,
+			zcbYtDeployerInstance.address,
 			CapitalHandlerDeployerInstance.address,
 			ZCBammDeployerInstance.address,
 			YTammDeployerInstance.address,
@@ -112,24 +112,27 @@ contract('VaultHealth', async function(accounts) {
 		await wAsset0.depositUnitAmount(accounts[0], _10To18.toString());
 		await wAsset1.depositUnitAmount(accounts[0], _10To18.toString());
 
-		zcbAsset0 = await capitalHandler.at(rec0.receipt.logs[0].args.addr);
-		zcbAsset1 = await capitalHandler.at(rec1.receipt.logs[0].args.addr);
+		ch0 = await capitalHandler.at(rec0.receipt.logs[0].args.addr);
+		ch1 = await capitalHandler.at(rec1.receipt.logs[0].args.addr);
 
-		ytAsset0 = await YieldToken.at(await zcbAsset0.yieldTokenAddress());
-		ytAsset1 = await YieldToken.at(await zcbAsset1.yieldTokenAddress());
+		zcbAsset0 = await IERC20.at(await ch0.zeroCouponBondAddress());
+		zcbAsset1 = await IERC20.at(await ch1.zeroCouponBondAddress());
 
-		await organizerInstance.deployZCBamm(zcbAsset0.address);
-		await organizerInstance.deployZCBamm(zcbAsset1.address);
+		ytAsset0 = await YieldToken.at(await ch0.yieldTokenAddress());
+		ytAsset1 = await YieldToken.at(await ch1.yieldTokenAddress());
 
-		amm0 = await ZCBamm.at(await organizerInstance.ZCBamms(zcbAsset0.address));
-		amm1 = await ZCBamm.at(await organizerInstance.ZCBamms(zcbAsset1.address));
+		await organizerInstance.deployZCBamm(ch0.address);
+		await organizerInstance.deployZCBamm(ch1.address);
+
+		amm0 = await ZCBamm.at(await organizerInstance.ZCBamms(ch0.address));
+		amm1 = await ZCBamm.at(await organizerInstance.ZCBamms(ch1.address));
 
 		//mint asset0 assets to account 0
 		await asset0.mintTo(accounts[0], _10To19.mul(_10));
 		await asset0.approve(wAsset0.address, _10To19.mul(_10));
 		await wAsset0.depositUnitAmount(accounts[0], _10To19.mul(_10));
-		await wAsset0.approve(zcbAsset0.address, _10To19);
-		await zcbAsset0.depositWrappedToken(accounts[0], _10To19);
+		await wAsset0.approve(ch0.address, _10To19);
+		await ch0.depositWrappedToken(accounts[0], _10To19);
 		await wAsset0.approve(vaultFactoryInstance.address, _10To19);
 		await zcbAsset0.approve(vaultFactoryInstance.address, _10To19);
 		await zcbAsset0.approve(amm0.address, _10To19);
@@ -139,8 +142,8 @@ contract('VaultHealth', async function(accounts) {
 		await asset1.mintTo(accounts[0], _10To19.mul(_10));
 		await asset1.approve(wAsset1.address, _10To19.mul(_10));
 		await wAsset1.depositUnitAmount(accounts[0], _10To19.mul(_10));
-		await wAsset1.approve(zcbAsset1.address, _10To19);
-		await zcbAsset1.depositWrappedToken(accounts[0], _10To19);
+		await wAsset1.approve(ch1.address, _10To19);
+		await ch1.depositWrappedToken(accounts[0], _10To19);
 		await wAsset1.approve(vaultFactoryInstance.address, _10To19);
 		await zcbAsset1.approve(vaultFactoryInstance.address, _10To19);
 		await zcbAsset1.approve(amm1.address, _10To19);
@@ -150,8 +153,8 @@ contract('VaultHealth', async function(accounts) {
 		await asset0.mintTo(accounts[1], _10To19.mul(_10));
 		await asset0.approve(wAsset0.address, _10To19.mul(_10), {from: accounts[1]});
 		await wAsset0.depositUnitAmount(accounts[1], _10To19.mul(_10), {from: accounts[1]});
-		await wAsset0.approve(zcbAsset0.address, _10To19, {from: accounts[1]});
-		await zcbAsset0.depositWrappedToken(accounts[1], _10To19, {from: accounts[1]});
+		await wAsset0.approve(ch0.address, _10To19, {from: accounts[1]});
+		await ch0.depositWrappedToken(accounts[1], _10To19, {from: accounts[1]});
 		await zcbAsset0.approve(vaultFactoryInstance.address, _10To19, {from: accounts[1]});
 		await wAsset0.approve(vaultFactoryInstance.address, _10To19, {from: accounts[1]});
 

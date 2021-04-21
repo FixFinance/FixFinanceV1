@@ -4,6 +4,7 @@ pragma solidity >=0.6.5 <0.7.0;
 import "../libraries/SafeMath.sol";
 import "../libraries/SignedSafeMath.sol";
 import "../interfaces/ICapitalHandler.sol";
+import "../interfaces/IZeroCouponBond.sol";
 import "../interfaces/IVaultHealth.sol";
 import "../interfaces/IWrapper.sol";
 import "../interfaces/IERC20.sol";
@@ -56,22 +57,24 @@ contract VaultFactoryDelegate is VaultFactoryData {
 		@Description: when a bidder is outbid return their bid
 
 		@param address _bidder: the address of the bidder
-		@param address _asset: the address of the asset that the bidder posted with their bid in
+		@param address _asset: the address of the CH corresponding to the ZCB that the bidder
+			posted with their bid in
 		@param uint _amount: the amount of _asset that was posted by the bidder
 	*/
-	function refundBid(address _bidder, address _asset, uint _amount) internal {
-		ICapitalHandler(_asset).mintZCBTo(_bidder, _amount);
+	function refundBid(address _bidder, address _CHaddr, uint _amount) internal {
+		ICapitalHandler(_CHaddr).mintZCBTo(_bidder, _amount);
 	}
 
 	/*
 		@Description: when a bidder makes a bid collect collateral for their bid
 
 		@param address _bidder: the address of the bidder
-		@param address _asset: the address of the asset that the bidder is posing as collateral
+		@param address _asset: the address of the CH corresponding to the ZCB that the bidder
+			posted with their bid in
 		@param uint _amount: the amount of _asset that the bidder is required to post
 	*/
-	function collectBid(address _bidder, address _asset, uint _amount) internal {
-		ICapitalHandler(_asset).burnZCBFrom(_bidder, _amount);
+	function collectBid(address _bidder, address _CHaddr, uint _amount) internal {
+		ICapitalHandler(_CHaddr).burnZCBFrom(_bidder, _amount);
 	}
 
 	/*
@@ -217,8 +220,9 @@ contract VaultFactoryDelegate is VaultFactoryData {
 		require(vaultWithstandsChange(_assetSupplied, _assetBorrowed, _amountSupplied, _amountBorrowed, _priceMultiplier, _suppliedRateChange, _borrowRateChange));
 
 		IERC20(_assetSupplied).transferFrom(msg.sender, address(this), _amountSupplied);
-		ICapitalHandler(_assetBorrowed).mintZCBTo(msg.sender, _amountBorrowed);
-		raiseShortInterest(_assetBorrowed, _amountBorrowed);
+		address CHborrowed = IZeroCouponBond(_assetBorrowed).CapitalHandlerAddress();
+		ICapitalHandler(CHborrowed).mintZCBTo(msg.sender, _amountBorrowed);
+		raiseShortInterest(CHborrowed, _amountBorrowed);
 
 		_vaults[msg.sender].push(Vault(_assetSupplied, _assetBorrowed, _amountSupplied, _amountBorrowed));
 	}
@@ -236,8 +240,9 @@ contract VaultFactoryDelegate is VaultFactoryData {
 
 		//burn borrowed ZCB
 		if (vault.amountBorrowed > 0) {
-			ICapitalHandler(vault.assetBorrowed).burnZCBFrom(msg.sender, vault.amountBorrowed);
-			lowerShortInterest(vault.assetBorrowed, vault.amountBorrowed);
+			address CHborrowed = IZeroCouponBond(vault.assetBorrowed).CapitalHandlerAddress();
+			ICapitalHandler(CHborrowed).burnZCBFrom(msg.sender, vault.amountBorrowed);
+			lowerShortInterest(CHborrowed, vault.amountBorrowed);
 		}
 		if (vault.amountSupplied > 0)
 			IERC20(vault.assetSupplied).transfer(_to, vault.amountSupplied);
@@ -350,8 +355,9 @@ contract VaultFactoryDelegate is VaultFactoryData {
 
 		_vaults[msg.sender][_index].amountBorrowed += _amount;
 
-		ICapitalHandler(vault.assetBorrowed).mintZCBTo(_to, _amount);
-		raiseShortInterest(vault.assetBorrowed, _amount);
+		address CHborrowed = IZeroCouponBond(vault.assetBorrowed).CapitalHandlerAddress();
+		ICapitalHandler(CHborrowed).mintZCBTo(_to, _amount);
+		raiseShortInterest(CHborrowed, _amount);
 	}
 
 	/*
@@ -365,8 +371,9 @@ contract VaultFactoryDelegate is VaultFactoryData {
 		require(_vaults[_owner].length > _index);
 		require(_vaults[_owner][_index].amountBorrowed >= _amount);
 		address assetBorrowed = _vaults[_owner][_index].assetBorrowed;
-		ICapitalHandler(assetBorrowed).burnZCBFrom(msg.sender, _amount);
-		lowerShortInterest(assetBorrowed, _amount);
+		address CHborrowed = IZeroCouponBond(assetBorrowed).CapitalHandlerAddress();
+		ICapitalHandler(CHborrowed).burnZCBFrom(msg.sender, _amount);
+		lowerShortInterest(CHborrowed, _amount);
 		_vaults[_owner][_index].amountBorrowed -= _amount;
 	}
 
@@ -395,8 +402,9 @@ contract VaultFactoryDelegate is VaultFactoryData {
 			require(maturity < block.timestamp + MAX_TIME_TO_MATURITY);
 		}
 		//burn borrowed ZCB
-		collectBid(msg.sender, vault.assetBorrowed, _amtIn);
-		lowerShortInterest(vault.assetBorrowed, _amtIn);
+		address CHborrowed = IZeroCouponBond(_assetBorrowed).CapitalHandlerAddress();
+		collectBid(msg.sender, CHborrowed, _amtIn);
+		lowerShortInterest(CHborrowed, _amtIn);
 		//any surplus in the bid may be added as _revenue
 		if (_bid < maxBid){
 			distributeSurplus(_owner, vault.assetSupplied, maxBid - _bid);
@@ -434,8 +442,9 @@ contract VaultFactoryDelegate is VaultFactoryData {
 		uint maxBid = liq.bidAmount * _amtIn / liq.amountBorrowed;
 		require(_bid < maxBid);
 
-		refundBid(liq.bidder, liq.assetBorrowed, _amtIn);
-		collectBid(msg.sender, liq.assetBorrowed, _amtIn);
+		address CHborrowed = IZeroCouponBond(liq.assetBorrowed).CapitalHandlerAddress();
+		refundBid(liq.bidder, CHborrowed, _amtIn);
+		collectBid(msg.sender, CHborrowed, _amtIn);
 		distributeSurplus(liq.vaultOwner, liq.assetSupplied, maxBid - _bid);
 
 		if (_amtIn == liq.amountBorrowed) {
@@ -500,8 +509,9 @@ contract VaultFactoryDelegate is VaultFactoryData {
 			!satisfiesLimit(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied, vault.amountBorrowed, false));
 
 		//burn borrowed ZCB
-		ICapitalHandler(_assetBorrowed).burnZCBFrom(_to, vault.amountBorrowed);
-		lowerShortInterest(_assetBorrowed, vault.amountBorrowed);
+		address CHborrowed = IZeroCouponBond(vault.assetBorrowed).CapitalHandlerAddress();
+		ICapitalHandler(CHborrowed).burnZCBFrom(_to, vault.amountBorrowed);
+		lowerShortInterest(CHborrowed, vault.amountBorrowed);
 		IERC20(_assetSupplied).transfer(_to, vault.amountSupplied);
 
 		delete _vaults[_owner][_index];
@@ -533,9 +543,9 @@ contract VaultFactoryDelegate is VaultFactoryData {
 			!satisfiesLimit(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied, vault.amountBorrowed, false));
 
 		//burn borrowed ZCB
-
-		ICapitalHandler(_assetBorrowed).burnZCBFrom(_to, _in);
-		lowerShortInterest(_assetBorrowed, _in);
+		address CHborrowed = IZeroCouponBond(vault.assetBorrowed).CapitalHandlerAddress();
+		ICapitalHandler(CHborrowed).burnZCBFrom(_to, _in);
+		lowerShortInterest(CHborrowed, _in);
 		IERC20(_assetSupplied).transfer(_to, amtOut);
 
 		_vaults[_owner][_index].amountBorrowed -= _in;
@@ -569,7 +579,9 @@ contract VaultFactoryDelegate is VaultFactoryData {
 			!satisfiesLimit(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied, vault.amountBorrowed, false));
 
 		//burn borrowed ZCB
-		IERC20(_assetBorrowed).transferFrom(msg.sender, address(0), amtIn);
+		address CHborrowed = IZeroCouponBond(_assetBorrowed).CapitalHandlerAddress();
+		ICapitalHandler(CHborrowed).burnZCBFrom(_to, amtIn);
+		lowerShortInterest(CHborrowed, amtIn);
 		IERC20(_assetSupplied).transfer(_to, _out);
 
 		_vaults[_owner][_index].amountBorrowed -= amtIn;

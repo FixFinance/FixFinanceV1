@@ -1,11 +1,10 @@
-pragma solidity >=0.6.5 <0.7.0;
+pragma solidity >=0.6.0;
+
 import "./interfaces/ICapitalHandler.sol";
 import "./interfaces/IWrapper.sol";
-import "./interfaces/IYieldToken.sol";
-import "./interfaces/IERC20.sol";
-import "./libraries/SafeMath.sol";
+import "./interfaces/IZeroCouponBond.sol";
 
-contract YieldToken is IYieldToken {
+contract ZeroCouponBond is IZeroCouponBond {
 
 	ICapitalHandler immutable ch;
 	IWrapper immutable wrapper;
@@ -20,23 +19,19 @@ contract YieldToken is IYieldToken {
 	constructor(address _wrapperAddress, address _capitalHandlerAddress, uint _maturity) public {
 		IWrapper _wrapper = IWrapper(_wrapperAddress);
 		decimals = _wrapper.decimals();
-		symbol = string(abi.encodePacked(_wrapper.symbol(),'yt'));
-		name = string(abi.encodePacked(_wrapper.name(),' yield token'));
+		symbol = string(abi.encodePacked(_wrapper.symbol(),'zcb'));
+		name = string(abi.encodePacked(_wrapper.name(),' zero coupon bond'));
 		wrapper = _wrapper;
         ch = ICapitalHandler(_capitalHandlerAddress);
         maturity = _maturity;
 	}
 
-	function totalSupply() public view override returns (uint _supply){
-		_supply = wrapper.balanceOf(address(ch));
+	function balanceOf(address _owner) public view override returns (uint balance) {
+		balance = ch.totalBalanceZCB(_owner);
 	}
 
-    function balanceOf(address _owner) public view override returns (uint _amount) {
-    	_amount = ch.balanceYield(_owner);
-    }
-
     function transfer(address _to, uint256 _value) public override returns (bool success) {
-        ch.transferYield(msg.sender, _to, _value);
+    	ch.transferZCB(msg.sender, _to, _value);
 
         emit Transfer(msg.sender, _to, _value);
 
@@ -54,13 +49,17 @@ contract YieldToken is IYieldToken {
     function transferFrom(address _from, address _to, uint256 _value) public override returns (bool success) {
         require(_value <= allowance[_from][msg.sender]);
 
-        ch.transferYield(_from, _to, _value);
+    	ch.transferZCB(_from, _to, _value);
 
         allowance[_from][msg.sender] -= _value;
 
         emit Transfer(_from, _to, _value);
 
         return true;
+    }
+
+    function totalSupply() public view override returns (uint _supply) {
+    	_supply = wrapper.WrappedAmtToUnitAmt_RoundDown(wrapper.balanceOf(address(this)));
     }
 
     /*
@@ -82,29 +81,4 @@ contract YieldToken is IYieldToken {
     function CapitalHandlerAddress() external view override returns (address) {
         return address(ch);
     }
-
-    /*
-        Here we repeat all of the ERC20 functions except we denominate the values in underlying asset rather
-        than wrapped asset amounts and add _2 at the end of the names. We also add bool _roundUp as a parameter
-    */
-
-    function balanceOf_2(address _owner, bool _roundUp) external view override returns (uint) {
-        return _roundUp ? wrapper.WrappedAmtToUnitAmt_RoundUp(balanceOf(_owner)) : wrapper.WrappedAmtToUnitAmt_RoundDown(balanceOf(_owner));
-    }
-
-    //_value denominated in unit not in wrapped
-    function transfer_2(address _to, uint256 _value, bool _roundUp) external override {
-        transfer(_to, _roundUp ? wrapper.UnitAmtToWrappedAmt_RoundUp(_value) : wrapper.UnitAmtToWrappedAmt_RoundDown(_value));
-    }
-
-    //_value denominated in unit not in wrapped
-    function approve_2(address _spender, uint256 _value, bool _roundUp) external override {
-        approve(_spender, _roundUp ? wrapper.UnitAmtToWrappedAmt_RoundUp(_value) : wrapper.UnitAmtToWrappedAmt_RoundDown(_value));        
-    }
-
-    //_value denominated in unit not in wrapped
-    function transferFrom_2(address _from, address _to, uint256 _value, bool _roundUp) external override {
-        transferFrom(_from, _to, _roundUp ? wrapper.UnitAmtToWrappedAmt_RoundUp(_value) : wrapper.UnitAmtToWrappedAmt_RoundDown(_value));
-    }
-
 }

@@ -54,6 +54,7 @@ abstract contract IZCBamm is IERC20 {
 	//---------------------f-o-r---I-E_R_C-2-0-----------------------
 	address public ZCBaddress;
 	address public YTaddress;
+	address public CHaddress;
 
 	//total amount of smallest denomination units of coin in this smart contract
 	uint public override totalSupply;

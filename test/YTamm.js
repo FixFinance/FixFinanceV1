@@ -3,7 +3,8 @@ const NGBwrapper = artifacts.require("NGBwrapper");
 const BigMath = artifacts.require("BigMath");
 const Ei = artifacts.require("Ei");
 const capitalHandler = artifacts.require("CapitalHandler");
-const yieldToken = artifacts.require("YieldToken");
+const zeroCouponBond = artifacts.require("IZeroCouponBond");
+const yieldToken = artifacts.require("IYieldToken");
 const zcbYtDeployer = artifacts.require("ZCB_YT_Deployer");
 const ZCBamm = artifacts.require("ZCBamm");
 const YTamm = artifacts.require("YTamm");
@@ -102,6 +103,7 @@ contract('YTamm', async function(accounts){
 		//maturity is 110 days out
 		maturity = timestamp + 110*24*60*60;
 		capitalHandlerInstance = await capitalHandler.new(NGBwrapperInstance.address, maturity, zcbYtDeployerInstance.address);
+		zcbInstance = await zeroCouponBond.at(await capitalHandlerInstance.zeroCouponBondAddress());
 		yieldTokenInstance = await yieldToken.at(await capitalHandlerInstance.yieldTokenAddress());
 		await ZCBamm.link("BigMath", BigMathInstance.address);
 		await YTamm.link("BigMath", BigMathInstance.address);
@@ -125,7 +127,7 @@ contract('YTamm', async function(accounts){
 		await NGBwrapperInstance.depositUnitAmount(accounts[0], balance);
 		await NGBwrapperInstance.approve(capitalHandlerInstance.address, balance);
 		await capitalHandlerInstance.depositWrappedToken(accounts[0], balance);
-		await capitalHandlerInstance.approve(amm0.address, balance);
+		await zcbInstance.approve(amm0.address, balance);
 		await yieldTokenInstance.approve(amm0.address, balance);
 
 		/*
@@ -154,7 +156,7 @@ contract('YTamm', async function(accounts){
 		YTtoLmultiplier = parseInt(YTtoLmultiplierBN.toString()) * Math.pow(10, -18);
 		anchor = (await amm0.anchor()).toNumber();
 
-		await capitalHandlerInstance.approve(amm1.address, balance);
+		await zcbInstance.approve(amm1.address, balance);
 		await yieldTokenInstance.approve(amm1.address, balance);
 
 		OracleRate = parseInt(OracleRateString) * Math.pow(2, -64);
@@ -170,7 +172,7 @@ contract('YTamm', async function(accounts){
 		assert.equal(lpBal.toString(), toMint.toString(), "correct balance of YTamm liquidity tokens");
 		expectedZCBbalance = balance.sub(toMint).toString();
 		expectedYTbalance = balance.sub(toMint.mul(YTtoLmultiplierBN_p1).div(_10To18BN)).toString();
-		assert.equal((await capitalHandlerInstance.balanceOf(accounts[0])).toString(), expectedZCBbalance, "correct balance ZCB");
+		assert.equal((await zcbInstance.balanceOf(accounts[0])).toString(), expectedZCBbalance, "correct balance ZCB");
 		assert.equal((await yieldTokenInstance.balanceOf_2(accounts[0], false)).toString(), expectedYTbalance, "correct balance YT");
 		let results = await amm1.getReserves();
 		Ureserves = results._Ureserves.toString();
@@ -194,7 +196,7 @@ contract('YTamm', async function(accounts){
 		expectedYTbalance = (new BN(expectedYTbalance)).sub(expectedUin).sub(expectedYTin).toString();
 		assert.equal((await amm1.ineligibleBalanceOf(accounts[0])).toString(), toMint.toString(), "correct ineligible balance of YTamm liquidity tokens");
 		assert.equal((await amm1.balanceOf(accounts[0])).toString(), toMint.toString(), "correct balance of YTamm liquidity tokens");
-		assert.equal((await capitalHandlerInstance.balanceOf(accounts[0])).toString(), expectedZCBbalance, "correct balance ZCB");
+		assert.equal((await zcbInstance.balanceOf(accounts[0])).toString(), expectedZCBbalance, "correct balance ZCB");
 		assert.equal((await yieldTokenInstance.balanceOf_2(accounts[0], false)).toString(), expectedYTbalance, "correct balance YT");
 		let expectedUreserves = (new BN(Ureserves)).add(expectedUin).toString();
 		let expectedYTreserves = (new BN(YTreserves)).add(expectedYTin).toString();
@@ -219,7 +221,7 @@ contract('YTamm', async function(accounts){
 
 		let amm1balance = await amm1.balanceOf(accounts[0]);
 		let amm1IneligibleBalance = await amm1.ineligibleBalanceOf(accounts[0]);
-		ZCBbalance = await capitalHandlerInstance.balanceOf(accounts[0]);
+		ZCBbalance = await zcbInstance.balanceOf(accounts[0]);
 		YTbalance = await yieldTokenInstance.balanceOf_2(accounts[0], false);
 		assert.equal(amm1balance.toString(), toMint, "correct balance of YTamm liquidity tokens");
 		assert.equal(amm1IneligibleBalance.toString(), "0", "correct ineligible balance of YTamm liquidity tokens");
@@ -248,7 +250,7 @@ contract('YTamm', async function(accounts){
 		let totalFee = nonFeeAdjustedExpectedUout - UoutToSender;
 		let treasuryFee = Math.floor(TreasuryFeeNumber * totalFee);
 		let prevZCBbalance = ZCBbalance;
-		ZCBbalance = await capitalHandlerInstance.balanceOf(accounts[0]);
+		ZCBbalance = await zcbInstance.balanceOf(accounts[0]);
 		let ActualUout = ZCBbalance.sub(prevZCBbalance);
 		let ActualUoutNumber = parseInt(ActualUout.toString());
 
@@ -258,7 +260,7 @@ contract('YTamm', async function(accounts){
 		Ureserves = parseInt(results._Ureserves.toString());
 		YTreserves = parseInt(results._YTreserves.toString());
 
-		treasuryZCBbalance = await capitalHandlerInstance.balanceOf(nullAddress);
+		treasuryZCBbalance = await zcbInstance.balanceOf(nullAddress);
 		treasuryYTbalance = await yieldTokenInstance.balanceOf_2(nullAddress, false);
 		let treasuryZCBnum = parseInt(treasuryZCBbalance.toString());
 		let treasuryYTnum = parseInt(treasuryYTbalance.toString());
@@ -290,7 +292,7 @@ contract('YTamm', async function(accounts){
 		let totalFee = expectedUin - nonFeeAdjustedUin;
 		let treasuryFee = Math.floor(TreasuryFeeNumber * totalFee);
 		let prevZCBbalance = ZCBbalance;
-		ZCBbalance = await capitalHandlerInstance.balanceOf(accounts[0]);
+		ZCBbalance = await zcbInstance.balanceOf(accounts[0]);
 		let Uin = prevZCBbalance.sub(ZCBbalance);
 		let ActualUin = parseInt(Uin.toString());
 
@@ -302,7 +304,7 @@ contract('YTamm', async function(accounts){
 
 		let prevTreasuryZCBbalance = treasuryZCBbalance;
 		let prevTreasuryYTbalance = treasuryYTbalance;
-		treasuryZCBbalance = await capitalHandlerInstance.balanceOf(nullAddress);
+		treasuryZCBbalance = await zcbInstance.balanceOf(nullAddress);
 		treasuryYTbalance = await yieldTokenInstance.balanceOf_2(nullAddress, false);
 		let treasuryZCBchange = (treasuryZCBbalance.sub(prevTreasuryZCBbalance)).toString();
 		let treasuryYTchange = parseInt(treasuryYTbalance.sub(prevTreasuryYTbalance).toString());
@@ -332,7 +334,7 @@ contract('YTamm', async function(accounts){
 		let nonFeeAdjustedUin = YT_U_math.Uin(parseInt(YTreserves.toString()), parseInt(totalSupply.mul(_10To18BN).div(YTtoLmultiplierBN).toString()), r, w, 1.0, OracleRate, parseInt(amtOut.toString()));
 		let expectedUin = YT_U_math.Uin(parseInt(YTreserves.toString()), parseInt(totalSupply.mul(_10To18BN).div(YTtoLmultiplierBN).toString()), r, w, fToYT, OracleRate, parseInt(amtOut.toString()));
 		let prevZCBbalance = ZCBbalance;
-		ZCBbalance = await capitalHandlerInstance.balanceOf(accounts[0]);
+		ZCBbalance = await zcbInstance.balanceOf(accounts[0]);
 		let Uin = prevZCBbalance.sub(ZCBbalance);
 		let error = Math.abs(parseInt(Uin.toString())/expectedUin - 1);
 		assert.isBelow(error, 0.000001, "acceptable margin of error")
@@ -437,7 +439,7 @@ contract('YTamm', async function(accounts){
 		let results = await amm1.getReserves();
 		Ureserves = results._Ureserves.toString();
 		YTreserves = results._YTreserves.toString();
-		let balZCB = await capitalHandlerInstance.balanceOf(amm1.address);
+		let balZCB = await zcbInstance.balanceOf(amm1.address);
 		let balYT = await yieldTokenInstance.balanceOf_2(amm1.address, false);
 		let expectedUreserves = balZCB.sub(amtUrevenue).toString();
 		let expectedYTreserves = balYT.sub(balZCB).sub(amtYTrevenue).toString();
@@ -449,7 +451,7 @@ contract('YTamm', async function(accounts){
 		//simulate generation of yield by sending funds directly to pool address
 		amtZCB = balance.div(new BN(1000));
 		amtYT = balance.div(new BN(500));
-		await capitalHandlerInstance.transfer(amm1.address, amtZCB);
+		await zcbInstance.transfer(amm1.address, amtZCB);
 		await yieldTokenInstance.transfer_2(amm1.address, amtYT, true);
 		amtZCB = amtZCB.add(amtUrevenue);
 		amtYT = amtYT.add(amtYTrevenue).add(amtUrevenue);
@@ -545,7 +547,7 @@ contract('YTamm', async function(accounts){
 		let results = await amm1.getReserves();
 		Ureserves = results._Ureserves.toString();
 		YTreserves = results._YTreserves.toString();
-		let balZCB = await capitalHandlerInstance.balanceOf(amm1.address);
+		let balZCB = await zcbInstance.balanceOf(amm1.address);
 		let balYT = await yieldTokenInstance.balanceOf_2(amm1.address, false);
 		let expectedUreserves = balZCB.toString();
 		let expectedYTreserves = balYT.sub(balZCB).toString();
@@ -560,7 +562,7 @@ contract('YTamm', async function(accounts){
 		amtZCB2 = _10To18BN.div(new BN(1000));
 		amtYT2 = _10To18BN.div(new BN(1000));
 
-		await capitalHandlerInstance.transfer(amm1.address, amtZCB2);
+		await zcbInstance.transfer(amm1.address, amtZCB2);
 		await yieldTokenInstance.transfer_2(amm1.address, amtYT2, true);
 
 		activeTotalSupply = await amm1.activeTotalSupply();
@@ -641,7 +643,7 @@ contract('YTamm', async function(accounts){
 		//generate yield for LPs
 		amtZCB = _10To18BN.div(new BN(1000));
 		amtYT = _10To18BN.div(new BN(5000));
-		await capitalHandlerInstance.transfer(amm1.address, amtZCB);
+		await zcbInstance.transfer(amm1.address, amtZCB);
 		await yieldTokenInstance.transfer_2(amm1.address, amtYT, true);
 
 		await amm1.contractClaimDividend();

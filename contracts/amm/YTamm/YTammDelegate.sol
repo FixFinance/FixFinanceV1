@@ -254,7 +254,7 @@ contract YTammDelegate is DividendEnabledData, IYTammData {
 			YTtoLmultiplier == internalTotalSupply / YTreserves
 		*/
 		YTtoLmultiplier = internalTotalSupply.mul(1 ether) / _YTreserves;
-		SlippageConstant = AmmInfoOracle(AmmInfoOracleAddress).getSlippageConstant(ZCBaddress);
+		SlippageConstant = AmmInfoOracle(AmmInfoOracleAddress).getSlippageConstant(CHaddress);
 		lastRecalibration = block.timestamp;
 		//ensure noone reserves quote before recalibrating and is then able to take the quote
 		quoteSignature = bytes32(0);

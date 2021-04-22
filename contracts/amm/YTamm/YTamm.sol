@@ -44,6 +44,7 @@ contract YTamm is IYTamm {
 			apy,
 			maturity-block.timestamp
 		);
+		CHaddress = _CHaddress;
 		ZCBaddress = _ZCBaddress;
 		YTaddress = _YTaddress;
 		delegateAddress = _delegateAddress;
@@ -487,7 +488,6 @@ contract YTamm is IYTamm {
 			_amount
 		));
 		(uint treasuryFee, ) = AmmInfoOracle(AmmInfoOracleAddress).treasuryFee(nonFeeAdjustedUout, Uout);
-		//(uint Uout, uint treasuryFee, ) = AmmInfoOracle(AmmInfoOracleAddress).feeAdjustedAmountOut(maturity, nonFeeAdjustedUout);
 		uint reserveDecrease = Uout.add(treasuryFee);
 		require(Ureserves >= reserveDecrease);
 		writeQuoteSignature(true, _amount, Uout, treasuryFee);
@@ -527,7 +527,6 @@ contract YTamm is IYTamm {
 			-_amount
 		));
 		(uint treasuryFee, ) = AmmInfoOracle(AmmInfoOracleAddress).treasuryFee(Uin, nonFeeAdjustedUin);
-		//(uint Uin, uint treasuryFee, ) = AmmInfoOracle(AmmInfoOracleAddress).feeAdjustedAmountIn(maturity, nonFeeAdjustedUin);
 		writeQuoteSignature(false, _amount, Uin, treasuryFee);
 		return Uin;
 	}

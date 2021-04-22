@@ -73,6 +73,11 @@ contract CapitalHandler is ICapitalHandler, Ownable {
 		zeroCouponBondAddress = ZCB_YT_Deployer(_ZCB_YTdeployerAddr).deployZCB(_wrapper, _maturity);
 	}
 
+	modifier beforePayoutPhase() {
+		require(!inPayoutPhase);
+		_;
+	}
+
 	/*
 		@Description: find the amount of wrapped token that the user may withdraw from the capital handler
 	*/
@@ -96,7 +101,7 @@ contract CapitalHandler is ICapitalHandler, Ownable {
 		@param address _to: the address that shall receive the ZCB and YT
 		@param uint _amountWrappedTkn: the amount of wrapped asset to deposit
 	*/
-	function depositWrappedToken(address _to, uint _amountWrappedTkn) external override {
+	function depositWrappedToken(address _to, uint _amountWrappedTkn) external override beforePayoutPhase {
 		wrapper.transferFrom(msg.sender, address(this), _amountWrappedTkn);
 		balanceYield[_to] += _amountWrappedTkn;
 	}
@@ -109,7 +114,7 @@ contract CapitalHandler is ICapitalHandler, Ownable {
 		@param bool _unwrap: if true - wrapped asset will be sent to _to address
 			otherwise underlyingAsset will be sent
 	*/
-	function withdraw(address _to, uint _amountWrappedTkn, bool _unwrap) external override {
+	function withdraw(address _to, uint _amountWrappedTkn, bool _unwrap) external override beforePayoutPhase {
 		require(wrappedTokenFree(msg.sender) >= _amountWrappedTkn);
 		balanceYield[msg.sender] -= _amountWrappedTkn;
 		if (_unwrap)
@@ -127,7 +132,7 @@ contract CapitalHandler is ICapitalHandler, Ownable {
 		@param bool _unwrap: if true - wrapped asset will be sent to _to address
 			otherwise underlyingAsset will be sent
 	*/
-	function withdrawAll(address _to, bool _unwrap) external override {
+	function withdrawAll(address _to, bool _unwrap) external override beforePayoutPhase {
 		uint freeToMove = wrappedTokenFree(msg.sender);
 		balanceYield[msg.sender] -= freeToMove;
 		if (_unwrap)
@@ -141,12 +146,22 @@ contract CapitalHandler is ICapitalHandler, Ownable {
 			underlying asset, pays out in wrapped asset
 
 		@param address _to: the address that shall receive the wrapped asset
+		@param bool _unwrap: if true - wrapped asset will be sent to _to address
+			otherwise underlyingAsset will be sent
 	*/
-	function claimBondPayout(address _to) external override {
+	function claimBondPayout(address _to, bool _unwrap) external override {
+		require(inPayoutPhase);
+		uint freeToMove = wrappedTokenFree(msg.sender);
 		int bondBal = balanceBonds[msg.sender];
-		require(inPayoutPhase && bondBal > 0);
-		wrapper.withdrawWrappedAmount(_to, uint(bondBal).mul(1 ether)/maturityConversionRate);
-		balanceBonds[msg.sender] = 0;
+		if (bondBal > 0) {
+			freeToMove += uint(bondBal).mul(1 ether)/maturityConversionRate;
+		}
+		if (_unwrap)
+			wrapper.withdrawWrappedAmount(_to, freeToMove);
+		else
+			wrapper.transfer(_to, freeToMove);
+		delete balanceYield[msg.sender];
+		delete balanceBonds[msg.sender];
 	}
 
 	/*

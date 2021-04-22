@@ -7,7 +7,7 @@ interface ICapitalHandler {
 	function depositWrappedToken(address _to, uint _amountWrappedTkn) external;
 	function withdraw(address _to, uint _amountWrappedTkn, bool _unwrap) external;
 	function withdrawAll(address _to, bool _unwrap) external;
-	function claimBondPayout(address _to) external;
+	function claimBondPayout(address _to, bool _unwrap) external;
 	function enterPayoutPhase() external;
 	function inPayoutPhase() external view returns (bool);
 	function maturity() external view returns(uint64);

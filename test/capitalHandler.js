@@ -151,8 +151,9 @@ contract('capitalHandler', async function(accounts){
 			maturity inflation in our calculations below
 		*/
 		expectedPayout = bondBalAct1.mul(postMaturityInflation).div(adjustedInflation);
-		await capitalHandlerInstance.claimBondPayout(accounts[2], {from: accounts[1]});
-		assert.equal((await capitalHandlerInstance.balanceBonds(accounts[1])).toString(), '0', "balance long bond decrease to 0");
+		await capitalHandlerInstance.claimBondPayout(accounts[2], true, {from: accounts[1]});
+		assert.equal((await capitalHandlerInstance.balanceBonds(accounts[1])).toString(), '0', "balance bond set to 0");
+		assert.equal((await capitalHandlerInstance.balanceYield(accounts[1])).toString(), '0', "balance yield set to 0");
 		assert.equal((await dummyATokenInstance.balanceOf(accounts[2])).toString(), expectedPayout.toString(), "correct payout of long bond tokens");
 	});
 

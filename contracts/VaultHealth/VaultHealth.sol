@@ -308,11 +308,30 @@ contract VaultHealth is IVaultHealth, Ownable {
 
 		@param address _deposited: the address of the asset supplied to the vault
 		@param address _borrowed: the address of the asset borrowed from the vault
+
+		@return address baseDepositedAsset: the underlying wrapper for the collateral asset
+		@return address baseBorrowedAsset: the underlying wrapper for the borrowed asset
+		@return address chDeposited: the address of the CapitalHandler corresponding to the collateral asset
+			it is possible that there is no CapitalHandler associated with the collateral asset, in this case
+			this value will return as address(0)
+		@return address chSupplied: the address of the CapitalHandler corresponding to the borrowed asset
 	*/
-	function baseAssetAddresses(address _deposited, address _borrowed) internal view returns (address baseDepositedAsset, address baseBorrowedAsset) {
+	function baseAssetAddresses(address _deposited, address _borrowed) internal view returns (
+		address baseDepositedAsset,
+		address baseBorrowedAsset,
+		address chDeposited,
+		address chBorrowed
+	) {
 		organizer org = organizer(organizerAddress);
-		baseDepositedAsset = UpperRateThreshold[_deposited] == 0 ? org.capitalHandlerToWrapper(_deposited) : _deposited;
-		baseBorrowedAsset = org.capitalHandlerToWrapper(_borrowed);
+		if (UpperRateThreshold[_deposited] == 0) {
+			chDeposited = IZeroCouponBond(_deposited).CapitalHandlerAddress();
+			baseDepositedAsset = org.capitalHandlerToWrapper(chDeposited);
+		}
+		else {
+			baseDepositedAsset = _deposited;
+		}
+		chBorrowed = IZeroCouponBond(_borrowed).CapitalHandlerAddress();
+		baseBorrowedAsset = org.capitalHandlerToWrapper(chBorrowed);
 	}
 
 	/*
@@ -336,14 +355,16 @@ contract VaultHealth is IVaultHealth, Ownable {
 			upper collateralisation limit
 	*/
 	function _amountSuppliedAtUpperLimit(address _assetSupplied, address _assetBorrowed, uint _amountBorrowed) internal view returns (uint) {
-		(address _baseSupplied, address _baseBorrowed) = baseAssetAddresses(_assetSupplied, _assetBorrowed);
+		(address _baseSupplied, address _baseBorrowed, address chSupplied, address chBorrowed) = baseAssetAddresses(_assetSupplied, _assetBorrowed);
 
-		return _amountBorrowed
+		//wierd hack to prevent stack too deep
+		_amountBorrowed = _amountBorrowed
 			.mul(crossAssetPrice(_baseSupplied, _baseBorrowed))
-			.mul(getRateMultiplier_BaseRate(_assetBorrowed, _baseBorrowed, RateAdjuster.UPPER_BORROW))
+			.mul(getRateMultiplier_BaseRate(chBorrowed, _baseBorrowed, RateAdjuster.UPPER_BORROW))
 			.div(1 ether)
-			.mul(crossCollateralizationRatio(_baseSupplied, _baseBorrowed, Safety.UPPER))
-			.div(_assetSupplied == _baseSupplied ? (1 ether) : getRateMultiplier_BaseRate(_assetSupplied, _baseSupplied, RateAdjuster.UPPER_DEPOSIT))
+			.mul(crossCollateralizationRatio(_baseSupplied, _baseBorrowed, Safety.UPPER));
+		return _amountBorrowed
+			.div(_assetSupplied == _baseSupplied ? (1 ether) : getRateMultiplier_BaseRate(chSupplied, _baseSupplied, RateAdjuster.UPPER_DEPOSIT))
 			.div(1 ether);
 	}
 
@@ -359,14 +380,16 @@ contract VaultHealth is IVaultHealth, Ownable {
 			lower collateralisation limit
 	*/
 	function _amountSuppliedAtLowerLimit(address _assetSupplied, address _assetBorrowed, uint _amountBorrowed) internal view returns (uint) {
-		(address _baseSupplied, address _baseBorrowed) = baseAssetAddresses(_assetSupplied, _assetBorrowed);
+		(address _baseSupplied, address _baseBorrowed, address chSupplied, address chBorrowed) = baseAssetAddresses(_assetSupplied, _assetBorrowed);
 
-		return _amountBorrowed
+		//wierd hack to prevent stack too deep
+		_amountBorrowed = _amountBorrowed
 			.mul(crossAssetPrice(_baseSupplied, _baseBorrowed))
-			.mul(getRateMultiplier_BaseRate(_assetBorrowed, _baseBorrowed, RateAdjuster.LOW_BORROW))
+			.mul(getRateMultiplier_BaseRate(chBorrowed, _baseBorrowed, RateAdjuster.LOW_BORROW))
 			.div(1 ether)
-			.mul(crossCollateralizationRatio(_baseSupplied, _baseBorrowed, Safety.LOW))
-			.div(_assetSupplied == _baseSupplied ? (1 ether) : getRateMultiplier_BaseRate(_assetSupplied, _baseSupplied, RateAdjuster.LOW_DEPOSIT))
+			.mul(crossCollateralizationRatio(_baseSupplied, _baseBorrowed, Safety.LOW));
+		return _amountBorrowed
+			.div(_assetSupplied == _baseSupplied ? (1 ether) : getRateMultiplier_BaseRate(chSupplied, _baseSupplied, RateAdjuster.LOW_DEPOSIT))
 			.div(1 ether);
 	}
 
@@ -546,15 +569,15 @@ contract VaultHealth is IVaultHealth, Ownable {
 			upper collateralisation limit
 	*/
 	function amountBorrowedAtUpperLimit(address _assetSupplied, address _assetBorrowed, uint _amountSupplied) external override view returns (uint) {
-		(address _baseSupplied, address _baseBorrowed) = baseAssetAddresses(_assetSupplied, _assetBorrowed);
+		(address _baseSupplied, address _baseBorrowed, address chSupplied, address chBorrowed) = baseAssetAddresses(_assetSupplied, _assetBorrowed);
 
 		uint term1 = _amountSupplied
-			.mul(_assetSupplied == _baseSupplied ? (1 ether) : getRateMultiplier_BaseRate(_assetSupplied, _baseSupplied, RateAdjuster.UPPER_DEPOSIT));
+			.mul(_assetSupplied == _baseSupplied ? (1 ether) : getRateMultiplier_BaseRate(chSupplied, _baseSupplied, RateAdjuster.UPPER_DEPOSIT));
 		return term1
 			.mul(1 ether)
 			.div(crossAssetPrice(_baseSupplied, _baseBorrowed))
 			.mul(1 ether)
-			.div(getRateMultiplier_BaseRate(_assetBorrowed, _baseBorrowed, RateAdjuster.UPPER_BORROW))
+			.div(getRateMultiplier_BaseRate(chBorrowed, _baseBorrowed, RateAdjuster.UPPER_BORROW))
 			.div(crossCollateralizationRatio(_baseSupplied, _baseBorrowed, Safety.UPPER));
 	}
 
@@ -569,15 +592,15 @@ contract VaultHealth is IVaultHealth, Ownable {
 			lower collateralisation limit
 	*/
 	function amountBorrowedAtLowerLimit(address _assetSupplied, address _assetBorrowed, uint _amountSupplied) external override view returns (uint) {
-		(address _baseSupplied, address _baseBorrowed) = baseAssetAddresses(_assetSupplied, _assetBorrowed);
+		(address _baseSupplied, address _baseBorrowed, address chSupplied, address chBorrowed) = baseAssetAddresses(_assetSupplied, _assetBorrowed);
 
 		uint term1 = _amountSupplied
-			.mul(_assetSupplied == _baseSupplied ? (1 ether) : getRateMultiplier_BaseRate(_assetSupplied, _baseSupplied, RateAdjuster.LOW_DEPOSIT));
+			.mul(_assetSupplied == _baseSupplied ? (1 ether) : getRateMultiplier_BaseRate(chSupplied, _baseSupplied, RateAdjuster.LOW_DEPOSIT));
 		return term1
 			.mul(1 ether)
 			.div(crossAssetPrice(_baseSupplied, _baseBorrowed))
 			.mul(1 ether)
-			.div(getRateMultiplier_BaseRate(_assetBorrowed, _baseBorrowed, RateAdjuster.LOW_BORROW))
+			.div(getRateMultiplier_BaseRate(chBorrowed, _baseBorrowed, RateAdjuster.LOW_BORROW))
 			.div(crossCollateralizationRatio(_baseSupplied, _baseBorrowed, Safety.LOW));
 	}
 
@@ -633,17 +656,19 @@ contract VaultHealth is IVaultHealth, Ownable {
 		int128 _borrowRateChange
 	) public view override returns(bool) {
 
-		(address _baseSupplied, address _baseBorrowed) = baseAssetAddresses(_assetSupplied, _assetBorrowed);
+		(address _baseSupplied, address _baseBorrowed, address chSupplied, address chBorrowed) = baseAssetAddresses(_assetSupplied, _assetBorrowed);
 
 		//wierd hack to prevent stack too deep
 		_amountBorrowed = _amountBorrowed
 			.mul(crossAssetPrice(_baseSupplied, _baseBorrowed));
 		_amountBorrowed = _amountBorrowed
-			.mul(getRateMultiplier_Changed(_assetBorrowed, _baseBorrowed, RateAdjuster.UPPER_BORROW, _borrowRateChange))
+			.mul(getRateMultiplier_Changed(chBorrowed, _baseBorrowed, RateAdjuster.UPPER_BORROW, _borrowRateChange))
 			.div(1 ether);
 		_amountBorrowed = _amountBorrowed
-			.mul(crossCollateralizationRatio(_baseSupplied, _baseBorrowed, Safety.UPPER))
-			.div(_assetSupplied == _baseSupplied ? (1 ether) : getRateMultiplier_Changed(_assetSupplied, _baseSupplied, RateAdjuster.UPPER_DEPOSIT, _suppliedRateChange))
+			.mul(crossCollateralizationRatio(_baseSupplied, _baseBorrowed, Safety.UPPER));
+		_amountBorrowed = _amountBorrowed
+			.div(_assetSupplied == _baseSupplied ? (1 ether) : getRateMultiplier_Changed(chSupplied, _baseSupplied, RateAdjuster.UPPER_DEPOSIT, _suppliedRateChange));
+		_amountBorrowed = _amountBorrowed
 			.mul(_priceMultiplier)
 			.div((1 ether)*TOTAL_BASIS_POINTS);
 

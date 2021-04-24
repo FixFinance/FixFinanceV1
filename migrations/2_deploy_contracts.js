@@ -1,12 +1,12 @@
 const NGBwrapper = artifacts.require('NGBwrapper');
-const capitalHandler = artifacts.require('CapitalHandler');
+const capitalHandler = artifacts.require('FixCapitalPool');
 const dummyAToken = artifacts.require('dummyAToken');
 const organizer = artifacts.require('organizer');
 const zcbYtDeployer = artifacts.require('ZCB_YT_Deployer');
 const VaultFactoryDelegate = artifacts.require("VaultFactoryDelegate");
 const VaultFactoryDelegate2 = artifacts.require("VaultFactoryDelegate2");
 const VaultFactory = artifacts.require("VaultFactory");
-const CapitalHandlerDeployer = artifacts.require('CapitalHandlerDeployer');
+const FixCapitalPoolDeployer = artifacts.require('FixCapitalPoolDeployer');
 const ZCBammDeployer = artifacts.require('ZCBammDeployer');
 const YTammDelegate = artifacts.require('YTammDelegate');
 const YTammDeployer = artifacts.require('YTammDeployer');
@@ -38,11 +38,11 @@ module.exports = async function(deployer) {
 	organizerInstance = await deployer.deploy(organizer);
 
 	await organizerInstance.deployATokenWrapper(kovanAEthAddress);
-	await organizerInstance.deployCapitalHandlerInstance(kovanAEthAddress, start2021);
-	await organizerInstance.deployCapitalHandlerInstance(kovanAEthAddress, start2022);
-	await organizerInstance.deployCapitalHandlerInstance(kovanAEthAddress, start2026);
+	await organizerInstance.deployFixCapitalPoolInstance(kovanAEthAddress, start2021);
+	await organizerInstance.deployFixCapitalPoolInstance(kovanAEthAddress, start2022);
+	await organizerInstance.deployFixCapitalPoolInstance(kovanAEthAddress, start2026);
 
-	capitalHandlers = await organizerInstance.allCapitalHandlerInstances();
+	capitalHandlers = await organizerInstance.allFixCapitalPoolInstances();
 
 	for (let i = 0; i < capitalHandlers.length; i++) {
 		await factory.createPair(kovanAEthAddress, capitalHandlers[i]);
@@ -60,7 +60,7 @@ module.exports = async function(deployer) {
 		vaultFactoryDelegateInstance.address,
 		vaultFactoryDelegate2Instance.address
 	);
-	capitalHandlerDeployerInstance = await deployer.deploy(CapitalHandlerDeployer);
+	capitalHandlerDeployerInstance = await deployer.deploy(FixCapitalPoolDeployer);
 	swapRouterDelegateInstance = await deployer.deploy(SwapRouterDelegate);
 	swapRouterDeployerInstance = await deployer.deploy(SwapRouterDeployer, swapRouterDelegateInstance.address);
 	ammInfoOracle = await deployer.deploy(AmmInfoOracle, "0", nullAddress);
@@ -84,5 +84,5 @@ module.exports = async function(deployer) {
 	await organizerInstance.DeploySwapRouter();
 	let rec = await organizerInstance.deployAssetWrapper(dummyATokenInstance.address);
 	wAsset = await NGBwrapper.at(rec.receipt.logs[0].args.wrapperAddress);
-	await organizerInstance.deployCapitalHandlerInstance(wAsset.address, start2026);
+	await organizerInstance.deployFixCapitalPoolInstance(wAsset.address, start2026);
 };

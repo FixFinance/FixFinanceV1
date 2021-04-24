@@ -11,7 +11,7 @@ interface IVaultFactory {
 	//-----------------------------------------V-a-u-l-t---M-a-n-a-g-e-m-e-n-t-----------------------------
 	//----------------------------v-i-e-w-s----------------------------
 	function wrapperToUnderlyingAsset(address _wrapeprAddress) external view returns (address);
-	function capitalHandlerToWrapper(address _capitalHandlerAddress) external view returns (address);
+	function fixCapitalPoolToWrapper(address _fixCapitalPoolAddress) external view returns (address);
 	function shortInterestAllDurations(address _wrapper) external view returns (uint);
 	function VaultHealthAddress() external view returns (address);
 	//-----------vault-related-views-----
@@ -34,16 +34,16 @@ interface IVaultFactory {
 	//-------------YT-vault-related-views-----------
 	function YTrevenue(address _asset) external view returns (uint yield, int bond);
 	function YTvaults(address _owner, uint _index) external view returns (
-		address CHsupplied,
-		address CHborrowed,
+		address FCPsupplied,
+		address FCPborrowed,
 		uint yieldSupplied,
 		int bondSupplied,
 		uint amountBorrowed
 	);
 	function YTLiquidations(uint _index) external view returns (
 		address vaultOwner,
-		address CHsupplied,
-		address CHborrowed,
+		address FCPsupplied,
+		address FCPborrowed,
 		int bondRatio,
 		uint amountBorrowed,
 		address bidder,
@@ -81,8 +81,8 @@ interface IVaultFactory {
 	function repay(address _owner, uint _index, uint _amount) external;
 	//---------------------------Y-T---v-a-u-l-t-s---------------------------------
 	function openYTVault(
-		address _CHsupplied,
-		address _CHborrowed,
+		address _FCPsupplied,
+		address _FCPborrowed,
 		uint _yieldSupplied,
 		int _bondSupplied,
 		uint _amountBorrowed,
@@ -120,17 +120,17 @@ interface IVaultFactory {
 	function partialLiquidationSpecificOut(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _out, uint _maxIn, address _to) external;
 	//----------------------------------------------Y-T-V-a-u-l-t--L-i-q-u-i-d-a-t-i-o-n-s------------------------------------------
 	function claimYTRebate(address _asset) external;
-	function auctionYTLiquidation(address _owner, uint _index, address _CHborrowed, address _CHsupplied, uint _bidYield, int _minBondRatio, uint _amtIn) external;
+	function auctionYTLiquidation(address _owner, uint _index, address _FCPborrowed, address _FCPsupplied, uint _bidYield, int _minBondRatio, uint _amtIn) external;
 	function bidOnYTLiquidation(uint _index, uint _bidYield, uint _amtIn) external;
 	function claimYTLiquidation(uint _index, address _to) external;
-	function instantYTLiquidation(address _owner, uint _index, address _CHborrowed, address _CHsupplied, uint _maxIn, uint _minOut, int _minBondRatio, address _to) external;
-	function partialYTLiquidationSpecificIn(address _owner, uint _index, address _CHborrowed, address _CHsupplied, uint _in, uint _minOut, int _minBondRatio, address _to) external;
-	function partialYTLiquidationSpecificOut(address _owner, uint _index, address _CHborrowed, address _CHsupplied, uint _out, int _minBondRatio, uint _maxIn, address _to) external;
+	function instantYTLiquidation(address _owner, uint _index, address _FCPborrowed, address _FCPsupplied, uint _maxIn, uint _minOut, int _minBondRatio, address _to) external;
+	function partialYTLiquidationSpecificIn(address _owner, uint _index, address _FCPborrowed, address _FCPsupplied, uint _in, uint _minOut, int _minBondRatio, address _to) external;
+	function partialYTLiquidationSpecificOut(address _owner, uint _index, address _FCPborrowed, address _FCPsupplied, uint _out, int _minBondRatio, uint _maxIn, address _to) external;
 	//--------------------------------------------a-d-m-i-n---------------------------------------------
 	function setLiquidationRebate(uint _rebateBips) external;
 	function whitelistWrapper(address _wrapeprAddress) external;
 	function whitelistAsset(address _assetAddress) external;
-	function whitelistCapitalHandler(address _capitalHandlerAddress) external;
+	function whitelistFixCapitalPool(address _fixCapitalPoolAddress) external;
 	function claimRevenue(address _asset) external;
-	function claimYTRevenue(address _CH, int _bondIn) external;
+	function claimYTRevenue(address _FCP, int _bondIn) external;
 }

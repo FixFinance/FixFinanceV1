@@ -1,9 +1,9 @@
 pragma solidity >=0.6.0 <0.7.0;
 import "./Wrappers/NGBwrapper.sol";
-import "./CapitalHandler.sol";
+import "./FixCapitalPool.sol";
 import "./amm/ZCBamm/ZCBammDeployer.sol";
 import "./amm/YTamm/YTammDeployer.sol";
-import "./CapitalHandlerDeployer.sol";
+import "./FixCapitalPoolDeployer.sol";
 import "./SwapRouter/SwapRouterDeployer.sol";
 import "./SwapRouter/SwapRouter.sol";
 import "./AmmInfoOracle.sol";
@@ -26,19 +26,19 @@ contract organizer {
 		uint8 wrapperType
 	);
 
-	event CapitalHandlerDeployment(
+	event FixCapitalPoolDeployment(
 		address addr
 	);
 
-	//acts as a whitelist for capitalHandlers that were deployed using this organiser
-	mapping(address => address) public capitalHandlerToWrapper;
-	//CapitalHandler => ZCBamm address
+	//acts as a whitelist for fixCapitalPools that were deployed using this organiser
+	mapping(address => address) public fixCapitalPoolToWrapper;
+	//FixCapitalPool => ZCBamm address
 	mapping(address => address) public ZCBamms;
 	//CapitlHandler => YTamm address
 	mapping(address => address) public YTamms;
 
 	address public yieldTokenDeployerAddress;
-	address public CapitalHandlerDeployerAddress;
+	address public FixCapitalPoolDeployerAddress;
 	address public ZCBammDeployerAddress;
 	address public YTammDeployerAddress;
 	address public SwapRouterAddress;
@@ -60,7 +60,7 @@ contract organizer {
 		address _treasuryAddress
 	) public {
 		yieldTokenDeployerAddress = _yieldTokenDeployerAddress;	
-		CapitalHandlerDeployerAddress = _CapitalhandlerDeployerAddress;
+		FixCapitalPoolDeployerAddress = _CapitalhandlerDeployerAddress;
 		ZCBammDeployerAddress = _ZCBammDeployerAddress;
 		YTammDeployerAddress = _YTammDeployerAddress;
 		SwapRouterDeployerAddress = _SwapRouterDeployerAddress;
@@ -89,40 +89,40 @@ contract organizer {
 	}
 
 	/*
-		@Description: deploy a new CapitalHandler instance, whitelist it in capitalHandlerToWrapper mapping
+		@Description: deploy a new FixCapitalPool instance, whitelist it in fixCapitalPoolToWrapper mapping
 
-		@param address _wrapperAddress: the address of the IWrapper for which to deploy the CapitalHandler
-		@param uint64 _maturity: the maturity of the new CapitalHandler to deploy
+		@param address _wrapperAddress: the address of the IWrapper for which to deploy the FixCapitalPool
+		@param uint64 _maturity: the maturity of the new FixCapitalPool to deploy
 	*/
-	function deployCapitalHandlerInstance(address _wrapperAddress, uint64 _maturity) public {
+	function deployFixCapitalPoolInstance(address _wrapperAddress, uint64 _maturity) public {
 		require(_maturity > block.timestamp+(1 weeks), "maturity must be at least 1 weeks away");
-		address capitalHandlerAddress = CapitalHandlerDeployer(CapitalHandlerDeployerAddress).deploy(_wrapperAddress, _maturity, yieldTokenDeployerAddress, msg.sender);
-		emit CapitalHandlerDeployment(capitalHandlerAddress);
-		capitalHandlerToWrapper[capitalHandlerAddress] = _wrapperAddress;
+		address fixCapitalPoolAddress = FixCapitalPoolDeployer(FixCapitalPoolDeployerAddress).deploy(_wrapperAddress, _maturity, yieldTokenDeployerAddress, msg.sender);
+		emit FixCapitalPoolDeployment(fixCapitalPoolAddress);
+		fixCapitalPoolToWrapper[fixCapitalPoolAddress] = _wrapperAddress;
 	}
 
 	/*
-		@Description: deploy a ZCBamm for a specific capital handler
+		@Description: deploy a ZCBamm for a specific fix capital pool
 			only one ZCBamm may only be deployed
 
-		@param address _capitalHandlerAddress: the address of the CapitalHandler for which to deploy a ZCBamm
+		@param address _fixCapitalPoolAddress: the address of the FixCapitalPool for which to deploy a ZCBamm
 	*/
-	function deployZCBamm(address _capitalHandlerAddress) public {
-		require(ZCBamms[_capitalHandlerAddress] == address(0));
-		require(capitalHandlerToWrapper[_capitalHandlerAddress] != address(0));
-		ZCBamms[_capitalHandlerAddress] = ZCBammDeployer(ZCBammDeployerAddress).deploy(_capitalHandlerAddress, AmmInfoOracleAddress);
+	function deployZCBamm(address _fixCapitalPoolAddress) public {
+		require(ZCBamms[_fixCapitalPoolAddress] == address(0));
+		require(fixCapitalPoolToWrapper[_fixCapitalPoolAddress] != address(0));
+		ZCBamms[_fixCapitalPoolAddress] = ZCBammDeployer(ZCBammDeployerAddress).deploy(_fixCapitalPoolAddress, AmmInfoOracleAddress);
 	}
 
 	/*
-		@Description: deploy a YTamm for a specific capital handler
+		@Description: deploy a YTamm for a specific fix capital pool
 			only one YTamm may be deployed, a YTamm cannot be deployed until after the ZCBamm for the same
-			capital handler has been deployed and published the first rate in its native oracle
+			fix capital pool has been deployed and published the first rate in its native oracle
 	*/
-	function deployYTamm(address _capitalHandlerAddress) public {
-		require(YTamms[_capitalHandlerAddress] == address(0));
-		address ZCBammAddress = ZCBamms[_capitalHandlerAddress];
+	function deployYTamm(address _fixCapitalPoolAddress) public {
+		require(YTamms[_fixCapitalPoolAddress] == address(0));
+		address ZCBammAddress = ZCBamms[_fixCapitalPoolAddress];
 		require(ZCBammAddress != address(0));
-		YTamms[_capitalHandlerAddress] = YTammDeployer(YTammDeployerAddress).deploy(ZCBammAddress, AmmInfoOracleAddress);
+		YTamms[_fixCapitalPoolAddress] = YTammDeployer(YTammDeployerAddress).deploy(ZCBammAddress, AmmInfoOracleAddress);
 	}
 
 }

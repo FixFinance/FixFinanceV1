@@ -1,5 +1,5 @@
 pragma solidity >=0.6.0;
-import "../interfaces/ICapitalHandler.sol";
+import "../interfaces/IFixCapitalPool.sol";
 import "../interfaces/IDividend.sol";
 import "../interfaces/IYieldToken.sol";
 import "../interfaces/IWrapper.sol";

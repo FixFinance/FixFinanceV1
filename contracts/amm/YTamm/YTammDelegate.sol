@@ -5,7 +5,7 @@ import "../../helpers/IYTammData.sol";
 import "../../libraries/ABDKMath64x64.sol";
 import "../../libraries/SafeMath.sol";
 import "../../libraries/BigMath.sol";
-import "../../interfaces/ICapitalHandler.sol";
+import "../../interfaces/IFixCapitalPool.sol";
 import "../../interfaces/IYieldToken.sol";
 import "../../interfaces/IWrapper.sol";
 import "../../interfaces/IERC20.sol";
@@ -254,7 +254,7 @@ contract YTammDelegate is DividendEnabledData, IYTammData {
 			YTtoLmultiplier == internalTotalSupply / YTreserves
 		*/
 		YTtoLmultiplier = internalTotalSupply.mul(1 ether) / _YTreserves;
-		SlippageConstant = AmmInfoOracle(AmmInfoOracleAddress).getSlippageConstant(CHaddress);
+		SlippageConstant = AmmInfoOracle(AmmInfoOracleAddress).getSlippageConstant(FCPaddress);
 		lastRecalibration = block.timestamp;
 		//ensure noone reserves quote before recalibrating and is then able to take the quote
 		quoteSignature = bytes32(0);

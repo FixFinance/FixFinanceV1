@@ -53,20 +53,20 @@ contract DummyVaultHealth is IVaultHealth {
 		return _amountSupplied * 1e18 / lowerRatio[_assetSupplied][_assetBorrowed];
 	}
 
-	function YTvaultAmountBorrowedAtUpperLimit(address _CHsupplied, address _CHborrowed, uint _amountYield, int _amountBond) external view override returns (uint) {
+	function YTvaultAmountBorrowedAtUpperLimit(address _FCPsupplied, address _FCPborrowed, uint _amountYield, int _amountBond) external view override returns (uint) {
 		if (
-			_CHsupplied == address(0) ||
-			_CHborrowed == address(0) ||
+			_FCPsupplied == address(0) ||
+			_FCPborrowed == address(0) ||
 			_amountYield == 0 ||
 			_amountBond == 0
 			)
 			return 0;
 		return 1;
 	}
-	function YTvaultAmountBorrowedAtLowerLimit(address _CHsupplied, address _CHborrowed, uint _amountYield, int _amountBond) external view override returns (uint) {
+	function YTvaultAmountBorrowedAtLowerLimit(address _FCPsupplied, address _FCPborrowed, uint _amountYield, int _amountBond) external view override returns (uint) {
 		if (
-			_CHsupplied == address(0) ||
-			_CHborrowed == address(0) ||
+			_FCPsupplied == address(0) ||
+			_FCPborrowed == address(0) ||
 			_amountYield == 0 ||
 			_amountBond == 0
 			)
@@ -74,10 +74,10 @@ contract DummyVaultHealth is IVaultHealth {
 		return 1;
 	}
 
-	function YTvaultSatisfiesUpperLimit(address _CHsupplied, address _CHborrowed, uint _amountYield, int _amountBond, uint _amountBorrowed) external view override returns (bool) {
+	function YTvaultSatisfiesUpperLimit(address _FCPsupplied, address _FCPborrowed, uint _amountYield, int _amountBond, uint _amountBorrowed) external view override returns (bool) {
 		if (
-			_CHsupplied	== address(0) ||
-			_CHborrowed == address(0) ||
+			_FCPsupplied	== address(0) ||
+			_FCPborrowed == address(0) ||
 			_amountYield == 0 ||
 			_amountBond == 0 ||
 			_amountBorrowed == 0
@@ -85,10 +85,10 @@ contract DummyVaultHealth is IVaultHealth {
 			return false || toReturn;
 		return true && toReturn;
 	}
-	function YTvaultSatisfiesLowerLimit(address _CHsupplied, address _CHborrowed, uint _amountYield, int _amountBond, uint _amountBorrowed) external view override returns (bool) {
+	function YTvaultSatisfiesLowerLimit(address _FCPsupplied, address _FCPborrowed, uint _amountYield, int _amountBond, uint _amountBorrowed) external view override returns (bool) {
 		if (
-			_CHsupplied	== address(0) ||
-			_CHborrowed == address(0) ||
+			_FCPsupplied	== address(0) ||
+			_FCPborrowed == address(0) ||
 			_amountYield == 0 ||
 			_amountBond == 0 ||
 			_amountBorrowed == 0
@@ -134,8 +134,8 @@ contract DummyVaultHealth is IVaultHealth {
 	}
 
 	function YTvaultWithstandsChange(
-		address _CHsupplied,
-		address _CHborrowed,
+		address _FCPsupplied,
+		address _FCPborrowed,
 		uint _amountYield,
 		int _amountBond,
 		uint _amountBorrowed,
@@ -147,8 +147,8 @@ contract DummyVaultHealth is IVaultHealth {
 			silence warnings about not using parameters
 		*/
 		if (
-			_CHsupplied == address(0) ||
-			_CHborrowed == address(0) ||
+			_FCPsupplied == address(0) ||
+			_FCPborrowed == address(0) ||
 			_amountYield == 0 ||
 			_amountBond == 0 ||
 			_amountBorrowed == 0 ||

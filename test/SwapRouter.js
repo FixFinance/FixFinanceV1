@@ -1,14 +1,14 @@
 const dummyAToken = artifacts.require('dummyAToken');
 const dummyVaultHealth = artifacts.require('DummyVaultHealth');
 const NGBwrapper = artifacts.require('NGBwrapper');
-const CapitalHandler = artifacts.require('CapitalHandler');
+const FixCapitalPool = artifacts.require('FixCapitalPool');
 const YieldToken = artifacts.require('YieldToken');
 const zcbYtDeployer = artifacts.require('ZCB_YT_Deployer');
 const organizer = artifacts.require('organizer');
 const IERC20 = artifacts.require("IERC20");
 const BigMath = artifacts.require("BigMath");
 const Ei = artifacts.require("Ei");
-const CapitalHandlerDeployer = artifacts.require('CapitalHandlerDeployer');
+const FixCapitalPoolDeployer = artifacts.require('FixCapitalPoolDeployer');
 const ZCBamm = artifacts.require('ZCBamm');
 const YTamm = artifacts.require('YTamm');
 const ZCBammDeployer = artifacts.require('ZCBammDeployer');
@@ -48,7 +48,7 @@ contract('SwapRouter', async function(accounts) {
 		ZCBammDeployerInstance = await ZCBammDeployer.new();
 		YTammDelegateInstance = await YTammDelegate.new();
 		YTammDeployerInstance = await YTammDeployer.new(YTammDelegateInstance.address);
-		capitalHandlerDeployerInstance = await CapitalHandlerDeployer.new();
+		fixCapitalPoolDeployerInstance = await FixCapitalPoolDeployer.new();
 		swapRouterDelegateInstance = await SwapRouterDelegate.new();
 		swapRouterDeployerInstance = await SwapRouterDeployer.new(swapRouterDelegateInstance.address);
 		ammInfoOracleInstance = await AmmInfoOracle.new(
@@ -57,7 +57,7 @@ contract('SwapRouter', async function(accounts) {
 		);
 		organizerInstance = await organizer.new(
 			zcbYtDeployerInstance.address,
-			capitalHandlerDeployerInstance.address,
+			fixCapitalPoolDeployerInstance.address,
 			ZCBammDeployerInstance.address,
 			YTammDeployerInstance.address,
 			swapRouterDeployerInstance.address,
@@ -74,16 +74,16 @@ contract('SwapRouter', async function(accounts) {
 		aTokenInstance = await dummyAToken.new("aCOIN");
 		let rec = await organizerInstance.deployAssetWrapper(aTokenInstance.address);
 		NGBwrapperInstance = await NGBwrapper.at(rec.receipt.logs[0].args.wrapperAddress);
-		rec = await organizerInstance.deployCapitalHandlerInstance(NGBwrapperInstance.address, maturity);
-		capitalHandlerInstance = await CapitalHandler.at(rec.receipt.logs[0].args.addr);
+		rec = await organizerInstance.deployFixCapitalPoolInstance(NGBwrapperInstance.address, maturity);
+		fixCapitalPoolInstance = await FixCapitalPool.at(rec.receipt.logs[0].args.addr);
 
-		await ammInfoOracleInstance.setSlippageConstant(capitalHandlerInstance.address, SlippageConstant);
-		await ammInfoOracleInstance.setFeeConstants(capitalHandlerInstance.address, ZCBammFeeConstant, YTammFeeConstant);
+		await ammInfoOracleInstance.setSlippageConstant(fixCapitalPoolInstance.address, SlippageConstant);
+		await ammInfoOracleInstance.setFeeConstants(fixCapitalPoolInstance.address, ZCBammFeeConstant, YTammFeeConstant);
 
-		zcbInstance = await IERC20.at(await capitalHandlerInstance.zeroCouponBondAddress());
-		yieldTokenInstance = await YieldToken.at(await capitalHandlerInstance.yieldTokenAddress());
-		await organizerInstance.deployZCBamm(capitalHandlerInstance.address);
-		amm0 = await ZCBamm.at(await organizerInstance.ZCBamms(capitalHandlerInstance.address));
+		zcbInstance = await IERC20.at(await fixCapitalPoolInstance.zeroCouponBondAddress());
+		yieldTokenInstance = await YieldToken.at(await fixCapitalPoolInstance.yieldTokenAddress());
+		await organizerInstance.deployZCBamm(fixCapitalPoolInstance.address);
+		amm0 = await ZCBamm.at(await organizerInstance.ZCBamms(fixCapitalPoolInstance.address));
 
 		//simulate generation of 100% returns in money market
 		await aTokenInstance.setInflation("2"+_10To18BN.toString().substring(1));
@@ -92,8 +92,8 @@ contract('SwapRouter', async function(accounts) {
 		balance = _10To18BN;
 		await aTokenInstance.approve(NGBwrapperInstance.address, balance);
 		await NGBwrapperInstance.depositUnitAmount(accounts[0], balance);
-		await NGBwrapperInstance.approve(capitalHandlerInstance.address, balance);
-		await capitalHandlerInstance.depositWrappedToken(accounts[0], balance);
+		await NGBwrapperInstance.approve(fixCapitalPoolInstance.address, balance);
+		await fixCapitalPoolInstance.depositWrappedToken(accounts[0], balance);
 		await zcbInstance.approve(amm0.address, balance);
 		await yieldTokenInstance.approve(amm0.address, balance);
 
@@ -115,8 +115,8 @@ contract('SwapRouter', async function(accounts) {
 		await amm0.setOracleRate(OracleRateString);
 
 
-		await organizerInstance.deployYTamm(capitalHandlerInstance.address);
-		amm1 = await YTamm.at(await organizerInstance.YTamms(capitalHandlerInstance.address));
+		await organizerInstance.deployYTamm(fixCapitalPoolInstance.address);
+		amm1 = await YTamm.at(await organizerInstance.YTamms(fixCapitalPoolInstance.address));
 		//router = await SwapRouter.at(await organizerInstance.SwapRouterAddress());
 
 		await zcbInstance.approve(amm1.address, balance);
@@ -145,7 +145,7 @@ contract('SwapRouter', async function(accounts) {
 		let minZCB = "100001";
 		let toApprove = roundingBuffer.add(new BN(amt));
 		await aTokenInstance.approve(router.address, toApprove);
-		await router.UnitToZCB(capitalHandlerInstance.address, amt, minZCB);
+		await router.UnitToZCB(fixCapitalPoolInstance.address, amt, minZCB);
 
 		newBalanceATkn = await aTokenInstance.balanceOf(accounts[0]);
 		newBalanceYT = await yieldTokenInstance.balanceOf(accounts[0]);
@@ -168,7 +168,7 @@ contract('SwapRouter', async function(accounts) {
 		let maxATkn = "100000";
 		//let maxATkn = "99999";
 		await aTokenInstance.approve(router.address, maxATkn);
-		await router.UnitToYT(capitalHandlerInstance.address, amtYT, maxATkn);
+		await router.UnitToYT(fixCapitalPoolInstance.address, amtYT, maxATkn);
 
 		newBalanceATkn = await aTokenInstance.balanceOf(accounts[0]);
 		newBalanceYT = await yieldTokenInstance.balanceOf(accounts[0]);
@@ -190,7 +190,7 @@ contract('SwapRouter', async function(accounts) {
 		let amtYT = "90000";
 		let maxZCBin = "1000000";
 		await zcbInstance.approve(router.address, maxZCBin);
-		await router.SwapZCBtoYT(capitalHandlerInstance.address, amtYT, maxZCBin);
+		await router.SwapZCBtoYT(fixCapitalPoolInstance.address, amtYT, maxZCBin);
 
 		newBalanceYT = await yieldTokenInstance.balanceOf_2(accounts[0], false);
 		newBalanceZCB = await zcbInstance.balanceOf(accounts[0]);
@@ -210,7 +210,7 @@ contract('SwapRouter', async function(accounts) {
 		let amtYT = "900000";
 		let minZCBout = "10";
 		await yieldTokenInstance.approve_2(router.address, amtYT, true);
-		await router.SwapYTtoZCB(capitalHandlerInstance.address, amtYT, minZCBout);
+		await router.SwapYTtoZCB(fixCapitalPoolInstance.address, amtYT, minZCBout);
 
 		newBalanceYT = await yieldTokenInstance.balanceOf_2(accounts[0], false);
 		newBalanceZCB = await zcbInstance.balanceOf(accounts[0]);
@@ -230,7 +230,7 @@ contract('SwapRouter', async function(accounts) {
 		let amtYT = "90000";
 		let maxZCBin = "1000000";
 		await zcbInstance.approve(router.address, maxZCBin);
-		await router.SwapZCBtoYT_ZCBamm(capitalHandlerInstance.address, amtYT, maxZCBin);
+		await router.SwapZCBtoYT_ZCBamm(fixCapitalPoolInstance.address, amtYT, maxZCBin);
 
 		newBalanceYT = await yieldTokenInstance.balanceOf_2(accounts[0], false);
 		newBalanceZCB = await zcbInstance.balanceOf(accounts[0]);
@@ -252,7 +252,7 @@ contract('SwapRouter', async function(accounts) {
 
 		await yieldTokenInstance.approve_2(router.address, amtYT, true);
 		let approveAmount = (new BN(amtYT)).add(new BN(1)).toString();
-		await router.SwapYTtoZCB_ZCBamm(capitalHandlerInstance.address, amtYT, minZCBout);
+		await router.SwapYTtoZCB_ZCBamm(fixCapitalPoolInstance.address, amtYT, minZCBout);
 
 		newBalanceYT = await yieldTokenInstance.balanceOf_2(accounts[0], false);
 		newBalanceZCB = await zcbInstance.balanceOf(accounts[0]);
@@ -273,7 +273,7 @@ contract('SwapRouter', async function(accounts) {
 		let Uin = "40000";
 		await yieldTokenInstance.approve_2(router.address, Uin, true);
 		await zcbInstance.approve(router.address, Uin);
-		await router.SwapUtoYT_ZCBamm(capitalHandlerInstance.address, amtYT, Uin);
+		await router.SwapUtoYT_ZCBamm(fixCapitalPoolInstance.address, amtYT, Uin);
 
 		newBalanceYT = await yieldTokenInstance.balanceOf_2(accounts[0], false);
 		newBalanceZCB = await zcbInstance.balanceOf(accounts[0]);
@@ -297,7 +297,7 @@ contract('SwapRouter', async function(accounts) {
 		let minUout = "10000";
 
 		await yieldTokenInstance.approve_2(router.address, amtYT, true);
-		await router.SwapYTtoU_ZCBamm(capitalHandlerInstance.address, amtYT, minUout);
+		await router.SwapYTtoU_ZCBamm(fixCapitalPoolInstance.address, amtYT, minUout);
 
 		newBalanceYT = await yieldTokenInstance.balanceOf_2(accounts[0], false);
 		newBalanceZCB = await zcbInstance.balanceOf(accounts[0]);
@@ -323,7 +323,7 @@ contract('SwapRouter', async function(accounts) {
 		let minUtotal = "90001";
 		await zcbInstance.approve(router.address, amtZCB);
 		await yieldTokenInstance.approve_2(router.address, amtYT, true);
-		await router.LiquidateSpecificToUnderlying(capitalHandlerInstance.address, amtZCB, amtYT, minUtotal, true);
+		await router.LiquidateSpecificToUnderlying(fixCapitalPoolInstance.address, amtZCB, amtYT, minUtotal, true);
 
 		newBalanceATkn = await aTokenInstance.balanceOf(accounts[0]);
 		newBalanceYT = await yieldTokenInstance.balanceOf_2(accounts[0], false);
@@ -349,7 +349,7 @@ contract('SwapRouter', async function(accounts) {
 		let minUtotal = "90001";
 		await zcbInstance.approve(router.address, amtZCB);
 		await yieldTokenInstance.approve_2(router.address, amtYT, true);
-		await router.LiquidateSpecificToUnderlying(capitalHandlerInstance.address, amtZCB, amtYT, minUtotal, true);
+		await router.LiquidateSpecificToUnderlying(fixCapitalPoolInstance.address, amtZCB, amtYT, minUtotal, true);
 
 		newBalanceATkn = await aTokenInstance.balanceOf(accounts[0]);
 		newBalanceYT = await yieldTokenInstance.balanceOf_2(accounts[0], false);
@@ -379,7 +379,7 @@ contract('SwapRouter', async function(accounts) {
 		let minUtotal = "2";
 		await zcbInstance.approve(router.address, balanceZCB);
 		await yieldTokenInstance.approve(router.address, balanceYT);
-		await router.LiquidateAllToUnderlying(capitalHandlerInstance.address, minUtotal, true);
+		await router.LiquidateAllToUnderlying(fixCapitalPoolInstance.address, minUtotal, true);
 
 		newBalanceATkn = await aTokenInstance.balanceOf(accounts[0]);
 		newBalanceYT = await yieldTokenInstance.balanceOf(accounts[0]);

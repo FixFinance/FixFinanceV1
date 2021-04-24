@@ -4,7 +4,7 @@ import "../../helpers/IYTamm.sol";
 import "../../libraries/ABDKMath64x64.sol";
 import "../../libraries/SafeMath.sol";
 import "../../libraries/BigMath.sol";
-import "../../interfaces/ICapitalHandler.sol";
+import "../../interfaces/IFixCapitalPool.sol";
 import "../../interfaces/IYieldToken.sol";
 import "../../interfaces/IWrapper.sol";
 import "../../interfaces/IERC20.sol";
@@ -27,7 +27,7 @@ contract YTamm is IYTamm {
 		address _feeOracleAddress,
 		address _delegateAddress
 	) public {
-		address _CHaddress = IZCBamm(_ZCBammAddress).CHaddress();
+		address _FCPaddress = IZCBamm(_ZCBammAddress).FCPaddress();
 		address _ZCBaddress = IZCBamm(_ZCBammAddress).ZCBaddress();
 		address _YTaddress = IZCBamm(_ZCBammAddress).YTaddress();
 		uint64 _maturity = IZCBamm(_ZCBammAddress).maturity();
@@ -38,13 +38,13 @@ contract YTamm is IYTamm {
 		maturity = _maturity;
 		ZCBammAddress = _ZCBammAddress;
 		AmmInfoOracleAddress = _feeOracleAddress;
-		SlippageConstant = AmmInfoOracle(_feeOracleAddress).getSlippageConstant(_CHaddress);
-		wrapper = ICapitalHandler(_CHaddress).wrapper();
+		SlippageConstant = AmmInfoOracle(_feeOracleAddress).getSlippageConstant(_FCPaddress);
+		wrapper = IFixCapitalPool(_FCPaddress).wrapper();
 		YTtoLmultiplier = BigMath.YT_U_ratio(
 			apy,
 			maturity-block.timestamp
 		);
-		CHaddress = _CHaddress;
+		FCPaddress = _FCPaddress;
 		ZCBaddress = _ZCBaddress;
 		YTaddress = _YTaddress;
 		delegateAddress = _delegateAddress;
@@ -364,7 +364,7 @@ contract YTamm is IYTamm {
 			inflTotalSupply,
 			_TimeRemaining,
 			SlippageConstant,
-			(1 ether)**2 / AmmInfoOracle(AmmInfoOracleAddress).getYTammFeeConstant(CHaddress),
+			(1 ether)**2 / AmmInfoOracle(AmmInfoOracleAddress).getYTammFeeConstant(FCPaddress),
 			OracleRate,
 			_amount
 		));
@@ -410,7 +410,7 @@ contract YTamm is IYTamm {
 			inflTotalSupply,
 			_TimeRemaining,
 			SlippageConstant,
-			AmmInfoOracle(AmmInfoOracleAddress).getYTammFeeConstant(CHaddress),
+			AmmInfoOracle(AmmInfoOracleAddress).getYTammFeeConstant(FCPaddress),
 			OracleRate,
 			-_amount
 		));
@@ -483,7 +483,7 @@ contract YTamm is IYTamm {
 			inflTotalSupply,
 			_TimeRemaining,
 			SlippageConstant,
-			(1 ether)**2 / AmmInfoOracle(AmmInfoOracleAddress).getYTammFeeConstant(CHaddress),
+			(1 ether)**2 / AmmInfoOracle(AmmInfoOracleAddress).getYTammFeeConstant(FCPaddress),
 			OracleRate,
 			_amount
 		));
@@ -522,7 +522,7 @@ contract YTamm is IYTamm {
 			inflTotalSupply,
 			_TimeRemaining,
 			SlippageConstant,
-			AmmInfoOracle(AmmInfoOracleAddress).getYTammFeeConstant(CHaddress),
+			AmmInfoOracle(AmmInfoOracleAddress).getYTammFeeConstant(FCPaddress),
 			OracleRate,
 			-_amount
 		));

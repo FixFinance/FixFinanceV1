@@ -1,6 +1,6 @@
 pragma solidity >=0.6.0;
 import "./helpers/Ownable.sol";
-import "./interfaces/ICapitalHandler.sol";
+import "./interfaces/IFixCapitalPool.sol";
 import "./libraries/SafeMath.sol";
 import "./libraries/ABDKMath64x64.sol";
 import "./libraries/BigMath.sol";
@@ -81,30 +81,30 @@ contract AmmInfoOracle is Ownable {
 	}
 
 	/*
-		@Description: owner of a capital handler contract may override the default fee constants based on the
-			capital handler's wrapper and supplant it with their own fee constants
+		@Description: owner of a fix capital pool contract may override the default fee constants based on the
+			fix capital pool's wrapper and supplant it with their own fee constants
 
-		@param address _capitalHandlerAddress: address of capital handler contract for which to set amm fee consts
+		@param address _fixCapitalPoolAddress: address of fix capital pool contract for which to set amm fee consts
 		@param uint _ZCBammFeeConstant: the fee constant for the ZCBamm, must be >= 1, inflated by (1 ether)
 		@param uint _YTammFeeConstant: the fee constant for the YTamm, must be >= 1, inflated by (1 ether)
 	*/
-	function setFeeConstants(address _capitalHandlerAddress, uint _ZCBammFeeConstant, uint _YTammFeeConstant) public {
-		require(msg.sender == Ownable(_capitalHandlerAddress).owner());
+	function setFeeConstants(address _fixCapitalPoolAddress, uint _ZCBammFeeConstant, uint _YTammFeeConstant) public {
+		require(msg.sender == Ownable(_fixCapitalPoolAddress).owner());
 		require(_ZCBammFeeConstant >= 1 ether && _YTammFeeConstant >= 1 ether);
-		ZCBammFeeConstants[_capitalHandlerAddress] = _ZCBammFeeConstant;
-		YTammFeeConstants[_capitalHandlerAddress] = _YTammFeeConstant;
+		ZCBammFeeConstants[_fixCapitalPoolAddress] = _ZCBammFeeConstant;
+		YTammFeeConstants[_fixCapitalPoolAddress] = _YTammFeeConstant;
 	}
 
 	/*
-		@Description: owner of a capital handler may override the default slippage constant for the YTamm that
-			utilises their capital handler contract.
+		@Description: owner of a fix capital pool may override the default slippage constant for the YTamm that
+			utilises their fix capital pool contract.
 
-		@param address _capitalHandlerAddress: address of capital handler contract for which to set YTamm slippage
+		@param address _fixCapitalPoolAddress: address of fix capital pool contract for which to set YTamm slippage
 		@param uint _SlippageConstant: the sliippage constant for YTamms, inflated by 1 ether
 	*/
-	function setSlippageConstant(address _capitalHandlerAddress, uint256 _SlippageConstant) public {
-		require(msg.sender == Ownable(_capitalHandlerAddress).owner());
-		YTammSlippageConstants[_capitalHandlerAddress] = _SlippageConstant;
+	function setSlippageConstant(address _fixCapitalPoolAddress, uint256 _SlippageConstant) public {
+		require(msg.sender == Ownable(_fixCapitalPoolAddress).owner());
+		YTammSlippageConstants[_fixCapitalPoolAddress] = _SlippageConstant;
 	}
 
 	//--------------------------------------------v-i-e-w-s------------------------------
@@ -127,53 +127,53 @@ contract AmmInfoOracle is Ownable {
 	}
 
 	/*
-		@Description: given a capital handler return its corresponding ZCBamm fee constant
-			if there is a specific constant for the capital handler return that,
-			otherwise return the default fee constant for the wrapper that the capital handler is associated with
+		@Description: given a fix capital pool return its corresponding ZCBamm fee constant
+			if there is a specific constant for the fix capital pool return that,
+			otherwise return the default fee constant for the wrapper that the fix capital pool is associated with
 
-		@param address _capitalHandlerAddress: corresponds to the capital handler contract for which to find the
+		@param address _fixCapitalPoolAddress: corresponds to the fix capital pool contract for which to find the
 			ZCBamm fee constant
 
-		@return uint FeeConstant: the ZCBamm fee constant corresponding to the capital handler contract
+		@return uint FeeConstant: the ZCBamm fee constant corresponding to the fix capital pool contract
 	*/
-	function getZCBammFeeConstant(address _capitalHandlerAddress) external view returns (uint FeeConstant) {
-		FeeConstant = ZCBammFeeConstants[_capitalHandlerAddress];
+	function getZCBammFeeConstant(address _fixCapitalPoolAddress) external view returns (uint FeeConstant) {
+		FeeConstant = ZCBammFeeConstants[_fixCapitalPoolAddress];
 		if (FeeConstant == 0) {
-			FeeConstant = WrapperToZCBFeeConst[address(ICapitalHandler(_capitalHandlerAddress).wrapper())];
+			FeeConstant = WrapperToZCBFeeConst[address(IFixCapitalPool(_fixCapitalPoolAddress).wrapper())];
 		}
 	}
 
 	/*
-		@Description: given a capital handler return its corresponding YTamm fee constant
-			if there is a specific constant for the capital handler return that,
-			otherwise return the default fee constant for the wrapper that the capital handler is associated with
+		@Description: given a fix capital pool return its corresponding YTamm fee constant
+			if there is a specific constant for the fix capital pool return that,
+			otherwise return the default fee constant for the wrapper that the fix capital pool is associated with
 
-		@param address _capitalHandlerAddress: corresponds to the capital handler contract for which to find the
+		@param address _fixCapitalPoolAddress: corresponds to the fix capital pool contract for which to find the
 			YTamm fee constant
 
-		@return uint FeeConstant: the YTamm fee constant corresponding to the capital handler contract
+		@return uint FeeConstant: the YTamm fee constant corresponding to the fix capital pool contract
 	*/
-	function getYTammFeeConstant(address _capitalHandlerAddress) external view returns (uint FeeConstant) {
-		FeeConstant = YTammFeeConstants[_capitalHandlerAddress];
+	function getYTammFeeConstant(address _fixCapitalPoolAddress) external view returns (uint FeeConstant) {
+		FeeConstant = YTammFeeConstants[_fixCapitalPoolAddress];
 		if (FeeConstant == 0) {
-			FeeConstant = WrapperToYTFeeConst[address(ICapitalHandler(_capitalHandlerAddress).wrapper())];
+			FeeConstant = WrapperToYTFeeConst[address(IFixCapitalPool(_fixCapitalPoolAddress).wrapper())];
 		}
 	}
 
 	/*
-		@Description: given a capital handler return its corresponding YTamm slippage constant
-			if there is a specific constant for the capital handler return that,
-			otherwise return the default slippage constant for the wrapper that the capital handler is associated with
+		@Description: given a fix capital pool return its corresponding YTamm slippage constant
+			if there is a specific constant for the fix capital pool return that,
+			otherwise return the default slippage constant for the wrapper that the fix capital pool is associated with
 
-		@param address _capitalHandlerAddress: corresponds to the capital handler contract for which to find the
+		@param address _fixCapitalPoolAddress: corresponds to the fix capital pool contract for which to find the
 			YTamm slippage constant
 
-		@return uint FeeConstant: the YTamm slippage constant corresponding to the capital handler contract
+		@return uint FeeConstant: the YTamm slippage constant corresponding to the fix capital pool contract
 	*/
-	function getSlippageConstant(address _capitalHandlerAddress) external view returns (uint SlippageConstant) {
-		SlippageConstant = YTammSlippageConstants[_capitalHandlerAddress];
+	function getSlippageConstant(address _fixCapitalPoolAddress) external view returns (uint SlippageConstant) {
+		SlippageConstant = YTammSlippageConstants[_fixCapitalPoolAddress];
 		if (SlippageConstant == 0) {
-			SlippageConstant = WrapperToYTSlippageConst[address(ICapitalHandler(_capitalHandlerAddress).wrapper())];
+			SlippageConstant = WrapperToYTSlippageConst[address(IFixCapitalPool(_fixCapitalPoolAddress).wrapper())];
 		}
 	}
 

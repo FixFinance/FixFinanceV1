@@ -2,7 +2,7 @@ const aToken = artifacts.require("dummyAToken");
 const NGBwrapper = artifacts.require("NGBwrapper");
 const BigMath = artifacts.require("BigMath");
 const Ei = artifacts.require("Ei");
-const capitalHandler = artifacts.require("CapitalHandler");
+const fixCapitalPool = artifacts.require("FixCapitalPool");
 const yieldToken = artifacts.require("IYieldToken");
 const zeroCouponBond = artifacts.require("IZeroCouponBond");
 const zcbYtDeployer = artifacts.require("ZCB_YT_Deployer");
@@ -53,14 +53,14 @@ contract('ZCBamm', async function(accounts){
 		let timestamp = (await web3.eth.getBlock('latest')).timestamp;
 		//maturity is 110 days out
 		maturity = timestamp + 110*24*60*60;
-		capitalHandlerInstance = await capitalHandler.new(NGBwrapperInstance.address, maturity, zcbYtDeployerInstance.address);
-		zcbInstance = await zeroCouponBond.at(await capitalHandlerInstance.zeroCouponBondAddress());
-		yieldTokenInstance = await yieldToken.at(await capitalHandlerInstance.yieldTokenAddress());
+		fixCapitalPoolInstance = await fixCapitalPool.new(NGBwrapperInstance.address, maturity, zcbYtDeployerInstance.address);
+		zcbInstance = await zeroCouponBond.at(await fixCapitalPoolInstance.zeroCouponBondAddress());
+		yieldTokenInstance = await yieldToken.at(await fixCapitalPoolInstance.yieldTokenAddress());
 		await ZCBamm.link("BigMath", BigMathInstance.address);
 		ammInfoOracleInstance = await AmmInfoOracle.new(BipsToTreasury, nullAddress);
-		await ammInfoOracleInstance.setSlippageConstant(capitalHandlerInstance.address, SlippageConstant);
-		await ammInfoOracleInstance.setFeeConstants(capitalHandlerInstance.address, ZCBammFeeConstant, YTammFeeConstant);
-		amm = await ZCBamm.new(capitalHandlerInstance.address, ammInfoOracleInstance.address);
+		await ammInfoOracleInstance.setSlippageConstant(fixCapitalPoolInstance.address, SlippageConstant);
+		await ammInfoOracleInstance.setFeeConstants(fixCapitalPoolInstance.address, ZCBammFeeConstant, YTammFeeConstant);
+		amm = await ZCBamm.new(fixCapitalPoolInstance.address, ammInfoOracleInstance.address);
 		anchor = (await amm.anchor()).toNumber();
 
 		//simulate generation of 100% returns in money market
@@ -70,8 +70,8 @@ contract('ZCBamm', async function(accounts){
 		balance = _10To18BN;
 		await aTokenInstance.approve(NGBwrapperInstance.address, balance);
 		await NGBwrapperInstance.depositUnitAmount(accounts[0], balance);
-		await NGBwrapperInstance.approve(capitalHandlerInstance.address, balance);
-		await capitalHandlerInstance.depositWrappedToken(accounts[0], balance);
+		await NGBwrapperInstance.approve(fixCapitalPoolInstance.address, balance);
+		await fixCapitalPoolInstance.depositWrappedToken(accounts[0], balance);
 		await zcbInstance.approve(amm.address, balance);
 		await yieldTokenInstance.approve(amm.address, balance);
 

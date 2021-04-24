@@ -3,7 +3,7 @@ pragma solidity >=0.6.5 <0.7.0;
 
 import "../libraries/SafeMath.sol";
 import "../libraries/SignedSafeMath.sol";
-import "../interfaces/ICapitalHandler.sol";
+import "../interfaces/IFixCapitalPool.sol";
 import "../interfaces/IVaultHealth.sol";
 import "../interfaces/IVaultFactory.sol";
 import "../interfaces/IWrapper.sol";
@@ -50,8 +50,8 @@ contract VaultFactory is VaultFactoryData, IVaultFactory, Ownable {
 		return _wrapperToUnderlyingAsset[_wrapeprAddress];
 	}
 
-	function capitalHandlerToWrapper(address _capitalHandlerAddress) external view override returns (address) {
-		return _capitalHandlerToWrapper[_capitalHandlerAddress];
+	function fixCapitalPoolToWrapper(address _fixCapitalPoolAddress) external view override returns (address) {
+		return _fixCapitalPoolToWrapper[_fixCapitalPoolAddress];
 	}
 
 	function shortInterestAllDurations(address _wrapper) external view override returns (uint) {
@@ -101,15 +101,15 @@ contract VaultFactory is VaultFactoryData, IVaultFactory, Ownable {
 	}
 
 	function YTvaults(address _owner, uint _index) external view override returns (
-		address CHsupplied,
-		address CHborrowed,
+		address FCPsupplied,
+		address FCPborrowed,
 		uint yieldSupplied,
 		int bondSupplied,
 		uint amountBorrowed
 	) {
 		YTVault memory vault = _YTvaults[_owner][_index];
-		CHsupplied = vault.CHsupplied;
-		CHborrowed = vault.CHborrowed;
+		FCPsupplied = vault.FCPsupplied;
+		FCPborrowed = vault.FCPborrowed;
 		yieldSupplied = vault.yieldSupplied;
 		bondSupplied = vault.bondSupplied;
 		amountBorrowed = vault.amountBorrowed;
@@ -117,8 +117,8 @@ contract VaultFactory is VaultFactoryData, IVaultFactory, Ownable {
 
 	function YTLiquidations(uint _index) external view override returns (
 		address vaultOwner,
-		address CHsupplied,
-		address CHborrowed,
+		address FCPsupplied,
+		address FCPborrowed,
 		int bondRatio,
 		uint amountBorrowed,
 		address bidder,
@@ -127,8 +127,8 @@ contract VaultFactory is VaultFactoryData, IVaultFactory, Ownable {
 	) {
 		YTLiquidation memory liq = _YTLiquidations[_index];
 		vaultOwner = liq.vaultOwner;
-		CHsupplied = liq.CHsupplied;
-		CHborrowed = liq.CHborrowed;
+		FCPsupplied = liq.FCPsupplied;
+		FCPborrowed = liq.FCPborrowed;
 		bondRatio = liq.bondRatio;
 		amountBorrowed = liq.amountBorrowed;
 		bidder = liq.bidder;
@@ -324,15 +324,15 @@ contract VaultFactory is VaultFactoryData, IVaultFactory, Ownable {
 	//--------------------------------------YT vault management-----------------------------------
 
 	/*
-		@Description: create a new YT vault, deposit some ZCB + YT of a CH and borrow some ZCB from it
+		@Description: create a new YT vault, deposit some ZCB + YT of a FCP and borrow some ZCB from it
 
-		@param address _CHsupplied: the address of the CH contract for which to supply ZCB and YT
-		@param address _CHborrowed: the CH that corresponds to theZCB that is borrowed from the new YTVault
-		@param uint _yieldSupplied: the amount from the balanceYield mapping in the supplied CH contract
+		@param address _FCPsupplied: the address of the FCP contract for which to supply ZCB and YT
+		@param address _FCPborrowed: the FCP that corresponds to theZCB that is borrowed from the new YTVault
+		@param uint _yieldSupplied: the amount from the balanceYield mapping in the supplied FCP contract
 			that is to be supplied to the new YTVault
-		@param int _bondSupplied: the amount from the balanceBonds mapping in the supplied CH contract
+		@param int _bondSupplied: the amount from the balanceBonds mapping in the supplied FCP contract
 			that is to be supplied to the new YTVault
-		@param uint _amountBorrowed: the amount of ZCB from _CHborrowed to borrow
+		@param uint _amountBorrowed: the amount of ZCB from _FCPborrowed to borrow
 		@param uint _priceMultiplier: a multiplier > 1
 			we ensure the vault will not be sent into the liquidation zone if the cross asset price
 			of _assetBorrowed to _assetSupplied increases by a factor of _priceMultiplier
@@ -347,8 +347,8 @@ contract VaultFactory is VaultFactoryData, IVaultFactory, Ownable {
 			(in ABDK format)
 	*/
 	function openYTVault(
-		address _CHsupplied,
-		address _CHborrowed,
+		address _FCPsupplied,
+		address _FCPborrowed,
 		uint _yieldSupplied,
 		int _bondSupplied,
 		uint _amountBorrowed,
@@ -358,8 +358,8 @@ contract VaultFactory is VaultFactoryData, IVaultFactory, Ownable {
 	) external override {
 		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
 			"openYTVault(address,address,uint256,int256,uint256,uint256,int128,int128)",
-			_CHsupplied,
-			_CHborrowed,
+			_FCPsupplied,
+			_FCPborrowed,
 			_yieldSupplied,
 			_bondSupplied,
 			_amountBorrowed,
@@ -609,11 +609,11 @@ contract VaultFactory is VaultFactoryData, IVaultFactory, Ownable {
 		@Description: allows a user to claim the excess collateral that was received as a rebate
 			when their YT vault(s) were liquidated
 	
-		@param address _asset: the address of the CH contract for which to claim the rebate
+		@param address _asset: the address of the FCP contract for which to claim the rebate
 	*/
 	function claimYTRebate(address _asset) external override {
 		YTPosition memory position = _YTLiquidationRebates[msg.sender][_asset];
-		ICapitalHandler(_asset).transferPosition(msg.sender, position.amountYield, position.amountBond);
+		IFixCapitalPool(_asset).transferPosition(msg.sender, position.amountYield, position.amountBond);
 		delete _YTLiquidationRebates[msg.sender][_asset];
 	}
 
@@ -623,21 +623,21 @@ contract VaultFactory is VaultFactoryData, IVaultFactory, Ownable {
 
 		@param address _owner: the owner of the vault to send to auction
 		@param uint _index: the index of the vault in vaults[_owner] to send to auction
-		@param address _CHborrowed: the address of the CH contract corresponding to the borrowed ZCB
-		@param address _CHsupplied: the address of the CH contract corresponding to the supplied ZCB & YT
-		@param uint _bidYield: the first bid (in YT corresponding _CHsupplied) made by msg.sender on the vault
+		@param address _FCPborrowed: the address of the FCP contract corresponding to the borrowed ZCB
+		@param address _FCPsupplied: the address of the FCP contract corresponding to the supplied ZCB & YT
+		@param uint _bidYield: the first bid (in YT corresponding _FCPsupplied) made by msg.sender on the vault
 			ZCB of bid is calculated by finding the corresponding amount of ZCB based on the ratio of YT to ZCB
 		@param int _minBondRatio: the miniumum value of vault.bondSupplied/vault.yieldSupplied inflated by (1 ether)
 			if ratio is below _minBondRatio tx will revert
 		@param uint _amtIn: the amount of the borrowed ZCB to send in
 	*/
-	function auctionYTLiquidation(address _owner, uint _index, address _CHborrowed, address _CHsupplied, uint _bidYield, int _minBondRatio, uint _amtIn) external override {
+	function auctionYTLiquidation(address _owner, uint _index, address _FCPborrowed, address _FCPsupplied, uint _bidYield, int _minBondRatio, uint _amtIn) external override {
 		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
 			"auctionYTLiquidation(address,uint256,address,address,uint256,int256,uint256)",
 			_owner,
 			_index,
-			_CHborrowed,
-			_CHsupplied,
+			_FCPborrowed,
+			_FCPsupplied,
 			_bidYield,
 			_minBondRatio,
 			_amtIn
@@ -649,7 +649,7 @@ contract VaultFactory is VaultFactoryData, IVaultFactory, Ownable {
 		@Description: place a new bid on a YT vault that has already begun an auction
 
 		@param uint _index: the index in _YTLiquidations[] of the auction
-		@param uint _bidYield: the bid (in YT corresponding _CHsupplied) made by msg.sender on the vault
+		@param uint _bidYield: the bid (in YT corresponding _FCPsupplied) made by msg.sender on the vault
 			ZCB of bid is calculated by finding the corresponding amount of ZCB based on the ratio of YT to ZCB
 		@param uint _amtIn: the amount of borrowed asset that the liquidator will be sending in
 	*/
@@ -685,21 +685,21 @@ contract VaultFactory is VaultFactoryData, IVaultFactory, Ownable {
 			this function is used when a liquidator would like to liquidate the entire vault
 		@param address _owner: the owner of the vault to send to auction
 		@param uint _index: the index of the vault in vaults[_owner] to send to auction
-		@param address _CHborrowed: the address of the CH contract corresponding to the borrowed ZCB
-		@param address _CHsupplied: the address of the CH contract corresponding to the supplied ZCB & YT
+		@param address _FCPborrowed: the address of the FCP contract corresponding to the borrowed ZCB
+		@param address _FCPsupplied: the address of the FCP contract corresponding to the supplied ZCB & YT
 		@param uint _maxIn: the maximum amount of the borrowed asset that msg.sender is willing to send in
 		@param int _minBondRatio: the minimum value of vault.bondSupplied / vault.yieldSupplied inflated by (1 ether)
 			if the actual bond ratio of the vault is < _minBondRatio tx will revert
-		@param uint _minOut: the minimum amount of YT from _CHsupplied that msg.sender wants to receive from this liquidation
+		@param uint _minOut: the minimum amount of YT from _FCPsupplied that msg.sender wants to receive from this liquidation
 		@param address _to: the address to which to send all of the collateral from the vault
 	*/
-	function instantYTLiquidation(address _owner, uint _index, address _CHborrowed, address _CHsupplied, uint _maxIn, uint _minOut, int _minBondRatio, address _to) external override {
+	function instantYTLiquidation(address _owner, uint _index, address _FCPborrowed, address _FCPsupplied, uint _maxIn, uint _minOut, int _minBondRatio, address _to) external override {
 		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
 			"instantYTLiquidation(address,uint256,address,address,uint256,uint256,int256,address)",
 			_owner,
 			_index,
-			_CHborrowed,
-			_CHsupplied,
+			_FCPborrowed,
+			_FCPsupplied,
 			_maxIn,
 			_minOut,
 			_minBondRatio,
@@ -716,21 +716,21 @@ contract VaultFactory is VaultFactoryData, IVaultFactory, Ownable {
 			amount of the borrowed asset and receiving the corresponding percentage of the vault's collateral
 		@param address _owner: the owner of the vault to send to auction
 		@param uint _index: the index of the vault in vaults[_owner] to send to auction
-		@param address _CHborrowed: the address of the CH contract corresponding to the borrowed ZCB
-		@param address _CHsupplied: the address of the CH contract corresponding to the supplied ZCB & YT
+		@param address _FCPborrowed: the address of the FCP contract corresponding to the borrowed ZCB
+		@param address _FCPsupplied: the address of the FCP contract corresponding to the supplied ZCB & YT
 		@param uint _in: the amount of the borrowed asset to supply to the vault
 		@param int _minBondRatio: the minimum value of vault.bondSupplied / vault.yieldSupplied inflated by (1 ether)
 			if the actual bond ratio of the vault is < _minBondRatio tx will revert
-		@param uint _minOut: the minimum amount of YT from _CHsupplied that msg.sender wants to receive from this liquidation
+		@param uint _minOut: the minimum amount of YT from _FCPsupplied that msg.sender wants to receive from this liquidation
 		@param address _to: the address to which to send all of the collateral from the vault
 	*/
-	function partialYTLiquidationSpecificIn(address _owner, uint _index, address _CHborrowed, address _CHsupplied, uint _in, uint _minOut, int _minBondRatio, address _to) external override {
+	function partialYTLiquidationSpecificIn(address _owner, uint _index, address _FCPborrowed, address _FCPsupplied, uint _in, uint _minOut, int _minBondRatio, address _to) external override {
 		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
 			"partialYTLiquidationSpecificIn(address,uint256,address,address,uint256,uint256,int256,address)",
 			_owner,
 			_index,
-			_CHborrowed,
-			_CHsupplied,
+			_FCPborrowed,
+			_FCPsupplied,
 			_in,
 			_minOut,
 			_minBondRatio,
@@ -744,24 +744,24 @@ contract VaultFactory is VaultFactoryData, IVaultFactory, Ownable {
 			vaults may be liquidated instantly without going through the auction process, this is intended to help the VaultFactory
 			keep solvency in the event of a market crisis
 			this function is used when a liquidator whould like to only partially liquidate the vault by receiving a specific
-			amount of YT corresponding to _CHsupplied and sending the corresponding amount of assetBorrowed
+			amount of YT corresponding to _FCPsupplied and sending the corresponding amount of assetBorrowed
 		@param address _owner: the owner of the vault to send to auction
 		@param uint _index: the index of the vault in vaults[_owner] to send to auction
-		@param address _CHborrowed: the address of the CH contract corresponding to the borrowed ZCB
-		@param address _CHsupplied: the address of the CH contract corresponding to the supplied ZCB & YT
-		@param uint _out: the amount of YT corresponding to _CHsupplied to receive from the vault
+		@param address _FCPborrowed: the address of the FCP contract corresponding to the borrowed ZCB
+		@param address _FCPsupplied: the address of the FCP contract corresponding to the supplied ZCB & YT
+		@param uint _out: the amount of YT corresponding to _FCPsupplied to receive from the vault
 		@param int _minBondOut: the minimum value of bond when transferPosition is called to payout liquidator
 			if the actual bond out is < _minBondOut tx will revert
 		@param uint _maxIn: the maximum amount of assetBorrowed that msg.sender is willing to bid on the vault
 		@param address _to: the address to which to send all of the collateral from the vault
 	*/
-	function partialYTLiquidationSpecificOut(address _owner, uint _index, address _CHborrowed, address _CHsupplied, uint _out, int _minBondRatio, uint _maxIn, address _to) external override {
+	function partialYTLiquidationSpecificOut(address _owner, uint _index, address _FCPborrowed, address _FCPsupplied, uint _out, int _minBondRatio, uint _maxIn, address _to) external override {
 		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
 			"partialYTLiquidationSpecificOut(address,uint256,address,address,uint256,int256,uint256,address)",
 			_owner,
 			_index,
-			_CHborrowed,
-			_CHsupplied,
+			_FCPborrowed,
+			_FCPsupplied,
 			_out,
 			_minBondRatio,
 			_maxIn,
@@ -795,10 +795,10 @@ contract VaultFactory is VaultFactoryData, IVaultFactory, Ownable {
 	/*
 		@Description: admin may call this function to allow a specific ZCB to be provided as collateral
 
-		@param address _capitalHandlerAddress: address of the ZCB to whitelist
+		@param address _fixCapitalPoolAddress: address of the ZCB to whitelist
 	*/
-	function whitelistCapitalHandler(address _capitalHandlerAddress) external override onlyOwner {
-		_capitalHandlerToWrapper[_capitalHandlerAddress] = address(ICapitalHandler(_capitalHandlerAddress).wrapper());
+	function whitelistFixCapitalPool(address _fixCapitalPoolAddress) external override onlyOwner {
+		_fixCapitalPoolToWrapper[_fixCapitalPoolAddress] = address(IFixCapitalPool(_fixCapitalPoolAddress).wrapper());
 	}
 
 	/*
@@ -827,16 +827,16 @@ contract VaultFactory is VaultFactoryData, IVaultFactory, Ownable {
 	/*
 		@Description: admin may call this function to claim YT liquidation revenue
 
-		@param address _CH: the address of the CH contract for which to claim revenue
+		@param address _FCP: the address of the FCP contract for which to claim revenue
 		@param int _bondIn: the amount of bond to send in to make the transfer position have a
 			positive minimum value at maturity
 	*/
-	function claimYTRevenue(address _CH, int _bondIn) external override onlyOwner {
+	function claimYTRevenue(address _FCP, int _bondIn) external override onlyOwner {
 		require(_bondIn > -1);
-		YTPosition memory pos = _YTRevenue[_CH];
-		ICapitalHandler(_CH).burnZCBFrom(msg.sender, uint(_bondIn));
-		ICapitalHandler(_CH).transferPosition(msg.sender, pos.amountYield, pos.amountBond.add(_bondIn));
-		delete _YTRevenue[_CH];
+		YTPosition memory pos = _YTRevenue[_FCP];
+		IFixCapitalPool(_FCP).burnZCBFrom(msg.sender, uint(_bondIn));
+		IFixCapitalPool(_FCP).transferPosition(msg.sender, pos.amountYield, pos.amountBond.add(_bondIn));
+		delete _YTRevenue[_FCP];
 	}
 }
 

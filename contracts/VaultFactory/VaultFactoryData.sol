@@ -25,8 +25,8 @@ contract VaultFactoryData {
 	}
 
 	struct YTVault {
-		address CHsupplied;
-		address CHborrowed;
+		address FCPsupplied;
+		address FCPborrowed;
 		uint yieldSupplied;
 		int bondSupplied;
 		uint amountBorrowed;
@@ -34,8 +34,8 @@ contract VaultFactoryData {
 
 	struct YTLiquidation {
 		address vaultOwner;
-		address CHsupplied;
-		address CHborrowed;
+		address FCPsupplied;
+		address FCPborrowed;
 		//bondSupplied / yieldSupplied inflated by (1 ether)
 		int bondRatio;
 		uint amountBorrowed;
@@ -60,8 +60,8 @@ contract VaultFactoryData {
 	mapping(address => address) internal _wrapperToUnderlyingAsset;
 
 	//acts as a whitelist for ZCBs & YTs that may be supplied as collateral
-	//capitalHandler => wrapper
-	mapping(address => address) internal _capitalHandlerToWrapper;
+	//fixCapitalPool => wrapper
+	mapping(address => address) internal _fixCapitalPoolToWrapper;
 
 	//underlying asset => short interest
 	mapping(address => uint) internal _shortInterestAllDurations;
@@ -72,7 +72,7 @@ contract VaultFactoryData {
 	//owner => asset => YTposition
 	mapping(address => mapping(address => YTPosition)) internal _YTLiquidationRebates;
 
-	//CH => YTPosition
+	//FCP => YTPosition
 	mapping(address => YTPosition) internal _YTRevenue;
 
 	//asset => amount

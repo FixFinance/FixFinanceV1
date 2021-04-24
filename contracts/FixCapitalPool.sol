@@ -1,5 +1,5 @@
 pragma solidity >=0.6.5 <0.7.0;
-import "./interfaces/ICapitalHandler.sol";
+import "./interfaces/IFixCapitalPool.sol";
 import "./interfaces/IWrapper.sol";
 import "./interfaces/IYieldToken.sol";
 import "./interfaces/IZeroCouponBond.sol";
@@ -10,7 +10,7 @@ import "./libraries/SafeMath.sol";
 import "./libraries/SignedSafeMath.sol";
 import "./helpers/Ownable.sol";
 
-contract CapitalHandler is ICapitalHandler, Ownable {
+contract FixCapitalPool is IFixCapitalPool, Ownable {
 	using SafeMath for uint;
 	using SignedSafeMath for int;
 
@@ -79,7 +79,7 @@ contract CapitalHandler is ICapitalHandler, Ownable {
 	}
 
 	/*
-		@Description: find the amount of wrapped token that the user may withdraw from the capital handler
+		@Description: find the amount of wrapped token that the user may withdraw from the fix capital pool
 	*/
 	function wrappedTokenFree(address _owner) public view override returns (uint wrappedTknFree) {
 		wrappedTknFree = balanceYield[_owner];
@@ -96,7 +96,7 @@ contract CapitalHandler is ICapitalHandler, Ownable {
 	}
 
 	/*
-		@Description: send wrapped asest to this capital handler, receive ZCB & YT
+		@Description: send wrapped asest to this fix capital pool, receive ZCB & YT
 
 		@param address _to: the address that shall receive the ZCB and YT
 		@param uint _amountWrappedTkn: the amount of wrapped asset to deposit
@@ -335,7 +335,7 @@ contract CapitalHandler is ICapitalHandler, Ownable {
 		@Description: before isFinalized admin may change the VaultFactory contract address
 			the vaultFactoryAddress is allowed to mint and burn ZCB so users should be careful and observant of this
 
-		@param address _vaultFactoryAddress: the address of the new bond minter contract that this capital handler
+		@param address _vaultFactoryAddress: the address of the new bond minter contract that this fix capital pool
 			will adhere to
 	*/
 	function setVaultFactoryAddress(address _vaultFactoryAddress) external override onlyOwner {

@@ -11,7 +11,7 @@ contract ZCBammDeployer {
 
 		@return address: the address of the new ZCBamm contract
 	*/
-	function deploy(address _CapitalHandlerAddress, address _feeOracleAddress) external returns (address) {
-		return address(new ZCBamm(_CapitalHandlerAddress, _feeOracleAddress));
+	function deploy(address _FixCapitalPoolAddress, address _feeOracleAddress) external returns (address) {
+		return address(new ZCBamm(_FixCapitalPoolAddress, _feeOracleAddress));
 	}
 }

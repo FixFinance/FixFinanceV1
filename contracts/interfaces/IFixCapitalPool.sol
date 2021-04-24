@@ -2,7 +2,7 @@ pragma solidity >=0.6.0;
 import "./IWrapper.sol";
 import "./IERC20.sol";
 
-interface ICapitalHandler {
+interface IFixCapitalPool {
 	function wrappedTokenFree(address _owner) external view returns (uint wrappedTknFree);
 	function depositWrappedToken(address _to, uint _amountWrappedTkn) external;
 	function withdraw(address _to, uint _amountWrappedTkn, bool _unwrap) external;

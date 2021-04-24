@@ -3,7 +3,7 @@ import "../organizer.sol";
 import "../helpers/IZCBamm.sol";
 import "../helpers/Ownable.sol";
 import "../interfaces/IVaultHealth.sol";
-import "../interfaces/ICapitalHandler.sol";
+import "../interfaces/IFixCapitalPool.sol";
 import "../libraries/ABDKMath64x64.sol";
 import "../libraries/SafeMath.sol";
 import "../oracle/interfaces/IOracleContainer.sol";
@@ -81,7 +81,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 		required due to rate volatility
 
 		When ZCBs are used in a vault to find the collateralization ratio due to underlying asset
-		you must find UpperCollateralzationRatio[org.capitalHandlerToWrapper(_ZCBaddress)]
+		you must find UpperCollateralzationRatio[org.fixCapitalPoolToWrapper(_ZCBaddress)]
 
 		In ABDK64.64 format
 	*/
@@ -121,16 +121,16 @@ contract VaultHealth is IVaultHealth, Ownable {
 	}
 
 	/*
-		@Description: get the amount of of years remaining to maturity for a specific CapitalHandler
+		@Description: get the amount of of years remaining to maturity for a specific FixCapitalPool
 			in ABDK64.64 format
 		
-		@param address _capitalHandlerAddress: the capital handler for which to get the years remaining to maturity
+		@param address _fixCapitalPoolAddress: the fix capital pool for which to get the years remaining to maturity
 			this param could alternatively be the address of a ZCB contract and the same effect would be achived
 
 		@return int128: years to maturity in ABDK64.64 format
 	*/
-	function getYearsRemaining(address _capitalHandlerAddress) internal view returns (int128) {
-		return int128(((ICapitalHandler(_capitalHandlerAddress).maturity() - block.timestamp) << 64) / SecondsPerYear);
+	function getYearsRemaining(address _fixCapitalPoolAddress) internal view returns (int128) {
+		return int128(((IFixCapitalPool(_fixCapitalPoolAddress).maturity() - block.timestamp) << 64) / SecondsPerYear);
 	}
 
 	/*
@@ -177,27 +177,27 @@ contract VaultHealth is IVaultHealth, Ownable {
 	}
 
 	/*
-		@Description: fetch the implied rate of a specific CapitalHandler
+		@Description: fetch the implied rate of a specific FixCapitalPool
 
-		@param address _capitalHandler: address of the CapitalHandler in question
+		@param address _fixCapitalPool: address of the FixCapitalPool in question
 
 		@return int128: the APY in ABDK64.64 format
 	*/
-	function getAPYFromOracle(address _capitalHandlerAddress) internal view returns (int128) {
-		return ZCBamm(organizer(organizerAddress).ZCBamms(_capitalHandlerAddress)).getAPYFromOracle();
+	function getAPYFromOracle(address _fixCapitalPoolAddress) internal view returns (int128) {
+		return ZCBamm(organizer(organizerAddress).ZCBamms(_fixCapitalPoolAddress)).getAPYFromOracle();
 	}
 
 	/*
 		@Description: get APY from oracle adjusted by a multiplier
 
-		@param address _capitalHandler: address of the CapitalHandler in question
+		@param address _fixCapitalPool: address of the FixCapitalPool in question
 		@param int128 _rateChange: multiplier with which to multiply APY
 			ABDK64.64 format
 
-		@param int128: APY of CapitalHandler fetched from oracle and multiplied by a multiplier
+		@param int128: APY of FixCapitalPool fetched from oracle and multiplied by a multiplier
 	*/
-	function getChangedAPYFromOracle(address _capitalHandlerAddress, int128 _rateChange) internal view returns (int128) {
-		return getAPYFromOracle(_capitalHandlerAddress).sub(ABDK_1).mul(_rateChange).add(ABDK_1);
+	function getChangedAPYFromOracle(address _fixCapitalPoolAddress, int128 _rateChange) internal view returns (int128) {
+		return getAPYFromOracle(_fixCapitalPoolAddress).sub(ABDK_1).mul(_rateChange).add(ABDK_1);
 	}
 
 	/*
@@ -205,14 +205,14 @@ contract VaultHealth is IVaultHealth, Ownable {
 			this multiplier is to be multiplied with the value of an amount of underlying asset equal to the amount of ZCBs
 			to find the value of the ZCBs
 
-		@param address _capitalHandler: address of the CapitalHandler in question
+		@param address _fixCapitalPool: address of the FixCapitalPool in question
 		@param address _underlyingAssetAddress: the underlying asset in question
 		@param RateAdjuster _rateAdjuster: the adjuster for which to find the rate multiplier
 
 		@return uint: rate multiplier
 	*/
-	function getRateMultiplier_BaseRate(address _capitalHandlerAddress, address _underlyingAssetAddress, RateAdjuster _rateAdjuster) internal view returns (uint) {
-		return getRateMultiplier(_capitalHandlerAddress, _underlyingAssetAddress, _rateAdjuster, getAPYFromOracle(_capitalHandlerAddress));
+	function getRateMultiplier_BaseRate(address _fixCapitalPoolAddress, address _underlyingAssetAddress, RateAdjuster _rateAdjuster) internal view returns (uint) {
+		return getRateMultiplier(_fixCapitalPoolAddress, _underlyingAssetAddress, _rateAdjuster, getAPYFromOracle(_fixCapitalPoolAddress));
 	}
 
 	/*
@@ -220,29 +220,29 @@ contract VaultHealth is IVaultHealth, Ownable {
 			when performing an action on a vault to ensure the action will not result in a vault's collateralisation ratio going below a limit.
 			this function finds the collateralisation limit if the rate of the underlying asset were to change by some extra change multiplier
 
-		@param address _capitalHandler: address of the CapitalHandler in question
+		@param address _fixCapitalPool: address of the FixCapitalPool in question
 		@param address _underlyingAssetAddress: the underlying asset in question
 		@param RateAdjuster _rateAdjuster: the adjuster for which to find the rate multiplier
 		@param int128 _rateChange: a change multiplier, multiplied with APY to get changed APY
 
 		@return uint: rate multiplier
 	*/
-	function getRateMultiplier_Changed(address _capitalHandlerAddress, address _underlyingAssetAddress, RateAdjuster _rateAdjuster, int128 _rateChange) internal view returns (uint) {
-		return getRateMultiplier(_capitalHandlerAddress, _underlyingAssetAddress, _rateAdjuster, getChangedAPYFromOracle(_capitalHandlerAddress, _rateChange));
+	function getRateMultiplier_Changed(address _fixCapitalPoolAddress, address _underlyingAssetAddress, RateAdjuster _rateAdjuster, int128 _rateChange) internal view returns (uint) {
+		return getRateMultiplier(_fixCapitalPoolAddress, _underlyingAssetAddress, _rateAdjuster, getChangedAPYFromOracle(_fixCapitalPoolAddress, _rateChange));
 	}
 
 	/*
 		@Description: find multiplier that discounts value of ZCBs now against face value of ZCBs.
 			in other words return ValueNow/ValueAtMaturity
 		
-		@param address _capitalHandler: address of the CapitalHandler in question
+		@param address _fixCapitalPool: address of the FixCapitalPool in question
 		@param address _underlyingAssetAddress: the underlying asset in question
 		@param RateAdjuster _rateAdjuster: the adjuster for which to find the rate multiplier
-		@param int128 _apy: the APY fetched from the oracle of the CapitalHandler
+		@param int128 _apy: the APY fetched from the oracle of the FixCapitalPool
 	*/
-	function getRateMultiplier(address _capitalHandlerAddress, address _underlyingAssetAddress, RateAdjuster _rateAdjuster, int128 _apy) internal view returns (uint) {
+	function getRateMultiplier(address _fixCapitalPoolAddress, address _underlyingAssetAddress, RateAdjuster _rateAdjuster, int128 _apy) internal view returns (uint) {
 		//ensure that we have been passed a ZCB address if not there is a rate multiplier of 1.0
-		int128 yearsRemaining = getYearsRemaining(_capitalHandlerAddress);
+		int128 yearsRemaining = getYearsRemaining(_fixCapitalPoolAddress);
 		int128 adjApy = _apy.sub(ABDK_1).mul(getRateThresholdMultiplier(_underlyingAssetAddress, _rateAdjuster)).add(ABDK_1);
 		if (isDeposited(_rateAdjuster)) {
 			int128 temp = _apy.add(MIN_RATE_ADJUSTMENT);
@@ -311,10 +311,10 @@ contract VaultHealth is IVaultHealth, Ownable {
 
 		@return address baseDepositedAsset: the underlying wrapper for the collateral asset
 		@return address baseBorrowedAsset: the underlying wrapper for the borrowed asset
-		@return address chDeposited: the address of the CapitalHandler corresponding to the collateral asset
-			it is possible that there is no CapitalHandler associated with the collateral asset, in this case
+		@return address chDeposited: the address of the FixCapitalPool corresponding to the collateral asset
+			it is possible that there is no FixCapitalPool associated with the collateral asset, in this case
 			this value will return as address(0)
-		@return address chSupplied: the address of the CapitalHandler corresponding to the borrowed asset
+		@return address chSupplied: the address of the FixCapitalPool corresponding to the borrowed asset
 	*/
 	function baseAssetAddresses(address _deposited, address _borrowed) internal view returns (
 		address baseDepositedAsset,
@@ -324,23 +324,23 @@ contract VaultHealth is IVaultHealth, Ownable {
 	) {
 		organizer org = organizer(organizerAddress);
 		if (UpperRateThreshold[_deposited] == 0) {
-			chDeposited = IZeroCouponBond(_deposited).CapitalHandlerAddress();
-			baseDepositedAsset = org.capitalHandlerToWrapper(chDeposited);
+			chDeposited = IZeroCouponBond(_deposited).FixCapitalPoolAddress();
+			baseDepositedAsset = org.fixCapitalPoolToWrapper(chDeposited);
 		}
 		else {
 			baseDepositedAsset = _deposited;
 		}
-		chBorrowed = IZeroCouponBond(_borrowed).CapitalHandlerAddress();
-		baseBorrowedAsset = org.capitalHandlerToWrapper(chBorrowed);
+		chBorrowed = IZeroCouponBond(_borrowed).FixCapitalPoolAddress();
+		baseBorrowedAsset = org.fixCapitalPoolToWrapper(chBorrowed);
 	}
 
 	/*
-		@Description: take 2 CapitalHandler addresses and find their corresponding base asset addresses
+		@Description: take 2 FixCapitalPool addresses and find their corresponding base asset addresses
 	*/
-	function bothCHtoBaseAddresses(address _addr0, address _addr1) internal view returns (address baseAddr0, address baseAddr1) {
+	function bothFCPtoBaseAddresses(address _addr0, address _addr1) internal view returns (address baseAddr0, address baseAddr1) {
 		organizer org = organizer(organizerAddress);
-		baseAddr0 = org.capitalHandlerToWrapper(_addr0);
-		baseAddr1 = org.capitalHandlerToWrapper(_addr1);
+		baseAddr0 = org.fixCapitalPoolToWrapper(_addr0);
+		baseAddr1 = org.fixCapitalPoolToWrapper(_addr1);
 	}
 
 
@@ -398,30 +398,30 @@ contract VaultHealth is IVaultHealth, Ownable {
 		@Description: find the maximum amount of borrowed asset that may be borrowed from a vault without going under the
 			upper collateralization limit
 
-		@param address _CHsupplied: the address of the CapitalHandler instance for which a combination of YT & ZCB are being
+		@param address _FCPsupplied: the address of the FixCapitalPool instance for which a combination of YT & ZCB are being
 			supplied to the vault
-		@param address _CHborrowed: the address of the CapitalHandler instance for which ZCB is being borrowed from the vault
+		@param address _FCPborrowed: the address of the FixCapitalPool instance for which ZCB is being borrowed from the vault
 		@param uint _amountYield: the amount of YT being supplied to the vault (in unit amount)
 		@param int _amountBond: the difference between the amount of ZCB supplied to the vault and the amount of YT supplied
 			amtZCB - amtYT == _amountBond
 
-		@return uint: the maximum amount of ZCB for CapitalHandler _CHborrowed for which the vault will not be forced below
+		@return uint: the maximum amount of ZCB for FixCapitalPool _FCPborrowed for which the vault will not be forced below
 			the upper collateralization limit
 	*/
 	function _YTvaultAmountBorrowedAtUpperLimit(
-		address _CHsupplied,
-		address _CHborrowed,
+		address _FCPsupplied,
+		address _FCPborrowed,
 		uint _amountYield,
 		int _amountBond
 	) internal view returns (uint) {
-		(address _baseSupplied, address _baseBorrowed) = bothCHtoBaseAddresses(_CHsupplied, _CHborrowed);
+		(address _baseSupplied, address _baseBorrowed) = bothFCPtoBaseAddresses(_FCPsupplied, _FCPborrowed);
 
 		bool positiveBond = _amountBond >= 0;
 
 		//if !positiveBond there are essentially 2 ZCBs being borrowed from the vault with _baseSupplied as the supplied asset
 		//thus we change the rate adjuster to borrow if the "supplied" ZCB is negative
 		uint ZCBvalue = uint(positiveBond ? _amountBond : -_amountBond)
-			.mul(getRateMultiplier_BaseRate(_CHsupplied, _baseSupplied, positiveBond ? RateAdjuster.UPPER_DEPOSIT : RateAdjuster.UPPER_BORROW))
+			.mul(getRateMultiplier_BaseRate(_FCPsupplied, _baseSupplied, positiveBond ? RateAdjuster.UPPER_DEPOSIT : RateAdjuster.UPPER_BORROW))
 			.div(1 ether);
 
 		//after rate adjustments find the effective amount of the underlying asset which may be used in collateralisation calculation
@@ -431,7 +431,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 			.mul((1 ether)**2)
 			.div(crossAssetPrice(_baseSupplied, _baseBorrowed))
 			.mul(1 ether)
-			.div(getRateMultiplier_BaseRate(_CHborrowed, _baseBorrowed, RateAdjuster.UPPER_BORROW))
+			.div(getRateMultiplier_BaseRate(_FCPborrowed, _baseBorrowed, RateAdjuster.UPPER_BORROW))
 			.div(crossCollateralizationRatio(_baseSupplied, _baseBorrowed, Safety.UPPER));
 	}
 
@@ -439,30 +439,30 @@ contract VaultHealth is IVaultHealth, Ownable {
 		@Description: find the maximum amount of borrowed asset that may be borrowed from a vault without going under the
 			lower collateralization limit
 
-		@param address _CHsupplied: the address of the CapitalHandler instance for which a combination of YT & ZCB are being
+		@param address _FCPsupplied: the address of the FixCapitalPool instance for which a combination of YT & ZCB are being
 			supplied to the vault
-		@param address _CHborrowed: the address of the CapitalHandler instance for which ZCB is being borrowed from the vault
+		@param address _FCPborrowed: the address of the FixCapitalPool instance for which ZCB is being borrowed from the vault
 		@param uint _amountYield: the amount of YT being supplied to the vault (in unit amount)
 		@param int _amountBond: the difference between the amount of ZCB supplied to the vault and the amount of YT supplied
 			amtZCB - amtYT == _amountBond
 
-		@return uint: the maximum amount of ZCB for CapitalHandler _CHborrowed for which the vault will not be forced below
+		@return uint: the maximum amount of ZCB for FixCapitalPool _FCPborrowed for which the vault will not be forced below
 			the lower collateralization limit
 	*/
 	function _YTvaultAmountBorrowedAtLowerLimit(
-		address _CHsupplied,
-		address _CHborrowed,
+		address _FCPsupplied,
+		address _FCPborrowed,
 		uint _amountYield,
 		int _amountBond
 	) internal view returns (uint) {
-		(address _baseSupplied, address _baseBorrowed) = bothCHtoBaseAddresses(_CHsupplied, _CHborrowed);
+		(address _baseSupplied, address _baseBorrowed) = bothFCPtoBaseAddresses(_FCPsupplied, _FCPborrowed);
 
 		bool positiveBond = _amountBond >= 0;
 
 		//if !positiveBond there are essentially 2 ZCBs being borrowed from the vault with _baseSupplied as the supplied asset
 		//thus we change the rate adjuster to borrow if the "supplied" ZCB is negative
 		uint ZCBvalue = uint(positiveBond ? _amountBond : -_amountBond)
-			.mul(getRateMultiplier_BaseRate(_CHsupplied, _baseSupplied, positiveBond ? RateAdjuster.LOW_DEPOSIT : RateAdjuster.LOW_BORROW))
+			.mul(getRateMultiplier_BaseRate(_FCPsupplied, _baseSupplied, positiveBond ? RateAdjuster.LOW_DEPOSIT : RateAdjuster.LOW_BORROW))
 			.div(1 ether);
 
 		//after rate adjustments find the effective amount of the underlying asset which may be used in collateralisation calculation
@@ -472,7 +472,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 			.mul((1 ether)**2)
 			.div(crossAssetPrice(_baseSupplied, _baseBorrowed))
 			.mul(1 ether)
-			.div(getRateMultiplier_BaseRate(_CHborrowed, _baseBorrowed, RateAdjuster.LOW_BORROW))
+			.div(getRateMultiplier_BaseRate(_FCPborrowed, _baseBorrowed, RateAdjuster.LOW_BORROW))
 			.div(crossCollateralizationRatio(_baseSupplied, _baseBorrowed, Safety.LOW));
 	}
 
@@ -513,35 +513,35 @@ contract VaultHealth is IVaultHealth, Ownable {
 	/*
 		@Description: check if a YT vault is above the upper collateralisation limit
 
-		@param address _CHsupplied: the address of the Capitalhandler supplied to the vault
-		@param address _CHborrowed: the address of the asset borrowed from the vault
+		@param address _FCPsupplied: the address of the Capitalhandler supplied to the vault
+		@param address _FCPborrowed: the address of the asset borrowed from the vault
 		@param uint _amountYield: the amount of YT being supplied to the vault (in unit amount)
 		@param int _amountBond: the difference between the amount of ZCB supplied to the vault and the amount of YT supplied
 			amtZCB - amtYT == _amountBond
-		@param uint _amountBorrowed: the amount of ZCB from _CHborrowed that has been borrowed from the vault
+		@param uint _amountBorrowed: the amount of ZCB from _FCPborrowed that has been borrowed from the vault
 
 		@return bool: returns true if the vault is above the upper collateralisation limit
 			false otherwise
 	*/
-	function YTvaultSatisfiesUpperLimit(address _CHsupplied, address _CHborrowed, uint _amountYield, int _amountBond, uint _amountBorrowed) external override view returns (bool) {
-		return _amountBorrowed < _YTvaultAmountBorrowedAtUpperLimit(_CHsupplied, _CHborrowed, _amountYield, _amountBond);
+	function YTvaultSatisfiesUpperLimit(address _FCPsupplied, address _FCPborrowed, uint _amountYield, int _amountBond, uint _amountBorrowed) external override view returns (bool) {
+		return _amountBorrowed < _YTvaultAmountBorrowedAtUpperLimit(_FCPsupplied, _FCPborrowed, _amountYield, _amountBond);
 	}
 
 	/*
 		@Description: check if a YT vault is above the lower collateralisation limit
 
-		@param address _CHsupplied: the address of the Capitalhandler supplied to the vault
-		@param address _CHborrowed: the address of the asset borrowed from the vault
+		@param address _FCPsupplied: the address of the Capitalhandler supplied to the vault
+		@param address _FCPborrowed: the address of the asset borrowed from the vault
 		@param uint _amountYield: the amount of YT being supplied to the vault (in unit amount)
 		@param int _amountBond: the difference between the amount of ZCB supplied to the vault and the amount of YT supplied
 			amtZCB - amtYT == _amountBond
-		@param uint _amountBorrowed: the amount of ZCB from _CHborrowed that has been borrowed from the vault
+		@param uint _amountBorrowed: the amount of ZCB from _FCPborrowed that has been borrowed from the vault
 
 		@return bool: returns true if the vault is above the lower collateralisation limit
 			false otherwise
 	*/
-	function YTvaultSatisfiesLowerLimit(address _CHsupplied, address _CHborrowed, uint _amountYield, int _amountBond, uint _amountBorrowed) external override view returns (bool) {
-		return _amountBorrowed < _YTvaultAmountBorrowedAtLowerLimit(_CHsupplied, _CHborrowed, _amountYield, _amountBond);
+	function YTvaultSatisfiesLowerLimit(address _FCPsupplied, address _FCPborrowed, uint _amountYield, int _amountBond, uint _amountBorrowed) external override view returns (bool) {
+		return _amountBorrowed < _YTvaultAmountBorrowedAtLowerLimit(_FCPsupplied, _FCPborrowed, _amountYield, _amountBond);
 	}
 
 	/*
@@ -608,24 +608,24 @@ contract VaultHealth is IVaultHealth, Ownable {
 		@Description: returns _YTvaultAmountBorrowedAtUpperLimit externally
 	*/
 	function YTvaultAmountBorrowedAtUpperLimit(
-		address _CHsupplied,
-		address _CHborrowed,
+		address _FCPsupplied,
+		address _FCPborrowed,
 		uint _amountYield,
 		int _amountBond
 	) external view override returns (uint) {
-		return _YTvaultAmountBorrowedAtUpperLimit(_CHsupplied, _CHborrowed, _amountYield, _amountBond);
+		return _YTvaultAmountBorrowedAtUpperLimit(_FCPsupplied, _FCPborrowed, _amountYield, _amountBond);
 	}
 
 	/*
 		@Description: returns _YTvaultAmountBorrowedAtLowerLimit externally
 	*/
 	function YTvaultAmountBorrowedAtLowerLimit(
-		address _CHsupplied,
-		address _CHborrowed,
+		address _FCPsupplied,
+		address _FCPborrowed,
 		uint _amountYield,
 		int _amountBond
 	) external view override returns (uint) {
-		return _YTvaultAmountBorrowedAtLowerLimit(_CHsupplied, _CHborrowed, _amountYield, _amountBond);
+		return _YTvaultAmountBorrowedAtLowerLimit(_FCPsupplied, _FCPborrowed, _amountYield, _amountBond);
 	}
 
 	/*
@@ -679,12 +679,12 @@ contract VaultHealth is IVaultHealth, Ownable {
 		@Description: ensure that a vault will not be sent into liquidation zone if price changes a specified amount
 			and rates change by a multiplier
 
-		@param address _CHsupplied: the address of the Capitalhandler supplied to the vault
-		@param address _CHborrowed: the address of the asset borrowed from the vault
+		@param address _FCPsupplied: the address of the Capitalhandler supplied to the vault
+		@param address _FCPborrowed: the address of the asset borrowed from the vault
 		@param uint _amountYield: the amount of YT being supplied to the vault (in unit amount)
 		@param int _amountBond: the difference between the amount of ZCB supplied to the vault and the amount of YT supplied
 			amtZCB - amtYT == _amountBond
-		@param uint _amountBorrowed: the amount of ZCB from _CHborrowed that has been borrowed from the vault
+		@param uint _amountBorrowed: the amount of ZCB from _FCPborrowed that has been borrowed from the vault
 		@param uint _priceMultiplier: the multiplier by which cross asset price of deposit versus borrowed asset changes
 			inflated by 1 ether
 		@param int128 _suppliedRateChange: the multiplier by which the rate of the supplied asset will change
@@ -696,8 +696,8 @@ contract VaultHealth is IVaultHealth, Ownable {
 			false otherwise
 	*/
 	function YTvaultWithstandsChange(
-		address _CHsupplied,
-		address _CHborrowed,
+		address _FCPsupplied,
+		address _FCPborrowed,
 		uint _amountYield,
 		int _amountBond,
 		uint _amountBorrowed,
@@ -705,7 +705,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 		int128 _suppliedRateChange,
 		int128 _borrowRateChange
 	) external view override returns (bool) {
-		(address _baseSupplied, address _baseBorrowed) = bothCHtoBaseAddresses(_CHsupplied, _CHborrowed);
+		(address _baseSupplied, address _baseBorrowed) = bothFCPtoBaseAddresses(_FCPsupplied, _FCPborrowed);
 
 		//after rate adjustments find the effective amount of the underlying asset which may be used in collateralisation calculation
 		uint compositeSupplied;
@@ -715,7 +715,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 			//if !positiveBond there are essentially 2 ZCBs being borrowed from the vault with _baseSupplied as the supplied asset
 			//thus we change the rate adjuster to borrow if the "supplied" ZCB is negative
 			uint ZCBvalue = uint(positiveBond ? _amountBond : -_amountBond)
-				.mul(getRateMultiplier_Changed(_CHsupplied, _baseSupplied, positiveBond ? RateAdjuster.UPPER_DEPOSIT : RateAdjuster.UPPER_BORROW, _suppliedRateChange));
+				.mul(getRateMultiplier_Changed(_FCPsupplied, _baseSupplied, positiveBond ? RateAdjuster.UPPER_DEPOSIT : RateAdjuster.UPPER_BORROW, _suppliedRateChange));
 
 			compositeSupplied = positiveBond ? _amountYield.add(ZCBvalue) : _amountYield.sub(ZCBvalue);
 		}
@@ -726,7 +726,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 			.mul((1 ether)*TOTAL_BASIS_POINTS)
 			.div(_priceMultiplier);
 		compositeSupplied = compositeSupplied
-			.div(getRateMultiplier_Changed(_CHborrowed, _baseBorrowed, RateAdjuster.UPPER_BORROW, _borrowRateChange))
+			.div(getRateMultiplier_Changed(_FCPborrowed, _baseBorrowed, RateAdjuster.UPPER_BORROW, _borrowRateChange))
 			.div(crossCollateralizationRatio(_baseSupplied, _baseBorrowed, Safety.UPPER));
 		return compositeSupplied > _amountBorrowed;
 	}
@@ -744,8 +744,8 @@ contract VaultHealth is IVaultHealth, Ownable {
 	*/
 	function setCollateralizationRatios(address _underlyingAssetAddress, uint120 _upper, uint120 _lower) external onlyOwner {
 		require(_upper >= _lower && _lower > ABDK_1);
-		//ensure that the contract at _underlyingAssetAddress is not a capital handler contract
-		require(organizer(organizerAddress).capitalHandlerToWrapper(_underlyingAssetAddress) == address(0));
+		//ensure that the contract at _underlyingAssetAddress is not a fix capital pool contract
+		require(organizer(organizerAddress).fixCapitalPoolToWrapper(_underlyingAssetAddress) == address(0));
 		UpperCollateralizationRatio[_underlyingAssetAddress] = _upper;
 		LowerCollateralizationRatio[_underlyingAssetAddress] = _lower;
 	}
@@ -761,8 +761,8 @@ contract VaultHealth is IVaultHealth, Ownable {
 	*/
 	function setRateThresholds(address _underlyingAssetAddress, uint120 _upper, uint120 _lower) external onlyOwner {
 		require(_upper >= _lower && _lower > ABDK_1);
-		//ensure that the contract at _underlyingAssetAddress is not a capital handler contract
-		require(organizer(organizerAddress).capitalHandlerToWrapper(_underlyingAssetAddress) == address(0));
+		//ensure that the contract at _underlyingAssetAddress is not a fix capital pool contract
+		require(organizer(organizerAddress).fixCapitalPoolToWrapper(_underlyingAssetAddress) == address(0));
 		UpperRateThreshold[_underlyingAssetAddress] = _upper;
 		LowerRateThreshold[_underlyingAssetAddress] = _lower;
 	}

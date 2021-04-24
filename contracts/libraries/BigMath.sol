@@ -201,7 +201,7 @@ library BigMath {
     uint r,
     int128 changeReserve0,
     address AmmInfoOracleAddress,
-    address capitalHandlerAddress,
+    address fixCapitalPoolAddress,
     bool flipFee
   ) public view returns (uint change, uint treasuryFee, address sendTo) {
 
@@ -213,7 +213,7 @@ library BigMath {
       changeReserve0
     )).abs());
 
-    uint feeConstant = AmmInfoOracle(AmmInfoOracleAddress).getZCBammFeeConstant(capitalHandlerAddress);
+    uint feeConstant = AmmInfoOracle(AmmInfoOracleAddress).getZCBammFeeConstant(fixCapitalPoolAddress);
     if (flipFee) {
       feeConstant = uint((1 ether)**2).div(feeConstant);
     }

@@ -15,7 +15,7 @@ contract IYTammData {
 	uint public YTtoLmultiplier;
 	uint public SlippageConstant;
 
-	address public CHaddress;
+	address public FCPaddress;
 
 	uint internal constant SecondsPerYear = 31556926;
 	int128 internal constant _2WeeksABDK = int128((2 weeks << 64)/SecondsPerYear);

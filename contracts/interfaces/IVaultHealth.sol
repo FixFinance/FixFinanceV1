@@ -11,11 +11,11 @@ interface IVaultHealth {
 	function amountBorrowedAtUpperLimit(address _assetSupplied, address _assetBorrowed, uint _amountSupplied) external view returns (uint);
 	function amountBorrowedAtLowerLimit(address _assetSupplied, address _assetBorrowed, uint _amountSupplied) external view returns (uint);
 
-	function YTvaultAmountBorrowedAtUpperLimit(address _CHsupplied, address _CHborrowed, uint _amountYield, int _amountBond) external view returns (uint);
-	function YTvaultAmountBorrowedAtLowerLimit(address _CHsupplied, address _CHborrowed, uint _amountYield, int _amountBond) external view returns (uint);
+	function YTvaultAmountBorrowedAtUpperLimit(address _FCPsupplied, address _FCPborrowed, uint _amountYield, int _amountBond) external view returns (uint);
+	function YTvaultAmountBorrowedAtLowerLimit(address _FCPsupplied, address _FCPborrowed, uint _amountYield, int _amountBond) external view returns (uint);
 
-	function YTvaultSatisfiesUpperLimit(address _CHsupplied, address _CHborrowed, uint _amountYield, int _amountBond, uint _amountBorrowed) external view returns (bool);
-	function YTvaultSatisfiesLowerLimit(address _CHsupplied, address _CHborrowed, uint _amountYield, int _amountBond, uint _amountBorrowed) external view returns (bool);
+	function YTvaultSatisfiesUpperLimit(address _FCPsupplied, address _FCPborrowed, uint _amountYield, int _amountBond, uint _amountBorrowed) external view returns (bool);
+	function YTvaultSatisfiesLowerLimit(address _FCPsupplied, address _FCPborrowed, uint _amountYield, int _amountBond, uint _amountBorrowed) external view returns (bool);
 
 	function vaultWithstandsChange(
 		address _assetSupplied,
@@ -28,8 +28,8 @@ interface IVaultHealth {
 	) external view returns (bool);
 
 	function YTvaultWithstandsChange(
-		address _CHsupplied,
-		address _CHborrowed,
+		address _FCPsupplied,
+		address _FCPborrowed,
 		uint _amountYield,
 		int _amountBond,
 		uint _amountBorrowed,

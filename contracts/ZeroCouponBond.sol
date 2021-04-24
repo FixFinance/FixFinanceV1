@@ -1,12 +1,12 @@
 pragma solidity >=0.6.0;
 
-import "./interfaces/ICapitalHandler.sol";
+import "./interfaces/IFixCapitalPool.sol";
 import "./interfaces/IWrapper.sol";
 import "./interfaces/IZeroCouponBond.sol";
 
 contract ZeroCouponBond is IZeroCouponBond {
 
-	ICapitalHandler immutable ch;
+	IFixCapitalPool immutable ch;
 	IWrapper immutable wrapper;
 
     string public override name;
@@ -16,13 +16,13 @@ contract ZeroCouponBond is IZeroCouponBond {
 
     mapping(address => mapping(address => uint256)) public override allowance;
 
-	constructor(address _wrapperAddress, address _capitalHandlerAddress, uint _maturity) public {
+	constructor(address _wrapperAddress, address _fixCapitalPoolAddress, uint _maturity) public {
 		IWrapper _wrapper = IWrapper(_wrapperAddress);
 		decimals = _wrapper.decimals();
 		symbol = string(abi.encodePacked(_wrapper.symbol(),'zcb'));
 		name = string(abi.encodePacked(_wrapper.name(),' zero coupon bond'));
 		wrapper = _wrapper;
-        ch = ICapitalHandler(_capitalHandlerAddress);
+        ch = IFixCapitalPool(_fixCapitalPoolAddress);
         maturity = _maturity;
 	}
 
@@ -63,7 +63,7 @@ contract ZeroCouponBond is IZeroCouponBond {
     }
 
     /*
-        @Description: the CapitalHandler contract can decrement approvals by calling this function
+        @Description: the FixCapitalPool contract can decrement approvals by calling this function
 
         @param address _owner: the owner of the funds that are approved
         @param address _spender: the spender of the funds that are approved
@@ -76,9 +76,9 @@ contract ZeroCouponBond is IZeroCouponBond {
     }
 
     /*
-        @Description: get the address of this contract's corresponding CapitalHandler contract
+        @Description: get the address of this contract's corresponding FixCapitalPool contract
     */
-    function CapitalHandlerAddress() external view override returns (address) {
+    function FixCapitalPoolAddress() external view override returns (address) {
         return address(ch);
     }
 }

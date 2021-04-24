@@ -1,6 +1,6 @@
 const dummyAToken = artifacts.require('dummyAToken');
 const NGBwrapper = artifacts.require('NGBwrapper');
-const capitalHandler = artifacts.require('CapitalHandler');
+const fixCapitalPool = artifacts.require('FixCapitalPool');
 const BN = web3.utils.BN;
 const _10To18 = (new BN('10')).pow(new BN('18'));
 

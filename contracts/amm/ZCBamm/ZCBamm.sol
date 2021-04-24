@@ -3,7 +3,7 @@ pragma solidity >=0.6.0;
 import "../../helpers/IZCBamm.sol";
 import "../../libraries/ABDKMath64x64.sol";
 import "../../libraries/BigMath.sol";
-import "../../interfaces/ICapitalHandler.sol";
+import "../../interfaces/IFixCapitalPool.sol";
 import "../../interfaces/IZeroCouponBond.sol";
 import "../../interfaces/IYieldToken.sol";
 import "../../interfaces/IWrapper.sol";
@@ -53,10 +53,10 @@ contract ZCBamm is IZCBamm {
 	/*
 		Init AMM
 	*/
-	constructor(address _CHaddress, address _feeOracleAddress) public {
-		address _YTaddress = ICapitalHandler(_CHaddress).yieldTokenAddress();
-		address _ZCBaddress = ICapitalHandler(_CHaddress).zeroCouponBondAddress();
-		uint64 _maturity = ICapitalHandler(_CHaddress).maturity();
+	constructor(address _FCPaddress, address _feeOracleAddress) public {
+		address _YTaddress = IFixCapitalPool(_FCPaddress).yieldTokenAddress();
+		address _ZCBaddress = IFixCapitalPool(_FCPaddress).zeroCouponBondAddress();
+		uint64 _maturity = IFixCapitalPool(_FCPaddress).maturity();
 		require(_maturity > block.timestamp + 10 days);
 		maturity = _maturity;
 		//we want time remaining / anchor to be less than 1, thus make anchor greater than time remaining
@@ -64,11 +64,11 @@ contract ZCBamm is IZCBamm {
 		anchor = temp;
 		nextAnchor = temp;
 		AmmInfoOracleAddress = _feeOracleAddress;
-		wrapper = ICapitalHandler(_CHaddress).wrapper();
+		wrapper = IFixCapitalPool(_FCPaddress).wrapper();
 		lastRecalibration = block.timestamp;
 		ZCBaddress = _ZCBaddress;
 		YTaddress = _YTaddress;
-		CHaddress = _CHaddress;
+		FCPaddress = _FCPaddress;
 	}
 
 	/*
@@ -372,7 +372,7 @@ contract ZCBamm is IZCBamm {
 				r,
 				_amount,
 				AmmInfoOracleAddress,
-				CHaddress,
+				FCPaddress,
 				false
 			);
 
@@ -394,7 +394,7 @@ contract ZCBamm is IZCBamm {
 				r,
 				_amount,
 				AmmInfoOracleAddress,
-				CHaddress,
+				FCPaddress,
 				true
 			);
 
@@ -437,7 +437,7 @@ contract ZCBamm is IZCBamm {
 				r,
 				-_amount,
 				AmmInfoOracleAddress,
-				CHaddress,
+				FCPaddress,
 				false
 			);
 			reserveIncrease = amountIn.sub(treasuryFee);
@@ -456,7 +456,7 @@ contract ZCBamm is IZCBamm {
 				r,
 				-_amount,
 				AmmInfoOracleAddress,
-				CHaddress,
+				FCPaddress,
 				true
 			);
 			reserveIncrease = amountIn.sub(treasuryFee);
@@ -522,7 +522,7 @@ contract ZCBamm is IZCBamm {
 				r,
 				_amount,
 				AmmInfoOracleAddress,
-				CHaddress,
+				FCPaddress,
 				false
 			);
 
@@ -535,7 +535,7 @@ contract ZCBamm is IZCBamm {
 				r,
 				_amount,
 				AmmInfoOracleAddress,
-				CHaddress,
+				FCPaddress,
 				true
 			);
 
@@ -569,7 +569,7 @@ contract ZCBamm is IZCBamm {
 				r,
 				-_amount,
 				AmmInfoOracleAddress,
-				CHaddress,
+				FCPaddress,
 				false
 			);
 
@@ -581,7 +581,7 @@ contract ZCBamm is IZCBamm {
 				r,
 				-_amount,
 				AmmInfoOracleAddress,
-				CHaddress,
+				FCPaddress,
 				true
 			);
 

@@ -1,14 +1,14 @@
 const dummyAToken = artifacts.require('dummyAToken');
 const dummyVaultHealth = artifacts.require('DummyVaultHealth');
 const NGBwrapper = artifacts.require('NGBwrapper');
-const CapitalHandler = artifacts.require('CapitalHandler');
+const FixCapitalPool = artifacts.require('FixCapitalPool');
 const YieldToken = artifacts.require('YieldToken');
 const zcbYtDeployer = artifacts.require('ZCB_YT_Deployer');
 const organizer = artifacts.require('organizer');
 const IERC20 = artifacts.require("IERC20");
 const BigMath = artifacts.require("BigMath");
 const Ei = artifacts.require("Ei");
-const CapitalHandlerDeployer = artifacts.require('CapitalHandlerDeployer');
+const FixCapitalPoolDeployer = artifacts.require('FixCapitalPoolDeployer');
 const ZCBamm = artifacts.require('ZCBamm');
 const YTamm = artifacts.require('YTamm');
 const ZCBammDeployer = artifacts.require('ZCBammDeployer');
@@ -41,13 +41,13 @@ contract('organizer', function(accounts) {
 		ZCBammDeployerInstance = await ZCBammDeployer.new();
 		YTammDelegateInstance = await YTammDelegate.new();
 		YTammDeployerInstance = await YTammDeployer.new(YTammDelegateInstance.address);
-		capitalHandlerDeployerInstance = await CapitalHandlerDeployer.new();
+		fixCapitalPoolDeployerInstance = await FixCapitalPoolDeployer.new();
 		swapRouterDelegateInstance = await SwapRouterDelegate.new();
 		swapRouterDeployerInstance = await SwapRouterDeployer.new(swapRouterDelegateInstance.address);
 		ammInfoOracleInstance = await AmmInfoOracle.new("0", nullAddress);
 		organizerInstance = await organizer.new(
 			zcbYtDeployerInstance.address,
-			capitalHandlerDeployerInstance.address,
+			fixCapitalPoolDeployerInstance.address,
 			ZCBammDeployerInstance.address,
 			YTammDeployerInstance.address,
 			swapRouterDeployerInstance.address,
@@ -70,37 +70,37 @@ contract('organizer', function(accounts) {
 		wAsset0 = await NGBwrapper.at(rec.receipt.logs[0].args.wrapperAddress);
 	});
 
-	it('deploy CapitalHandler', async () => {
-		let rec = await organizerInstance.deployCapitalHandlerInstance(wAsset0.address, maturity);
-		capitalHandlerInstance = await CapitalHandler.at(rec.receipt.logs[0].args.addr);
-		yieldTokenInstance = await YieldToken.at(await capitalHandlerInstance.yieldTokenAddress());
-		zcbInstance = await IERC20.at(await capitalHandlerInstance.zeroCouponBondAddress());
-		assert.notEqual(capitalHandlerInstance.address, nullAddress, "organizer::capitalHandlerMapping[asset0] must be non-null");
+	it('deploy FixCapitalPool', async () => {
+		let rec = await organizerInstance.deployFixCapitalPoolInstance(wAsset0.address, maturity);
+		fixCapitalPoolInstance = await FixCapitalPool.at(rec.receipt.logs[0].args.addr);
+		yieldTokenInstance = await YieldToken.at(await fixCapitalPoolInstance.yieldTokenAddress());
+		zcbInstance = await IERC20.at(await fixCapitalPoolInstance.zeroCouponBondAddress());
+		assert.notEqual(fixCapitalPoolInstance.address, nullAddress, "organizer::fixCapitalPoolMapping[asset0] must be non-null");
 	});
 
 	it('deploy ZCBamm', async () => {
-		await organizerInstance.deployZCBamm(capitalHandlerInstance.address);
-		ZCBammInstance = await ZCBamm.at(await organizerInstance.ZCBamms(capitalHandlerInstance.address));
+		await organizerInstance.deployZCBamm(fixCapitalPoolInstance.address);
+		ZCBammInstance = await ZCBamm.at(await organizerInstance.ZCBamms(fixCapitalPoolInstance.address));
 	});
 
 	it('cannot override ZCBamm deployment', async () => {
 		let caught = false;
 		try {
-			await organizerInstance.deployZCBamm(capitalHandlerInstance.address);
+			await organizerInstance.deployZCBamm(fixCapitalPoolInstance.address);
 		} catch (err) {
 			caught = true
 		}
-		if (!caught) assert.fail('organizer::ZCBamms[capitalHandlerInstance] was overridden');
+		if (!caught) assert.fail('organizer::ZCBamms[fixCapitalPoolInstance] was overridden');
 
 
 		//set the rate in the ZCBamm so that they YT amm may be deployed
-		amm0 = await ZCBamm.at(await organizerInstance.ZCBamms(capitalHandlerInstance.address));
+		amm0 = await ZCBamm.at(await organizerInstance.ZCBamms(fixCapitalPoolInstance.address));
 
 		balance = _10To18BN;
 		await asset0.approve(wAsset0.address, balance);
 		await wAsset0.depositUnitAmount(accounts[0], balance);
-		await wAsset0.approve(capitalHandlerInstance.address, balance);
-		await capitalHandlerInstance.depositWrappedToken(accounts[0], balance);
+		await wAsset0.approve(fixCapitalPoolInstance.address, balance);
+		await fixCapitalPoolInstance.depositWrappedToken(accounts[0], balance);
 		await zcbInstance.approve(amm0.address, balance);
 		await yieldTokenInstance.approve(amm0.address, balance);
 
@@ -120,18 +120,18 @@ contract('organizer', function(accounts) {
 	});
 
 	it('deploy YTamm', async () => {
-		await organizerInstance.deployYTamm(capitalHandlerInstance.address);
-		YTammInstance = await YTamm.at(await organizerInstance.YTamms(capitalHandlerInstance.address));
+		await organizerInstance.deployYTamm(fixCapitalPoolInstance.address);
+		YTammInstance = await YTamm.at(await organizerInstance.YTamms(fixCapitalPoolInstance.address));
 	});
 
 	it('cannot override YTamm deployment', async () => {
 		let caught = false;
 		try {
-			await organizerInstance.deployYTamm(capitalHandlerInstance.address);
+			await organizerInstance.deployYTamm(fixCapitalPoolInstance.address);
 		} catch (err) {
 			caught = true
 		}
-		if (!caught) assert.fail('organizer::YTamms[capitalHandlerInstance] was overridden');
+		if (!caught) assert.fail('organizer::YTamms[fixCapitalPoolInstance] was overridden');
 	});
 
 });

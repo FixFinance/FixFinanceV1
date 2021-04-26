@@ -1,7 +1,8 @@
 pragma solidity >=0.6.5 <0.7.0;
 import "./IERC20.sol";
+import "./IERC3156FlashLender.sol";
 
-interface IWrapper is IERC20 {
+interface IWrapper is IERC20, IERC3156FlashLender {
 	function underlyingAssetAddress() external view returns(address);
 	function underlyingIsWrapped() external view returns(bool);
 

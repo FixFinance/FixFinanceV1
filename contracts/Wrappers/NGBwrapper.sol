@@ -4,6 +4,7 @@ import "../interfaces/IWrapper.sol";
 import "../libraries/SafeMath.sol";
 import "../libraries/ABDKMath64x64.sol";
 import "../libraries/BigMath.sol";
+import "../helpers/nonReentrant.sol";
 import "../helpers/Ownable.sol";
 import "../ERC20.sol";
 
@@ -14,9 +15,12 @@ import "../ERC20.sol";
 
 	The balances of the underlying asset automatically grow as yield is generated
 */
-contract NGBwrapper is IWrapper, Ownable {
+contract NGBwrapper is IWrapper, nonReentrant, Ownable {
 	using SafeMath for uint;
 	using ABDKMath64x64 for int128;
+
+    bytes32 public constant CALLBACK_SUCCESS = keccak256("ERC3156FlashBorrower.onFlashLoan");
+    uint256 public flashLoanFee; // denominated in super bips
 
 	//SBPS == super bips == 1/100th of a bip
 	//100 * 10_000 == 1_000_000
@@ -379,6 +383,53 @@ contract NGBwrapper is IWrapper, Ownable {
         return true;
     }
 
+    //-----------------------E-I-P-3-1-6-5---f-l-a-s-h-l-o-a-n---f-u-n-c-t-i-o-n-a-l-i-t-y-----------------
+
+
+    function maxFlashLoan(
+        address token
+    ) external view override returns (uint256) {
+    	require(token == address(this));
+    	uint _flashLoanFee = flashLoanFee;
+    	return (uint256(-1) - totalSupply).div(_flashLoanFee == 0 ? 1 : _flashLoanFee);
+    }
+
+    function flashFee(
+        address token,
+        uint256 amount
+    ) external view override returns (uint256) {
+    	require(token == address(this));
+    	return amount.mul(flashLoanFee) / totalSBPS;
+    }
+
+    function flashLoan(
+        IERC3156FlashBorrower receiver,
+        address token,
+        uint256 amount,
+        bytes calldata data
+    ) external override noReentry returns (bool) {
+    	require(token == address(this));
+    	require(amount + totalSupply <= uint256(-1));
+    	uint _flashLoanFee = flashLoanFee;
+    	require(amount <= (uint256(-1) - totalSupply) / (_flashLoanFee == 0 ? 1 : _flashLoanFee));
+    	uint fee = amount.mul(flashLoanFee) / totalSBPS;
+    	balanceOf[msg.sender] += amount;
+    	bytes32 out = receiver.onFlashLoan(msg.sender, token, amount, fee, data);
+    	require(CALLBACK_SUCCESS == out);
+        uint256 _allowance = allowance[address(receiver)][address(this)];
+        require(
+            _allowance >= (amount + fee),
+            "FlashMinter: Repay not approved"
+        );
+        allowance[address(receiver)][address(this)] = _allowance - (amount + fee);
+        uint balance = balanceOf[address(receiver)];
+        require(balance >= (amount + fee));
+        balanceOf[address(receiver)] = balance - (amount + fee);
+        totalSupply = totalSupply.sub(fee);
+        return true;
+    }
+
+
     //------------------------------------a-d-m-i-n----------------------------
 
     /*
@@ -389,8 +440,13 @@ contract NGBwrapper is IWrapper, Ownable {
 			the pool. You can think of it as if totalSBPS - _SBPSRetained is the annual
 			asset management fee for a wrapper
     */
-    function setFee(uint32 _SBPSRetained) external onlyOwner {
+    function setInterestFee(uint32 _SBPSRetained) external onlyOwner {
     	require(_SBPSRetained > 0 && _SBPSRetained <= totalSBPS);
     	SBPSRetained = _SBPSRetained;
     }
+
+    function setFlashLoanFee(uint _flashLoanFee) external onlyOwner {
+    	flashLoanFee = _flashLoanFee;
+    }
+
 }

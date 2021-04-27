@@ -96,7 +96,13 @@ contract organizer {
 	*/
 	function deployFixCapitalPoolInstance(address _wrapperAddress, uint64 _maturity) public {
 		require(_maturity > block.timestamp+(1 weeks), "maturity must be at least 1 weeks away");
-		address fixCapitalPoolAddress = FixCapitalPoolDeployer(FixCapitalPoolDeployerAddress).deploy(_wrapperAddress, _maturity, yieldTokenDeployerAddress, msg.sender);
+		address fixCapitalPoolAddress = FixCapitalPoolDeployer(FixCapitalPoolDeployerAddress).deploy(
+			_wrapperAddress,
+			_maturity,
+			yieldTokenDeployerAddress,
+			msg.sender,
+			treasuryAddress
+		);
 		emit FixCapitalPoolDeployment(fixCapitalPoolAddress);
 		fixCapitalPoolToWrapper[fixCapitalPoolAddress] = _wrapperAddress;
 	}

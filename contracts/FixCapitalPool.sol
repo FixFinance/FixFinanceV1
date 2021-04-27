@@ -66,13 +66,16 @@ contract FixCapitalPool is IFixCapitalPool, Ownable, nonReentrant {
     uint256 constant MAX_YIELD_FLASHLOAN = 2**250 / totalSBPS;
     int256 constant MAX_BOND_FLASHLOAN = 2**250 / int(totalSBPS);
 
+    address public override treasuryAddress;
+
     /*
 		init
     */
 	constructor(
 		address _wrapper,
 		uint64 _maturity,
-		address _ZCB_YTdeployerAddr
+		address _ZCB_YTdeployerAddr,
+		address _treasuryAddress
 	) public {
 		IWrapper temp = IWrapper(_wrapper);
 		wrapper = temp;
@@ -81,6 +84,8 @@ contract FixCapitalPool is IFixCapitalPool, Ownable, nonReentrant {
 		maturity = _maturity;
 		yieldTokenAddress = ZCB_YT_Deployer(_ZCB_YTdeployerAddr).deployYT(_wrapper, _maturity);
 		zeroCouponBondAddress = ZCB_YT_Deployer(_ZCB_YTdeployerAddr).deployZCB(_wrapper, _maturity);
+		treasuryAddress = _treasuryAddress;
+		flashLoanFee = 100; //default flashloan fee of 100 super bips or 1 basis point or 0.01%
 	}
 
 	modifier beforePayoutPhase() {
@@ -435,7 +440,7 @@ contract FixCapitalPool is IFixCapitalPool, Ownable, nonReentrant {
 			yieldFee = _amountYield.mul(_flashLoanFee) / totalSBPS;
 			balanceYield[msg.sender] = balanceYield[msg.sender].add(_amountYield);
 		}
-		if (_amountBond > 0) {
+		if (_amountBond != 0) {
 			bondFee = _amountBond.mul(int(_flashLoanFee)) / int(totalSBPS);
 			balanceBonds[msg.sender] = balanceBonds[msg.sender].add(_amountBond);
 		}
@@ -447,13 +452,19 @@ contract FixCapitalPool is IFixCapitalPool, Ownable, nonReentrant {
 		bytes32 out = _receiver.onFlashLoan(msg.sender, _amountYield, _amountBond, yieldFee, bondFee, _data);
 		require(out == CALLBACK_SUCCESS);
 
+		address _owner = owner;
+		address _treasuryAddress = treasuryAddress;
 		if (_amountYield > 0) {
 			balanceYield[msg.sender] = balanceYield[msg.sender].sub(_amountYield).sub(yieldFee);
-			balanceYield[owner] = balanceYield[owner].add(yieldFee);
+			uint dividend = yieldFee >> 1;
+			balanceYield[_treasuryAddress] = balanceYield[_treasuryAddress].add(dividend);
+			balanceYield[_owner] = balanceYield[_owner].add(yieldFee - dividend);
 		}
-		if (_amountBond > 0) {
+		if (_amountBond != 0) {
 			balanceBonds[msg.sender] = balanceBonds[msg.sender].sub(_amountBond).sub(bondFee);
-			balanceBonds[owner] = balanceBonds[owner].add(bondFee);
+			int dividend = bondFee / 2;
+			balanceBonds[_treasuryAddress] = balanceBonds[_treasuryAddress].add(dividend);
+			balanceBonds[_owner] = balanceBonds[_owner].add(bondFee - dividend);
 		}
 	    return true;
     }

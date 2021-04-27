@@ -102,7 +102,7 @@ contract('YTamm', async function(accounts){
 		let timestamp = (await web3.eth.getBlock('latest')).timestamp;
 		//maturity is 110 days out
 		maturity = timestamp + 110*24*60*60;
-		fixCapitalPoolInstance = await fixCapitalPool.new(NGBwrapperInstance.address, maturity, zcbYtDeployerInstance.address);
+		fixCapitalPoolInstance = await fixCapitalPool.new(NGBwrapperInstance.address, maturity, zcbYtDeployerInstance.address, accounts[3]);
 		zcbInstance = await zeroCouponBond.at(await fixCapitalPoolInstance.zeroCouponBondAddress());
 		yieldTokenInstance = await yieldToken.at(await fixCapitalPoolInstance.yieldTokenAddress());
 		await ZCBamm.link("BigMath", BigMathInstance.address);

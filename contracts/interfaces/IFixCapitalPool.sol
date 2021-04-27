@@ -19,6 +19,7 @@ interface IFixCapitalPool is IFCPFlashLender {
 	function yieldTokenAddress() external view returns(address);
 	function zeroCouponBondAddress() external view returns(address);
 	function vaultFactoryAddress() external view returns(address);
+	function treasuryAddress() external view returns(address);
 	function wrapper() external view returns(IWrapper);
 	function transferPosition(address _to, uint _yield, int _bond) external;
 	function transferPositionFrom(address _from, address _to, uint _yield, int _bond) external;

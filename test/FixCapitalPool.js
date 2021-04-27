@@ -18,7 +18,7 @@ contract('FixCapitalPool', async function(accounts){
 		NGBwrapperInstance = await NGBwrapper.new(dummyATokenInstance.address, accounts[4], SBPSretained);
 		zcbYtDeployerInstance = await zcbYtDeployer.new();
 		timeNow = (await web3.eth.getBlock('latest')).timestamp;
-		fixCapitalPoolInstance = await fixCapitalPool.new(NGBwrapperInstance.address, timeNow+86400, zcbYtDeployerInstance.address);
+		fixCapitalPoolInstance = await fixCapitalPool.new(NGBwrapperInstance.address, timeNow+86400, zcbYtDeployerInstance.address, accounts[3]);
 		inflation = await dummyATokenInstance.inflation();
 		yieldTokenInstance = await IERC20.at(await fixCapitalPoolInstance.yieldTokenAddress());
 		zcbInstance = await IERC20.at(await fixCapitalPoolInstance.zeroCouponBondAddress());

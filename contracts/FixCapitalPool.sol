@@ -9,8 +9,9 @@ import "./ZCB_YT_Deployer.sol";
 import "./libraries/SafeMath.sol";
 import "./libraries/SignedSafeMath.sol";
 import "./helpers/Ownable.sol";
+import "./helpers/nonReentrant.sol";
 
-contract FixCapitalPool is IFixCapitalPool, Ownable {
+contract FixCapitalPool is IFixCapitalPool, Ownable, nonReentrant {
 	using SafeMath for uint;
 	using SignedSafeMath for int;
 
@@ -55,6 +56,15 @@ contract FixCapitalPool is IFixCapitalPool, Ownable {
 	address public override zeroCouponBondAddress;
 
 	address public override vaultFactoryAddress;
+
+	//data for flashloans
+    bytes32 public constant CALLBACK_SUCCESS = keccak256("FCPFlashBorrower.onFlashLoan");
+    uint256 public flashLoanFee; // denominated in super bips
+	//SBPS == super bips == 1/100th of a bip
+	//100 * 10_000 == 1_000_000
+	uint32 private constant totalSBPS = 1_000_000;
+    uint256 constant MAX_YIELD_FLASHLOAN = 2**250 / totalSBPS;
+    int256 constant MAX_BOND_FLASHLOAN = 2**250 / int(totalSBPS);
 
     /*
 		init
@@ -350,4 +360,101 @@ contract FixCapitalPool is IFixCapitalPool, Ownable {
 		isFinalized = true;
 	}
 
+    /*
+		@Description: set the percentage fee that is applied to all flashloans
+
+		@param uint _flashLoanFee: the new fee percentage denominated in superbips which is to be applied to flashloans
+    */
+    function setFlashLoanFee(uint _flashLoanFee) external onlyOwner {
+    	flashLoanFee = _flashLoanFee;
+    }
+
+	//------------------------------f-l-a-s-h-l-o-a-n-s--------------------------
+
+	/*
+		@Description: get the maximum amount of yield and bond that may be flashloaned
+
+		@return uint256 maxYield: the maximum amount in the balanceYield mapping that may be flashloaned
+		@return int256 maxBond; the maximum amount in the balanceBonds mapping that may be flashloaned
+	*/
+    function maxFlashLoan() external view override returns (uint256 maxYield, int256 maxBond) {
+    	maxYield = MAX_YIELD_FLASHLOAN;
+    	maxBond = MAX_BOND_FLASHLOAN;
+    }
+
+    /*
+		@Description: the fee amount of yield and bonds that will be charged given specific amounts flashloaned
+
+		@param uint256 _amountYield: the amount of yield flashloaned
+		@param int256 _amountBond: the amount of bond flashloaned
+
+		@return uint256 yieldFee: the fee in terms of yield
+		@return int256 bondFee: the fee in bonds
+    */
+	function flashFee(
+		uint256 _amountYield,
+		int256 _amountBond
+	) external view override returns (uint256 yieldFee, int256 bondFee) {
+		require(_amountYield <= MAX_YIELD_FLASHLOAN);
+		require(_amountBond <= MAX_BOND_FLASHLOAN);
+		uint _flashLoanFee = flashLoanFee;
+		yieldFee = _amountYield.mul(_flashLoanFee) / totalSBPS;
+		bondFee = _amountBond.mul(int(_flashLoanFee)) / int(totalSBPS);
+	}
+
+	/*
+		@Description: initiate flashloan
+
+		@param IFCPFlashBorrower: the contract that shall borrow the funds
+		@param uint256 _amountYield: the amount of yield to flashborrow
+		@param int256 _amountBond: the amount of bond to flashborrow
+		@param bytes calldata _data: the data to pass to the flash borrow receiver
+
+		@return bool: true when flashloan is successful
+    */
+    function flashLoan(
+        IFCPFlashBorrower _receiver,
+        uint256 _amountYield,
+        int256 _amountBond,
+        bytes calldata _data
+    ) external override beforePayoutPhase noReentry returns (bool) {
+		require(_amountYield <= MAX_YIELD_FLASHLOAN);
+		require(_amountBond <= MAX_BOND_FLASHLOAN);
+		uint ratio = wrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
+		uint effectiveZCB = _amountYield.mul(ratio) / (1 ether);
+		if (_amountBond >= 0) {
+			effectiveZCB = effectiveZCB.add(uint(_amountBond));
+		}
+		else {
+			effectiveZCB = effectiveZCB.sub(uint(-_amountBond));
+		}
+		uint _flashLoanFee = flashLoanFee;
+		uint yieldFee;
+		int bondFee;
+		if (_amountYield > 0) {
+			yieldFee = _amountYield.mul(_flashLoanFee) / totalSBPS;
+			balanceYield[msg.sender] = balanceYield[msg.sender].add(_amountYield);
+		}
+		if (_amountBond > 0) {
+			bondFee = _amountBond.mul(int(_flashLoanFee)) / int(totalSBPS);
+			balanceBonds[msg.sender] = balanceBonds[msg.sender].add(_amountBond);
+		}
+
+		//decrement allowances
+		IZeroCouponBond(zeroCouponBondAddress).decrementAllowance(address(_receiver), msg.sender, effectiveZCB);
+		IYieldToken(yieldTokenAddress).decrementAllowance(address(_receiver), msg.sender, _amountYield);
+
+		bytes32 out = _receiver.onFlashLoan(msg.sender, _amountYield, _amountBond, yieldFee, bondFee, _data);
+		require(out == CALLBACK_SUCCESS);
+
+		if (_amountYield > 0) {
+			balanceYield[msg.sender] = balanceYield[msg.sender].sub(_amountYield).sub(yieldFee);
+			balanceYield[owner] = balanceYield[owner].add(yieldFee);
+		}
+		if (_amountBond > 0) {
+			balanceBonds[msg.sender] = balanceBonds[msg.sender].sub(_amountBond).sub(bondFee);
+			balanceBonds[owner] = balanceBonds[owner].add(bondFee);
+		}
+	    return true;
+    }
 }

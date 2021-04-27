@@ -414,14 +414,14 @@ contract NGBwrapper is IWrapper, nonReentrant, Ownable {
     	require(amount <= (uint256(-1) - totalSupply) / (_flashLoanFee == 0 ? 1 : _flashLoanFee));
     	uint fee = amount.mul(flashLoanFee) / totalSBPS;
     	balanceOf[msg.sender] += amount;
-    	bytes32 out = receiver.onFlashLoan(msg.sender, token, amount, fee, data);
-    	require(CALLBACK_SUCCESS == out);
         uint256 _allowance = allowance[address(receiver)][address(this)];
         require(
             _allowance >= (amount + fee),
             "FlashMinter: Repay not approved"
         );
         allowance[address(receiver)][address(this)] = _allowance - (amount + fee);
+    	bytes32 out = receiver.onFlashLoan(msg.sender, token, amount, fee, data);
+    	require(CALLBACK_SUCCESS == out);
         uint balance = balanceOf[address(receiver)];
         require(balance >= (amount + fee));
         balanceOf[address(receiver)] = balance - (amount + fee);
@@ -445,6 +445,11 @@ contract NGBwrapper is IWrapper, nonReentrant, Ownable {
     	SBPSRetained = _SBPSRetained;
     }
 
+    /*
+		@Description: set the percentage fee that is applied to all flashloans
+
+		@param uint _flashLoanFee: the new fee percentage denominated in superbips which is to be applied to flashloans
+    */
     function setFlashLoanFee(uint _flashLoanFee) external onlyOwner {
     	flashLoanFee = _flashLoanFee;
     }

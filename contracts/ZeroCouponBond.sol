@@ -59,7 +59,7 @@ contract ZeroCouponBond is IZeroCouponBond {
     }
 
     function totalSupply() public view override returns (uint _supply) {
-    	_supply = wrapper.WrappedAmtToUnitAmt_RoundDown(wrapper.balanceOf(address(this)));
+    	_supply = wrapper.WrappedAmtToUnitAmt_RoundDown(wrapper.balanceOf(address(ch)));
     }
 
     /*

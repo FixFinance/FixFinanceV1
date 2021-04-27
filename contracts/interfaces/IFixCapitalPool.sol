@@ -1,8 +1,9 @@
 pragma solidity >=0.6.0;
+import "./IFCPFlashLender.sol";
 import "./IWrapper.sol";
 import "./IERC20.sol";
 
-interface IFixCapitalPool {
+interface IFixCapitalPool is IFCPFlashLender {
 	function wrappedTokenFree(address _owner) external view returns (uint wrappedTknFree);
 	function depositWrappedToken(address _to, uint _amountWrappedTkn) external;
 	function withdraw(address _to, uint _amountWrappedTkn, bool _unwrap) external;

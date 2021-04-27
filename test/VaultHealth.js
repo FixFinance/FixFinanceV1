@@ -67,6 +67,7 @@ contract('VaultHealth', async function(accounts) {
 		vaultFactoryDelegate2Instance = await VaultFactoryDelegate2.new();
 		vaultFactoryInstance = await VaultFactory.new(
 			vaultHealthInstance.address,
+			nullAddress,
 			vaultFactoryDelegateInstance.address,
 			vaultFactoryDelegate2Instance.address
 		);

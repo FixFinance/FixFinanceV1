@@ -3,6 +3,7 @@ pragma solidity >=0.6.0;
 import "../VaultFactory/VaultFactoryData.sol";
 
 interface IVaultFactory {
+	function treasuryAddress() external view returns(address);
 	function vaultsLength(address _owner) external view returns(uint);
 	function YTvaultsLength(address _owner) external view returns(uint);
 	function allVaults(address _owner) external view returns(VaultFactoryData.Vault[] memory _vaults);

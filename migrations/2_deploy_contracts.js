@@ -57,6 +57,7 @@ module.exports = async function(deployer) {
 	vaultFactoryInstance = await deployer.deploy(
 		VaultFactory,
 		nullAddress,
+		accounts[0],
 		vaultFactoryDelegateInstance.address,
 		vaultFactoryDelegate2Instance.address
 	);

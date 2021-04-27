@@ -50,8 +50,10 @@ contract('VaultFactory', async function(accounts) {
 		vaultHealthInstance = await dummyVaultHealth.new();
 		vaultFactoryDelegateInstance = await VaultFactoryDelegate.new();
 		vaultFactoryDelegate2Instance = await VaultFactoryDelegate2.new();
+		treasuryAccount = accounts[5];
 		vaultFactoryInstance = await VaultFactory.new(
 			vaultHealthInstance.address,
+			treasuryAccount,
 			vaultFactoryDelegateInstance.address,
 			vaultFactoryDelegate2Instance.address
 		);
@@ -511,20 +513,24 @@ contract('VaultFactory', async function(accounts) {
 	});
 
 	it('contract owner withdraws revenue', async () => {
-		let revenue = await vaultFactoryInstance.revenue(zcbAsset0.address);
+		let revenue = await vaultFactoryInstance.revenue(wAsset1.address);
+		let expToTreasury = revenue.div(new BN(2));
+		let expToOwner = revenue.sub(expToTreasury);
 
-		let prevBalance = await zcbAsset0.balanceOf(accounts[0]);
+		let prevBalanceOwner = await wAsset1.balanceOf(accounts[0]);
+		let prevBalanceTreasury = await wAsset1.balanceOf(treasuryAccount);
 
-		await vaultFactoryInstance.claimRevenue(zcbAsset0.address);
+		await vaultFactoryInstance.claimRevenue(wAsset1.address);
 
-		let newRevenue = await vaultFactoryInstance.revenue(zcbAsset0.address);
+		let newRevenue = await vaultFactoryInstance.revenue(wAsset1.address);
 
-		let newBalance = await zcbAsset0.balanceOf(accounts[0]);
+		let newBalanceOwner = await wAsset1.balanceOf(accounts[0]);
+		let newBalanceTreasury = await wAsset1.balanceOf(treasuryAccount);
 
 		assert.equal(newRevenue.toString(), "0", "revenue storage value reduced to 0 after all is withdrawn");
-		assert.equal(newBalance.sub(prevBalance).toString(), revenue.toString(), "correct amount paid to contract owner");
+		assert.equal(newBalanceOwner.sub(prevBalanceOwner).toString(), expToOwner.toString(), "correct amount paid to contract owner");
+		assert.equal(newBalanceTreasury.sub(prevBalanceTreasury).toString(), expToTreasury.toString(), "correct amount paid to treasury");
 	});
-
 
 
 	/*
@@ -1030,20 +1036,31 @@ contract('VaultFactory', async function(accounts) {
 		}
 		if (!caught) assert.fail("only contract owner should be able to claim revenue");
 
-		let prevBalanceYield = await fcp1.balanceYield(accounts[0]);
-		let prevBalanceBond = await fcp1.balanceBonds(accounts[0]);
+		let expYieldToTreasury = revenue.yield.div(new BN(2));
+		let expBondToTreasury = revenue.bond.add(new BN(bondIn)).div(new BN(2));
+		let expYieldToOwner = revenue.yield.sub(expYieldToTreasury);
+		let expBondToOwner = revenue.bond.add(new BN(bondIn)).sub(expBondToTreasury);
+
+		let prevOwnerBalanceYield = await fcp1.balanceYield(accounts[0]);
+		let prevOwnerBalanceBond = await fcp1.balanceBonds(accounts[0]);
+		let prevTreasuryBalanceYield = await fcp1.balanceYield(treasuryAccount);
+		let prevTreasuryBalanceBond = await fcp1.balanceBonds(treasuryAccount);
 
 		await vaultFactoryInstance.claimYTRevenue(fcp1.address, bondIn);
 
 		let newRevenue = await vaultFactoryInstance.YTrevenue(fcp1.address);
 
-		let newBalanceYield = await fcp1.balanceYield(accounts[0]);
-		let newBalanceBond = await fcp1.balanceBonds(accounts[0]);
+		let newOwnerBalanceYield = await fcp1.balanceYield(accounts[0]);
+		let newOwnerBalanceBond = await fcp1.balanceBonds(accounts[0]);
+		let newTreasuryBalanceYield = await fcp1.balanceYield(treasuryAccount);
+		let newTreasuryBalanceBond = await fcp1.balanceBonds(treasuryAccount);
 
 		assert.equal(newRevenue.yield.toString(), "0", "revenue yield value reduced to 0 after all is withdrawn");
 		assert.equal(newRevenue.bond.toString(), "0", "revenue bond value reduced to 0 after all is withdrawn");
-		assert.equal(newBalanceYield.sub(prevBalanceYield).toString(), revenue.yield.toString(), "correct amount yield paid to contract owner");
-		assert.equal(newBalanceBond.sub(prevBalanceBond).toString(), revenue.bond.toString(), "correct amount bond paid to contract owner");
+		assert.equal(newOwnerBalanceYield.sub(prevOwnerBalanceYield).toString(), expYieldToOwner.toString(), "correct amount yield paid to contract owner");
+		assert.equal(newOwnerBalanceBond.sub(prevOwnerBalanceBond.sub(new BN(bondIn))).toString(), expBondToOwner.toString(), "correct amount bond paid to contract owner");
+		assert.equal(newTreasuryBalanceYield.sub(prevTreasuryBalanceYield).toString(), expYieldToTreasury.toString(), "correct amount yield paid to treasury");
+		assert.equal(newTreasuryBalanceBond.sub(prevTreasuryBalanceBond).toString(), expBondToTreasury.toString(), "correct amount bond paid to treasury");
 	});
 
 });

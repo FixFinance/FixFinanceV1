@@ -84,6 +84,9 @@ contract VaultFactoryData {
 	//user => vault index => vault
 	mapping(address => YTVault[]) internal _YTvaults;
 
+	//receives half of all liquidation revenue
+	address internal _treasuryAddress;
+
 	/*
 		Basis points of surplus collateral over bid which is
 		retained by the owner of the liquidated vault

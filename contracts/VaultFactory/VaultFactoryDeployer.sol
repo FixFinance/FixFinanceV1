@@ -8,13 +8,15 @@ contract VaultFactoryDeployer {
 		address addr
 	);
 
+	address treasury;
 	address delegate;
 	address delegate2;
 
 	/*
 		init
 	*/
-	constructor(address _delegate, address _delegate2) public {
+	constructor(address _treasury, address _delegate, address _delegate2) public {
+		treasury = _treasury;
 		delegate = _delegate;
 		delegate2 = _delegate2;
 	}
@@ -27,7 +29,7 @@ contract VaultFactoryDeployer {
 		@return address: the address of the new VaultFactory contract
 	*/
 	function deploy(address _vaultHealthAddress) external returns(address) {
-		VaultFactory temp = new VaultFactory(_vaultHealthAddress, delegate, delegate2);
+		VaultFactory temp = new VaultFactory(_vaultHealthAddress, treasury, delegate, delegate2);
 		temp.transferOwnership(msg.sender);
 		emit Deploy(address(temp));
 		return address(temp);

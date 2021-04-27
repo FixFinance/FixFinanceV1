@@ -18,13 +18,18 @@ contract VaultFactory is VaultFactoryData, IVaultFactory, Ownable {
 	address delegateAddress;
 	address delegate2Address;
 
-	constructor(address _vaultHealthContract, address _delegateAddress, address _delegate2Address) public {
+	constructor(address _vaultHealthContract, address _treasuryAddr, address _delegateAddress, address _delegate2Address) public {
 		vaultHealthContract = IVaultHealth(_vaultHealthContract);
+		_treasuryAddress = _treasuryAddr;
 		delegateAddress = _delegateAddress;
 		delegate2Address = _delegate2Address;
 	}
 
 	//-----------------------------------views-------------------------------------
+
+	function treasuryAddress() external view override returns(address) {
+		return _treasuryAddress;
+	}
 
 	function vaultsLength(address _owner) external view override returns(uint) {
 		return _vaults[_owner].length;
@@ -820,7 +825,9 @@ contract VaultFactory is VaultFactoryData, IVaultFactory, Ownable {
 	*/
 	function claimRevenue(address _asset) external override onlyOwner {
 		uint rev = _revenue[_asset];
-		IERC20(_asset).transfer(msg.sender, rev);
+		uint toTreasury = rev >> 1;
+		IERC20(_asset).transfer(_treasuryAddress, toTreasury);
+		IERC20(_asset).transfer(msg.sender, rev - toTreasury);
 		delete _revenue[_asset];
 	}
 
@@ -835,7 +842,10 @@ contract VaultFactory is VaultFactoryData, IVaultFactory, Ownable {
 		require(_bondIn > -1);
 		YTPosition memory pos = _YTRevenue[_FCP];
 		IFixCapitalPool(_FCP).burnZCBFrom(msg.sender, uint(_bondIn));
-		IFixCapitalPool(_FCP).transferPosition(msg.sender, pos.amountYield, pos.amountBond.add(_bondIn));
+		uint yieldToTreasury = pos.amountYield >> 1;
+		int bondToTreasury = pos.amountBond.add(_bondIn) / 2;
+		IFixCapitalPool(_FCP).transferPosition(_treasuryAddress, yieldToTreasury, bondToTreasury);
+		IFixCapitalPool(_FCP).transferPosition(msg.sender, pos.amountYield - yieldToTreasury, (pos.amountBond + _bondIn) - bondToTreasury);
 		delete _YTRevenue[_FCP];
 	}
 }

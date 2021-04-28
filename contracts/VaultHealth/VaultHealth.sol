@@ -248,6 +248,17 @@ contract VaultHealth is IVaultHealth, Ownable {
 	function getRateMultiplier(address _fixCapitalPoolAddress, address _underlyingAssetAddress, RateAdjuster _rateAdjuster, int128 _apy) internal view returns (uint) {
 		//ensure that we have been passed a ZCB address if not there is a rate multiplier of 1.0
 		int128 yearsRemaining = getYearsRemaining(_fixCapitalPoolAddress, _underlyingAssetAddress);
+		if (yearsRemaining <= 0) {
+			if (IFixCapitalPool(_fixCapitalPoolAddress).inPayoutPhase()) {
+				//account for nominal value accrual of ZCBs since maturity
+				uint numerator = IWrapper(_underlyingAssetAddress).WrappedAmtToUnitAmt_RoundDown(1 ether);
+				uint denominator = IFixCapitalPool(_fixCapitalPoolAddress).maturityConversionRate();
+				return numerator.mul(1 ether).div(denominator);
+			}
+			else {
+				return (1 ether);
+			}
+		}
 		int128 adjApy = _apy.sub(ABDK_1).mul(getRateThresholdMultiplier(_underlyingAssetAddress, _rateAdjuster)).add(ABDK_1);
 		if (isDeposited(_rateAdjuster)) {
 			int128 temp = _apy.add(MIN_RATE_ADJUSTMENT);

@@ -362,11 +362,13 @@ contract VaultFactoryDelegate2 is VaultFactoryData {
 
 		uint resultantBorrowed = vault.amountBorrowed.add(_amount);
 
+		uint unitAmountYield = getUnitValueYield(vault.FCPsupplied, vault.yieldSupplied);
+
 		validateYTvaultMultipliers(_priceMultiplier, _suppliedRateChange, _borrowRateChange, vault.bondSupplied > 0);
 		require(vaultHealthContract.YTvaultWithstandsChange(
 			vault.FCPsupplied,
 			vault.FCPborrowed,
-			vault.yieldSupplied,
+			unitAmountYield,
 			vault.bondSupplied,
 			resultantBorrowed,
 			_priceMultiplier,
@@ -551,11 +553,14 @@ contract VaultFactoryDelegate2 is VaultFactoryData {
 		int bondRatio = vault.bondSupplied.mul(1 ether).div(int(vault.yieldSupplied));
 		require(bondRatio >= _minBondRatio);
 
+
 		if (IFixCapitalPool(_FCPborrowed).maturity() >= block.timestamp + CRITICAL_TIME_TO_MATURITY) {
+			uint unitAmountYield = getUnitValueYield(vault.FCPsupplied, vault.yieldSupplied);
+	
 			require(!vaultHealthContract.YTvaultSatisfiesLowerLimit(
 				vault.FCPsupplied,
 				vault.FCPborrowed,
-				vault.yieldSupplied,
+				unitAmountYield,
 				vault.bondSupplied,
 				vault.amountBorrowed
 			));
@@ -603,10 +608,12 @@ contract VaultFactoryDelegate2 is VaultFactoryData {
 		int bondOut = vault.bondSupplied.mul(int(_in)).div(int(vault.amountBorrowed));
 
 		if (IFixCapitalPool(_FCPborrowed).maturity() >= block.timestamp + CRITICAL_TIME_TO_MATURITY) {
+			uint unitAmountYield = getUnitValueYield(vault.FCPsupplied, vault.yieldSupplied);
+	
 			require(!vaultHealthContract.YTvaultSatisfiesLowerLimit(
 				vault.FCPsupplied,
 				vault.FCPborrowed,
-				vault.yieldSupplied,
+				unitAmountYield,
 				vault.bondSupplied,
 				vault.amountBorrowed
 			));
@@ -651,10 +658,12 @@ contract VaultFactoryDelegate2 is VaultFactoryData {
 		require(bondOut >= _minBondOut);
 
 		if (IFixCapitalPool(_FCPborrowed).maturity() >= block.timestamp + CRITICAL_TIME_TO_MATURITY) {
+			uint unitAmountYield = getUnitValueYield(vault.FCPsupplied, vault.yieldSupplied);
+
 			require(!vaultHealthContract.YTvaultSatisfiesLowerLimit(
 				vault.FCPsupplied,
 				vault.FCPborrowed,
-				vault.yieldSupplied,
+				unitAmountYield,
 				vault.bondSupplied,
 				vault.amountBorrowed
 			));

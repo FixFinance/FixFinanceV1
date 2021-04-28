@@ -290,7 +290,7 @@ contract('VaultHealth', async function(accounts) {
 		let rateMultiplier0 = adjAPY0**(-yearsRemaining);
 		let rateMultiplier1 = adjAPY1**(-yearsRemaining);
 
-		let amountBorrowed = 10000000;	//asset0
+		let amountBorrowed = 100000000;	//asset0
 		let collateralizationRatio = upperRatio0*upperRatio1;
 		let expectedAmountSupplied = Math.floor(amountBorrowed*rateMultiplier0*price*collateralizationRatio/rateMultiplier1);
 		let actualBN = await vaultHealthInstance.amountSuppliedAtUpperLimit(zcbAsset1.address, zcbAsset0.address, amountBorrowed)
@@ -319,7 +319,7 @@ contract('VaultHealth', async function(accounts) {
 		let rateMultiplier0 = adjAPY0**(-yearsRemaining);
 		let rateMultiplier1 = 1.0;
 
-		let amountBorrowed = 10000000;	//asset0
+		let amountBorrowed = 100000000;	//asset0
 		let collateralizationRatio = upperRatio0*upperRatio1;
 		let expectedAmountSupplied = Math.floor(amountBorrowed*rateMultiplier0*price*collateralizationRatio/rateMultiplier1);
 		let actualBN = await vaultHealthInstance.amountSuppliedAtUpperLimit(wAsset1.address, zcbAsset0.address, amountBorrowed)
@@ -357,7 +357,7 @@ contract('VaultHealth', async function(accounts) {
 		let rateMultiplier0 = adjAPY0**(-yearsRemaining);
 		let rateMultiplier1 = adjAPY1**(-yearsRemaining);
 
-		let amountBorrowed = 10000000;	//asset0
+		let amountBorrowed = 100000000;	//asset0
 		let collateralizationRatio = lowerRatio0*lowerRatio1;
 		let expectedAmountSupplied = Math.floor(amountBorrowed*rateMultiplier0*price*collateralizationRatio/rateMultiplier1);
 		let actualBN = await vaultHealthInstance.amountSuppliedAtLowerLimit(zcbAsset1.address, zcbAsset0.address, amountBorrowed)
@@ -386,7 +386,7 @@ contract('VaultHealth', async function(accounts) {
 		let rateMultiplier0 = adjAPY0**(-yearsRemaining);
 		let rateMultiplier1 = 1.0;
 
-		let amountBorrowed = 10000000;	//asset0
+		let amountBorrowed = 100000000;	//asset0
 		let collateralizationRatio = lowerRatio0*lowerRatio1;
 		let expectedAmountSupplied = Math.floor(amountBorrowed*rateMultiplier0*price*collateralizationRatio/rateMultiplier1);
 		let actualBN = await vaultHealthInstance.amountSuppliedAtLowerLimit(wAsset1.address, zcbAsset0.address, amountBorrowed)
@@ -424,7 +424,7 @@ contract('VaultHealth', async function(accounts) {
 		let rateMultiplier0 = adjAPY0**(-yearsRemaining);
 		let rateMultiplier1 = adjAPY1**(-yearsRemaining);
 
-		let amountSupplied = 10000000;	//asset1
+		let amountSupplied = 100000000;	//asset1
 		let collateralizationRatio = upperRatio0*upperRatio1;
 		let expectedAmountBorrowed = Math.floor(amountSupplied * rateMultiplier1/rateMultiplier0/price/collateralizationRatio);
 		let actualBN = await vaultHealthInstance.amountBorrowedAtUpperLimit(zcbAsset1.address, zcbAsset0.address, amountSupplied);
@@ -454,7 +454,7 @@ contract('VaultHealth', async function(accounts) {
 		let rateMultiplier0 = adjAPY0**(-yearsRemaining);
 		let rateMultiplier1 = 1.0;
 
-		let amountSupplied = 10000000;	//asset0
+		let amountSupplied = 100000000;	//asset0
 		let collateralizationRatio = upperRatio0*upperRatio1;
 		let expectedAmountBorrowed = Math.floor(amountSupplied * rateMultiplier1/rateMultiplier0/price/collateralizationRatio);
 		let actualBN = await vaultHealthInstance.amountBorrowedAtUpperLimit(wAsset1.address, zcbAsset0.address, amountSupplied);
@@ -492,7 +492,7 @@ contract('VaultHealth', async function(accounts) {
 		let rateMultiplier0 = adjAPY0**(-yearsRemaining);
 		let rateMultiplier1 = adjAPY1**(-yearsRemaining);
 
-		let amountSupplied = 10000000;	//asset1
+		let amountSupplied = 100000000;	//asset1
 		let collateralizationRatio = lowerRatio0*lowerRatio1;
 		let expectedAmountBorrowed = Math.floor(amountSupplied * rateMultiplier1/rateMultiplier0/price/collateralizationRatio);
 		let actualBN = await vaultHealthInstance.amountBorrowedAtLowerLimit(zcbAsset1.address, zcbAsset0.address, amountSupplied);
@@ -522,7 +522,7 @@ contract('VaultHealth', async function(accounts) {
 		let rateMultiplier0 = adjAPY0**(-yearsRemaining);
 		let rateMultiplier1 = 1.0;
 
-		let amountSupplied = 10000000;	//asset0
+		let amountSupplied = 100000000;	//asset0
 		let collateralizationRatio = lowerRatio0*lowerRatio1;
 		let expectedAmountBorrowed = Math.floor(amountSupplied * rateMultiplier1/rateMultiplier0/price/collateralizationRatio);
 		let actualBN = await vaultHealthInstance.amountBorrowedAtLowerLimit(wAsset1.address, zcbAsset0.address, amountSupplied);
@@ -560,7 +560,7 @@ contract('VaultHealth', async function(accounts) {
 		let rateMultiplier0 = adjAPY0**(-yearsRemaining);
 		let rateMultiplier1 = 1.0;
 
-		let amountBorrowed = 10000000;	//asset0
+		let amountBorrowed = 100000000;	//asset0
 		let collateralizationRatio = upperRatio0*upperRatio1;
 		let expectedAmountSupplied = Math.floor(amountBorrowed*rateMultiplier0*price*collateralizationRatio/rateMultiplier1);
 		let rec = await vaultHealthInstance.set(zcbAsset2.address, zcbAsset0.address, amountBorrowed)
@@ -599,7 +599,7 @@ contract('VaultHealth', async function(accounts) {
 		let rateMultiplier0 = adjAPY0**(-yearsRemaining);
 		let rateMultiplier1 = 2.0;
 
-		let amountBorrowed = 10000000;	//asset0
+		let amountBorrowed = 100000000;	//asset0
 		let collateralizationRatio = upperRatio0*upperRatio1;
 		let expectedAmountSupplied = Math.floor(amountBorrowed*rateMultiplier0*price*collateralizationRatio/rateMultiplier1);
 		let actualBN = await vaultHealthInstance.amountSuppliedAtUpperLimit(zcbAsset2.address, zcbAsset0.address, amountBorrowed)
@@ -629,7 +629,7 @@ contract('VaultHealth', async function(accounts) {
 		let rateMultiplier0 = adjAPY0**(-yearsRemaining);
 		let rateMultiplier1 = 1.0;
 
-		let amountSupplied = 10000000;
+		let amountSupplied = 100000000;
 		let collateralizationRatio = upperRatio0*upperRatio1;
 		let expectedAmountBorrowed = Math.floor(amountSupplied * rateMultiplier1/rateMultiplier0/price/collateralizationRatio);
 		let actualBN = await vaultHealthInstance.YTvaultAmountBorrowedAtUpperLimit(fcp1.address, fcp0.address, amountSupplied, 0);
@@ -658,7 +658,7 @@ contract('VaultHealth', async function(accounts) {
 		let rateMultiplier0 = adjAPY0**(-yearsRemaining);
 		let rateMultiplier1 = 1.0;
 
-		let amountSupplied = 10000000;
+		let amountSupplied = 100000000;
 		let collateralizationRatio = lowerRatio0*lowerRatio1;
 		let expectedAmountBorrowed = Math.floor(amountSupplied * rateMultiplier1/rateMultiplier0/price/collateralizationRatio);
 		let actualBN = await vaultHealthInstance.YTvaultAmountBorrowedAtLowerLimit(fcp1.address, fcp0.address, amountSupplied, 0);
@@ -693,8 +693,8 @@ contract('VaultHealth', async function(accounts) {
 		let rateMultiplier0 = adjAPY0**(-yearsRemaining);
 		let rateMultiplier1 = adjAPY1**(-yearsRemaining);
 
-		let amountSupplied = 10000000;
-		let amountBond = 2000000;
+		let amountSupplied = 100000000;
+		let amountBond = 20000000;
 		let collateralizationRatio = upperRatio0*upperRatio1;
 		let compositeSupplied = amountSupplied + amountBond*rateMultiplier1;
 		let expectedAmountBorrowed = Math.floor(compositeSupplied/rateMultiplier0/price/collateralizationRatio);
@@ -730,8 +730,8 @@ contract('VaultHealth', async function(accounts) {
 		let rateMultiplier0 = adjAPY0**(-yearsRemaining);
 		let rateMultiplier1 = adjAPY1**(-yearsRemaining);
 
-		let amountSupplied = 10000000;
-		let amountBond = 2000000;
+		let amountSupplied = 100000000;
+		let amountBond = 20000000;
 		let collateralizationRatio = lowerRatio0*lowerRatio1;
 		let compositeSupplied = amountSupplied + amountBond*rateMultiplier1;
 		let expectedAmountBorrowed = Math.floor(compositeSupplied/rateMultiplier0/price/collateralizationRatio);
@@ -769,8 +769,8 @@ contract('VaultHealth', async function(accounts) {
 		let rateMultiplier0 = adjAPY0**(-yearsRemaining);
 		let rateMultiplier1 = adjAPY1**(-yearsRemaining);
 
-		let amountSupplied = 10000000;
-		let amountBond = -2000000;
+		let amountSupplied = 100000000;
+		let amountBond = -20000000;
 		let collateralizationRatio = upperRatio0*upperRatio1;
 		let compositeSupplied = amountSupplied + amountBond*rateMultiplier1;
 		let expectedAmountBorrowed = Math.floor(compositeSupplied/rateMultiplier0/price/collateralizationRatio);
@@ -808,8 +808,8 @@ contract('VaultHealth', async function(accounts) {
 		let rateMultiplier0 = adjAPY0**(-yearsRemaining);
 		let rateMultiplier1 = adjAPY1**(-yearsRemaining);
 
-		let amountSupplied = 10000000;
-		let amountBond = -2000000;
+		let amountSupplied = 100000000;
+		let amountBond = -20000000;
 		let collateralizationRatio = lowerRatio0*lowerRatio1;
 		let compositeSupplied = amountSupplied + amountBond*rateMultiplier1;
 		let expectedAmountBorrowed = Math.floor(compositeSupplied/rateMultiplier0/price/collateralizationRatio);
@@ -842,7 +842,7 @@ contract('VaultHealth', async function(accounts) {
 		let rateMultiplier0 = adjAPY0**(-yearsRemaining);
 		let rateMultiplier1 = 1.0;
 
-		let amountSupplied = 10000000;	//asset1
+		let amountSupplied = 100000000;	//asset1
 		let collateralizationRatio = upperRatio0*upperRatio1;
 		let expectedAmountBorrowed = Math.floor(rateMultiplier1/rateMultiplier0/price/collateralizationRatio);
 		let actualBN = await vaultHealthInstance.amountBorrowedAtUpperLimit(wAsset1.address, zcbAsset0.address, amountSupplied);
@@ -913,7 +913,7 @@ contract('VaultHealth', async function(accounts) {
 		let rateMultiplier0 = adjAPY0**(-yearsRemaining);
 		let rateMultiplier1 = adjAPY1**(-yearsRemaining);
 
-		let amountSupplied = 10000000;	//asset1
+		let amountSupplied = 100000000;	//asset1
 		let collateralizationRatio = upperRatio0*upperRatio1;
 		let expectedAmountBorrowed = Math.floor(rateMultiplier1/rateMultiplier0/price/collateralizationRatio);
 		let actualBN = await vaultHealthInstance.amountBorrowedAtUpperLimit(zcbAsset1.address, zcbAsset0.address, amountSupplied);

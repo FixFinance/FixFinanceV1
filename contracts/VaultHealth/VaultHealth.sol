@@ -217,23 +217,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 		@return uint: rate multiplier
 	*/
 	function getRateMultiplier_BaseRate(address _fixCapitalPoolAddress, address _underlyingAssetAddress, RateAdjuster _rateAdjuster) internal view returns (uint) {
-		return getRateMultiplier(_fixCapitalPoolAddress, _underlyingAssetAddress, _rateAdjuster, getAPYFromOracle(_fixCapitalPoolAddress));
-	}
-
-	/*
-		@Description: this function performs a simmilar task to getRateMultiplier_BaseRate() except it is called
-			when performing an action on a vault to ensure the action will not result in a vault's collateralisation ratio going below a limit.
-			this function finds the collateralisation limit if the rate of the underlying asset were to change by some extra change multiplier
-
-		@param address _fixCapitalPool: address of the FixCapitalPool in question
-		@param address _underlyingAssetAddress: the underlying asset in question
-		@param RateAdjuster _rateAdjuster: the adjuster for which to find the rate multiplier
-		@param int128 _rateChange: a change multiplier, multiplied with APY to get changed APY
-
-		@return uint: rate multiplier
-	*/
-	function getRateMultiplier_Changed(address _fixCapitalPoolAddress, address _underlyingAssetAddress, RateAdjuster _rateAdjuster, int128 _rateChange) internal view returns (uint) {
-		return getRateMultiplier(_fixCapitalPoolAddress, _underlyingAssetAddress, _rateAdjuster, getChangedAPYFromOracle(_fixCapitalPoolAddress, _rateChange));
+		return getRateMultiplier(_fixCapitalPoolAddress, _underlyingAssetAddress, _rateAdjuster, (1 ether));
 	}
 
 	/*
@@ -243,9 +227,9 @@ contract VaultHealth is IVaultHealth, Ownable {
 		@param address _fixCapitalPool: address of the FixCapitalPool in question
 		@param address _underlyingAssetAddress: the underlying asset in question
 		@param RateAdjuster _rateAdjuster: the adjuster for which to find the rate multiplier
-		@param int128 _apy: the APY fetched from the oracle of the FixCapitalPool
+		@param int128 _rateChange: a change multiplier, multiplied with APY to get changed APY
 	*/
-	function getRateMultiplier(address _fixCapitalPoolAddress, address _underlyingAssetAddress, RateAdjuster _rateAdjuster, int128 _apy) internal view returns (uint) {
+	function getRateMultiplier(address _fixCapitalPoolAddress, address _underlyingAssetAddress, RateAdjuster _rateAdjuster, int128 _rateChange) internal view returns (uint) {
 		//ensure that we have been passed a ZCB address if not there is a rate multiplier of 1.0
 		int128 yearsRemaining = getYearsRemaining(_fixCapitalPoolAddress, _underlyingAssetAddress);
 		if (yearsRemaining <= 0) {
@@ -259,13 +243,14 @@ contract VaultHealth is IVaultHealth, Ownable {
 				return (1 ether);
 			}
 		}
-		int128 adjApy = _apy.sub(ABDK_1).mul(getRateThresholdMultiplier(_underlyingAssetAddress, _rateAdjuster)).add(ABDK_1);
+		int128 startApy = _rateChange == (1 ether) ? getAPYFromOracle(_fixCapitalPoolAddress) : getChangedAPYFromOracle(_fixCapitalPoolAddress, _rateChange);
+		int128 adjApy = startApy.sub(ABDK_1).mul(getRateThresholdMultiplier(_underlyingAssetAddress, _rateAdjuster)).add(ABDK_1);
 		if (isDeposited(_rateAdjuster)) {
-			int128 temp = _apy.add(MIN_RATE_ADJUSTMENT);
+			int128 temp = startApy.add(MIN_RATE_ADJUSTMENT);
 			adjApy = temp > adjApy ? temp : adjApy;
 		}
 		else if (isBorrowed(_rateAdjuster)) {
-			int128 temp = _apy.sub(MIN_RATE_ADJUSTMENT);
+			int128 temp = startApy.sub(MIN_RATE_ADJUSTMENT);
 			adjApy = temp < adjApy ? temp : adjApy;
 		}
 		if (adjApy <= ABDK_1) return (1 ether);
@@ -567,6 +552,11 @@ contract VaultHealth is IVaultHealth, Ownable {
 		return _amountSuppliedAtUpperLimit(_assetSupplied, _assetBorrowed, _amountBorrowed);
 	}
 
+	uint test;
+	function set(address _assetSupplied, address _assetBorrowed, uint _amountBorrowed) public {
+		test = _amountSuppliedAtUpperLimit(_assetSupplied, _assetBorrowed, _amountBorrowed);
+	}
+
 	/*
 		@Description: returns value from _amountSuppliedAtLowerLimit() externally
 	*/
@@ -678,12 +668,12 @@ contract VaultHealth is IVaultHealth, Ownable {
 		_amountBorrowed = _amountBorrowed
 			.mul(crossAssetPrice(_baseSupplied, _baseBorrowed));
 		_amountBorrowed = _amountBorrowed
-			.mul(getRateMultiplier_Changed(chBorrowed, _baseBorrowed, RateAdjuster.UPPER_BORROW, _borrowRateChange))
+			.mul(getRateMultiplier(chBorrowed, _baseBorrowed, RateAdjuster.UPPER_BORROW, _borrowRateChange))
 			.div(1 ether);
 		_amountBorrowed = _amountBorrowed
 			.mul(crossCollateralizationRatio(_baseSupplied, _baseBorrowed, Safety.UPPER));
 		_amountBorrowed = _amountBorrowed
-			.div(_assetSupplied == _baseSupplied ? (1 ether) : getRateMultiplier_Changed(chSupplied, _baseSupplied, RateAdjuster.UPPER_DEPOSIT, _suppliedRateChange));
+			.div(_assetSupplied == _baseSupplied ? (1 ether) : getRateMultiplier(chSupplied, _baseSupplied, RateAdjuster.UPPER_DEPOSIT, _suppliedRateChange));
 		_amountBorrowed = _amountBorrowed
 			.mul(_priceMultiplier)
 			.div((1 ether)*TOTAL_BASIS_POINTS);
@@ -731,7 +721,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 			//if !positiveBond there are essentially 2 ZCBs being borrowed from the vault with _baseSupplied as the supplied asset
 			//thus we change the rate adjuster to borrow if the "supplied" ZCB is negative
 			uint ZCBvalue = uint(positiveBond ? _amountBond : -_amountBond)
-				.mul(getRateMultiplier_Changed(_FCPsupplied, _baseSupplied, positiveBond ? RateAdjuster.UPPER_DEPOSIT : RateAdjuster.UPPER_BORROW, _suppliedRateChange));
+				.mul(getRateMultiplier(_FCPsupplied, _baseSupplied, positiveBond ? RateAdjuster.UPPER_DEPOSIT : RateAdjuster.UPPER_BORROW, _suppliedRateChange));
 
 			compositeSupplied = positiveBond ? _amountYield.add(ZCBvalue) : _amountYield.sub(ZCBvalue);
 		}
@@ -742,7 +732,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 			.mul((1 ether)*TOTAL_BASIS_POINTS)
 			.div(_priceMultiplier);
 		compositeSupplied = compositeSupplied
-			.div(getRateMultiplier_Changed(_FCPborrowed, _baseBorrowed, RateAdjuster.UPPER_BORROW, _borrowRateChange))
+			.div(getRateMultiplier(_FCPborrowed, _baseBorrowed, RateAdjuster.UPPER_BORROW, _borrowRateChange))
 			.div(crossCollateralizationRatio(_baseSupplied, _baseBorrowed, Safety.UPPER));
 		return compositeSupplied > _amountBorrowed;
 	}

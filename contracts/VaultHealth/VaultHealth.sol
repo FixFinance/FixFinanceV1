@@ -2,6 +2,7 @@ pragma solidity >=0.6.0;
 import "../organizer.sol";
 import "../helpers/IZCBamm.sol";
 import "../helpers/Ownable.sol";
+import "../interfaces/IWrapper.sol";
 import "../interfaces/IVaultHealth.sol";
 import "../interfaces/IFixCapitalPool.sol";
 import "../libraries/ABDKMath64x64.sol";
@@ -126,11 +127,15 @@ contract VaultHealth is IVaultHealth, Ownable {
 		
 		@param address _fixCapitalPoolAddress: the fix capital pool for which to get the years remaining to maturity
 			this param could alternatively be the address of a ZCB contract and the same effect would be achived
+		@param address _baseAsset: is address of an IWrapper contract, we need this address to call lastUpdate
+			to find the latest timestamp for which yield has been finalised
 
 		@return int128: years to maturity in ABDK64.64 format
 	*/
-	function getYearsRemaining(address _fixCapitalPoolAddress) internal view returns (int128) {
-		return int128(((IFixCapitalPool(_fixCapitalPoolAddress).maturity() - block.timestamp) << 64) / SecondsPerYear);
+	function getYearsRemaining(address _fixCapitalPoolAddress, address _baseAsset) internal view returns (int128) {
+		uint maturity = IFixCapitalPool(_fixCapitalPoolAddress).maturity();
+		uint lastUpdate = IWrapper(_baseAsset).lastUpdate();
+		return maturity > lastUpdate ? int128(((maturity - lastUpdate) << 64) / SecondsPerYear) : -1;
 	}
 
 	/*
@@ -242,7 +247,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 	*/
 	function getRateMultiplier(address _fixCapitalPoolAddress, address _underlyingAssetAddress, RateAdjuster _rateAdjuster, int128 _apy) internal view returns (uint) {
 		//ensure that we have been passed a ZCB address if not there is a rate multiplier of 1.0
-		int128 yearsRemaining = getYearsRemaining(_fixCapitalPoolAddress);
+		int128 yearsRemaining = getYearsRemaining(_fixCapitalPoolAddress, _underlyingAssetAddress);
 		int128 adjApy = _apy.sub(ABDK_1).mul(getRateThresholdMultiplier(_underlyingAssetAddress, _rateAdjuster)).add(ABDK_1);
 		if (isDeposited(_rateAdjuster)) {
 			int128 temp = _apy.add(MIN_RATE_ADJUSTMENT);

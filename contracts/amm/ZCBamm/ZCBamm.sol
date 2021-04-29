@@ -676,6 +676,30 @@ contract ZCBamm is IZCBamm {
 	}
 
 	/*
+		@Description: returns the implied yield from the rate offered in this amm between now and maturity
+
+		@return int128 yield: OracleRate**(timeRemaining), also equivalent to impliedAPY**(yearsRemaining)
+	*/
+	function impliedYieldToMaturity() external view override returns (int128 yield) {
+		return BigMath.Pow(OracleRate, int128(timeRemaining()));
+	}
+
+	/*
+		@Description: returns the implied yield from the rate offered in this amm for x number of years
+			it should be noted that while the market anticipates a specific rate between now and maturity as given by the oracle
+			it is highly unlikely that the market anticipates this rate to be the same over another time interval
+			please keep these market dynamics in mind when using this function
+
+		@param int128 _years: the number of years for which to calculate implied yield at the market rate
+
+		@return int128 yield: OracleRate**(yearsToAnchors(years)), also equivalent to impliedAPY**(years)
+	*/
+	function impliedYieldOverYears(int128 _years) external view override returns (int128 yield) {
+		int128 numAnchors = _years.mul(int128(anchor)) / int128(SecondsPerYear);
+		return BigMath.Pow(OracleRate, numAnchors);
+	}
+
+	/*
 		@Description: set the median of all datapoints in the impliedRates array as the
 			oracle rate, may only be called after all datapoints have been updated since
 			last call to this function

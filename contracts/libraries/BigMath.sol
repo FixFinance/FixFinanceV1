@@ -344,7 +344,7 @@ library BigMath {
   function Pow(int128 base, int128 exponent) internal pure returns (int128) {
     /*
       base**exponent ==
-      2**(log_2(base**exponent))
+      2**(log_2(base**exponent)) ==
       2**(exponent * log_2(base))
     */
     return base.log_2().mul(exponent).exp_2();

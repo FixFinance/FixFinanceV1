@@ -40,6 +40,8 @@ abstract contract IZCBamm is IERC20 {
 	function inflatedTotalSupply() external virtual view returns (uint);
 	function getRateFromOracle() external virtual view returns (int128 rate);
 	function getAPYFromOracle() external virtual view returns (int128 APY);
+	function impliedYieldToMaturity() external virtual view returns (int128 yield);
+	function impliedYieldOverYears(int128 _years) external virtual view returns (int128 yield);
 	function getImpliedRateData() external virtual view returns (
 		int128[LENGTH_RATE_SERIES] memory _impliedRates,
 		uint[LENGTH_RATE_SERIES] memory _timestamps

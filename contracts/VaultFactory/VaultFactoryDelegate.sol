@@ -216,6 +216,7 @@ contract VaultFactoryDelegate is VaultFactoryData {
 		int128 _borrowRateChange
 		) external {
 
+		require(_assetSupplied != _assetBorrowed);
 		require(_fixCapitalPoolToWrapper[_assetSupplied] != address(0) || _wrapperToUnderlyingAsset[_assetSupplied] != address(0));
 		require(vaultWithstandsChange(_assetSupplied, _assetBorrowed, _amountSupplied, _amountBorrowed, _priceMultiplier, _suppliedRateChange, _borrowRateChange));
 

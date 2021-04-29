@@ -182,6 +182,23 @@ contract VaultHealth is IVaultHealth, Ownable {
 	}
 
 	/*
+		@Description: find the total implied yield between now and maturity for a given FCP
+			we use this function rather than finding apy and exponentiating to the number of years because we can
+			avoid 1 call to log and 1 call to exp when APY is calculated
+			instead we find the rate based on the anchor time period and exponetiate to the power of the number
+			of anchor time periods to maturity
+
+		@param address _fixCapitalPoolAddress: address of the FCP for which to find total yield until maturity
+
+		@return int128: the market implied total yield of the FCP up to maturity, fetched from oracle
+	*/
+	function getYieldToMaturityFromOracle(address _fixCapitalPoolAddress, int128 _yearsRemaining) internal view returns (int128) {
+		//we call impliedYieldOverYears rather than impliedYieldToMaturity
+		//because this prevents using another Sload to find maturity again
+		return IZCBamm(organizer(organizerAddress).ZCBamms(_fixCapitalPoolAddress)).impliedYieldOverYears(_yearsRemaining);
+	}
+
+	/*
 		@Description: fetch the implied rate of a specific FixCapitalPool
 
 		@param address _fixCapitalPool: address of the FixCapitalPool in question
@@ -189,20 +206,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 		@return int128: the APY in ABDK64.64 format
 	*/
 	function getAPYFromOracle(address _fixCapitalPoolAddress) internal view returns (int128) {
-		return ZCBamm(organizer(organizerAddress).ZCBamms(_fixCapitalPoolAddress)).getAPYFromOracle();
-	}
-
-	/*
-		@Description: get APY from oracle adjusted by a multiplier
-
-		@param address _fixCapitalPool: address of the FixCapitalPool in question
-		@param int128 _rateChange: multiplier with which to multiply APY
-			ABDK64.64 format
-
-		@param int128: APY of FixCapitalPool fetched from oracle and multiplied by a multiplier
-	*/
-	function getChangedAPYFromOracle(address _fixCapitalPoolAddress, int128 _rateChange) internal view returns (int128) {
-		return getAPYFromOracle(_fixCapitalPoolAddress).sub(ABDK_1).mul(_rateChange).add(ABDK_1);
+		return IZCBamm(organizer(organizerAddress).ZCBamms(_fixCapitalPoolAddress)).getAPYFromOracle();
 	}
 
 	/*
@@ -217,7 +221,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 		@return uint: rate multiplier
 	*/
 	function getRateMultiplier_BaseRate(address _fixCapitalPoolAddress, address _underlyingAssetAddress, RateAdjuster _rateAdjuster) internal view returns (uint) {
-		return getRateMultiplier(_fixCapitalPoolAddress, _underlyingAssetAddress, _rateAdjuster, (1 ether));
+		return getRateMultiplier(_fixCapitalPoolAddress, _underlyingAssetAddress, _rateAdjuster, ABDK_1);
 	}
 
 	/*
@@ -233,38 +237,171 @@ contract VaultHealth is IVaultHealth, Ownable {
 		//ensure that we have been passed a ZCB address if not there is a rate multiplier of 1.0
 		int128 yearsRemaining = getYearsRemaining(_fixCapitalPoolAddress, _underlyingAssetAddress);
 		if (yearsRemaining <= 0) {
-			if (IFixCapitalPool(_fixCapitalPoolAddress).inPayoutPhase()) {
-				//account for nominal value accrual of ZCBs since maturity
-				uint numerator = IWrapper(_underlyingAssetAddress).WrappedAmtToUnitAmt_RoundDown(1 ether);
-				uint denominator = IFixCapitalPool(_fixCapitalPoolAddress).maturityConversionRate();
-				return numerator.mul(1 ether).div(denominator);
-			}
-			else {
-				return (1 ether);
-			}
+			return getYieldSinceMaturity(_fixCapitalPoolAddress, _underlyingAssetAddress);
 		}
-		int128 startApy = _rateChange == (1 ether) ? getAPYFromOracle(_fixCapitalPoolAddress) : getChangedAPYFromOracle(_fixCapitalPoolAddress, _rateChange);
-		int128 adjApy = startApy.sub(ABDK_1).mul(getRateThresholdMultiplier(_underlyingAssetAddress, _rateAdjuster)).add(ABDK_1);
+		return rateToRateMultiplier(getAPYFromOracle(_fixCapitalPoolAddress), yearsRemaining, _underlyingAssetAddress, _rateAdjuster, _rateChange);
+	}
+
+
+	/*
+		@Description: given a startingAPY for a FCP fetched from the oracle and some other info get a rate multiplier
+
+		@param int128 _startAPY: the apy given by the oracle
+		@param int128: _yearsRemaining: the time in years until the FCP matures
+		@param address _underlyingAssetAddress: the wrapper corresponding to the FCP
+		@param RateAdjuster _rateAdjuster: the adjuster for which to find the rate multiplier
+		@param int128 _rateChange: a change multiplier, multiplied with APY to get changed APY
+	*/
+	function rateToRateMultiplier(
+		int128 _startAPY,
+		int128 _yearsRemaining,
+		address _underlyingAssetAddress,
+		RateAdjuster _rateAdjuster,
+		int128 _rateChange
+	) internal view returns (uint) {
+		_startAPY = _startAPY.sub(ABDK_1).mul(_rateChange).add(ABDK_1);
+		int128 adjApy = _startAPY.sub(ABDK_1).mul(getRateThresholdMultiplier(_underlyingAssetAddress, _rateAdjuster)).add(ABDK_1);
 		if (isDeposited(_rateAdjuster)) {
-			int128 temp = startApy.add(MIN_RATE_ADJUSTMENT);
+			int128 temp = _startAPY.add(MIN_RATE_ADJUSTMENT);
 			adjApy = temp > adjApy ? temp : adjApy;
 		}
 		else if (isBorrowed(_rateAdjuster)) {
-			int128 temp = startApy.sub(MIN_RATE_ADJUSTMENT);
+			int128 temp = _startAPY.sub(MIN_RATE_ADJUSTMENT);
 			adjApy = temp < adjApy ? temp : adjApy;
 		}
 		if (adjApy <= ABDK_1) return (1 ether);
 		/*
-			rateMultiplier == 1 / ((adjApy)**yearsRemaining)
-			rateMultiplier == 1 / (2**(log_2((adjApy)**yearsRemaining)))
-			rateMultiplier == 1 / (2**(yearsRemaining*log_2((adjApy))))
-			rateMultiplier == 2**(-1*yearsRemaining*log_2((adjApy)))
-			rateMultiplier == adjApy.log_2().mul(yearsRemaining).neg().exp_2()
+			rateMultiplier == 1 / ((adjApy)**_yearsRemaining)
+			rateMultiplier == ((adjApy)**-_yearsRemaining)
 		*/
-		int128 rateMultiplier = adjApy.log_2().mul(yearsRemaining).neg().exp_2();
+		int128 rateMultiplier = BigMath.Pow(adjApy, _yearsRemaining.neg());
 		if (rateMultiplier >= ABDK_1) return (1 ether);
 		//normalize by changing to 1 ether format
 		return uint(rateMultiplier).mul(1 ether) >> 64;
+	}
+
+	/*
+		@Description: given a matured FCP find the appreciation in unit terms of the ZCBs since maturity
+
+		@param address _fixCapitalPoolAddress: the address of the FCP contract for which to find the yield since maturity
+		@param address _underlyingAssetAddress: the wrapper corresponding to the FCP
+
+		@return uint: the yield inflated by (1 ether) of ZCBs corresponding to the FCP since maturity
+	*/
+	function getYieldSinceMaturity(address _fixCapitalPoolAddress, address _underlyingAssetAddress) internal view returns (uint) {
+		if (IFixCapitalPool(_fixCapitalPoolAddress).inPayoutPhase()) {
+			//account for nominal value accrual of ZCBs since maturity
+			uint numerator = IWrapper(_underlyingAssetAddress).WrappedAmtToUnitAmt_RoundDown(1 ether);
+			uint denominator = IFixCapitalPool(_fixCapitalPoolAddress).maturityConversionRate();
+			return numerator.mul(1 ether).div(denominator);
+		}
+		else {
+			return (1 ether);
+		}		
+	}
+
+	/*
+		@Description: given two FCPs of the same base wrapper find the implied market rate between the maturities of the FCPs
+
+		@param address _supplied: the address of the FCP for which ZCB &/ YT are being provided as collateral
+		@param address _borrowed: the address of the FCP for which ZCB is being borrowed
+		@param int128 _ytmSupplied: years til maturity (ytm) for the supplied FCP, ABDK format
+		@param int128 _ytmBorrowed: years til maturity (ytm) for the borrowed FCP, ABDK format
+
+		@return int128 spreadAPY: the implied matket rate for the time spread between the two maturities, ABDK format
+		@return int128 spreadTime: the magnitude in years of the time between the two maturities, ABDK format
+	*/
+	function impliedAPYBetweenMaturities(address _supplied, address _borrowed, int128 _ytmSupplied, int128 _ytmBorrowed) internal view returns (int128 spreadAPY, int128 spreadTime) {
+		int128 totalYieldSupplied = getYieldToMaturityFromOracle(_supplied, _ytmSupplied);
+		int128 totalYieldBorrowed = getYieldToMaturityFromOracle(_borrowed, _ytmBorrowed);
+		int128 yieldSpread;
+		if (_ytmSupplied > _ytmBorrowed) {
+			spreadTime = _ytmSupplied.sub(_ytmBorrowed);
+			if (totalYieldBorrowed  >= totalYieldSupplied) {
+				/*
+					there is an inefficiency in the market that says there is negative yield between maturities
+					which is impossible so we override it and say that there is no yield between maturities
+				*/
+				return (1 ether, spreadTime);
+			}
+			yieldSpread = totalYieldSupplied.div(totalYieldBorrowed);
+		}
+		else {
+			spreadTime = _ytmBorrowed.sub(_ytmSupplied);
+			if (totalYieldBorrowed <= totalYieldSupplied) {
+				/*
+					there is an inefficiency in the market that says there is negative yield between maturities
+					which is impossible so we override it and say that there is no yield between maturities
+				*/
+				return (1 ether, spreadTime);
+			}
+			yieldSpread = totalYieldBorrowed.div(totalYieldSupplied);
+		}
+		/*
+			yieldSpread == spreadAPY**spreadTime
+			log(yieldSpread) == spreadTime*log(spreadAPY)
+			log(yieldSpread)/spreadTime == log(spreadAPY)
+			spreadAPY == exp(log(yieldSpread)/spreadTime)
+		*/
+		spreadAPY = yieldSpread.log_2().div(spreadTime).exp_2();
+	}
+
+
+	/*
+		@Description: given both the supplied and borrowed assets find the composite rate multiplier for the vault
+
+		@param address _supplied: the asset or FCP that is being supplied as collateral to the vault
+		@param address _baseSupplied: the wrapper corresponding to the asset that has been supplied
+		@param address _borrowed: the address of the FCP at which ZCB is being borrowed
+		@param address _baseBorrowed: the wrapper corresponding to the borrowed FCP
+		@param Safety _safety: the safety level for which to calculate the rate multiplier
+		@param int128 _suppliedRateChange: a change multiplier, multiplied with the APY of the supplied
+			to get changed APY for the supplied
+		@param int128 _borrowedRateChange: a change multiplier, multiplied with the APY of the borrowed
+			to get changed APY for the borrowed
+	*/
+	function combinedRateMultipliers(
+		address _supplied,
+		address _baseSupplied,
+		address _borrowed,
+		address _baseBorrowed,
+		Safety _safety,
+		int128 _suppliedRateChange,
+		int128 _borrowedRateChange
+	) internal view returns (uint) {
+		bool upSafety = _safety == Safety.UPPER;
+		uint supplied;
+		uint borrowed;
+		if (_baseSupplied == _baseBorrowed) {
+			require(_supplied != _borrowed);
+			if (_supplied != _baseSupplied) { //supplied is zcb
+				int128 ytmSupplied = getYearsRemaining(_supplied, _baseSupplied);
+				if (ytmSupplied > 0) { //supplied zcb has yet to reach maturity
+					//find implied market rate between maturity dates and calculate
+					int128 ytmBorrowed = getYearsRemaining(_borrowed, _baseBorrowed);
+					(int128 spreadAPY, int128 spreadTime) = impliedAPYBetweenMaturities(_supplied, _borrowed, ytmSupplied, ytmBorrowed);
+					if (ytmBorrowed > ytmSupplied) {
+						return rateToRateMultiplier(spreadAPY, spreadTime, _baseSupplied, (upSafety ? RateAdjuster.UPPER_DEPOSIT : RateAdjuster.LOW_DEPOSIT), _suppliedRateChange);
+					}
+					else {
+						uint rm = rateToRateMultiplier(spreadAPY, spreadTime, _baseSupplied, (upSafety ? RateAdjuster.UPPER_BORROW : RateAdjuster.LOW_BORROW), _borrowedRateChange);
+						return uint((1 ether)**2).div(rm);
+					}
+				}
+				else { //supplied zcb has matured
+					supplied = getYieldSinceMaturity(_supplied, _baseSupplied);
+				}
+			}
+			else { //supplied is a wrapped asset
+				borrowed = getRateMultiplier(_supplied, _baseSupplied, (upSafety ? RateAdjuster.UPPER_BORROW : RateAdjuster.LOW_BORROW) , _borrowedRateChange);
+				supplied = (1 ether);
+			}
+		}
+		else { //base assets are different, do not calculate time spread
+			supplied = getRateMultiplier(_supplied, _baseSupplied, (upSafety ? RateAdjuster.UPPER_DEPOSIT : RateAdjuster.LOW_DEPOSIT) , _suppliedRateChange);
+			borrowed = getRateMultiplier(_supplied, _baseSupplied, (upSafety ? RateAdjuster.UPPER_BORROW : RateAdjuster.LOW_BORROW) , _borrowedRateChange);
+		}
+		return supplied.mul(1 ether).div(borrowed);
 	}
 
 	/*

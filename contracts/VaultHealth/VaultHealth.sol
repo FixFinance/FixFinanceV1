@@ -552,11 +552,6 @@ contract VaultHealth is IVaultHealth, Ownable {
 		return _amountSuppliedAtUpperLimit(_assetSupplied, _assetBorrowed, _amountBorrowed);
 	}
 
-	uint test;
-	function set(address _assetSupplied, address _assetBorrowed, uint _amountBorrowed) public {
-		test = _amountSuppliedAtUpperLimit(_assetSupplied, _assetBorrowed, _amountBorrowed);
-	}
-
 	/*
 		@Description: returns value from _amountSuppliedAtLowerLimit() externally
 	*/

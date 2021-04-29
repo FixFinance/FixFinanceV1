@@ -539,6 +539,7 @@ contract('VaultHealth', async function(accounts) {
 	it('amountSuppliedAtUpperLimit: matured zcb (not in payout phase) deposited', async () => {
 		await helper.advanceTime(_8days+1);
 		await asset1.setInflation(_10To18.mul(new BN(2)));
+		await wAsset1.forceHarvest();
 		await setPrice(_10To18.mul(new BN(3)));
 		/*
 			asset0 is borrowed
@@ -563,7 +564,6 @@ contract('VaultHealth', async function(accounts) {
 		let amountBorrowed = 100000000;	//asset0
 		let collateralizationRatio = upperRatio0*upperRatio1;
 		let expectedAmountSupplied = Math.floor(amountBorrowed*rateMultiplier0*price*collateralizationRatio/rateMultiplier1);
-		let rec = await vaultHealthInstance.set(zcbAsset2.address, zcbAsset0.address, amountBorrowed)
 		let actualBN = await vaultHealthInstance.amountSuppliedAtUpperLimit(zcbAsset2.address, zcbAsset0.address, amountBorrowed)
 		let actual = parseInt(actualBN.toString());
 
@@ -578,6 +578,7 @@ contract('VaultHealth', async function(accounts) {
 	it('amountSuppliedAtUpperLimit: matured zcb (in payout phase) deposited', async () => {
 		await fcp2.enterPayoutPhase();
 		await asset1.setInflation(_10To18.mul(new BN(4)));
+		await wAsset1.forceHarvest();
 		await setPrice(_10To18.mul(new BN(3)));
 		/*
 			asset0 is borrowed
@@ -822,6 +823,37 @@ contract('VaultHealth', async function(accounts) {
 		let needed = new BN(Math.ceil(actual/(amountSupplied-amountBond)) + 1);
 		assert.equal(await vaultHealthInstance.YTvaultSatisfiesLowerLimit(fcp1.address, fcp0.address, amountSupplied, amountBond, actualBN), false, "correct value returned by satisfiesLowerLimit");
 		assert.equal(await vaultHealthInstance.YTvaultSatisfiesLowerLimit(fcp1.address, fcp0.address, amountSupplied, amountBond, actualBN.sub(new BN(needed))), true, "correct value returned by satisfiesLowerLimit");
+	});
+
+	it('YTvaultSatisfiesUpperLimit(): ZCB > YT, (FCP in payout phase supplied)', async () => {
+		await setPrice(_10To18.mul(new BN(3)));
+		let adjAPY0 = (APY0-1)/upperThreshold0 + 1;
+
+		let temp0 = APY0-minRateAdjustment;
+
+		adjAPY0 = Math.min(adjAPY0, temp0);
+
+		adjAPY0 = Math.max(adjAPY0, 1);
+
+		let yearsRemaining = (maturity - (await web3.eth.getBlock('latest')).timestamp)/ SecondsPerYear;
+
+		let rateMultiplier0 = adjAPY0**(-yearsRemaining);
+		let rateMultiplier1 = 2.0;
+
+		let amountSupplied = 100000000;
+		let amountBond = 20000000;
+		let collateralizationRatio = upperRatio0*upperRatio1;
+		let compositeSupplied = amountSupplied + amountBond*rateMultiplier1;
+		let expectedAmountBorrowed = Math.floor(compositeSupplied/rateMultiplier0/price/collateralizationRatio);
+		let actualBN = await vaultHealthInstance.YTvaultAmountBorrowedAtUpperLimit(fcp2.address, fcp0.address, amountSupplied, amountBond);
+		let actual = parseInt(actualBN.toString());
+
+		let error = AmountError(expectedAmountBorrowed, actual);
+		assert.isBelow(error, ErrorRange, "output within acceptable error range");
+
+		let needed = new BN(Math.ceil(actual/(amountSupplied+amountBond)) + 1);
+		assert.equal(await vaultHealthInstance.YTvaultSatisfiesUpperLimit(fcp2.address, fcp0.address, amountSupplied, amountBond, actualBN), false, "correct value returned by satisfiesUpperLimit");
+		assert.equal(await vaultHealthInstance.YTvaultSatisfiesUpperLimit(fcp2.address, fcp0.address, amountSupplied, amountBond, actualBN.sub(new BN(needed))), true, "correct value returned by satisfiesUpperLimit");
 	});
 
 	it('vaultWithstandsChange: aToken deposited', async () => {

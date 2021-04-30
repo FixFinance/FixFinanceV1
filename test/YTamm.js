@@ -608,7 +608,6 @@ contract('YTamm', async function(accounts){
 	});
 
 	it('Cannot call contractClaimDividend() with no yield generation', async () => {
-		//process.exit();
 		//advance 1 day and 1 second
 		await helper.advanceTime(1 + 24*60*60);
 		let caught = false;

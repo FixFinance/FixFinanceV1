@@ -350,58 +350,72 @@ contract VaultHealth is IVaultHealth, Ownable {
 	/*
 		@Description: given both the supplied and borrowed assets find the composite rate multiplier for the vault
 
+		@param bool _positiveSupplied: true if and only if a positve number of ZCB corresponding to the supplied FCP has been supplied
+		@param bool _upperSafety: true if the safety level for which to calculate the rate multiplier is Safety.UPPER
+			false otherwise
 		@param address _supplied: the asset or FCP that is being supplied as collateral to the vault
 		@param address _baseSupplied: the wrapper corresponding to the asset that has been supplied
 		@param address _borrowed: the address of the FCP at which ZCB is being borrowed
 		@param address _baseBorrowed: the wrapper corresponding to the borrowed FCP
-		@param Safety _safety: the safety level for which to calculate the rate multiplier
 		@param int128 _suppliedRateChange: a change multiplier, multiplied with the APY of the supplied
 			to get changed APY for the supplied
 		@param int128 _borrowedRateChange: a change multiplier, multiplied with the APY of the borrowed
 			to get changed APY for the borrowed
 	*/
 	function combinedRateMultipliers(
+		bool _positiveSupplied,
+		bool _upperSafety,
 		address _supplied,
 		address _baseSupplied,
 		address _borrowed,
 		address _baseBorrowed,
-		Safety _safety,
 		int128 _suppliedRateChange,
 		int128 _borrowedRateChange
 	) internal view returns (uint) {
-		bool upSafety = _safety == Safety.UPPER;
-		uint supplied;
-		uint borrowed;
-		if (_baseSupplied == _baseBorrowed) {
+		uint suppliedMultiplier;
+		uint borrowedMultiplier;
+		if (_baseSupplied == _baseBorrowed && _positiveSupplied) {
 			require(_supplied != _borrowed);
 			if (_supplied != _baseSupplied) { //supplied is zcb
 				int128 ytmSupplied = getYearsRemaining(_supplied, _baseSupplied);
 				if (ytmSupplied > 0) { //supplied zcb has yet to reach maturity
 					//find implied market rate between maturity dates and calculate
+					bool _ups = _upperSafety; //prevent stack too deep
 					int128 ytmBorrowed = getYearsRemaining(_borrowed, _baseBorrowed);
 					(int128 spreadAPY, int128 spreadTime) = impliedAPYBetweenMaturities(_supplied, _borrowed, ytmSupplied, ytmBorrowed);
+					address _bs = _baseSupplied; //prevent stack too deep
 					if (ytmBorrowed > ytmSupplied) {
-						return rateToRateMultiplier(spreadAPY, spreadTime, _baseSupplied, (upSafety ? RateAdjuster.UPPER_DEPOSIT : RateAdjuster.LOW_DEPOSIT), _suppliedRateChange);
+						return rateToRateMultiplier(spreadAPY, spreadTime, _bs, (_ups ? RateAdjuster.UPPER_DEPOSIT : RateAdjuster.LOW_DEPOSIT), _suppliedRateChange);
 					}
 					else {
-						uint rm = rateToRateMultiplier(spreadAPY, spreadTime, _baseSupplied, (upSafety ? RateAdjuster.UPPER_BORROW : RateAdjuster.LOW_BORROW), _borrowedRateChange);
+						uint rm = rateToRateMultiplier(spreadAPY, spreadTime, _bs, (_ups ? RateAdjuster.UPPER_BORROW : RateAdjuster.LOW_BORROW), _borrowedRateChange);
 						return uint((1 ether)**2).div(rm);
 					}
 				}
 				else { //supplied zcb has matured
-					supplied = getYieldSinceMaturity(_supplied, _baseSupplied);
+					suppliedMultiplier = getYieldSinceMaturity(_supplied, _baseSupplied);
 				}
 			}
 			else { //supplied is a wrapped asset
-				borrowed = getRateMultiplier(_supplied, _baseSupplied, (upSafety ? RateAdjuster.UPPER_BORROW : RateAdjuster.LOW_BORROW) , _borrowedRateChange);
-				supplied = (1 ether);
+				suppliedMultiplier = (1 ether);
 			}
+			borrowedMultiplier = getRateMultiplier(_borrowed, _baseBorrowed, (_upperSafety ? RateAdjuster.UPPER_BORROW : RateAdjuster.LOW_BORROW) , _borrowedRateChange);
 		}
-		else { //base assets are different, do not calculate time spread
-			supplied = getRateMultiplier(_supplied, _baseSupplied, (upSafety ? RateAdjuster.UPPER_DEPOSIT : RateAdjuster.LOW_DEPOSIT) , _suppliedRateChange);
-			borrowed = getRateMultiplier(_supplied, _baseSupplied, (upSafety ? RateAdjuster.UPPER_BORROW : RateAdjuster.LOW_BORROW) , _borrowedRateChange);
+		else { //base assets are different or supplied is negative, do not calculate time spread
+			if (_supplied != _baseSupplied) { //supplied is zcb
+				RateAdjuster raSupplied = (_upperSafety ?
+					(_positiveSupplied ? RateAdjuster.UPPER_DEPOSIT : RateAdjuster.UPPER_BORROW)
+						:
+					(_positiveSupplied ? RateAdjuster.LOW_DEPOSIT : RateAdjuster.LOW_BORROW));
+				suppliedMultiplier = getRateMultiplier(_supplied, _baseSupplied, raSupplied , _suppliedRateChange);
+			}
+			else {
+				suppliedMultiplier = (1 ether);
+			}
+			RateAdjuster raBorrowed = (_upperSafety ? RateAdjuster.UPPER_BORROW : RateAdjuster.LOW_BORROW);
+			borrowedMultiplier = getRateMultiplier(_borrowed, _baseBorrowed, raBorrowed , _borrowedRateChange);
 		}
-		return supplied.mul(1 ether).div(borrowed);
+		return suppliedMultiplier.mul(1 ether).div(borrowedMultiplier);
 	}
 
 	/*
@@ -449,27 +463,28 @@ contract VaultHealth is IVaultHealth, Ownable {
 
 		@return address baseDepositedAsset: the underlying wrapper for the collateral asset
 		@return address baseBorrowedAsset: the underlying wrapper for the borrowed asset
-		@return address chDeposited: the address of the FixCapitalPool corresponding to the collateral asset
+		@return address fcpDeposited: the address of the FixCapitalPool corresponding to the collateral asset
 			it is possible that there is no FixCapitalPool associated with the collateral asset, in this case
 			this value will return as address(0)
-		@return address chSupplied: the address of the FixCapitalPool corresponding to the borrowed asset
+		@return address fcpSupplied: the address of the FixCapitalPool corresponding to the borrowed asset
 	*/
 	function baseAssetAddresses(address _deposited, address _borrowed) internal view returns (
 		address baseDepositedAsset,
 		address baseBorrowedAsset,
-		address chDeposited,
-		address chBorrowed
+		address fcpDeposited,
+		address fcpBorrowed
 	) {
 		organizer org = organizer(organizerAddress);
-		if (UpperRateThreshold[_deposited] == 0) {
-			chDeposited = IZeroCouponBond(_deposited).FixCapitalPoolAddress();
-			baseDepositedAsset = org.fixCapitalPoolToWrapper(chDeposited);
+		if (UpperRateThreshold[_deposited] == 0) { //deposited is ZCB
+			fcpDeposited = IZeroCouponBond(_deposited).FixCapitalPoolAddress();
+			baseDepositedAsset = org.fixCapitalPoolToWrapper(fcpDeposited);
 		}
 		else {
+			fcpDeposited = _deposited;
 			baseDepositedAsset = _deposited;
 		}
-		chBorrowed = IZeroCouponBond(_borrowed).FixCapitalPoolAddress();
-		baseBorrowedAsset = org.fixCapitalPoolToWrapper(chBorrowed);
+		fcpBorrowed = IZeroCouponBond(_borrowed).FixCapitalPoolAddress();
+		baseBorrowedAsset = org.fixCapitalPoolToWrapper(fcpBorrowed);
 	}
 
 	/*
@@ -493,17 +508,15 @@ contract VaultHealth is IVaultHealth, Ownable {
 			upper collateralisation limit
 	*/
 	function _amountSuppliedAtUpperLimit(address _assetSupplied, address _assetBorrowed, uint _amountBorrowed) internal view returns (uint) {
-		(address _baseSupplied, address _baseBorrowed, address chSupplied, address chBorrowed) = baseAssetAddresses(_assetSupplied, _assetBorrowed);
+		(address _baseSupplied, address _baseBorrowed, address fcpSupplied, address fcpBorrowed) = baseAssetAddresses(_assetSupplied, _assetBorrowed);
 
 		//wierd hack to prevent stack too deep
 		_amountBorrowed = _amountBorrowed
 			.mul(crossAssetPrice(_baseSupplied, _baseBorrowed))
-			.mul(getRateMultiplier_BaseRate(chBorrowed, _baseBorrowed, RateAdjuster.UPPER_BORROW))
-			.div(1 ether)
-			.mul(crossCollateralizationRatio(_baseSupplied, _baseBorrowed, Safety.UPPER));
-		return _amountBorrowed
-			.div(_assetSupplied == _baseSupplied ? (1 ether) : getRateMultiplier_BaseRate(chSupplied, _baseSupplied, RateAdjuster.UPPER_DEPOSIT))
+			.mul(crossCollateralizationRatio(_baseSupplied, _baseBorrowed, Safety.UPPER))
 			.div(1 ether);
+		return _amountBorrowed
+			.div(combinedRateMultipliers(true, true, fcpSupplied, _baseSupplied, fcpBorrowed, _baseBorrowed, ABDK_1, ABDK_1));
 	}
 
 
@@ -518,19 +531,196 @@ contract VaultHealth is IVaultHealth, Ownable {
 			lower collateralisation limit
 	*/
 	function _amountSuppliedAtLowerLimit(address _assetSupplied, address _assetBorrowed, uint _amountBorrowed) internal view returns (uint) {
-		(address _baseSupplied, address _baseBorrowed, address chSupplied, address chBorrowed) = baseAssetAddresses(_assetSupplied, _assetBorrowed);
+		(address _baseSupplied, address _baseBorrowed, address fcpSupplied, address fcpBorrowed) = baseAssetAddresses(_assetSupplied, _assetBorrowed);
 
 		//wierd hack to prevent stack too deep
 		_amountBorrowed = _amountBorrowed
 			.mul(crossAssetPrice(_baseSupplied, _baseBorrowed))
-			.mul(getRateMultiplier_BaseRate(chBorrowed, _baseBorrowed, RateAdjuster.LOW_BORROW))
-			.div(1 ether)
-			.mul(crossCollateralizationRatio(_baseSupplied, _baseBorrowed, Safety.LOW));
-		return _amountBorrowed
-			.div(_assetSupplied == _baseSupplied ? (1 ether) : getRateMultiplier_BaseRate(chSupplied, _baseSupplied, RateAdjuster.LOW_DEPOSIT))
+			.mul(crossCollateralizationRatio(_baseSupplied, _baseBorrowed, Safety.LOW))
 			.div(1 ether);
+		return _amountBorrowed
+			.div(combinedRateMultipliers(true, false, fcpSupplied, _baseSupplied, fcpBorrowed, _baseBorrowed, ABDK_1, ABDK_1));
 	}
 
+	/*
+		@Description: find the maximum amount borrowed for a YT vault at the upper limit
+			this function handles the case where the YT vault is not based on a time/rate spread
+			this means that either the _baseSupplied != _baseBorrowed || _amountBond <= 0 || _FCPsupplied is past maturity
+
+		@param address _FCPsupplied: the FCP corresponding to the YT vault's collateral
+		@param address _baseSupplied: the wrapper corresponding to _FCPsupplied
+		@param address _FCPborrowed: the FCP corresponding to the ZCB of the YT vault's debt
+		@param address _baseBorrowed: the wrapper corresponding to _FCPborrowed
+		@param uint _amountYield: the amount of YT being supplied to the vault (in unit amount)
+		@param int _amountBond: the difference between the amount of ZCB supplied to the vault and the amount of YT supplied
+			if _amountYield is unit amounts of collateral in the underlying, add _amountBond to _amountYield to get the amt of ZCB collateral
+			amtZCB - amtYT == _amountBond
+		@param int128 _suppliedRateChange: a change multiplier, multiplied with the APY of the supplied
+			to get changed APY for the supplied
+		@param int128 _borrowedRateChange: a change multiplier, multiplied with the APY of the borrowed
+			to get changed APY for the borrowed
+	*/
+	function YTvaultAmtBorrowedUL_0(
+		address _FCPsupplied,
+		address _baseSupplied,
+		address _FCPborrowed,
+		address _baseBorrowed,
+		uint _amountYield,
+		int _amountBond,
+		int128 _suppliedRateChange,
+		int128 _borrowedRateChange
+	) internal view returns (uint) {
+		bool positiveBond = _amountBond >= 0;
+
+		//if !positiveBond there are essentially 2 ZCBs being borrowed from the vault with _baseSupplied as the supplied asset
+		//thus we change the rate adjuster to borrow if the "supplied" ZCB is negative
+		uint ZCBvalue = uint(positiveBond ? _amountBond : -_amountBond)
+			.mul(getRateMultiplier(_FCPsupplied, _baseSupplied, positiveBond ? RateAdjuster.UPPER_DEPOSIT : RateAdjuster.UPPER_BORROW, _suppliedRateChange))
+			.div(1 ether);
+
+		//after rate adjustments find the effective amount of the underlying asset which may be used in collateralisation calculation
+		uint compositeSupplied = positiveBond ? _amountYield.add(ZCBvalue) : _amountYield.sub(ZCBvalue);
+
+		//wierd hack to prevent stack too deep
+		compositeSupplied = compositeSupplied
+			.mul((1 ether)**2)
+			.div(crossAssetPrice(_baseSupplied, _baseBorrowed));
+		return compositeSupplied
+			.mul(1 ether)
+			.div(getRateMultiplier(_FCPborrowed, _baseBorrowed, RateAdjuster.UPPER_BORROW, _borrowedRateChange))
+			.div(crossCollateralizationRatio(_baseSupplied, _baseBorrowed, Safety.UPPER));
+	}
+
+	/*
+		@Description: find the maximum amount borrowed for a YT vault at the upper limit
+			this function handles the case where the YT vault is based on a time/rate spread
+			this means that _baseSupplied == _baseBorrowed && _amountBond > 0 && _FCPsupplied is not past maturity
+
+		@param address _FCPsupplied: the FCP corresponding to the YT vault's collateral
+		@param address _baseSupplied: the wrapper corresponding to _FCPsupplied
+		@param address _FCPborrowed: the FCP corresponding to the ZCB of the YT vault's debt
+		@param address _baseBorrowed: the wrapper corresponding to _FCPborrowed
+		@param uint _amountYield: the amount of YT being supplied to the vault (in unit amount)
+		@param int _amountBond: the difference between the amount of ZCB supplied to the vault and the amount of YT supplied
+			if _amountYield is unit amounts of collateral in the underlying, add _amountBond to _amountYield to get the amt of ZCB collateral
+			amtZCB - amtYT == _amountBond
+		@param int128 _suppliedRateChange: a change multiplier, multiplied with the APY of the supplied
+			to get changed APY for the supplied
+		@param int128 _borrowedRateChange: a change multiplier, multiplied with the APY of the borrowed
+			to get changed APY for the borrowed
+	*/
+	function YTvaultAmtBorrowedUL_1(
+		address _FCPsupplied,
+		address _baseSupplied,
+		address _FCPborrowed,
+		address _baseBorrowed,
+		uint _amountYield,
+		int _amountBond,
+		int128 _suppliedRateChange,
+		int128 _borrowedRateChange
+	) internal view returns (uint) {
+		require(_amountBond > 0);
+		uint maxBorrowAgainstYield = _amountYield
+			.mul((1 ether)**2)
+			.div(getRateMultiplier_BaseRate(_FCPborrowed, _baseBorrowed, RateAdjuster.UPPER_BORROW));
+		uint maxBorrowAgainstBond = uint(_amountBond)
+			.mul(combinedRateMultipliers(true, true, _FCPsupplied, _baseSupplied, _FCPborrowed, _baseBorrowed, _suppliedRateChange, _borrowedRateChange));
+
+		return (maxBorrowAgainstYield + maxBorrowAgainstBond)
+			.mul(1 ether)
+			.div(crossAssetPrice(_baseSupplied, _baseBorrowed))
+			.div(crossCollateralizationRatio(_baseSupplied, _baseBorrowed, Safety.UPPER));
+	}
+
+	/*
+		@Description: find the maximum amount borrowed for a YT vault at the lower limit
+			this function handles the case where the YT vault is not based on a time/rate spread
+			this means that either the _baseSupplied != _baseBorrowed || _amountBond <= 0 || _FCPsupplied is past maturity
+
+		@param address _FCPsupplied: the FCP corresponding to the YT vault's collateral
+		@param address _baseSupplied: the wrapper corresponding to _FCPsupplied
+		@param address _FCPborrowed: the FCP corresponding to the ZCB of the YT vault's debt
+		@param address _baseBorrowed: the wrapper corresponding to _FCPborrowed
+		@param uint _amountYield: the amount of YT being supplied to the vault (in unit amount)
+		@param int _amountBond: the difference between the amount of ZCB supplied to the vault and the amount of YT supplied
+			if _amountYield is unit amounts of collateral in the underlying, add _amountBond to _amountYield to get the amt of ZCB collateral
+			amtZCB - amtYT == _amountBond
+		@param int128 _suppliedRateChange: a change multiplier, multiplied with the APY of the supplied
+			to get changed APY for the supplied
+		@param int128 _borrowedRateChange: a change multiplier, multiplied with the APY of the borrowed
+			to get changed APY for the borrowed
+	*/
+	function YTvaultAmtBorrowedLL_0(
+		address _FCPsupplied,
+		address _baseSupplied,
+		address _FCPborrowed,
+		address _baseBorrowed,
+		uint _amountYield,
+		int _amountBond,
+		int128 _suppliedRateChange,
+		int128 _borrowedRateChange
+	) internal view returns (uint) {
+		bool positiveBond = _amountBond >= 0;
+
+		//if !positiveBond there are essentially 2 ZCBs being borrowed from the vault with _baseSupplied as the supplied asset
+		//thus we change the rate adjuster to borrow if the "supplied" ZCB is negative
+		uint ZCBvalue = uint(positiveBond ? _amountBond : -_amountBond)
+			.mul(getRateMultiplier(_FCPsupplied, _baseSupplied, positiveBond ? RateAdjuster.LOW_DEPOSIT : RateAdjuster.LOW_BORROW, _suppliedRateChange))
+			.div(1 ether);
+
+		//after rate adjustments find the effective amount of the underlying asset which may be used in collateralisation calculation
+		uint compositeSupplied = positiveBond ? _amountYield.add(ZCBvalue) : _amountYield.sub(ZCBvalue);
+
+		//wierd hack to prevent stack too deep
+		compositeSupplied = compositeSupplied
+			.mul((1 ether)**2)
+			.div(crossAssetPrice(_baseSupplied, _baseBorrowed));
+		return compositeSupplied
+			.mul(1 ether)
+			.div(getRateMultiplier(_FCPborrowed, _baseBorrowed, RateAdjuster.LOW_BORROW, _borrowedRateChange))
+			.div(crossCollateralizationRatio(_baseSupplied, _baseBorrowed, Safety.LOW));
+	}
+
+	/*
+		@Description: find the maximum amount borrowed for a YT vault at the lower limit
+			this function handles the case where the YT vault is based on a time/rate spread
+			this means that _baseSupplied == _baseBorrowed && _amountBond > 0 && _FCPsupplied is not past maturity
+
+		@param address _FCPsupplied: the FCP corresponding to the YT vault's collateral
+		@param address _baseSupplied: the wrapper corresponding to _FCPsupplied
+		@param address _FCPborrowed: the FCP corresponding to the ZCB of the YT vault's debt
+		@param address _baseBorrowed: the wrapper corresponding to _FCPborrowed
+		@param uint _amountYield: the amount of YT being supplied to the vault (in unit amount)
+		@param int _amountBond: the difference between the amount of ZCB supplied to the vault and the amount of YT supplied
+			if _amountYield is unit amounts of collateral in the underlying, add _amountBond to _amountYield to get the amt of ZCB collateral
+			amtZCB - amtYT == _amountBond
+		@param int128 _suppliedRateChange: a change multiplier, multiplied with the APY of the supplied
+			to get changed APY for the supplied
+		@param int128 _borrowedRateChange: a change multiplier, multiplied with the APY of the borrowed
+			to get changed APY for the borrowed
+	*/
+	function YTvaultAmtBorrowedLL_1(
+		address _FCPsupplied,
+		address _baseSupplied,
+		address _FCPborrowed,
+		address _baseBorrowed,
+		uint _amountYield,
+		int _amountBond,
+		int128 _suppliedRateChange,
+		int128 _borrowedRateChange
+	) internal view returns (uint) {
+		require(_amountBond > 0);
+		uint maxBorrowAgainstYield = _amountYield
+			.mul((1 ether)**2)
+			.div(getRateMultiplier_BaseRate(_FCPborrowed, _baseBorrowed, RateAdjuster.LOW_BORROW));
+		uint maxBorrowAgainstBond = uint(_amountBond)
+			.mul(combinedRateMultipliers(true, false, _FCPsupplied, _baseSupplied, _FCPborrowed, _baseBorrowed, _suppliedRateChange, _borrowedRateChange));
+
+		return (maxBorrowAgainstYield + maxBorrowAgainstBond)
+			.mul(1 ether)
+			.div(crossAssetPrice(_baseSupplied, _baseBorrowed))
+			.div(crossCollateralizationRatio(_baseSupplied, _baseBorrowed, Safety.LOW));
+	}
 
 	/*
 		@Description: find the maximum amount of borrowed asset that may be borrowed from a vault without going under the
@@ -555,22 +745,12 @@ contract VaultHealth is IVaultHealth, Ownable {
 		(address _baseSupplied, address _baseBorrowed) = bothFCPtoBaseAddresses(_FCPsupplied, _FCPborrowed);
 
 		bool positiveBond = _amountBond >= 0;
-
-		//if !positiveBond there are essentially 2 ZCBs being borrowed from the vault with _baseSupplied as the supplied asset
-		//thus we change the rate adjuster to borrow if the "supplied" ZCB is negative
-		uint ZCBvalue = uint(positiveBond ? _amountBond : -_amountBond)
-			.mul(getRateMultiplier_BaseRate(_FCPsupplied, _baseSupplied, positiveBond ? RateAdjuster.UPPER_DEPOSIT : RateAdjuster.UPPER_BORROW))
-			.div(1 ether);
-
-		//after rate adjustments find the effective amount of the underlying asset which may be used in collateralisation calculation
-		uint compositeSupplied = positiveBond ? _amountYield.add(ZCBvalue) : _amountYield.sub(ZCBvalue);
-
-		return compositeSupplied
-			.mul((1 ether)**2)
-			.div(crossAssetPrice(_baseSupplied, _baseBorrowed))
-			.mul(1 ether)
-			.div(getRateMultiplier_BaseRate(_FCPborrowed, _baseBorrowed, RateAdjuster.UPPER_BORROW))
-			.div(crossCollateralizationRatio(_baseSupplied, _baseBorrowed, Safety.UPPER));
+		if (!positiveBond && _baseSupplied == _baseBorrowed && getYearsRemaining(_FCPsupplied, _baseSupplied) > 0) {
+			return YTvaultAmtBorrowedUL_1(_FCPsupplied, _baseSupplied, _FCPborrowed, _baseBorrowed, _amountYield, _amountBond, ABDK_1, ABDK_1);
+		}
+		else {
+			return YTvaultAmtBorrowedUL_0(_FCPsupplied, _baseSupplied, _FCPborrowed, _baseBorrowed, _amountYield, _amountBond, ABDK_1, ABDK_1);
+		}
 	}
 
 	/*
@@ -596,22 +776,12 @@ contract VaultHealth is IVaultHealth, Ownable {
 		(address _baseSupplied, address _baseBorrowed) = bothFCPtoBaseAddresses(_FCPsupplied, _FCPborrowed);
 
 		bool positiveBond = _amountBond >= 0;
-
-		//if !positiveBond there are essentially 2 ZCBs being borrowed from the vault with _baseSupplied as the supplied asset
-		//thus we change the rate adjuster to borrow if the "supplied" ZCB is negative
-		uint ZCBvalue = uint(positiveBond ? _amountBond : -_amountBond)
-			.mul(getRateMultiplier_BaseRate(_FCPsupplied, _baseSupplied, positiveBond ? RateAdjuster.LOW_DEPOSIT : RateAdjuster.LOW_BORROW))
-			.div(1 ether);
-
-		//after rate adjustments find the effective amount of the underlying asset which may be used in collateralisation calculation
-		uint compositeSupplied = positiveBond ? _amountYield.add(ZCBvalue) : _amountYield.sub(ZCBvalue);
-
-		return compositeSupplied
-			.mul((1 ether)**2)
-			.div(crossAssetPrice(_baseSupplied, _baseBorrowed))
-			.mul(1 ether)
-			.div(getRateMultiplier_BaseRate(_FCPborrowed, _baseBorrowed, RateAdjuster.LOW_BORROW))
-			.div(crossCollateralizationRatio(_baseSupplied, _baseBorrowed, Safety.LOW));
+		if (!positiveBond && _baseSupplied == _baseBorrowed && getYearsRemaining(_FCPsupplied, _baseSupplied) > 0) {
+			return YTvaultAmtBorrowedLL_1(_FCPsupplied, _baseSupplied, _FCPborrowed, _baseBorrowed, _amountYield, _amountBond, ABDK_1, ABDK_1);
+		}
+		else {
+			return YTvaultAmtBorrowedLL_0(_FCPsupplied, _baseSupplied, _FCPborrowed, _baseBorrowed, _amountYield, _amountBond, ABDK_1, ABDK_1);
+		}
 	}
 
 
@@ -707,15 +877,13 @@ contract VaultHealth is IVaultHealth, Ownable {
 			upper collateralisation limit
 	*/
 	function amountBorrowedAtUpperLimit(address _assetSupplied, address _assetBorrowed, uint _amountSupplied) external override view returns (uint) {
-		(address _baseSupplied, address _baseBorrowed, address chSupplied, address chBorrowed) = baseAssetAddresses(_assetSupplied, _assetBorrowed);
+		(address _baseSupplied, address _baseBorrowed, address fcpSupplied, address fcpBorrowed) = baseAssetAddresses(_assetSupplied, _assetBorrowed);
 
 		uint term1 = _amountSupplied
-			.mul(_assetSupplied == _baseSupplied ? (1 ether) : getRateMultiplier_BaseRate(chSupplied, _baseSupplied, RateAdjuster.UPPER_DEPOSIT));
+			.mul(1 ether)
+			.mul(combinedRateMultipliers(true, true, fcpSupplied, _baseSupplied, fcpBorrowed, _baseBorrowed, ABDK_1, ABDK_1));
 		return term1
-			.mul(1 ether)
 			.div(crossAssetPrice(_baseSupplied, _baseBorrowed))
-			.mul(1 ether)
-			.div(getRateMultiplier_BaseRate(chBorrowed, _baseBorrowed, RateAdjuster.UPPER_BORROW))
 			.div(crossCollateralizationRatio(_baseSupplied, _baseBorrowed, Safety.UPPER));
 	}
 
@@ -730,15 +898,13 @@ contract VaultHealth is IVaultHealth, Ownable {
 			lower collateralisation limit
 	*/
 	function amountBorrowedAtLowerLimit(address _assetSupplied, address _assetBorrowed, uint _amountSupplied) external override view returns (uint) {
-		(address _baseSupplied, address _baseBorrowed, address chSupplied, address chBorrowed) = baseAssetAddresses(_assetSupplied, _assetBorrowed);
+		(address _baseSupplied, address _baseBorrowed, address fcpSupplied, address fcpBorrowed) = baseAssetAddresses(_assetSupplied, _assetBorrowed);
 
 		uint term1 = _amountSupplied
-			.mul(_assetSupplied == _baseSupplied ? (1 ether) : getRateMultiplier_BaseRate(chSupplied, _baseSupplied, RateAdjuster.LOW_DEPOSIT));
+			.mul(1 ether)
+			.mul(combinedRateMultipliers(true, false, fcpSupplied, _baseSupplied, fcpBorrowed, _baseBorrowed, ABDK_1, ABDK_1));
 		return term1
-			.mul(1 ether)
 			.div(crossAssetPrice(_baseSupplied, _baseBorrowed))
-			.mul(1 ether)
-			.div(getRateMultiplier_BaseRate(chBorrowed, _baseBorrowed, RateAdjuster.LOW_BORROW))
 			.div(crossCollateralizationRatio(_baseSupplied, _baseBorrowed, Safety.LOW));
 	}
 
@@ -775,7 +941,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 		@param uint _amountSupplied: the amount of _assetSupplied that has been supplied to the vault
 		@param uint _amountBorrowed: the amount of _assetBorrowed that has been borrowed from the vault
 		@param uint _priceMultiplier: the multiplier by which cross asset price of deposit versus borrowed asset changes
-			inflated by 1 ether
+			inflated by TOTAL_BASIS_POINTS
 		@param int128 _suppliedRateChange: the multiplier by which the rate of the supplied asset will change
 			in ABDK64.64 format
 		@param int128 _borrowRateChange: the multiplier by which the rate of the borrowed asset will change
@@ -794,18 +960,15 @@ contract VaultHealth is IVaultHealth, Ownable {
 		int128 _borrowRateChange
 	) public view override returns(bool) {
 
-		(address _baseSupplied, address _baseBorrowed, address chSupplied, address chBorrowed) = baseAssetAddresses(_assetSupplied, _assetBorrowed);
+		(address _baseSupplied, address _baseBorrowed, address fcpSupplied, address fcpBorrowed) = baseAssetAddresses(_assetSupplied, _assetBorrowed);
 
 		//wierd hack to prevent stack too deep
 		_amountBorrowed = _amountBorrowed
 			.mul(crossAssetPrice(_baseSupplied, _baseBorrowed));
 		_amountBorrowed = _amountBorrowed
-			.mul(getRateMultiplier(chBorrowed, _baseBorrowed, RateAdjuster.UPPER_BORROW, _borrowRateChange))
-			.div(1 ether);
+			.div(combinedRateMultipliers(true, true, fcpSupplied, _baseSupplied, fcpBorrowed, _baseBorrowed, _suppliedRateChange, _borrowRateChange));
 		_amountBorrowed = _amountBorrowed
 			.mul(crossCollateralizationRatio(_baseSupplied, _baseBorrowed, Safety.UPPER));
-		_amountBorrowed = _amountBorrowed
-			.div(_assetSupplied == _baseSupplied ? (1 ether) : getRateMultiplier(chSupplied, _baseSupplied, RateAdjuster.UPPER_DEPOSIT, _suppliedRateChange));
 		_amountBorrowed = _amountBorrowed
 			.mul(_priceMultiplier)
 			.div((1 ether)*TOTAL_BASIS_POINTS);
@@ -824,10 +987,10 @@ contract VaultHealth is IVaultHealth, Ownable {
 			amtZCB - amtYT == _amountBond
 		@param uint _amountBorrowed: the amount of ZCB from _FCPborrowed that has been borrowed from the vault
 		@param uint _priceMultiplier: the multiplier by which cross asset price of deposit versus borrowed asset changes
-			inflated by 1 ether
+			inflated by TOTAL_BASIS_POINTS
 		@param int128 _suppliedRateChange: the multiplier by which the rate of the supplied asset will change
 			in ABDK64.64 format
-		@param int128 _borrowRateChange: the multiplier by which the rate of the borrowed asset will change
+		@param int128 _borrowedRateChange: the multiplier by which the rate of the borrowed asset will change
 			in ABDK64.64 format
 
 		@return bool: returns true if vault will stay above liquidation zone
@@ -841,32 +1004,21 @@ contract VaultHealth is IVaultHealth, Ownable {
 		uint _amountBorrowed,
 		uint _priceMultiplier,
 		int128 _suppliedRateChange,
-		int128 _borrowRateChange
+		int128 _borrowedRateChange
 	) external view override returns (bool) {
 		(address _baseSupplied, address _baseBorrowed) = bothFCPtoBaseAddresses(_FCPsupplied, _FCPborrowed);
 
-		//after rate adjustments find the effective amount of the underlying asset which may be used in collateralisation calculation
-		uint compositeSupplied;
-		{
-			bool positiveBond = _amountBond >= 0;
-
-			//if !positiveBond there are essentially 2 ZCBs being borrowed from the vault with _baseSupplied as the supplied asset
-			//thus we change the rate adjuster to borrow if the "supplied" ZCB is negative
-			uint ZCBvalue = uint(positiveBond ? _amountBond : -_amountBond)
-				.mul(getRateMultiplier(_FCPsupplied, _baseSupplied, positiveBond ? RateAdjuster.UPPER_DEPOSIT : RateAdjuster.UPPER_BORROW, _suppliedRateChange));
-
-			compositeSupplied = positiveBond ? _amountYield.add(ZCBvalue) : _amountYield.sub(ZCBvalue);
+		bool positiveBond = _amountBond >= 0;
+		uint maxBorrowed;
+		if (!positiveBond && _baseSupplied == _baseBorrowed && getYearsRemaining(_FCPsupplied, _baseSupplied) > 0) {
+			maxBorrowed = YTvaultAmtBorrowedUL_1(_FCPsupplied, _baseSupplied, _FCPborrowed, _baseBorrowed, _amountYield, _amountBond, _suppliedRateChange, _borrowedRateChange);
 		}
-
-		compositeSupplied = compositeSupplied
-			.mul((1 ether)**2)
-			.div(crossAssetPrice(_baseSupplied, _baseBorrowed))
-			.mul((1 ether)*TOTAL_BASIS_POINTS)
-			.div(_priceMultiplier);
-		compositeSupplied = compositeSupplied
-			.div(getRateMultiplier(_FCPborrowed, _baseBorrowed, RateAdjuster.UPPER_BORROW, _borrowRateChange))
-			.div(crossCollateralizationRatio(_baseSupplied, _baseBorrowed, Safety.UPPER));
-		return compositeSupplied > _amountBorrowed;
+		else {
+			maxBorrowed = YTvaultAmtBorrowedUL_0(_FCPsupplied, _baseSupplied, _FCPborrowed, _baseBorrowed, _amountYield, _amountBond, _suppliedRateChange, _borrowedRateChange);
+		}
+		//account for price multiplier
+		uint adjMaxBorrowed = maxBorrowed.mul(TOTAL_BASIS_POINTS).div(_priceMultiplier);
+		return _amountBorrowed < adjMaxBorrowed;
 	}
 
 	//-----------------------a-d-m-i-n---o-p-e-r-a-t-i-o-n-s---------------------------

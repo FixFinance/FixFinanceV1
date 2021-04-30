@@ -940,7 +940,6 @@ contract('VaultFactory', async function(accounts) {
 	});
 
 	it('liquidates vaults due to time', async () => {
-		//process.exit();
 		let amountSupplied = _10To18;
 
 		await vaultHealthInstance.setToReturn(true);

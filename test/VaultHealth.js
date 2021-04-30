@@ -295,7 +295,6 @@ contract('VaultHealth', async function(accounts) {
 		let expectedAmountSupplied = Math.floor(amountBorrowed*rateMultiplier0*price*collateralizationRatio/rateMultiplier1);
 		let actualBN = await vaultHealthInstance.amountSuppliedAtUpperLimit(zcbAsset1.address, zcbAsset0.address, amountBorrowed)
 		let actual = parseInt(actualBN.toString());
-
 		let error = AmountError(expectedAmountSupplied, actual);
 		assert.isBelow(error, ErrorRange, "output within acceptable error range");
 

@@ -361,6 +361,11 @@ contract VaultHealth is IVaultHealth, Ownable {
 			to get changed APY for the supplied
 		@param int128 _borrowedRateChange: a change multiplier, multiplied with the APY of the borrowed
 			to get changed APY for the borrowed
+
+		@return uint: the combined rate multiplier given the supplied asset and the borrowed asset
+		@return bool: true if: supplied+borrowed assets are both zcbs on the same wrapper asset and
+				the maturity of the supplied is before the maturity of the borrowed,
+			false otherwise
 	*/
 	function combinedRateMultipliers(
 		bool _positiveSupplied,
@@ -371,7 +376,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 		address _baseBorrowed,
 		int128 _suppliedRateChange,
 		int128 _borrowedRateChange
-	) internal view returns (uint) {
+	) internal view returns (uint, bool) {
 		uint suppliedMultiplier;
 		uint borrowedMultiplier;
 		if (_baseSupplied == _baseBorrowed && _positiveSupplied) {
@@ -385,11 +390,13 @@ contract VaultHealth is IVaultHealth, Ownable {
 					(int128 spreadAPY, int128 spreadTime) = impliedAPYBetweenMaturities(_supplied, _borrowed, ytmSupplied, ytmBorrowed);
 					address _bs = _baseSupplied; //prevent stack too deep
 					if (ytmBorrowed > ytmSupplied) {
-						return rateToRateMultiplier(spreadAPY, spreadTime, _bs, (_ups ? RateAdjuster.UPPER_BORROW : RateAdjuster.LOW_BORROW), _suppliedRateChange);
+						int128 src = _suppliedRateChange; // prevent stack too deep
+						return (rateToRateMultiplier(spreadAPY, spreadTime, _bs, (_ups ? RateAdjuster.UPPER_BORROW : RateAdjuster.LOW_BORROW), src), true);
 					}
 					else {
-						uint rm = rateToRateMultiplier(spreadAPY, spreadTime, _bs, (_ups ? RateAdjuster.UPPER_DEPOSIT : RateAdjuster.LOW_DEPOSIT), _borrowedRateChange);
-						return uint((1 ether)**2).div(rm);
+						int128 brc = _borrowedRateChange; // prevent stack too deep
+						uint rm = rateToRateMultiplier(spreadAPY, spreadTime, _bs, (_ups ? RateAdjuster.UPPER_DEPOSIT : RateAdjuster.LOW_DEPOSIT), brc);
+						return (uint((1 ether)**2).div(rm), false);
 					}
 				}
 				else { //supplied zcb has matured
@@ -415,7 +422,32 @@ contract VaultHealth is IVaultHealth, Ownable {
 			RateAdjuster raBorrowed = (_upperSafety ? RateAdjuster.UPPER_BORROW : RateAdjuster.LOW_BORROW);
 			borrowedMultiplier = getRateMultiplier(_borrowed, _baseBorrowed, raBorrowed , _borrowedRateChange);
 		}
-		return suppliedMultiplier.mul(1 ether).div(borrowedMultiplier);
+		return (suppliedMultiplier.mul(1 ether).div(borrowedMultiplier), false);
+	}
+
+	/*
+		@Description: return only the uint value that is returned by combiendRateMultipliers
+	*/
+	function combinedRateMultipliers_onlyMultiplier(
+		bool _positiveSupplied,
+		bool _upperSafety,
+		address _supplied,
+		address _baseSupplied,
+		address _borrowed,
+		address _baseBorrowed,
+		int128 _suppliedRateChange,
+		int128 _borrowedRateChange
+	) internal view returns (uint multiplier) {
+		(multiplier, ) = combinedRateMultipliers(
+			_positiveSupplied,
+			_upperSafety,
+			_supplied,
+			_baseSupplied,
+			_borrowed,
+			_baseBorrowed,
+			_suppliedRateChange,
+			_borrowedRateChange
+		);
 	}
 
 	/*
@@ -519,7 +551,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 			.mul(crossCollateralizationRatio(_baseSupplied, _baseBorrowed, Safety.UPPER))
 			.div(1 ether);
 		return _amountBorrowed
-			.div(combinedRateMultipliers(true, true, fcpSupplied, _baseSupplied, fcpBorrowed, _baseBorrowed, ABDK_1, ABDK_1));
+			.div(combinedRateMultipliers_onlyMultiplier(true, true, fcpSupplied, _baseSupplied, fcpBorrowed, _baseBorrowed, ABDK_1, ABDK_1));
 	}
 
 	/*
@@ -541,7 +573,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 			.mul(crossCollateralizationRatio(_baseSupplied, _baseBorrowed, Safety.LOW))
 			.div(1 ether);
 		return _amountBorrowed
-			.div(combinedRateMultipliers(true, false, fcpSupplied, _baseSupplied, fcpBorrowed, _baseBorrowed, ABDK_1, ABDK_1));
+			.div(combinedRateMultipliers_onlyMultiplier(true, false, fcpSupplied, _baseSupplied, fcpBorrowed, _baseBorrowed, ABDK_1, ABDK_1));
 	}
 
 	/*
@@ -624,11 +656,47 @@ contract VaultHealth is IVaultHealth, Ownable {
 		require(_amountBond > 0);
 		uint maxBorrowAgainstYield = _amountYield
 			.mul((1 ether)**2)
-			.div(getRateMultiplier_BaseRate(_FCPborrowed, _baseBorrowed, RateAdjuster.UPPER_BORROW));
-		uint maxBorrowAgainstBond = uint(_amountBond)
-			.mul(combinedRateMultipliers(true, true, _FCPsupplied, _baseSupplied, _FCPborrowed, _baseBorrowed, _suppliedRateChange, _borrowedRateChange));
+			.div(getRateMultiplier(_FCPborrowed, _baseBorrowed, RateAdjuster.UPPER_BORROW, _borrowedRateChange));
+		(uint rmSpread, bool flip) = combinedRateMultipliers(true, true, _FCPsupplied, _baseSupplied, _FCPborrowed, _baseBorrowed, _suppliedRateChange, _borrowedRateChange);
+		uint maxBorrowAgainstBond;
+		if (flip) {
+			maxBorrowAgainstBond = uint(_amountBond)
+				.mul((1 ether)**2)
+				.div(rmSpread);
+		}
+		else {
+			maxBorrowAgainstBond = uint(_amountBond)
+				.mul(rmSpread);
+		}
 
 		return (maxBorrowAgainstYield + maxBorrowAgainstBond).div(1 ether);
+	}
+
+	/*
+		@Description: find the maximum amount borrowed for a YT vault at the upper limit
+			this function handles the case where the FCP of the assets supplied to the YT vault
+			is the same FCP for which ZCB is being borrowed from the vault
+
+		@param address _FCP: the FCP corresponding to the supplied & borrowed assets
+		@param uint _amountYield: the amount of YT being supplied to the vault (in unit amount)
+		@param int _amountBond: the difference between the amount of ZCB supplied to the vault and the amount of YT supplied
+			if _amountYield is unit amounts of collateral in the underlying, add _amountBond to _amountYield to get the amt of ZCB collateral
+			amtZCB - amtYT == _amountBond
+		@param int128 _borrowedRateChange: a change multiplier, multiplied with the APY of the borrowed
+			to get changed APY for the borrowed
+	*/
+	function YTvaultAmtBorrowedUL_2(
+		address _FCP,
+		uint _amountYield,
+		int _amountBond,
+		int128 _borrowedRateChange
+	) internal view returns (uint) {
+		bool positiveBond = _amountBond > 0;
+		address base = organizer(organizerAddress).fixCapitalPoolToWrapper(_FCP);
+		uint totalToBorrowAgainst  = _amountYield
+			.mul(1 ether)
+			.div(getRateMultiplier(_FCP, base, RateAdjuster.UPPER_BORROW, _borrowedRateChange));
+		return positiveBond ? totalToBorrowAgainst.add(uint(_amountBond)) : totalToBorrowAgainst.sub(uint(-_amountBond));
 	}
 
 	/*
@@ -711,11 +779,47 @@ contract VaultHealth is IVaultHealth, Ownable {
 		require(_amountBond > 0);
 		uint maxBorrowAgainstYield = _amountYield
 			.mul((1 ether)**2)
-			.div(getRateMultiplier_BaseRate(_FCPborrowed, _baseBorrowed, RateAdjuster.LOW_BORROW));
-		uint maxBorrowAgainstBond = uint(_amountBond)
-			.mul(combinedRateMultipliers(true, false, _FCPsupplied, _baseSupplied, _FCPborrowed, _baseBorrowed, _suppliedRateChange, _borrowedRateChange));
+			.div(getRateMultiplier(_FCPborrowed, _baseBorrowed, RateAdjuster.LOW_BORROW, _borrowedRateChange));
+		(uint rmSpread, bool flip) = combinedRateMultipliers(true, false, _FCPsupplied, _baseSupplied, _FCPborrowed, _baseBorrowed, _suppliedRateChange, _borrowedRateChange);
+		uint maxBorrowAgainstBond;
+		if (flip) {
+			maxBorrowAgainstBond = uint(_amountBond)
+				.mul((1 ether)**2)
+				.div(rmSpread);
+		}
+		else {
+			maxBorrowAgainstBond = uint(_amountBond)
+				.mul(rmSpread);
+		}
 
 		return (maxBorrowAgainstYield + maxBorrowAgainstBond).div(1 ether);
+	}
+
+	/*
+		@Description: find the maximum amount borrowed for a YT vault at the upper limit
+			this function handles the case where the FCP of the assets supplied to the YT vault
+			is the same FCP for which ZCB is being borrowed from the vault
+
+		@param address _FCP: the FCP corresponding to the supplied & borrowed assets
+		@param uint _amountYield: the amount of YT being supplied to the vault (in unit amount)
+		@param int _amountBond: the difference between the amount of ZCB supplied to the vault and the amount of YT supplied
+			if _amountYield is unit amounts of collateral in the underlying, add _amountBond to _amountYield to get the amt of ZCB collateral
+			amtZCB - amtYT == _amountBond
+		@param int128 _borrowedRateChange: a change multiplier, multiplied with the APY of the borrowed
+			to get changed APY for the borrowed
+	*/
+	function YTvaultAmtBorrowedLL_2(
+		address _FCP,
+		uint _amountYield,
+		int _amountBond,
+		int128 _borrowedRateChange
+	) internal view returns (uint) {
+		bool positiveBond = _amountBond > 0;
+		address base = organizer(organizerAddress).fixCapitalPoolToWrapper(_FCP);
+		uint totalToBorrowAgainst  = _amountYield
+			.mul(1 ether)
+			.div(getRateMultiplier(_FCP, base, RateAdjuster.LOW_BORROW, _borrowedRateChange));
+		return positiveBond ? totalToBorrowAgainst.add(uint(_amountBond)) : totalToBorrowAgainst.sub(uint(-_amountBond));
 	}
 
 	/*
@@ -738,10 +842,14 @@ contract VaultHealth is IVaultHealth, Ownable {
 		uint _amountYield,
 		int _amountBond
 	) internal view returns (uint) {
+		if (_FCPsupplied == _FCPborrowed) {
+			return YTvaultAmtBorrowedUL_2(_FCPsupplied, _amountYield, _amountBond, ABDK_1);
+		}
+
 		(address _baseSupplied, address _baseBorrowed) = bothFCPtoBaseAddresses(_FCPsupplied, _FCPborrowed);
 
-		bool positiveBond = _amountBond >= 0;
-		if (!positiveBond && _baseSupplied == _baseBorrowed && getYearsRemaining(_FCPsupplied, _baseSupplied) > 0) {
+		bool positiveBond = _amountBond > 0;
+		if (positiveBond && _baseSupplied == _baseBorrowed && getYearsRemaining(_FCPsupplied, _baseSupplied) > 0) {
 			return YTvaultAmtBorrowedUL_1(_FCPsupplied, _baseSupplied, _FCPborrowed, _baseBorrowed, _amountYield, _amountBond, ABDK_1, ABDK_1);
 		}
 		else {
@@ -769,10 +877,14 @@ contract VaultHealth is IVaultHealth, Ownable {
 		uint _amountYield,
 		int _amountBond
 	) internal view returns (uint) {
+		if (_FCPsupplied == _FCPborrowed) {
+			return YTvaultAmtBorrowedLL_2(_FCPsupplied, _amountYield, _amountBond, ABDK_1);
+		}
+
 		(address _baseSupplied, address _baseBorrowed) = bothFCPtoBaseAddresses(_FCPsupplied, _FCPborrowed);
 
-		bool positiveBond = _amountBond >= 0;
-		if (!positiveBond && _baseSupplied == _baseBorrowed && getYearsRemaining(_FCPsupplied, _baseSupplied) > 0) {
+		bool positiveBond = _amountBond > 0;
+		if (positiveBond && _baseSupplied == _baseBorrowed && getYearsRemaining(_FCPsupplied, _baseSupplied) > 0) {
 			return YTvaultAmtBorrowedLL_1(_FCPsupplied, _baseSupplied, _FCPborrowed, _baseBorrowed, _amountYield, _amountBond, ABDK_1, ABDK_1);
 		}
 		else {
@@ -877,7 +989,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 
 		uint term1 = _amountSupplied
 			.mul(1 ether)
-			.mul(combinedRateMultipliers(true, true, fcpSupplied, _baseSupplied, fcpBorrowed, _baseBorrowed, ABDK_1, ABDK_1));
+			.mul(combinedRateMultipliers_onlyMultiplier(true, true, fcpSupplied, _baseSupplied, fcpBorrowed, _baseBorrowed, ABDK_1, ABDK_1));
 		return term1
 			.div(crossAssetPrice(_baseSupplied, _baseBorrowed))
 			.div(crossCollateralizationRatio(_baseSupplied, _baseBorrowed, Safety.UPPER));
@@ -898,7 +1010,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 
 		uint term1 = _amountSupplied
 			.mul(1 ether)
-			.mul(combinedRateMultipliers(true, false, fcpSupplied, _baseSupplied, fcpBorrowed, _baseBorrowed, ABDK_1, ABDK_1));
+			.mul(combinedRateMultipliers_onlyMultiplier(true, false, fcpSupplied, _baseSupplied, fcpBorrowed, _baseBorrowed, ABDK_1, ABDK_1));
 		return term1
 			.div(crossAssetPrice(_baseSupplied, _baseBorrowed))
 			.div(crossCollateralizationRatio(_baseSupplied, _baseBorrowed, Safety.LOW));
@@ -962,7 +1074,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 		_amountBorrowed = _amountBorrowed
 			.mul(crossAssetPrice(_baseSupplied, _baseBorrowed));
 		_amountBorrowed = _amountBorrowed
-			.div(combinedRateMultipliers(true, true, fcpSupplied, _baseSupplied, fcpBorrowed, _baseBorrowed, _suppliedRateChange, _borrowRateChange));
+			.div(combinedRateMultipliers_onlyMultiplier(true, true, fcpSupplied, _baseSupplied, fcpBorrowed, _baseBorrowed, _suppliedRateChange, _borrowRateChange));
 		_amountBorrowed = _amountBorrowed
 			.mul(crossCollateralizationRatio(_baseSupplied, _baseBorrowed, Safety.UPPER));
 		_amountBorrowed = _amountBorrowed

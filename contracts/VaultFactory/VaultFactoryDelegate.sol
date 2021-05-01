@@ -395,7 +395,7 @@ contract VaultFactoryDelegate is VaultFactoryData {
 		Vault memory vault = _vaults[_owner][_index];
 		require(vault.assetBorrowed == _assetBorrowed);
 		require(vault.assetSupplied == _assetSupplied);
-		require(vault.amountBorrowed >= _amtIn);
+		require(vault.amountBorrowed >= _amtIn && _amtIn > 0);
 		uint maxBid = vault.amountSupplied * _amtIn / vault.amountBorrowed;
 		require(maxBid >= _bid);
 		if (satisfiesLimit(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied, vault.amountBorrowed, true)) {
@@ -439,7 +439,7 @@ contract VaultFactoryDelegate is VaultFactoryData {
 	function bidOnLiquidation(uint _index, uint _bid, uint _amtIn) external {
 		require(_Liquidations.length > _index);
 		Liquidation memory liq = _Liquidations[_index];
-		require(_amtIn <= liq.amountBorrowed);
+		require(0 < _amtIn && _amtIn <= liq.amountBorrowed);
 		uint maxBid = liq.bidAmount * _amtIn / liq.amountBorrowed;
 		require(_bid < maxBid);
 
@@ -505,7 +505,7 @@ contract VaultFactoryDelegate is VaultFactoryData {
 		require(vault.assetBorrowed == _assetBorrowed);
 		require(vault.assetSupplied == _assetSupplied);
 		require(vault.amountBorrowed <= _maxIn);
-		require(vault.amountSupplied >= _minOut);
+		require(vault.amountSupplied >= _minOut && _minOut > 0);
 		require(IFixCapitalPool(_assetBorrowed).maturity() < block.timestamp + CRITICAL_TIME_TO_MATURITY || 
 			!satisfiesLimit(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied, vault.amountBorrowed, false));
 
@@ -537,7 +537,7 @@ contract VaultFactoryDelegate is VaultFactoryData {
 		Vault memory vault = _vaults[_owner][_index];
 		require(vault.assetBorrowed == _assetBorrowed);
 		require(vault.assetSupplied == _assetSupplied);
-		require(_in <= vault.amountBorrowed);
+		require(0 < _in && _in <= vault.amountBorrowed);
 		uint amtOut = _in*vault.amountSupplied/vault.amountBorrowed;
 		require(amtOut >= _minOut);
 		require(IFixCapitalPool(_assetBorrowed).maturity() < block.timestamp + (1 days) || 
@@ -575,7 +575,7 @@ contract VaultFactoryDelegate is VaultFactoryData {
 		require(vault.amountSupplied >= _out);
 		uint amtIn = _out*vault.amountBorrowed;
 		amtIn = amtIn/vault.amountSupplied + (amtIn%vault.amountSupplied == 0 ? 0 : 1);
-		require(amtIn <= _maxIn);
+		require(0 < amtIn && amtIn <= _maxIn);
 		require(IFixCapitalPool(_assetBorrowed).maturity() < block.timestamp + (1 days) || 
 			!satisfiesLimit(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied, vault.amountBorrowed, false));
 

@@ -127,6 +127,23 @@ contract VaultFactoryDelegate2 is VaultFactoryData {
 	}
 
 	/*
+		@Description: given an amount of wrapped token and a FCP contract which is based on the same wrapper
+			convert an amount of wrapped token into the current amount of ZCB that is a subasset of the wrapped token
+
+		@param address _FCP: the address of the FCP contract for which to find the amount of ZCB
+		@param uint _amountWrapped: the amount of wrapped token for which to find the amount of ZCB as a subasset
+	*/
+	function getZCBcontainedInWrappedAmt(address _FCP, uint _amountWrapped) internal view returns (uint amountZCB) {
+		if (IFixCapitalPool(_FCP).inPayoutPhase()) {
+			uint conversionRate = IFixCapitalPool(_FCP).maturityConversionRate();
+			amountZCB = conversionRate.mul(_amountWrapped) / (1 ether);
+		}
+		else {
+			amountZCB = getUnitValueYield(_FCP, _amountWrapped);
+		}
+	}
+
+	/*
 		@Description: ensure that args for YTvaultWithstandsChange() never increase vault health
 			all multipliers should have either no change on vault health or decrease vault health
 			we make this a function and not a modifier because we will not always have the
@@ -158,6 +175,32 @@ contract VaultFactoryDelegate2 is VaultFactoryData {
 			(_suppliedRateChange == ABDK_1) ||
 			(_positiveBondSupplied ? _suppliedRateChange > ABDK_1 : _suppliedRateChange < ABDK_1)
 		);
+	}
+
+	/*
+		@Description: if a YTVault has the same FCPborrowed and FCPsupplied pay back as much debt as possible
+			with the zcb contained as collateral in the vault
+			this can only be done where FCPborrowed == FCPsupplied because the ZCB that is collateral is the
+			same ZCB as the debt, this will not be true for any other type of Vault or YTVault
+
+		@param address _owner: the owner of the YTVault for which to pay back debt
+		@param uint _index: the index of the YTVault swithin YTvaults[_owner]
+		@param YTVault memory _vault: this parameter will be modified if debt is paid back
+			when this function is finished executing all member variables of _vault will == the member variables of
+			the storage vault which _vault is a copy of
+	*/
+	function autopayYTVault(address _owner, uint _index, YTVault memory _vault) internal {
+		if (_vault.FCPborrowed == _vault.FCPsupplied) {
+			uint unitValueYield = getZCBcontainedInWrappedAmt(_vault.FCPborrowed, _vault.yieldSupplied);
+			uint difference = _vault.bondSupplied >= 0 ? unitValueYield.add(uint(_vault.bondSupplied)) : unitValueYield.sub(uint(-_vault.bondSupplied));
+			difference = difference > _vault.amountBorrowed ? _vault.amountBorrowed : difference;
+			if (difference > 0) {
+				_vault.bondSupplied -= int(difference);
+				_vault.amountBorrowed -= difference;
+				_YTvaults[_owner][_index].bondSupplied = _vault.bondSupplied;
+				_YTvaults[_owner][_index].amountBorrowed = _vault.amountBorrowed;
+			}
+		}
 	}
 
 	/*
@@ -417,9 +460,10 @@ contract VaultFactoryDelegate2 is VaultFactoryData {
 	function auctionYTLiquidation(address _owner, uint _index, address _FCPborrowed, address _FCPsupplied, uint _bidYield, int _minBondRatio, uint _amtIn) external {
 		require(_YTvaults[_owner].length > _index);
 		YTVault memory vault = _YTvaults[_owner][_index];
+		autopayYTVault(_owner, _index, vault);
 		require(vault.FCPborrowed == _FCPborrowed);
 		require(vault.FCPsupplied == _FCPsupplied);
-		require(vault.amountBorrowed >= _amtIn);
+		require(vault.amountBorrowed >= _amtIn && _amtIn > 0);
 		uint maxBid = vault.yieldSupplied * _amtIn / vault.amountBorrowed;
 		require(maxBid >= _bidYield);
 
@@ -474,7 +518,7 @@ contract VaultFactoryDelegate2 is VaultFactoryData {
 	function bidOnYTLiquidation(uint _index, uint _bidYield, uint _amtIn) external {
 		require(_YTLiquidations.length > _index);
 		YTLiquidation memory liq = _YTLiquidations[_index];
-		require(_amtIn <= liq.amountBorrowed);
+		require(0 < _amtIn && _amtIn <= liq.amountBorrowed);
 		uint maxBid = liq.bidAmount * _amtIn / liq.amountBorrowed;
 		require(_bidYield < maxBid);
 
@@ -543,10 +587,11 @@ contract VaultFactoryDelegate2 is VaultFactoryData {
 	function instantYTLiquidation(address _owner, uint _index, address _FCPborrowed, address _FCPsupplied, uint _maxIn, uint _minOut, int _minBondRatio, address _to) external {
 		require(_YTvaults[_owner].length > _index);
 		YTVault memory vault = _YTvaults[_owner][_index];
+		autopayYTVault(_owner, _index, vault);
 		require(vault.FCPborrowed == _FCPborrowed);
 		require(vault.FCPsupplied == _FCPsupplied);
 		require(vault.amountBorrowed <= _maxIn);
-		require(vault.yieldSupplied >= _minOut);
+		require(vault.yieldSupplied >= _minOut && _minOut > 0);
 
 		//when we find bondRatio here we don't need to account for the rounding error because the only prupose of this variable is 
 		//the require statement below, other than that it has no impact on the distribution of funds
@@ -595,9 +640,10 @@ contract VaultFactoryDelegate2 is VaultFactoryData {
 	function partialYTLiquidationSpecificIn(address _owner, uint _index, address _FCPborrowed, address _FCPsupplied, uint _in, uint _minOut, int _minBondRatio, address _to) external {
 		require(_YTvaults[_owner].length > _index);
 		YTVault memory vault = _YTvaults[_owner][_index];
+		autopayYTVault(_owner, _index, vault);
 		require(vault.FCPborrowed == _FCPborrowed);
 		require(vault.FCPsupplied == _FCPsupplied);
-		require(_in <= vault.amountBorrowed);
+		require(0 < _in && _in <= vault.amountBorrowed);
 
 		//when we find bondRatio here we don't need to account for the rounding error because the only prupose of this variable is 
 		//the require statement below, other than that it has no impact on the distribution of funds
@@ -647,12 +693,13 @@ contract VaultFactoryDelegate2 is VaultFactoryData {
 	function partialYTLiquidationSpecificOut(address _owner, uint _index, address _FCPborrowed, address _FCPsupplied, uint _out, int _minBondOut, uint _maxIn, address _to) external {
 		require(_YTvaults[_owner].length > _index);
 		YTVault memory vault = _YTvaults[_owner][_index];
+		autopayYTVault(_owner, _index, vault);
 		require(vault.FCPborrowed == _FCPborrowed);
 		require(vault.FCPsupplied == _FCPsupplied);
 		require(vault.yieldSupplied >= _out);
 		uint amtIn = _out*vault.amountBorrowed;
 		amtIn = amtIn/vault.yieldSupplied + (amtIn%vault.yieldSupplied == 0 ? 0 : 1);
-		require(amtIn <= _maxIn);
+		require(0 < amtIn && amtIn <= _maxIn);
 
 		int bondOut = vault.bondSupplied.mul(int(_out)).div(int(vault.yieldSupplied));
 		require(bondOut >= _minBondOut);

@@ -142,9 +142,11 @@ contract('VaultHealth', async function(accounts) {
 
 		await organizerInstance.deployZCBamm(fcp0.address);
 		await organizerInstance.deployZCBamm(fcp1.address);
+		await organizerInstance.deployZCBamm(fcp2.address);
 
 		amm0 = await ZCBamm.at(await organizerInstance.ZCBamms(fcp0.address));
 		amm1 = await ZCBamm.at(await organizerInstance.ZCBamms(fcp1.address));
+		amm2 = await ZCBamm.at(await organizerInstance.ZCBamms(fcp2.address));
 
 		//mint asset0 assets to account 0
 		await asset0.mintTo(accounts[0], _10To19.mul(_10));
@@ -168,6 +170,13 @@ contract('VaultHealth', async function(accounts) {
 		await zcbAsset1.approve(amm1.address, _10To19);
 		await ytAsset1.approve(amm1.address, _10To19);
 
+		await wAsset1.approve(fcp2.address, _10To19);
+		await fcp2.depositWrappedToken(accounts[0], _10To19);
+		await wAsset1.approve(vaultFactoryInstance.address, _10To19);
+		await zcbAsset2.approve(vaultFactoryInstance.address, _10To19);
+		await zcbAsset2.approve(amm2.address, _10To19);
+		await ytAsset2.approve(amm2.address, _10To19);
+
 		//mint assets to account 1
 		await asset0.mintTo(accounts[1], _10To19.mul(_10));
 		await asset0.approve(wAsset0.address, _10To19.mul(_10), {from: accounts[1]});
@@ -181,10 +190,12 @@ contract('VaultHealth', async function(accounts) {
 		let toSend = _10To18.div(_10).div(_10);
 		await amm0.firstMint(toSend, toSend.div(_10));
 		await amm1.firstMint(toSend, toSend.div(_10));
+		await amm2.firstMint(toSend, toSend.div(_10).div(_10).div(new BN(2)));
 
 		for (let i = 0; i < LENGTH_RATE_SERIES; i++) {
 			await amm0.forceRateDataUpdate();
 			await amm1.forceRateDataUpdate();
+			await amm2.forceRateDataUpdate();
 			//advance 2 minuites
 			helper.advanceTime(121);
 		}
@@ -195,14 +206,8 @@ contract('VaultHealth', async function(accounts) {
 		let OracleRate1String = (await amm1.getImpliedRateData())._impliedRates[0].toString();
 		await amm1.setOracleRate(OracleRate1String);
 
-		//mint a few more times such that we have 3 records of the pool apys
-		await amm0.mint(_10, _10To18, _10To18);
-		await amm0.mint(_10, _10To18, _10To18);
-		await amm0.mint(_10, _10To18, _10To18);
-
-		await amm1.mint(_10, _10To18, _10To18);
-		await amm1.mint(_10, _10To18, _10To18);
-		await amm1.mint(_10, _10To18, _10To18);
+		let OracleRate2String = (await amm2.getImpliedRateData())._impliedRates[0].toString();
+		await amm2.setOracleRate(OracleRate2String);
 	});
 
 	//price inflated by _10Ti18
@@ -535,6 +540,116 @@ contract('VaultHealth', async function(accounts) {
 		assert.equal(await vaultHealthInstance.satisfiesLowerLimit(wAsset1.address, zcbAsset0.address, amountSupplied, actualBN.add(new BN(needed))), false, "correct value returned by satisfiesLowerLimit");
 	});
 
+	it('amountSuppliedAtUpperLimit: borrow zcb with same wrapped asset as collateral asset', async () => {
+		let adjAPY0 = (APY0-1)/upperThreshold0 + 1;
+
+		let temp0 = APY0-minRateAdjustment;
+
+		adjAPY0 = Math.min(adjAPY0, temp0);
+
+		adjAPY0 = Math.max(adjAPY0, 1);
+
+		let yearsRemaining = (maturity - (await web3.eth.getBlock('latest')).timestamp)/ SecondsPerYear;
+
+		let rateMultiplier0 = adjAPY0**(-yearsRemaining);
+
+		let amountBorrowed = 100000000;	//asset0
+		let expectedAmountSupplied = Math.floor(amountBorrowed*rateMultiplier0);
+		let actualBN = await vaultHealthInstance.amountSuppliedAtUpperLimit(wAsset0.address, zcbAsset0.address, amountBorrowed)
+		let actual = parseInt(actualBN.toString());
+
+		let error = AmountError(expectedAmountSupplied, actual);
+		assert.isBelow(error, ErrorRange, "output within acceptable error range");
+
+		let needed = Math.ceil(actual/amountBorrowed) + 1;
+		assert.equal(await vaultHealthInstance.satisfiesUpperLimit(wAsset0.address, zcbAsset0.address, actualBN, amountBorrowed), false, "correct value returned by satisfiesUpperLimit");
+		assert.equal(await vaultHealthInstance.satisfiesUpperLimit(wAsset0.address, zcbAsset0.address, actualBN.add(new BN(needed)), amountBorrowed), true, "correct value returned by satisfiesUpperLimit");
+	});
+
+	it('amountSuppliedAtUpperLimit: zcb time spread, borrow later maturity', async () => {
+		apy1BN = await amm1.getAPYFromOracle();
+		apy2BN = await amm2.getAPYFromOracle();
+		APY1 = (parseInt(apy1BN.toString()) * 2**-64);
+		APY2 = (parseInt(apy2BN.toString()) * 2**-64);
+
+		let yearsRemaining1 = (maturity - (await web3.eth.getBlock('latest')).timestamp)/ SecondsPerYear;
+		let yearsRemaining2 = (shortMaturity - (await web3.eth.getBlock('latest')).timestamp)/ SecondsPerYear;
+		let yearsSpread = yearsRemaining1 - yearsRemaining2;
+
+		let ytm1 = Math.pow(APY1, yearsRemaining1);
+		let ytm2 = Math.pow(APY2, yearsRemaining2);
+
+		let yr1 = (new BN(Math.floor(yearsRemaining1 * SecondsPerYear))).mul((new BN(2)).pow(new BN(64))).div(new BN(SecondsPerYear));
+		let yr2 = (new BN(Math.floor(yearsRemaining2 * SecondsPerYear))).mul((new BN(2)).pow(new BN(64))).div(new BN(SecondsPerYear));
+
+		let yieldSpread = ytm1 / ytm2;
+
+		let APYs = Math.pow(yieldSpread, 1/yearsSpread);
+
+		let adjAPYs = (APYs-1)/upperThreshold1 + 1;
+
+		let temp = APYs-minRateAdjustment;
+
+		adjAPYs = Math.min(adjAPYs, temp);
+
+		adjAPYs = Math.max(adjAPYs, 1);
+
+		let rateMultiplier = adjAPYs**(-yearsSpread);
+
+		let amountBorrowed = 100000000;	//zcb asset 1
+		let expectedAmountSupplied = Math.floor(amountBorrowed/rateMultiplier);
+		let actualBN = await vaultHealthInstance.amountSuppliedAtUpperLimit(zcbAsset2.address, zcbAsset1.address, amountBorrowed);
+		let actual = parseInt(actualBN.toString());
+		let error = AmountError(expectedAmountSupplied, actual);
+		assert.isBelow(error, ErrorRange, "output within acceptable error range");
+
+		let needed = Math.ceil(actual/amountBorrowed) + 1;
+		assert.equal(await vaultHealthInstance.satisfiesUpperLimit(zcbAsset2.address, zcbAsset1.address, actualBN, amountBorrowed), false, "correct value returned by satisfiesUpperLimit");
+		assert.equal(await vaultHealthInstance.satisfiesUpperLimit(zcbAsset2.address, zcbAsset1.address, actualBN.add(new BN(needed)), amountBorrowed), true, "correct value returned by satisfiesUpperLimit");
+	});
+
+	it('amountSuppliedAtUpperLimit: zcb time spread, borrow earlier maturity', async () => {
+		apy1BN = await amm1.getAPYFromOracle();
+		apy2BN = await amm2.getAPYFromOracle();
+		APY1 = (parseInt(apy1BN.toString()) * 2**-64);
+		APY2 = (parseInt(apy2BN.toString()) * 2**-64);
+
+		let yearsRemaining1 = (maturity - (await web3.eth.getBlock('latest')).timestamp)/ SecondsPerYear;
+		let yearsRemaining2 = (shortMaturity - (await web3.eth.getBlock('latest')).timestamp)/ SecondsPerYear;
+		let yearsSpread = yearsRemaining1 - yearsRemaining2;
+
+		let ytm1 = Math.pow(APY1, yearsRemaining1);
+		let ytm2 = Math.pow(APY2, yearsRemaining2);
+
+		let yr1 = (new BN(Math.floor(yearsRemaining1 * SecondsPerYear))).mul((new BN(2)).pow(new BN(64))).div(new BN(SecondsPerYear));
+		let yr2 = (new BN(Math.floor(yearsRemaining2 * SecondsPerYear))).mul((new BN(2)).pow(new BN(64))).div(new BN(SecondsPerYear));
+
+		let yieldSpread = ytm1 / ytm2;
+
+		let APYs = Math.pow(yieldSpread, 1/yearsSpread);
+
+		let adjAPYs = (APYs-1)*upperThreshold1 + 1;
+
+		let temp = APYs+minRateAdjustment;
+
+		adjAPYs = Math.max(adjAPYs, temp);
+
+		adjAPYs = Math.max(adjAPYs, 1);
+
+		let rateMultiplier = adjAPYs**(-yearsSpread);
+
+		let amountBorrowed = 100000000;	//zcb asset 2
+		let expectedAmountSupplied = Math.floor(amountBorrowed*rateMultiplier);
+		let actualBN = await vaultHealthInstance.amountSuppliedAtUpperLimit(zcbAsset1.address, zcbAsset2.address, amountBorrowed);
+		let actual = parseInt(actualBN.toString());
+		let error = AmountError(expectedAmountSupplied, actual);
+		assert.isBelow(error, ErrorRange, "output within acceptable error range");
+
+		let needed = Math.ceil(actual/amountBorrowed) + 1;
+		assert.equal(await vaultHealthInstance.satisfiesUpperLimit(zcbAsset1.address, zcbAsset2.address, actualBN, amountBorrowed), false, "correct value returned by satisfiesUpperLimit");
+		assert.equal(await vaultHealthInstance.satisfiesUpperLimit(zcbAsset1.address, zcbAsset2.address, actualBN.add(new BN(needed)), amountBorrowed), true, "correct value returned by satisfiesUpperLimit");
+	});
+
 	it('amountSuppliedAtUpperLimit: matured zcb (not in payout phase) deposited', async () => {
 		await helper.advanceTime(_8days+1);
 		await asset1.setInflation(_10To18.mul(new BN(2)));
@@ -612,7 +727,6 @@ contract('VaultHealth', async function(accounts) {
 		assert.equal(await vaultHealthInstance.satisfiesUpperLimit(zcbAsset2.address, zcbAsset0.address, actualBN, amountBorrowed), false, "correct value returned by satisfiesUpperLimit");
 		assert.equal(await vaultHealthInstance.satisfiesUpperLimit(zcbAsset2.address, zcbAsset0.address, actualBN.add(new BN(needed)), amountBorrowed), true, "correct value returned by satisfiesUpperLimit");
 	});
-
 
 	it('YTvaultSatisfiesUpperLimit(): ZCB == YT', async () => {
 		await setPrice(_10To18.mul(new BN(3)));

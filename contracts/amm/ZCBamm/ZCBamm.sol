@@ -57,7 +57,7 @@ contract ZCBamm is IZCBamm {
 		address _YTaddress = IFixCapitalPool(_FCPaddress).yieldTokenAddress();
 		address _ZCBaddress = IFixCapitalPool(_FCPaddress).zeroCouponBondAddress();
 		uint64 _maturity = IFixCapitalPool(_FCPaddress).maturity();
-		require(_maturity > block.timestamp + 10 days);
+		require(_maturity > block.timestamp + 1 weeks);
 		maturity = _maturity;
 		//we want time remaining / anchor to be less than 1, thus make anchor greater than time remaining
 		uint temp = ANCHOR_MULTIPLIER * (maturity - block.timestamp);
@@ -695,7 +695,7 @@ contract ZCBamm is IZCBamm {
 		@return int128 yield: OracleRate**(yearsToAnchors(years)), also equivalent to impliedAPY**(years)
 	*/
 	function impliedYieldOverYears(int128 _years) external view override returns (int128 yield) {
-		int128 numAnchors = _years.mul(int128(anchor)) / int128(SecondsPerYear);
+		int128 numAnchors = int128( int(_years).mul(int(SecondsPerYear)) / int(anchor) );
 		return BigMath.Pow(OracleRate, numAnchors);
 	}
 

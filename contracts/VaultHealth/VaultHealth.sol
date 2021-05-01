@@ -322,7 +322,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 					there is an inefficiency in the market that says there is negative yield between maturities
 					which is impossible so we override it and say that there is no yield between maturities
 				*/
-				return (1 ether, spreadTime);
+				return (ABDK_1, spreadTime);
 			}
 			yieldSpread = totalYieldSupplied.div(totalYieldBorrowed);
 		}
@@ -333,7 +333,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 					there is an inefficiency in the market that says there is negative yield between maturities
 					which is impossible so we override it and say that there is no yield between maturities
 				*/
-				return (1 ether, spreadTime);
+				return (ABDK_1, spreadTime);
 			}
 			yieldSpread = totalYieldBorrowed.div(totalYieldSupplied);
 		}
@@ -385,10 +385,10 @@ contract VaultHealth is IVaultHealth, Ownable {
 					(int128 spreadAPY, int128 spreadTime) = impliedAPYBetweenMaturities(_supplied, _borrowed, ytmSupplied, ytmBorrowed);
 					address _bs = _baseSupplied; //prevent stack too deep
 					if (ytmBorrowed > ytmSupplied) {
-						return rateToRateMultiplier(spreadAPY, spreadTime, _bs, (_ups ? RateAdjuster.UPPER_DEPOSIT : RateAdjuster.LOW_DEPOSIT), _suppliedRateChange);
+						return rateToRateMultiplier(spreadAPY, spreadTime, _bs, (_ups ? RateAdjuster.UPPER_BORROW : RateAdjuster.LOW_BORROW), _suppliedRateChange);
 					}
 					else {
-						uint rm = rateToRateMultiplier(spreadAPY, spreadTime, _bs, (_ups ? RateAdjuster.UPPER_BORROW : RateAdjuster.LOW_BORROW), _borrowedRateChange);
+						uint rm = rateToRateMultiplier(spreadAPY, spreadTime, _bs, (_ups ? RateAdjuster.UPPER_DEPOSIT : RateAdjuster.LOW_DEPOSIT), _borrowedRateChange);
 						return uint((1 ether)**2).div(rm);
 					}
 				}
@@ -448,6 +448,9 @@ contract VaultHealth is IVaultHealth, Ownable {
 		@return uint: cross collateralisation ratio between the asset deposited into the vault and the asset borrowed from the vault
 	*/
 	function crossCollateralizationRatio(address _deposited, address _borrowed, Safety _safety) internal view returns (uint) {
+		if (_deposited == _borrowed) {
+			return (1 ether);
+		}
 		if (_safety == Safety.UPPER) {
 			return uint(int128(UpperCollateralizationRatio[_deposited]).mul(int128(UpperCollateralizationRatio[_borrowed]))).mul(1 ether) >> 64;
 		}
@@ -518,7 +521,6 @@ contract VaultHealth is IVaultHealth, Ownable {
 		return _amountBorrowed
 			.div(combinedRateMultipliers(true, true, fcpSupplied, _baseSupplied, fcpBorrowed, _baseBorrowed, ABDK_1, ABDK_1));
 	}
-
 
 	/*
 		@Description: find the amount of supplied asset that is required for a vault stay above the lower collateralisation limit
@@ -626,10 +628,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 		uint maxBorrowAgainstBond = uint(_amountBond)
 			.mul(combinedRateMultipliers(true, true, _FCPsupplied, _baseSupplied, _FCPborrowed, _baseBorrowed, _suppliedRateChange, _borrowedRateChange));
 
-		return (maxBorrowAgainstYield + maxBorrowAgainstBond)
-			.mul(1 ether)
-			.div(crossAssetPrice(_baseSupplied, _baseBorrowed))
-			.div(crossCollateralizationRatio(_baseSupplied, _baseBorrowed, Safety.UPPER));
+		return (maxBorrowAgainstYield + maxBorrowAgainstBond).div(1 ether);
 	}
 
 	/*
@@ -716,10 +715,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 		uint maxBorrowAgainstBond = uint(_amountBond)
 			.mul(combinedRateMultipliers(true, false, _FCPsupplied, _baseSupplied, _FCPborrowed, _baseBorrowed, _suppliedRateChange, _borrowedRateChange));
 
-		return (maxBorrowAgainstYield + maxBorrowAgainstBond)
-			.mul(1 ether)
-			.div(crossAssetPrice(_baseSupplied, _baseBorrowed))
-			.div(crossCollateralizationRatio(_baseSupplied, _baseBorrowed, Safety.LOW));
+		return (maxBorrowAgainstYield + maxBorrowAgainstBond).div(1 ether);
 	}
 
 	/*

@@ -114,6 +114,9 @@ contract('VaultHealth', async function(accounts) {
 		wAsset0 = await NGBwrapper.at(reca.receipt.logs[0].args.wrapperAddress);
 		wAsset1 = await NGBwrapper.at(recb.receipt.logs[0].args.wrapperAddress);
 
+		await vaultHealthInstance.setMinimumRateAdjustment(wAsset0.address, basisPointsToABDKString(100));
+		await vaultHealthInstance.setMinimumRateAdjustment(wAsset1.address, basisPointsToABDKString(100));
+
 		let rec0 = await organizerInstance.deployFixCapitalPoolInstance(wAsset0.address, maturity);
 		let rec1 = await organizerInstance.deployFixCapitalPoolInstance(wAsset1.address, maturity);
 		let rec2 = await organizerInstance.deployFixCapitalPoolInstance(wAsset1.address, shortMaturity);

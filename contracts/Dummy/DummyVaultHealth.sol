@@ -97,7 +97,12 @@ contract DummyVaultHealth is IVaultHealth {
 		return true && toReturn;
 	}
 
-
+	function minimumRateAdjustment(address _underlyingAssetAddress) external view override returns (int128) {
+		if (_underlyingAssetAddress == address(0)) {
+			return 0;
+		}
+		return 1;
+	}
 
 	bool toReturn;
 	function setToReturn(bool _toReturn) external {
@@ -191,7 +196,19 @@ contract DummyVaultHealth is IVaultHealth {
 
 	}
 
-	function setMaximumShortInterest(address _underlyingAssetAddress, uint _maximumShortInterest) external {
+	function setMaximumShortInterest(address _underlyingAssetAddress, uint _maximumShortInterest) external override {
 		maximumShortInterest[_underlyingAssetAddress] = _maximumShortInterest;
+	}
+	function setCollateralizationRatios(address _underlyingAssetAddress, uint120 _upper, uint120 _lower) external override {
+		maximumShortInterest[_underlyingAssetAddress] = maximumShortInterest[_upper == _lower ? _underlyingAssetAddress : _underlyingAssetAddress];
+	}
+	function setRateThresholds(address _underlyingAssetAddress, uint120 _upper, uint120 _lower) external override {
+		maximumShortInterest[_underlyingAssetAddress] = maximumShortInterest[_upper == _lower ? _underlyingAssetAddress : _underlyingAssetAddress];
+	}
+	function setOrganizerAddress(address _organizerAddress) external override {
+		maximumShortInterest[_organizerAddress] = maximumShortInterest[_organizerAddress];
+	}
+	function setMinimumRateAdjustment(address _wrapperAddress, int128 _minimumRateAdjustment) external override {
+		maximumShortInterest[_wrapperAddress] = maximumShortInterest[_minimumRateAdjustment == _minimumRateAdjustment+1 ? _wrapperAddress : _wrapperAddress];
 	}
 }

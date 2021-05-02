@@ -56,16 +56,16 @@ contract VaultHealth is IVaultHealth, Ownable {
 
 	/*
 		When a user deposits bonds we take the Maximum of the rate shown in the oracle +
-		MIN_RATE_ADJUSTMENT and the rate shown in the oracle adjusted with the
+		minimumRateAdjustment[baseWrapperAsset] and the rate shown in the oracle adjusted with the
 		corresponding rate threshold as the rate for which collateralization requirements
 		will be calculated
 
 		When a user borrowes bonds we take the Maximum of the rate shown in the oracle -
-		MIN_RATE_ADJUSTMENT and the rate shown in the oracle adjusted with the
+		minimumRateAdjustment[baseWrapperAsset] and the rate shown in the oracle adjusted with the
 		corresponding rate threshold as the rate for which collateralization requirements
 		will be calculated
 	*/
-	int128 constant MIN_RATE_ADJUSTMENT = ABDK_1 / 100;
+	mapping(address => int128) public override minimumRateAdjustment;
 
 	/*
 		The Collateralisation Ratio mappings hold information about the % which any vault
@@ -262,11 +262,11 @@ contract VaultHealth is IVaultHealth, Ownable {
 		_startAPY = _startAPY.sub(ABDK_1).mul(_rateChange).add(ABDK_1);
 		int128 adjApy = _startAPY.sub(ABDK_1).mul(getRateThresholdMultiplier(_underlyingAssetAddress, _rateAdjuster)).add(ABDK_1);
 		if (isDeposited(_rateAdjuster)) {
-			int128 temp = _startAPY.add(MIN_RATE_ADJUSTMENT);
+			int128 temp = _startAPY.add(minimumRateAdjustment[_underlyingAssetAddress]);
 			adjApy = temp > adjApy ? temp : adjApy;
 		}
 		else if (isBorrowed(_rateAdjuster)) {
-			int128 temp = _startAPY.sub(MIN_RATE_ADJUSTMENT);
+			int128 temp = _startAPY.sub(minimumRateAdjustment[_underlyingAssetAddress]);
 			adjApy = temp < adjApy ? temp : adjApy;
 		}
 		if (adjApy <= ABDK_1) return (1 ether);
@@ -1140,7 +1140,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 		@param uint128 _lower: the upper collateralisation ratio
 			in ABDK64.64 format
 	*/
-	function setCollateralizationRatios(address _underlyingAssetAddress, uint120 _upper, uint120 _lower) external onlyOwner {
+	function setCollateralizationRatios(address _underlyingAssetAddress, uint120 _upper, uint120 _lower) external override onlyOwner {
 		require(_upper >= _lower && _lower > ABDK_1);
 		//ensure that the contract at _underlyingAssetAddress is not a fix capital pool contract
 		require(organizer(organizerAddress).fixCapitalPoolToWrapper(_underlyingAssetAddress) == address(0));
@@ -1157,7 +1157,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 		@param uint120 _lower: the lower rate threshold multiplier
 			in ABDK64.64 format
 	*/
-	function setRateThresholds(address _underlyingAssetAddress, uint120 _upper, uint120 _lower) external onlyOwner {
+	function setRateThresholds(address _underlyingAssetAddress, uint120 _upper, uint120 _lower) external override onlyOwner {
 		require(_upper >= _lower && _lower > ABDK_1);
 		//ensure that the contract at _underlyingAssetAddress is not a fix capital pool contract
 		require(organizer(organizerAddress).fixCapitalPoolToWrapper(_underlyingAssetAddress) == address(0));
@@ -1168,7 +1168,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 	/*
 		@Description: admin may set the organizer contract address
 	*/
-	function setOrganizerAddress(address _organizerAddress) external onlyOwner {
+	function setOrganizerAddress(address _organizerAddress) external override onlyOwner {
 		require(organizerAddress == address(0));
 		organizerAddress = _organizerAddress;
 	}
@@ -1179,8 +1179,19 @@ contract VaultHealth is IVaultHealth, Ownable {
 		@param address _underlyingAssetAddress: the address of the underlying asset for which to set a short interest cap
 		@param uint _maximumShortInterest: the maximum amount of units of the underlying asset that may sold short via ZCBs
 	*/
-	function setMaximumShortInterest(address _underlyingAssetAddress, uint _maximumShortInterest) external onlyOwner {
+	function setMaximumShortInterest(address _underlyingAssetAddress, uint _maximumShortInterest) external override onlyOwner {
 		maximumShortInterest[_underlyingAssetAddress] = _maximumShortInterest;
+	}
+
+	/*
+		@Description: admin may set the minimum amount by which the rate for an asset is adjusted when calculating
+			collalteralization requirements
+	
+		@param address _underlyingAssetAddress: the address of the wrapper asset for which to set the minimum rate adjustment
+		@param int128 _minimumRateAdjustment: the new minimum rate adjustment for _wrapperAsset
+	*/
+	function setMinimumRateAdjustment(address _wrapperAddress, int128 _minimumRateAdjustment) external override onlyOwner {
+		minimumRateAdjustment[_wrapperAddress] = _minimumRateAdjustment;
 	}
 }
 

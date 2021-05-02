@@ -39,4 +39,12 @@ interface IVaultHealth {
 	) external view returns (bool);	
 
 	function maximumShortInterest(address _underlyingAssetAddress) external view returns (uint);
+	function minimumRateAdjustment(address _underlyingAssetAddress) external view returns (int128);
+
+	//-------------a-d-m-i-n---------------
+	function setCollateralizationRatios(address _underlyingAssetAddress, uint120 _upper, uint120 _lower) external;
+	function setRateThresholds(address _underlyingAssetAddress, uint120 _upper, uint120 _lower) external;
+	function setOrganizerAddress(address _organizerAddress) external;
+	function setMaximumShortInterest(address _underlyingAssetAddress, uint _maximumShortInterest) external;
+	function setMinimumRateAdjustment(address _wrapperAddress, int128 _minimumRateAdjustment) external;
 }

@@ -21,7 +21,7 @@ const helper = require("../helper/helper.js");
 
 const nullAddress = "0x0000000000000000000000000000000000000000";
 const BN = web3.utils.BN;
-const _10 = new BN(10)
+const _10 = new BN(10);
 const _10To18 = _10.pow(new BN('18'));
 
 const _8days = 8*24*60*60;
@@ -852,7 +852,6 @@ contract('VaultFactory', async function(accounts) {
 		assert.equal(liquidation.bidTimestamp.toNumber(), timestamp, "correct value of liqudiation.bidTimestamp");
 	});
 
-
 	it('claim YT liquidation auction rewards', async () => {
 		//go 10 minuites into the future to claim liquidation
 		await helper.advanceTime(10*60 + 1);
@@ -870,6 +869,31 @@ contract('VaultFactory', async function(accounts) {
 		assert.equal(newBalBonds.sub(prevBalBonds).toString(), expectedBondChange.toString(), "correct payout bond after winning YTLiquidation auction");
 	});
 
+	it('cannot liquidate YTVaults that have been autopaid off', async () => {
+		let ys = 10000000;
+		let debt = 100000;
+		let bs = debt - ys;
+		maxShortInterest0 = _10To18.mul(_10To18).toString();
+		await vaultHealthInstance.setMaximumShortInterest(asset1.address, maxShortInterest0);
+		await vaultHealthInstance.setToReturn(true);
+		await vaultFactoryInstance.openYTVault(fcp1.address, fcp1.address, ys, bs, debt, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
+		await vaultHealthInstance.setToReturn(false);
+		let bid = debt;
+		vaultIndex = (await vaultFactoryInstance.YTvaultsLength(accounts[0])).toNumber() - 1;
+		sameFCPvaultIndex = vaultIndex;
+		vault = await vaultFactoryInstance.YTvaults(accounts[0], vaultIndex);
+		let minBondRatio = _10To18.mul(vault.bondSupplied).div(vault.yieldSupplied).sub(new BN(10));
+		let caught = false;
+		try {
+			await vaultFactoryInstance.auctionYTLiquidation(accounts[0], sameFCPvaultIndex, fcp0.address, fcp0.address, bid, minBondRatio, vault.amountBorrowed, {from: accounts[1]});
+		} catch (err) {
+			caught = true;
+		}
+		if (!caught) {
+			assert.fail('cannot liquidate YTvault that can be autopaid');
+		}
+	});
+
 	it('instant YT liquidations upon dropping below lowerCollateralLimit', async () => {
 		/*
 			first open vaults
@@ -883,6 +907,7 @@ contract('VaultFactory', async function(accounts) {
 
 		minBondRatio = bondSupplied.mul(_10To18).div(yieldSupplied).sub(new BN(10));
 		vaultIndex = (await vaultFactoryInstance.YTvaultsLength(accounts[0])).toNumber() - 2;
+		await vaultHealthInstance.setToReturn(true);
 		let caught = false;
 		try {
 			await vaultFactoryInstance.instantYTLiquidation(accounts[0], vaultIndex, fcp0.address, fcp1.address, amountBorrowed, yieldSupplied, minBondRatio, accounts[1], {from: accounts[1]});
@@ -913,6 +938,7 @@ contract('VaultFactory', async function(accounts) {
 		let expectedYieldOut = vault.yieldSupplied.mul(amtIn).div(vault.amountBorrowed);
 		let expectedBondOut = vault.bondSupplied.mul(amtIn).div(vault.amountBorrowed);
 		let minYieldOut = expectedYieldOut.sub(new BN(1));
+		await vaultHealthInstance.setToReturn(false);
 		await vaultFactoryInstance.partialYTLiquidationSpecificIn(accounts[0], vaultIndex, fcp0.address, fcp1.address,
 			amtIn, minYieldOut, minBondRatio, accounts[1], {from: accounts[1]});
 
@@ -927,6 +953,7 @@ contract('VaultFactory', async function(accounts) {
 	});
 
 	it('partial vault YT liquidation Specific Out', async () => {
+		await vaultHealthInstance.setToReturn(false);
 		await vaultFactoryInstance.partialYTLiquidationSpecificOut(accounts[0], vaultIndex, fcp0.address, fcp1.address,
 			vault.yieldSupplied, minBondRatio, vault.amountBorrowed, accounts[1], {from: accounts[1]});
 
@@ -985,7 +1012,7 @@ contract('VaultFactory', async function(accounts) {
 		assert.equal(liquidation.bidAmount.toString(), bid.toString(), "correct value of liquidation.bidAmount");
 		assert.equal(liquidation.bidTimestamp.toString(), timestamp, "correct value of liqudiation.bidTimestamp");
 
-		vault = await vaultFactoryInstance.YTvaults(accounts[0], 1);
+		vault = await vaultFactoryInstance.YTvaults(accounts[0], 2);
 
 		assert.equal(vault.FCPborrowed, nullAddress, "FCPborrowed is null");
 		assert.equal(vault.FCPsupplied, nullAddress, "FCPsupplied is null");
@@ -994,10 +1021,27 @@ contract('VaultFactory', async function(accounts) {
 		assert.equal(vault.bondSupplied.toString(), "0", "bondSupplied is correct");
 	});
 
+	it('cannot liquidate YTVaults (on time) that have been autopaid off', async () => {
+		await vaultHealthInstance.setToReturn(false);
+		vault = await vaultFactoryInstance.YTvaults(accounts[0], sameFCPvaultIndex);
+		let minBondRatio = _10To18.mul(vault.bondSupplied).div(vault.yieldSupplied).sub(new BN(10));
+		let caught = false;
+		try {
+			await vaultFactoryInstance.auctionYTLiquidation(accounts[0], sameFCPvaultIndex, fcp0.address, fcp0.address,
+				vault.amountBorrowed, minBondRatio, vault.amountBorrowed, {from: accounts[1]});
+		} catch (err) {
+			caught = true;
+		}
+		if (!caught) {
+			assert.fail('cannot liquidate YTvault that can be autopaid');
+		}
+	});
+
 	it('instant vault YT liquidations due to time to maturity', async () => {
 		vaultIndex++;
 		let caught = false;
 
+		await vaultHealthInstance.setToReturn(true);
 		try {
 			await vaultFactoryInstance.instantYTLiquidation(accounts[0], vaultIndex, fcp0.address, fcp1.address, amountBorrowed, yieldSupplied, minBondRatio, accounts[1], {from: accounts[1]});
 		} catch (err) {
@@ -1022,6 +1066,20 @@ contract('VaultFactory', async function(accounts) {
 		assert.equal(vault.bondSupplied.toString(), "0", "bondSupplied is correct");
 	});
 
+	it('cannot instantly liquidate YTVaults (on time) that have been autopaid off', async () => {
+		await vaultHealthInstance.setToReturn(false);
+		vault = await vaultFactoryInstance.YTvaults(accounts[0], sameFCPvaultIndex);
+		let minBondRatio = _10To18.mul(vault.bondSupplied).div(vault.yieldSupplied).sub(new BN(10));
+		let caught = false;
+		try {
+			await vaultFactoryInstance.instantYTLiquidation(accounts[0], sameFCPvaultIndex, fcp0.address, fcp0.address, vault.amountBorrowed, vault.yieldSupplied, minBondRatio, accounts[1], {from: accounts[1]});
+		} catch (err) {
+			caught = true;
+		}
+		if (!caught) {
+			assert.fail('cannot liquidate YTvault that can be autopaid');
+		}
+	});
 
 	it('contract owner withdraws YT revenue', async () => {
 		let revenue = await vaultFactoryInstance.YTrevenue(fcp1.address);

@@ -34,6 +34,8 @@ function basisPointsToABDKString(bips) {
 
 const ABDK_1 = basisPointsToABDKString(TOTAL_BASIS_POINTS);
 
+const NON_CHANGE_MULTIPLIERS = [TOTAL_BASIS_POINTS, ABDK_1, ABDK_1];
+
 const rebate_bips = 120;
 
 contract('VaultFactory', async function(accounts) {
@@ -230,24 +232,55 @@ contract('VaultFactory', async function(accounts) {
 	});
 
 	it('deposits into vault', async () => {
-		var prevBalanceW1 = await wAsset1.balanceOf(accounts[0]);
-		prevSupplied = new BN(vaults[0].amountSupplied);
-		await vaultFactoryInstance.deposit(accounts[0], 0, _10To18.toString());
-		currentSupplied = new BN((await vaultFactoryInstance.vaults(accounts[0], 0)).amountSupplied);
+		let prevBalanceW1 = await wAsset1.balanceOf(accounts[0]);
+		prevSupplied = new BN(vault.amountSupplied);
+
+		let toSupply = _10To18;
+		let expectedNewSupplied = prevSupplied.add(toSupply);
+		let expectedNewBalance = prevBalanceW1.sub(toSupply);
+
+		await vaultFactoryInstance.adjustVault(
+			accounts[0],
+			0,
+			vault.assetSupplied,
+			vault.assetBorrowed,
+			expectedNewSupplied,
+			vault.amountBorrowed,
+			NON_CHANGE_MULTIPLIERS,
+			[],
+			accounts[0]
+		);
+
+		vault = await vaultFactoryInstance.vaults(accounts[0], 0);
+
+		assert.equal((await wAsset1.balanceOf(accounts[0])).toString(), expectedNewBalance.toString(), "correct amount of wAsset1 supplied");
+		assert.equal(vault.amountSupplied.toString(), expectedNewSupplied.toString(), "correct increase in supplied asset in vault");
 
 		assert.equal((await wAsset1.balanceOf(accounts[0])).toString(), prevBalanceW1.sub(_10To18).toString(), "correct amount of wAsset1 supplied");
-		assert.equal(currentSupplied.sub(_10To18).toString(), prevSupplied.toString(), "correct increase in supplied asset in vault");
+		assert.equal(vault.amountSupplied.sub(_10To18).toString(), prevSupplied.toString(), "correct increase in supplied asset in vault");
 	});
 
 	it('removes from vault', async () => {
-		var toRemove = currentSupplied.sub(prevSupplied);
-		var prevBalanceW1 = await wAsset1.balanceOf(accounts[0]);
-		prevSupplied = currentSupplied;
+		let toRemove = _10To18;
+		let prevBalanceW1 = await wAsset1.balanceOf(accounts[0]);
+		let prevVault = vault;
+
+		let newSupplied = prevVault.amountSupplied.sub(toRemove);
 
 		await vaultHealthInstance.setToReturn(false);
 		let caught = false;
 		try {
-			await vaultFactoryInstance.remove(0, toRemove.toString(), accounts[0], TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
+			await vaultFactoryInstance.adjustVault(
+				accounts[0],
+				0,
+				vault.assetSupplied,
+				vault.assetBorrowed,
+				newSupplied,
+				vault.amountBorrowed,
+				NON_CHANGE_MULTIPLIERS,
+				[],
+				accounts[0]
+			);
 		} catch (err) {
 			caught = true;
 		}
@@ -255,52 +288,90 @@ contract('VaultFactory', async function(accounts) {
 
 		await vaultHealthInstance.setToReturn(true);
 
-		await vaultFactoryInstance.remove(0, toRemove.toString(), accounts[0], TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
+		await vaultFactoryInstance.adjustVault(
+			accounts[0],
+			0,
+			vault.assetSupplied,
+			vault.assetBorrowed,
+			newSupplied,
+			vault.amountBorrowed,
+			NON_CHANGE_MULTIPLIERS,
+			[],
+			accounts[0]
+		);
+
+		vault = await vaultFactoryInstance.vaults(accounts[0], 0);
 
 		currentSupplied = new BN((await vaultFactoryInstance.vaults(accounts[0], 0)).amountSupplied);
-		assert.equal((await wAsset1.balanceOf(accounts[0])).toString(), prevBalanceW1.add(toRemove), "correct amount of wAsset1 supplied");
-		assert.equal(prevSupplied.sub(currentSupplied).toString(), toRemove.toString(), "correct increase in supplied asset in vault");
+		assert.equal((await wAsset1.balanceOf(accounts[0])).toString(), prevBalanceW1.add(toRemove).toString(), "correct amount of wAsset1 supplied");
+		assert.equal(prevVault.amountSupplied.sub(vault.amountSupplied).toString(), toRemove.toString(), "correct increase in supplied asset in vault");
 	});
 
 
 	it('repays vault', async () => {
 		toRepay = _10To18.div(new BN('2'));
+		let prevBalanceZCB = await zcbAsset0.balanceOf(accounts[0]);
+		let newDebt = vault.amountBorrowed.sub(toRepay);
+		let prevVault = vault;
 
-		var prevBalanceZCB = await zcbAsset0.balanceOf(accounts[0]);
-		var prevBorrowed = new BN(vault.amountBorrowed);
-		await vaultFactoryInstance.repay(accounts[0], 0, toRepay.toString());
+		await vaultFactoryInstance.adjustVault(
+			accounts[0],
+			0,
+			vault.assetSupplied,
+			vault.assetBorrowed,
+			vault.amountSupplied,
+			newDebt,
+			NON_CHANGE_MULTIPLIERS,
+			[],
+			accounts[0]
+		);
 
-		var currentBalanceZCB = await zcbAsset0.balanceOf(accounts[0]);
-		var currentBorrowed = new BN((await vaultFactoryInstance.vaults(accounts[0], 0)).amountBorrowed);
+		vault = await vaultFactoryInstance.vaults(accounts[0], 0);
+		let currentBalanceZCB = await zcbAsset0.balanceOf(accounts[0]);
+
 		assert.equal(prevBalanceZCB.sub(currentBalanceZCB).toString(), toRepay.toString(), "correct amount repaid");
-		assert.equal(prevBorrowed.sub(currentBorrowed).toString(), toRepay.toString(), "correct amount repaid");
+		assert.equal(prevVault.amountBorrowed.sub(vault.amountBorrowed).toString(), toRepay.toString(), "correct amount repaid");
 	});
 
 	it('borrows from vault', async () => {
 		toBorrow = toRepay;
-		var prevBalanceZCB = await zcbAsset0.balanceOf(accounts[0]);
-		var prevBorrowed = new BN((await vaultFactoryInstance.vaults(accounts[0], 0)).amountBorrowed);
-		await vaultFactoryInstance.borrow(0, toBorrow.toString(), accounts[0], TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
+		let prevBalanceZCB = await zcbAsset0.balanceOf(accounts[0]);
+		let prevBorrowed = new BN((await vaultFactoryInstance.vaults(accounts[0], 0)).amountBorrowed);
+		let newDebt = vault.amountBorrowed.add(toBorrow);
+		let prevVault = vault;
 
-		var currentBalanceZCB = await zcbAsset0.balanceOf(accounts[0]);
-		currentBorrowed = new BN((await vaultFactoryInstance.vaults(accounts[0], 0)).amountBorrowed);
+		await vaultFactoryInstance.adjustVault(
+			accounts[0],
+			0,
+			vault.assetSupplied,
+			vault.assetBorrowed,
+			vault.amountSupplied,
+			newDebt,
+			NON_CHANGE_MULTIPLIERS,
+			[],
+			accounts[0]
+		);
+
+		vault = await vaultFactoryInstance.vaults(accounts[0], 0);
+		let currentBalanceZCB = await zcbAsset0.balanceOf(accounts[0]);
+
 		assert.equal(currentBalanceZCB.sub(prevBalanceZCB).toString(), toBorrow.toString(), "correct amount repaid");
-		assert.equal(currentBorrowed.sub(prevBorrowed).toString(), toBorrow.toString(), "correct amount repaid");
+		assert.equal(vault.amountBorrowed.sub(prevVault.amountBorrowed).toString(), toBorrow.toString(), "correct amount repaid");
 	});
 
 	it('send undercollateralised vaults to liquidation', async () => {
 		/*
 			increase collateralisation ratio limits such that the open vault will be sent to liquidation
 		*/
-		upperRatio = currentSupplied.mul(_10To18).div(currentBorrowed);
+		upperRatio = vault.amountSupplied.mul(_10To18).div(vault.amountBorrowed);
 		await vaultHealthInstance.setUpper(asset1.address, zcbAsset0.address, upperRatio);
 
 		let surplus = new BN("10000");
-		bid = currentSupplied.sub(surplus);
+		bid = vault.amountSupplied.sub(surplus);
 
 		caught = false;
 		try {
-			await vaultFactoryInstance.auctionLiquidation(accounts[0], 0, zcbAsset0.address, wAsset1.address, bid.toString(), currentBorrowed.toString(), {from: accounts[1]});
+			await vaultFactoryInstance.auctionLiquidation(accounts[0], 0, zcbAsset0.address, wAsset1.address, bid.toString(), vault.amountBorrowed.toString(), {from: accounts[1]});
 		} catch (err) {
 			caught = true;
 		}
@@ -311,7 +382,7 @@ contract('VaultFactory', async function(accounts) {
 
 		let prevRevenue = await vaultFactoryInstance.revenue(wAsset1.address);
 		
-		let rec = await vaultFactoryInstance.auctionLiquidation(accounts[0], 0, zcbAsset0.address, wAsset1.address, bid.toString(), currentBorrowed.toString(), {from: accounts[1]});
+		let rec = await vaultFactoryInstance.auctionLiquidation(accounts[0], 0, zcbAsset0.address, wAsset1.address, bid.toString(), vault.amountBorrowed.toString(), {from: accounts[1]});
 
 		let timestamp = (await web3.eth.getBlock(rec.receipt.blockNumber)).timestamp;
 
@@ -328,11 +399,12 @@ contract('VaultFactory', async function(accounts) {
 		assert.equal(liquidation.vaultOwner, accounts[0], "correct value of liquidation.vaultOwner");
 		assert.equal(liquidation.assetBorrowed, zcbAsset0.address, "correct value of liquidation.assetBorrowed");
 		assert.equal(liquidation.assetSupplied, wAsset1.address, "correct value of liquidation.assetSupplied");
-		assert.equal(liquidation.amountBorrowed.toString(), currentBorrowed.toString(), "correct value of liquidation.amountBorrowed");
+		assert.equal(liquidation.amountBorrowed.toString(), vault.amountBorrowed.toString(), "correct value of liquidation.amountBorrowed");
 		assert.equal(liquidation.bidder, accounts[1], "correct value of liqudiation.bidder");
 		assert.equal(liquidation.bidAmount.toString(), bid.toString(), "correct value of liquidation.bidAmount");
 		assert.equal(liquidation.bidTimestamp.toNumber(), timestamp, "correct value of liqudiation.bidTimestamp");
 
+		prevVault = vault;
 		vault = await vaultFactoryInstance.vaults(accounts[0], 0);
 
 		assert.equal(vault.assetBorrowed, nullAddress, "assetBorrowed is null");
@@ -365,7 +437,7 @@ contract('VaultFactory', async function(accounts) {
 		assert.equal(liquidation.vaultOwner, accounts[0], "correct value of liquidation.vaultOwner");
 		assert.equal(liquidation.assetBorrowed, zcbAsset0.address, "correct value of liquidation.assetBorrowed");
 		assert.equal(liquidation.assetSupplied, wAsset1.address, "correct value of liquidation.assetSupplied");
-		assert.equal(liquidation.amountBorrowed.toString(), currentBorrowed.toString(), "correct value of liquidation.amountBorrowed");
+		assert.equal(liquidation.amountBorrowed.toString(), prevVault.amountBorrowed.toString(), "correct value of liquidation.amountBorrowed");
 		assert.equal(liquidation.bidder, accounts[1], "correct value of liqudiation.bidder");
 		assert.equal(liquidation.bidAmount.toString(), bid.toString(), "correct value of liquidation.bidAmount");
 		assert.equal(liquidation.bidTimestamp.toNumber(), timestamp, "correct value of liqudiation.bidTimestamp");

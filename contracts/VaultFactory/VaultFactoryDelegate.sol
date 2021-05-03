@@ -3,6 +3,7 @@ pragma solidity >=0.6.5 <0.7.0;
 
 import "../libraries/SafeMath.sol";
 import "../libraries/SignedSafeMath.sol";
+import "../interfaces/IVaultManagerFlashReceiver.sol";
 import "../interfaces/IFixCapitalPool.sol";
 import "../interfaces/IZeroCouponBond.sol";
 import "../interfaces/IVaultHealth.sol";
@@ -254,128 +255,121 @@ contract VaultFactoryDelegate is VaultFactoryData {
 	}
 
 	/*
-		@Description: withdraw collateral from an existing vault
+		@Description: adjust the state of a vault by either changing the assets in it
+			or paying down/increasing debt or supplying/withdrawing collateral
+			for any call where funds would be transfered out of the vault msg.sender must be the vault owner
+			if the _data param has length > 0, assets sent out by the vault will be sent via flashloan
+			and repayment must be made in the required collateral assets 
 
-		@param uint _index: the vault to close is at vaults[msg.sender][_index]
-		@param uint _amount: the amount of the supplied asset to remove from the vault
-		@param address _to: the address to which to send the removed collateral
-		@param uint _priceMultiplier: a multiplier > 1
-			we ensure that after this action the vault will not be sent into the liquidation zone if the
-			cross asset price of _assetBorrowed to _assetSupplied increases by a factor of _priceMultiplier
-			(in terms of basis points)
-		@param int128 _suppliedRateChange: a multiplier > 1
-			we ensure that after this action the vault will not be sent into the liquidation zone if the
-			rate on the supplied asset increases by a factor of _suppliedRateChange
-			(in ABDK format)
-		@param int128 _borrowRateChange: a multiplier < 1
-			we ensure that after this action the vault will not be sent into the liquidation zone if the
-			rate on the borrow asset decreases by a factor of _borrowRateChange
-			(in ABDK format)
-	*/
-	function remove(
-		uint _index,
-		uint _amount,
-		address _to,
-		uint _priceMultiplier,
-		int128 _suppliedRateChange,
-		int128 _borrowRateChange
-		) external {
-
-		require(_vaults[msg.sender].length > _index);
-		Vault memory vault = _vaults[msg.sender][_index];
-
-		require(vault.amountSupplied >= _amount);
-		require(vaultWithstandsChange(
-			vault.assetSupplied,
-			vault.assetBorrowed,
-			vault.amountSupplied - _amount,
-			vault.amountBorrowed,
-			_priceMultiplier,
-			_suppliedRateChange,
-			_borrowRateChange
-		));
-
-		_vaults[msg.sender][_index].amountSupplied -= _amount;
-		IERC20(vault.assetSupplied).transfer(_to, _amount);
-	}
-
-	/*
-		@Description: deposit collateral into an exiting vault
-
-		@param address _owner: the owner of the vault to which to supply collateral
+		@param address _owner: the owner of the vault to adjust
 		@param uint _index: the index of the vault in vaults[_owner] to which to supply collateral
-		@param uint _amount: the amount of the supplied asset to provide as collateral to the vault
+		@param address _assetSupplied: the new asset(may be the same as previous) that is to be used as
+			collateral in the vault
+		@param address _assetBorrowed: the new asset(may be the same as previous) that is to be borrowed
+			from the vault
+		@param uint _amountSupplied: the total amount of collateral that shall be in the vault after execution
+		@param uint _amountBorrowed: the total amount of debt of the vault after execution
+		@param int128[3] calldata _multipliers: the 3 multipliers used on call to
+			vaultHealthContract.vaultWithstandsChange
+				uint(_multipliers[0]) is priceMultiplier
+				_multipliers[1] is suppliedRateMultiplier
+				_multipliers[2] is borrowedRateMultiplier
+		@param bytes calldata _data: data to be send to the flashloan receiver if a flashloan is to be done
+			if _data.length == 0 there will be no flashloan
+		@param  address _receiverAddr: the address of the flashloan receiver contract
 	*/
-	function deposit(address _owner, uint _index, uint _amount) external {
-		require(_vaults[_owner].length > _index);
-		IERC20(_vaults[_owner][_index].assetSupplied).transferFrom(msg.sender, address(this), _amount);
-		_vaults[_owner][_index].amountSupplied += _amount;
-	}
-
-
-	/*
-		@Description: withdraw more of the borrowed asset from an existing vault
-
-		@param uint _index: the index of the vault in vaults[msg.sender] to which to supply collateral
-		@param uint _amount: the amount of the borrowed asset to withdraw from the vault
-		@param address _to: the address to which to send the newly borrowed funds
-		@param uint _priceMultiplier: a multiplier > 1
-			we ensure that after this action the vault will not be sent into the liquidation zone if the
-			cross asset price of _assetBorrowed to _assetSupplied increases by a factor of _priceMultiplier
-			(in terms of basis points)
-		@param int128 _suppliedRateChange: a multiplier > 1
-			we ensure that after this action the vault will not be sent into the liquidation zone if the
-			rate on the supplied asset increases by a factor of _suppliedRateChange
-			(in ABDK format)
-		@param int128 _borrowRateChange: a multiplier < 1
-			we ensure that after this action the vault will not be sent into the liquidation zone if the
-			rate on the borrow asset decreases by a factor of _borrowRateChange
-			(in ABDK format)
-	*/
-	function borrow(
+	function adjustVault(
+		address _owner,
 		uint _index,
-		uint _amount,
-		address _to,
-		uint _priceMultiplier,
-		int128 _suppliedRateChange,
-		int128 _borrowRateChange
-		) external {
+		address _assetSupplied,
+		address _assetBorrowed,
+		uint _amountSupplied,
+		uint _amountBorrowed,
+		int128[3] calldata _multipliers,
+		bytes calldata _data,
+		address _receiverAddr
+	) external {
+		require(_index < _vaults[_owner].length);
 
-		require(_vaults[msg.sender].length > _index);
-		Vault memory vault = _vaults[msg.sender][_index];
+		Vault memory mVault = _vaults[_owner][_index];
+		Vault storage sVault = _vaults[_owner][_index];
 
-		require(vaultWithstandsChange(
-			vault.assetSupplied,
-			vault.assetBorrowed,
-			vault.amountSupplied,
-			vault.amountBorrowed + _amount,
-			_priceMultiplier,
-			_suppliedRateChange,
-			_borrowRateChange
-		));
+		//ensure that after operations vault will be in good health
+		//only check health if at any point funds are being removed from the vault
+		if (
+			_assetBorrowed != mVault.assetBorrowed ||
+			_assetSupplied != mVault.assetSupplied ||
+			_amountSupplied < mVault.amountSupplied ||
+			_amountBorrowed > mVault.amountBorrowed
+		) {
+			//index 0 in multipliers that must be converted to uint
+			require(_multipliers[0] > 0);
+			require(msg.sender == _owner);
+			require(vaultWithstandsChange(
+				_assetSupplied,
+				_assetBorrowed,
+				_amountSupplied,
+				_amountBorrowed,
+				uint(_multipliers[0]),
+				_multipliers[1],
+				_multipliers[2]
+			));
+		}
 
-		_vaults[msg.sender][_index].amountBorrowed += _amount;
+		//------------------distribute funds----------------------
+		if (mVault.assetSupplied != _assetSupplied) {
+			bool success = IERC20(mVault.assetSupplied).transfer(_receiverAddr, mVault.amountSupplied);
+			require(success);
+			sVault.assetSupplied = _assetSupplied;
+			sVault.amountSupplied = _amountSupplied;
+		}
+		else if (mVault.amountSupplied > _amountSupplied) {
+			bool succes = IERC20(_assetSupplied).transfer(_receiverAddr, mVault.amountSupplied - _amountSupplied);
+			require(succes);
+			sVault.amountSupplied = _amountSupplied;
+		}
+		else if (mVault.amountSupplied < _amountSupplied) {
+			sVault.amountSupplied = _amountSupplied;
+		}
 
-		address FCPborrowed = IZeroCouponBond(vault.assetBorrowed).FixCapitalPoolAddress();
-		IFixCapitalPool(FCPborrowed).mintZCBTo(_to, _amount);
-		raiseShortInterest(FCPborrowed, _amount);
-	}
+		if (mVault.assetBorrowed != _assetBorrowed) {
+			IFixCapitalPool fcp = IFixCapitalPool(IZeroCouponBond(_assetBorrowed).FixCapitalPoolAddress());
+			fcp.mintZCBTo(_receiverAddr, _amountBorrowed);
+			sVault.assetBorrowed = _assetBorrowed;
+			sVault.amountBorrowed = _amountBorrowed;
+		}
+		else if (mVault.amountBorrowed < _amountBorrowed) {
+			IFixCapitalPool fcp = IFixCapitalPool(IZeroCouponBond(_assetBorrowed).FixCapitalPoolAddress());
+			fcp.mintZCBTo(_receiverAddr, _amountBorrowed - mVault.amountBorrowed);
+			sVault.amountBorrowed = _amountBorrowed;
+		}
+		else if (mVault.amountBorrowed > _amountBorrowed) {
+			sVault.amountBorrowed = _amountBorrowed;
+		}
 
-	/*
-		@Description: repay the borrowed asset back into a vault
+		//-----------------------------flashloan------------------
+		if (_data.length > 0) {
+			IVaultManagerFlashReceiver(_receiverAddr).onFlashLoan(msg.sender, _data);
+		}
 
-		@param address _owner: the owner of the vault to which to reapy
-		@param uint _index: the index of the vault in vaults[_owner] to which to repay
-		@param uint _amount: the amount of the borrowed asset to reapy to the vault
-	*/
-	function repay(address _owner, uint _index, uint _amount) external {
-		require(_vaults[_owner].length > _index);
-		require(_vaults[_owner][_index].amountBorrowed >= _amount);
-		address assetBorrowed = _vaults[_owner][_index].assetBorrowed;
-		address FCPborrowed = IZeroCouponBond(assetBorrowed).FixCapitalPoolAddress();
-		IFixCapitalPool(FCPborrowed).burnZCBFrom(msg.sender, _amount);
-		lowerShortInterest(FCPborrowed, _amount);
-		_vaults[_owner][_index].amountBorrowed -= _amount;
+		//-----------------------------get funds-------------------------
+		if (mVault.assetSupplied != _assetSupplied) {
+			bool success = IERC20(_assetSupplied).transferFrom(msg.sender, address(this), _amountSupplied);
+			require(success);
+		}
+		else if (mVault.amountSupplied < _amountSupplied) {
+			bool success = IERC20(_assetSupplied).transferFrom(msg.sender, address(this), _amountSupplied - mVault.amountSupplied);
+			require(success);
+		}
+
+		if (mVault.assetBorrowed != _assetBorrowed) {
+			IFixCapitalPool fcp = IFixCapitalPool(IZeroCouponBond(mVault.assetBorrowed).FixCapitalPoolAddress());
+			fcp.burnZCBFrom(msg.sender, mVault.amountBorrowed);
+		}
+		else if (mVault.amountBorrowed > _amountBorrowed) {
+			IFixCapitalPool fcp = IFixCapitalPool(IZeroCouponBond(_assetBorrowed).FixCapitalPoolAddress());
+			fcp.burnZCBFrom(msg.sender,  mVault.amountBorrowed - _amountBorrowed);
+		}
 	}
 
 	//----------------------------------------------Liquidations------------------------------------------

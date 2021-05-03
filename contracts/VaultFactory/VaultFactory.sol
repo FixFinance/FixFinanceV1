@@ -209,121 +209,53 @@ contract VaultFactory is VaultFactoryData, IVaultFactory, Ownable {
 	}
 
 	/*
-		@Description: withdraw collateral from an existing vault
+		@Description: adjust the state of a vault by either changing the assets in it
+			or paying down/increasing debt or supplying/withdrawing collateral
+			for any call where funds would be transfered out of the vault msg.sender must be the vault owner
+			if the _data param has length > 0, assets sent out by the vault will be sent via flashloan
+			and repayment must be made in the required collateral assets 
 
-		@param uint _index: the vault to close is at vaults[msg.sender][_index]
-		@param uint _amount: the amount of the supplied asset to remove from the vault
-		@param address _to: the address to which to send the removed collateral
-		@param uint _priceMultiplier: a multiplier > 1
-			we ensure that after this action the vault will not be sent into the liquidation zone if the
-			cross asset price of _assetBorrowed to _assetSupplied increases by a factor of _priceMultiplier
-			(in terms of basis points)
-		@param int128 _suppliedRateChange: a multiplier > 1
-			we ensure that after this action the vault will not be sent into the liquidation zone if the
-			rate on the supplied asset increases by a factor of _suppliedRateChange
-			(in ABDK format)
-		@param int128 _borrowRateChange: a multiplier < 1
-			we ensure that after this action the vault will not be sent into the liquidation zone if the
-			rate on the borrow asset decreases by a factor of _borrowRateChange
-			(in ABDK format)
-	*/
-	function remove(
-		uint _index,
-		uint _amount,
-		address _to,
-		uint _priceMultiplier,
-		int128 _suppliedRateChange,
-		int128 _borrowRateChange
-		) external override {
-
-		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
-			"remove(uint256,uint256,address,uint256,int128,int128)",
-			_index,
-			_amount,
-			_to,
-			_priceMultiplier,
-			_suppliedRateChange,
-			_borrowRateChange
-		));
-		require(success);
-		emit Remove(msg.sender, _index, _amount);
-	}
-
-	/*
-		@Description: deposit collateral into an exiting vault
-
-		@param address _owner: the owner of the vault to which to supply collateral
+		@param address _owner: the owner of the vault to adjust
 		@param uint _index: the index of the vault in vaults[_owner] to which to supply collateral
-		@param uint _amount: the amount of the supplied asset to provide as collateral to the vault
+		@param address _assetSupplied: the new asset(may be the same as previous) that is to be used as
+			collateral in the vault
+		@param address _assetBorrowed: the new asset(may be the same as previous) that is to be borrowed
+			from the vault
+		@param uint _amountSupplied: the total amount of collateral that shall be in the vault after execution
+		@param uint _amountBorrowed: the total amount of debt of the vault after execution
+		@param int128[3] calldata _multipliers: the 3 multipliers used on call to
+			vaultHealthContract.vaultWithstandsChange
+				uint(_multipliers[0]) is priceMultiplier
+				_multipliers[1] is suppliedRateMultiplier
+				_multipliers[2] is borrowedRateMultiplier
+		@param bytes calldata _data: data to be send to the flashloan receiver if a flashloan is to be done
+			if _data.length == 0 there will be no flashloan
+		@param  address _receiverAddr: the address of the flashloan receiver contract
 	*/
-	function deposit(address _owner, uint _index, uint _amount) external override {
-		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
-			"deposit(address,uint256,uint256)",
-			_owner,
-			_index,
-			_amount
-		));
-		require(success);
-		emit Deposit(_owner, _index, _amount);
-	}
-
-	/*
-		@Description: withdraw more of the borrowed asset from an existing vault
-
-		@param uint _index: the index of the vault in vaults[msg.sender] to which to supply collateral
-		@param uint _amount: the amount of the borrowed asset to withdraw from the vault
-		@param address _to: the address to which to send the newly borrowed funds
-		@param uint _priceMultiplier: a multiplier > 1
-			we ensure that after this action the vault will not be sent into the liquidation zone if the
-			cross asset price of _assetBorrowed to _assetSupplied increases by a factor of _priceMultiplier
-			(in terms of basis points)
-		@param int128 _suppliedRateChange: a multiplier > 1
-			we ensure that after this action the vault will not be sent into the liquidation zone if the
-			rate on the supplied asset increases by a factor of _suppliedRateChange
-			(in ABDK format)
-		@param int128 _borrowRateChange: a multiplier < 1
-			we ensure that after this action the vault will not be sent into the liquidation zone if the
-			rate on the borrow asset decreases by a factor of _borrowRateChange
-			(in ABDK format)
-	*/
-	function borrow(
+	function adjustVault(
+		address _owner,
 		uint _index,
-		uint _amount,
-		address _to,
-		uint _priceMultiplier,
-		int128 _suppliedRateChange,
-		int128 _borrowRateChange
-		) external override {
-
+		address _assetSupplied,
+		address _assetBorrowed,
+		uint _amountSupplied,
+		uint _amountBorrowed,
+		int128[3] calldata _multipliers,
+		bytes calldata _data,
+		address _receiverAddr
+	) external override {
 		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
-			"borrow(uint256,uint256,address,uint256,int128,int128)",
-			_index,
-			_amount,
-			_to,
-			_priceMultiplier,
-			_suppliedRateChange,
-			_borrowRateChange
-		));
-		require(success);
-		emit Borrow(msg.sender, _index, _amount);
-	}
-
-	/*
-		@Description: repay the borrowed asset back into a vault
-
-		@param address _owner: the owner of the vault to which to reapy
-		@param uint _index: the index of the vault in vaults[_owner] to which to repay
-		@param uint _amount: the amount of the borrowed asset to reapy to the vault
-	*/
-	function repay(address _owner, uint _index, uint _amount) external override {
-		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
-			"repay(address,uint256,uint256)",
+			"adjustVault(address,uint256,address,address,uint256,uint256,int128[3],bytes,address)",
 			_owner,
 			_index,
-			_amount
+			_assetSupplied,
+			_assetBorrowed,
+			_amountSupplied,
+			_amountBorrowed,
+			_multipliers,
+			_data,
+			_receiverAddr
 		));
 		require(success);
-		emit Repay(_owner, _index, _amount);
 	}
 
 	//--------------------------------------YT vault management-----------------------------------

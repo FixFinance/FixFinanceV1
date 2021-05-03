@@ -61,25 +61,18 @@ interface IVaultFactory {
 		int128 _suppliedRateChange,
 		int128 _borrowRateChange
 	) external;
+	function adjustVault(
+		address _owner,
+		uint _index,
+		address _assetSupplied,
+		address _assetBorrowed,
+		uint _amountSupplied,
+		uint _amountBorrowed,
+		int128[3] calldata _multipliers,
+		bytes calldata _data,
+		address _receiverAddr
+	) external;
 	function closeVault(uint _index, address _to) external;
-	function remove(
-		uint _index,
-		uint _amount,
-		address _to,
-		uint _priceMultiplier,
-		int128 _suppliedRateChange,
-		int128 _borrowRateChange
-	) external;
-	function deposit(address _owner, uint _index, uint _amount) external;
-	function borrow(
-		uint _index,
-		uint _amount,
-		address _to,
-		uint _priceMultiplier,
-		int128 _suppliedRateChange,
-		int128 _borrowRateChange
-	) external;
-	function repay(address _owner, uint _index, uint _amount) external;
 	//---------------------------Y-T---v-a-u-l-t-s---------------------------------
 	function openYTVault(
 		address _FCPsupplied,

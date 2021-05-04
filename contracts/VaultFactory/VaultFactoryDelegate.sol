@@ -262,7 +262,7 @@ contract VaultFactoryDelegate is VaultFactoryData {
 			and repayment must be made in the required collateral assets 
 
 		@param address _owner: the owner of the vault to adjust
-		@param uint _index: the index of the vault in vaults[_owner] to which to supply collateral
+		@param uint _index: the index of the vault in vaults[_owner]
 		@param address _assetSupplied: the new asset(may be the same as previous) that is to be used as
 			collateral in the vault
 		@param address _assetBorrowed: the new asset(may be the same as previous) that is to be borrowed
@@ -318,8 +318,10 @@ contract VaultFactoryDelegate is VaultFactoryData {
 
 		//------------------distribute funds----------------------
 		if (mVault.assetSupplied != _assetSupplied) {
-			bool success = IERC20(mVault.assetSupplied).transfer(_receiverAddr, mVault.amountSupplied);
-			require(success);
+			if (mVault.amountSupplied != 0) {
+				bool success = IERC20(mVault.assetSupplied).transfer(_receiverAddr, mVault.amountSupplied);
+				require(success);
+			}
 			sVault.assetSupplied = _assetSupplied;
 			sVault.amountSupplied = _amountSupplied;
 		}
@@ -363,8 +365,10 @@ contract VaultFactoryDelegate is VaultFactoryData {
 		}
 
 		if (mVault.assetBorrowed != _assetBorrowed) {
-			IFixCapitalPool fcp = IFixCapitalPool(IZeroCouponBond(mVault.assetBorrowed).FixCapitalPoolAddress());
-			fcp.burnZCBFrom(msg.sender, mVault.amountBorrowed);
+			if (mVault.amountBorrowed > 0) {
+				IFixCapitalPool fcp = IFixCapitalPool(IZeroCouponBond(mVault.assetBorrowed).FixCapitalPoolAddress());
+				fcp.burnZCBFrom(msg.sender, mVault.amountBorrowed);
+			}
 		}
 		else if (mVault.amountBorrowed > _amountBorrowed) {
 			IFixCapitalPool fcp = IFixCapitalPool(IZeroCouponBond(_assetBorrowed).FixCapitalPoolAddress());

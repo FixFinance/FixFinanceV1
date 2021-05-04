@@ -84,26 +84,19 @@ interface IVaultFactory {
 		int128 _suppliedRateChange,
 		int128 _borrowRateChange
 	) external;
+	function adjustYTVault(
+		address _owner,
+		uint _index,
+		address _FCPsupplied,
+		address _FCPborrowed,
+		uint _yieldSupplied,
+		int _bondSupplied,
+		uint _amountBorrowed,
+		int128[3] calldata _multipliers,
+		bytes calldata _data,
+		address _receiverAddr
+	) external;
 	function closeYTVault(uint _index, address _to) external;
-	function YTremove(
-		uint _index,
-		uint _amountYield,
-		int _amountBond,
-		address _to,
-		uint _priceMultiplier,
-		int128 _suppliedRateChange,
-		int128 _borrowRateChange
-	) external;
-	function YTdeposit(address _owner, uint _index, uint _amountYield, int _amountBond) external;
-	function YTborrow(
-		uint _index,
-		uint _amount,
-		address _to,
-		uint _priceMultiplier,
-		int128 _suppliedRateChange,
-		int128 _borrowRateChange
-	) external;
-	function YTrepay(address _owner, uint _index, uint _amount) external;
 	//----------------------------------------------L-i-q-u-i-d-a-t-i-o-n-s------------------------------------------
 	function claimRebate(address _asset) external;
 	function auctionLiquidation(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _bid, uint _amtIn) external;

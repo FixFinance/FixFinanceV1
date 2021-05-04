@@ -266,24 +266,26 @@ contract FixCapitalPool is IFixCapitalPool, Ownable, nonReentrant {
 	*/
 	function transferPositionFrom(address _from, address _to, uint _yield, int _bond) external override {
 		//ensure position has positive minimum value at maturity
-		uint ratio = inPayoutPhase ? maturityConversionRate : wrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
-		uint unitAmtYield = _yield.mul(ratio)/(1 ether);
-		require(_bond >= 0 || unitAmtYield >= uint(-_bond));
 		uint yieldFrom = balanceYield[_from].sub(_yield);
-		int bondFrom = balanceBonds[_from].sub(_bond);
-		require(bondFrom >= 0 || yieldFrom.mul(ratio)/(1 ether) >= uint(-bondFrom));
+		if (_yield > 0) {
+			//decrement approval of YT
+			IYieldToken(yieldTokenAddress).decrementAllowance(_from, msg.sender, _yield);
+			balanceYield[_from] = yieldFrom;
+			balanceYield[_to] += _yield;
+		}
 
-		//decrement approval of ZCB
-		uint unitAmtZCB = _bond > 0 ? unitAmtYield.add(uint(_bond)) : unitAmtYield.sub(uint(-_bond));
-		IZeroCouponBond(zeroCouponBondAddress).decrementAllowance(_from, msg.sender, unitAmtZCB);
-
-		//decrement approval of YT
-		IYieldToken(yieldTokenAddress).decrementAllowance(_from, msg.sender, _yield);
-
-		balanceYield[_from] = yieldFrom;
-		balanceBonds[_from] = bondFrom;
-		balanceYield[_to] += _yield;
-		balanceBonds[_to] += _bond;
+		if (_bond != 0) {
+			uint ratio = inPayoutPhase ? maturityConversionRate : wrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
+			uint unitAmtYield = _yield.mul(ratio)/(1 ether);
+			require(_bond >= 0 || unitAmtYield >= uint(-_bond));
+			int bondFrom = balanceBonds[_from].sub(_bond);
+			require(bondFrom >= 0 || yieldFrom.mul(ratio)/(1 ether) >= uint(-bondFrom));
+			//decrement approval of ZCB
+			uint unitAmtZCB = _bond > 0 ? unitAmtYield.add(uint(_bond)) : unitAmtYield.sub(uint(-_bond));
+			IZeroCouponBond(zeroCouponBondAddress).decrementAllowance(_from, msg.sender, unitAmtZCB);
+			balanceBonds[_from] = bondFrom;
+			balanceBonds[_to] += _bond;
+		}
 	}
 
 	//---------------------------Z-e-r-o---C-o-u-p-o-n---B-o-n-d----------------

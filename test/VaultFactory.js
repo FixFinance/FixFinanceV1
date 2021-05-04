@@ -754,30 +754,62 @@ contract('VaultFactory', async function(accounts) {
 	it('deposits into YT vault', async () => {
 		var prevBalanceZCB1 = await zcbAsset1.balanceOf(accounts[0]);
 		var prevYield1 = await fcp1.balanceYield(accounts[0]);
-		prevVaultState = vault;
+		let prevVault = vault;
 		let toSupplyYield = _10To18;
 		let adjSuppliedYield = await wAsset1.WrappedAmtToUnitAmt_RoundDown(toSupplyYield);
 		let toSupplyBond = _10To18.neg();
-		await vaultFactoryInstance.YTdeposit(accounts[0], 0, toSupplyYield, toSupplyBond);
+
+		let newYield = vault.yieldSupplied.add(toSupplyYield);
+		let newBond = vault.bondSupplied.add(toSupplyBond);
+
+		await vaultFactoryInstance.adjustYTVault(
+			accounts[0],
+			0,
+			vault.FCPsupplied,
+			vault.FCPborrowed,
+			newYield,
+			newBond,
+			vault.amountBorrowed,
+			NON_CHANGE_MULTIPLIERS,
+			[],
+			accounts[0]
+		);
+
 		vault = await vaultFactoryInstance.YTvaults(accounts[0], 0);
 
 		assert.equal((await zcbAsset1.balanceOf(accounts[0])).toString(), prevBalanceZCB1.sub(adjSuppliedYield).sub(toSupplyBond), "correct amount of ZCB supplied");
 		assert.equal((await fcp1.balanceYield(accounts[0])).toString(), prevYield1.sub(toSupplyYield).toString(), "correct amount of yield supplied");
+		assert.equal(vault.yieldSupplied.toString(), newYield.toString(), "correct value of vault.yieldSupplied");
+		assert.equal(vault.bondSupplied.toString(), newBond.toString(), "correct value of vault.bondSupplied");
 	});
 
 	it('removes from YT vault', async () => {
 		var toRemove = currentSupplied.sub(prevSupplied);
 		var prevBalanceZCB1 = await zcbAsset1.balanceOf(accounts[0]);
 		var prevYield1 = await fcp1.balanceYield(accounts[0]);
-		prevVaultState = vault;
+		let prevVault = vault;
 		let amountYield = _10To18;
 		let adjAmountYield = await wAsset1.WrappedAmtToUnitAmt_RoundDown(amountYield);
 		let amountBond = _10To18.neg();
 
+		let newYield = vault.yieldSupplied.sub(amountYield);
+		let newBond = vault.bondSupplied.sub(amountBond);
+
 		await vaultHealthInstance.setToReturn(false);
 		let caught = false;
 		try {
-			await vaultFactoryInstance.YTremove(0, amountYield, amountBond, accounts[0], TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
+			await vaultFactoryInstance.adjustYTVault(
+				accounts[0],
+				0,
+				vault.FCPsupplied,
+				vault.FCPborrowed,
+				newYield,
+				newBond,
+				vault.amountBorrowed,
+				NON_CHANGE_MULTIPLIERS,
+				[],
+				accounts[0]
+			);
 		} catch (err) {
 			caught = true;
 		}
@@ -785,41 +817,81 @@ contract('VaultFactory', async function(accounts) {
 
 		await vaultHealthInstance.setToReturn(true);
 
-		await vaultFactoryInstance.YTremove(0, amountYield, amountBond, accounts[0], TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
+		await vaultFactoryInstance.adjustYTVault(
+			accounts[0],
+			0,
+			vault.FCPsupplied,
+			vault.FCPborrowed,
+			newYield,
+			newBond,
+			vault.amountBorrowed,
+			NON_CHANGE_MULTIPLIERS,
+			[],
+			accounts[0]
+		);
 
 		vault = await vaultFactoryInstance.YTvaults(accounts[0], 0);
 
 		assert.equal((await zcbAsset1.balanceOf(accounts[0])).toString(), prevBalanceZCB1.add(adjAmountYield).add(amountBond), "correct amount of ZCB received");
-		assert.equal(prevVaultState.yieldSupplied.sub(vault.yieldSupplied).toString(), amountYield.toString(), "correct amount of yield removed from vault");
+		assert.equal(prevVault.yieldSupplied.sub(vault.yieldSupplied).toString(), amountYield.toString(), "correct amount of yield removed from vault");
+		assert.equal(vault.yieldSupplied.toString(), newYield.toString(), "correct value of vault.yieldSupplied");
+		assert.equal(vault.bondSupplied.toString(), newBond.toString(), "correct value of vault.bondSupplied");
 	});
 
 
 	it('repays YT vault', async () => {
 		toRepay = vault.amountBorrowed.div(new BN('2'));
 
-		prevVaultState = vault;
+		let prevVault = vault;
 		var prevBalanceZCB0 = await zcbAsset0.balanceOf(accounts[0]);
-		await vaultFactoryInstance.YTrepay(accounts[0], 0, toRepay);
+		let newDebt = vault.amountBorrowed.sub(toRepay);
+		await vaultFactoryInstance.adjustYTVault(
+			accounts[0],
+			0,
+			vault.FCPsupplied,
+			vault.FCPborrowed,
+			vault.yieldSupplied,
+			vault.bondSupplied,
+			newDebt,
+			NON_CHANGE_MULTIPLIERS,
+			[],
+			accounts[0]
+		);
 
 		vault = await vaultFactoryInstance.YTvaults(accounts[0], 0);
 		var currentBalanceZCB0 = await zcbAsset0.balanceOf(accounts[0]);
 
 		assert.equal(prevBalanceZCB0.sub(currentBalanceZCB0).toString(), toRepay.toString(), "correct amount ZCB transferedFrom sender");
-		assert.equal(prevVaultState.amountBorrowed.sub(vault.amountBorrowed).toString(), toRepay.toString(), "correct amount repaid");
+		assert.equal(prevVault.amountBorrowed.sub(vault.amountBorrowed).toString(), toRepay.toString(), "correct amount repaid");
+		assert.equal(vault.amountBorrowed.toString(), newDebt.toString(), "correct value of vault.amountBorrowed");
 	});
 
 	it('borrows from YT vault', async () => {
 		toBorrow = toRepay;
 
-		prevVaultState = vault;
+		let prevVault = vault;
 		var prevBalanceZCB0 = await zcbAsset0.balanceOf(accounts[0]);
-		await vaultFactoryInstance.YTborrow(0, toBorrow, accounts[0], TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
+
+		let newDebt = vault.amountBorrowed.add(toBorrow);
+		await vaultFactoryInstance.adjustYTVault(
+			accounts[0],
+			0,
+			vault.FCPsupplied,
+			vault.FCPborrowed,
+			vault.yieldSupplied,
+			vault.bondSupplied,
+			newDebt,
+			NON_CHANGE_MULTIPLIERS,
+			[],
+			accounts[0]
+		);
 
 		vault = await vaultFactoryInstance.YTvaults(accounts[0], 0);
 		var currentBalanceZCB0 = await zcbAsset0.balanceOf(accounts[0]);
 
 		assert.equal(currentBalanceZCB0.sub(prevBalanceZCB0).toString(), toBorrow.toString(), "correct amount of borrowed asset transfered to _to");
-		assert.equal(vault.amountBorrowed.sub(prevVaultState.amountBorrowed).toString(), toBorrow.toString(), "correct amount borrowed");
+		assert.equal(vault.amountBorrowed.sub(prevVault.amountBorrowed).toString(), toBorrow.toString(), "correct amount borrowed");
+		assert.equal(vault.amountBorrowed.toString(), newDebt.toString(), "correct value of vault.amountBorrowed");
 	});
 
 	it('send undercollateralised YT vaults to liquidation', async () => {
@@ -1014,14 +1086,14 @@ contract('VaultFactory', async function(accounts) {
 		await vaultFactoryInstance.partialYTLiquidationSpecificIn(accounts[0], vaultIndex, fcp0.address, fcp1.address,
 			amtIn, minYieldOut, minBondRatio, accounts[1], {from: accounts[1]});
 
-		prevVaultState = vault;
+		let prevVault = vault;
 		vault = await vaultFactoryInstance.YTvaults(accounts[0], vaultIndex);
 
 		assert.equal(vault.FCPborrowed, fcp0.address, "FCPborrowed is correct");
 		assert.equal(vault.FCPsupplied, fcp1.address, "FCPsupplied is correct");
-		assert.equal(vault.amountBorrowed.toString(), prevVaultState.amountBorrowed.sub(amtIn).toString(), "amountBorrowed is correct");
-		assert.equal(vault.yieldSupplied.toString(), prevVaultState.yieldSupplied.sub(expectedYieldOut).toString(), "yieldSupplied is correct");
-		assert.equal(vault.bondSupplied.toString(), prevVaultState.bondSupplied.sub(expectedBondOut).toString(), "bondSupplied is correct");
+		assert.equal(vault.amountBorrowed.toString(), prevVault.amountBorrowed.sub(amtIn).toString(), "amountBorrowed is correct");
+		assert.equal(vault.yieldSupplied.toString(), prevVault.yieldSupplied.sub(expectedYieldOut).toString(), "yieldSupplied is correct");
+		assert.equal(vault.bondSupplied.toString(), prevVault.bondSupplied.sub(expectedBondOut).toString(), "bondSupplied is correct");
 	});
 
 	it('partial vault YT liquidation Specific Out', async () => {

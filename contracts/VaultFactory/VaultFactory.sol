@@ -216,7 +216,7 @@ contract VaultFactory is VaultFactoryData, IVaultFactory, Ownable {
 			and repayment must be made in the required collateral assets 
 
 		@param address _owner: the owner of the vault to adjust
-		@param uint _index: the index of the vault in vaults[_owner] to which to supply collateral
+		@param uint _index: the index of the vault in vaults[_owner]
 		@param address _assetSupplied: the new asset(may be the same as previous) that is to be used as
 			collateral in the vault
 		@param address _assetBorrowed: the new asset(may be the same as previous) that is to be borrowed
@@ -322,69 +322,60 @@ contract VaultFactory is VaultFactoryData, IVaultFactory, Ownable {
 		require(success);
 	}
 
-	function YTremove(
+	/*
+		@Description: adjust the state of a YT vault by either changing the assets in it
+			or paying down/increasing debt or supplying/withdrawing collateral
+			for any call where funds would be transfered out of the vault msg.sender must be the vault owner
+			if the _data param has length > 0, assets sent out by the vault will be sent via flashloan
+			and repayment must be made in the required collateral assets 
+
+		@param address _owner: the owner of the YT vault to adjust
+		@param uint _index: the index of the YT vault in YTvaults[_owner]
+		@param address _FCPsupplied: the new FCP (may be the same as previous) corresponding to the vault's
+			ZCB & YT collateral
+		@param address _FCPborrowed: the new FCP (may be the same as previous) corresponding to the ZCB
+			that is to be borrowed from the vault
+		@param uint _yieldSupplied: the amount from the balanceYield mapping in the supplied FCP contract
+			that will be supplied as collateral to the YTVault after execution
+		@param int _bondSupplied: the amount from the balanceBonds mapping in the supplied FCP contract
+			that will be supplied as collateral to the YTVault after execution
+		@param uint _amountBorrowed: the total amount of debt of the vault after execution
+		@param int128[3] calldata _multipliers: the 3 multipliers used on call to
+			vaultHealthContract.vaultWithstandsChange
+				uint(_multipliers[0]) is priceMultiplier
+				_multipliers[1] is suppliedRateMultiplier
+				_multipliers[2] is borrowedRateMultiplier
+		@param bytes calldata _data: data to be send to the flashloan receiver if a flashloan is to be done
+			if _data.length == 0 there will be no flashloan
+		@param  address _receiverAddr: the address of the flashloan receiver contract
+	*/
+	function adjustYTVault(
+		address _owner,
 		uint _index,
-		uint _amountYield,
-		int _amountBond,
-		address _to,
-		uint _priceMultiplier,
-		int128 _suppliedRateChange,
-		int128 _borrowRateChange
+		address _FCPsupplied,
+		address _FCPborrowed,
+		uint _yieldSupplied,
+		int _bondSupplied,
+		uint _amountBorrowed,
+		int128[3] calldata _multipliers,
+		bytes calldata _data,
+		address _receiverAddr
 	) external override {
 		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
-			"YTremove(uint256,uint256,int256,address,uint256,int128,int128)",
-			_index,
-			_amountYield,
-			_amountBond,
-			_to,
-			_priceMultiplier,
-			_suppliedRateChange,
-			_borrowRateChange
-		));
-		require(success);
-	}
-
-	function YTdeposit(address _owner, uint _index, uint _amountYield, int _amountBond) external override {
-		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
-			"YTdeposit(address,uint256,uint256,int256)",
+			"adjustYTVault(address,uint256,address,address,uint256,int256,uint256,int128[3],bytes,address)",
 			_owner,
 			_index,
-			_amountYield,
-			_amountBond
+			_FCPsupplied,
+			_FCPborrowed,
+			_yieldSupplied,
+			_bondSupplied,
+			_amountBorrowed,
+			_multipliers,
+			_data,
+			_receiverAddr
 		));
 		require(success);
 	}
-
-	function YTborrow(
-		uint _index,
-		uint _amount,
-		address _to,
-		uint _priceMultiplier,
-		int128 _suppliedRateChange,
-		int128 _borrowRateChange
-	) external override {
-		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
-			"YTborrow(uint256,uint256,address,uint256,int128,int128)",
-			_index,
-			_amount,
-			_to,
-			_priceMultiplier,
-			_suppliedRateChange,
-			_borrowRateChange
-		));
-		require(success);
-	}
-
-	function YTrepay(address _owner, uint _index, uint _amount) external override {
-		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
-			"YTrepay(address,uint256,uint256)",
-			_owner,
-			_index,
-			_amount
-		));
-		require(success);
-	}
-
 	//----------------------------------------------_Liquidations------------------------------------------
 
 	/*

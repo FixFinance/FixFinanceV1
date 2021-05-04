@@ -2,6 +2,7 @@ pragma solidity >=0.6.0;
 
 import "../libraries/SafeMath.sol";
 import "../libraries/SignedSafeMath.sol";
+import "../interfaces/IYTVaultManagerFlashReceiver.sol";
 import "../interfaces/IFixCapitalPool.sol";
 import "../interfaces/IVaultHealth.sol";
 import "../interfaces/IWrapper.sol";
@@ -286,161 +287,134 @@ contract VaultFactoryDelegate2 is VaultFactoryData {
 	}
 
 	/*
-		@Description: withdraw collateral from an existing vault
+		@Description: adjust the state of a YT vault by either changing the assets in it
+			or paying down/increasing debt or supplying/withdrawing collateral
+			for any call where funds would be transfered out of the vault msg.sender must be the vault owner
+			if the _data param has length > 0, assets sent out by the vault will be sent via flashloan
+			and repayment must be made in the required collateral assets 
 
-		@param uint _index: the vault to close is at vaults[msg.sender][_index]
-		@param uint _amountYield: the amount to decrease from vault.yieldSupplied
-		@param int _amountBond: the amount to decrease from vault.bondSupplied
-		@param address _to: the address to which to send the removed collateral
-		@param uint _priceMultiplier: a multiplier > 1
-			we ensure that after this action the vault will not be sent into the liquidation zone if the
-			cross asset price of _assetBorrowed to _assetSupplied increases by a factor of _priceMultiplier
-			(in terms of basis points)
-		@param int128 _suppliedRateChange: a multiplier > 1 if vault.amountBond is positive after change
-			otherwise < 1
-			we ensure the vault will not be sent into the liquidation zone if the rate on the supplied
-			asset increases by a factor of _suppliedRateChange
-			(in ABDK format)
-		@param int128 _borrowRateChange: a multiplier < 1
-			we ensure that after this action the vault will not be sent into the liquidation zone if the
-			rate on the borrow asset decreases by a factor of _borrowRateChange
-			(in ABDK format)
+		@param address _owner: the owner of the YT vault to adjust
+		@param uint _index: the index of the YT vault in YTvaults[_owner]
+		@param address _FCPsupplied: the new FCP (may be the same as previous) corresponding to the vault's
+			ZCB & YT collateral
+		@param address _FCPborrowed: the new FCP (may be the same as previous) corresponding to the ZCB
+			that is to be borrowed from the vault
+		@param uint _yieldSupplied: the amount from the balanceYield mapping in the supplied FCP contract
+			that will be supplied as collateral to the YTVault after execution
+		@param int _bondSupplied: the amount from the balanceBonds mapping in the supplied FCP contract
+			that will be supplied as collateral to the YTVault after execution
+		@param uint _amountBorrowed: the total amount of debt of the vault after execution
+		@param int128[3] calldata _multipliers: the 3 multipliers used on call to
+			vaultHealthContract.vaultWithstandsChange
+				uint(_multipliers[0]) is priceMultiplier
+				_multipliers[1] is suppliedRateMultiplier
+				_multipliers[2] is borrowedRateMultiplier
+		@param bytes calldata _data: data to be send to the flashloan receiver if a flashloan is to be done
+			if _data.length == 0 there will be no flashloan
+		@param  address _receiverAddr: the address of the flashloan receiver contract
 	*/
-	function YTremove(
+	function adjustYTVault(
+		address _owner,
 		uint _index,
-		uint _amountYield,
-		int _amountBond,
-		address _to,
-		uint _priceMultiplier,
-		int128 _suppliedRateChange,
-		int128 _borrowRateChange
+		address _FCPsupplied,
+		address _FCPborrowed,
+		uint _yieldSupplied,
+		int _bondSupplied,
+		uint _amountBorrowed,
+		int128[3] calldata _multipliers,
+		bytes calldata _data,
+		address _receiverAddr
 	) external {
-		require(_YTvaults[msg.sender].length > _index);
-		YTVault memory vault = _YTvaults[msg.sender][_index];
+		require(_index < _YTvaults[_owner].length);
 
-		//vault is stored in memory does not change state
-		vault.yieldSupplied = vault.yieldSupplied.sub(_amountYield);
-		vault.bondSupplied = vault.bondSupplied.sub(_amountBond);
+		YTVault memory mVault = _YTvaults[_owner][_index];
+		YTVault storage sVault = _YTvaults[_owner][_index];
 
-		require(vault.yieldSupplied >= MIN_YIELD_SUPPLIED || (vault.yieldSupplied == 0 && vault.bondSupplied == 0));
+		//ensure that after operations vault will be in good health
+		//only check health if at any point funds are being removed from the vault
+		if (
+			_FCPborrowed != mVault.FCPborrowed ||
+			_FCPsupplied != mVault.FCPsupplied ||
+			_yieldSupplied < mVault.yieldSupplied ||
+			_amountBorrowed > mVault.amountBorrowed
+		) {
+			//index 0 in multipliers that must be converted to uint
+			require(_multipliers[0] > 0);
+			require(msg.sender == _owner);
+			require(vaultHealthContract.YTvaultWithstandsChange(
+				_FCPsupplied,
+				_FCPborrowed,
+				_yieldSupplied,
+				_bondSupplied,
+				_amountBorrowed,
+				uint(_multipliers[0]),
+				_multipliers[1],
+				_multipliers[2]
+			));
+		}
 
-		uint unitAmountYield = getUnitValueYield(vault.FCPsupplied, vault.yieldSupplied);
+		//------------------distribute funds----------------------
+		if (mVault.FCPsupplied != _FCPsupplied) {
+			if (mVault.FCPsupplied != address(0)) {
+				IFixCapitalPool(mVault.FCPsupplied).transferPosition(_receiverAddr, mVault.yieldSupplied, mVault.bondSupplied);
+			}
+			sVault.FCPsupplied = _FCPsupplied;
+			sVault.yieldSupplied = _yieldSupplied;
+			sVault.bondSupplied = _bondSupplied;
+		}
+		else if (mVault.yieldSupplied != _yieldSupplied) {
+			if (mVault.yieldSupplied > _yieldSupplied) {
+				IFixCapitalPool(_FCPsupplied).transferPosition(_receiverAddr, mVault.yieldSupplied - _yieldSupplied, mVault.bondSupplied.sub(_bondSupplied));
+			}
+			sVault.yieldSupplied = _yieldSupplied;
+		}
+		if (mVault.bondSupplied != _bondSupplied) {
+			if (mVault.bondSupplied > _bondSupplied && mVault.yieldSupplied == _yieldSupplied) {
+				IFixCapitalPool(_FCPsupplied).transferPosition(_receiverAddr, 0, mVault.bondSupplied.sub(_bondSupplied));
+			}
+			sVault.bondSupplied = _bondSupplied;
+		}
 
-		//ensure resultant collateral in vault has valid minimum possible value at maturity
-		require(vault.bondSupplied >= 0 || unitAmountYield >= uint(-vault.bondSupplied));
+		if (mVault.FCPborrowed != _FCPborrowed) {
+			IFixCapitalPool(_FCPborrowed).mintZCBTo(_receiverAddr, _amountBorrowed);
+			sVault.FCPborrowed = _FCPborrowed;
+			sVault.amountBorrowed = _amountBorrowed;
+		}
+		else if (mVault.amountBorrowed < _amountBorrowed) {
+			IFixCapitalPool(_FCPborrowed).mintZCBTo(_receiverAddr, _amountBorrowed - mVault.amountBorrowed);
+			sVault.amountBorrowed = _amountBorrowed;
+		}
+		else if (mVault.amountBorrowed > _amountBorrowed) {
+			sVault.amountBorrowed = _amountBorrowed;
+		}
 
-		validateYTvaultMultipliers(_priceMultiplier, _suppliedRateChange, _borrowRateChange, vault.bondSupplied > 0);
-		require(vaultHealthContract.YTvaultWithstandsChange(
-			vault.FCPsupplied,
-			vault.FCPborrowed,
-			unitAmountYield,
-			vault.bondSupplied,
-			vault.amountBorrowed,
-			_priceMultiplier,
-			_suppliedRateChange,
-			_borrowRateChange
-		));
+		//-----------------------------flashloan------------------
+		if (_data.length > 0) {
+			IYTVaultManagerFlashReceiver(_receiverAddr).onFlashLoan(msg.sender, _data);
+		}
 
-		_YTvaults[msg.sender][_index].yieldSupplied = vault.yieldSupplied;
-		_YTvaults[msg.sender][_index].bondSupplied = vault.bondSupplied;
-		IFixCapitalPool(vault.FCPsupplied).transferPosition(_to, _amountYield, _amountBond);
+		//-----------------------------get funds-------------------------
+		if (mVault.FCPsupplied != _FCPsupplied) {
+			IFixCapitalPool(_FCPsupplied).transferPositionFrom(msg.sender, address(this), _yieldSupplied, _bondSupplied);
+		}
+		else if (mVault.yieldSupplied != _yieldSupplied) {
+			if (mVault.yieldSupplied < _yieldSupplied) {
+				IFixCapitalPool(_FCPsupplied).transferPositionFrom(msg.sender, address(this), _yieldSupplied - mVault.yieldSupplied, _bondSupplied.sub(mVault.bondSupplied));
+			}
+		}
+		else if (mVault.bondSupplied < _bondSupplied) {
+			IFixCapitalPool(_FCPsupplied).transferPositionFrom(_receiverAddr, address(this), 0, _bondSupplied.sub(mVault.bondSupplied));
+		}
+
+		if (mVault.FCPborrowed != _FCPborrowed) {
+			if (mVault.amountBorrowed > 0) {
+				IFixCapitalPool(mVault.FCPborrowed).burnZCBFrom(msg.sender, mVault.amountBorrowed);
+			}
+		}
+		else if (mVault.amountBorrowed > _amountBorrowed) {
+			IFixCapitalPool(_FCPborrowed).burnZCBFrom(msg.sender,  mVault.amountBorrowed - _amountBorrowed);
+		}
 	}
-
-	/*
-		@Description: deposit collateral into an exiting YT vault
-
-		@param address _owner: the owner of the YT vault to which to supply collateral
-		@param uint _index: the index of the vault in YTvaults[_owner] to which to supply collateral
-		@param uint _amountYield: the amount to increase vault.yieldSupplied
-		@param int _amountBond: the amount to increase vault.bondSupplied
-	*/
-	function YTdeposit(address _owner, uint _index, uint _amountYield, int _amountBond) external {
-		require(_YTvaults[_owner].length > _index);
-		YTVault storage storageVault =  _YTvaults[_owner][_index];
-
-		uint resultantYield = storageVault.yieldSupplied.add(_amountYield);
-		require(resultantYield >= MIN_YIELD_SUPPLIED);
-		int resultantBond = storageVault.bondSupplied.add(_amountBond);
-
-		address _FCPsupplied = storageVault.FCPsupplied;
-		uint unitAmountYield = getUnitValueYield(_FCPsupplied, resultantYield);
-		//ensure vault collateral has positive minimum possible value at maturity
-		require(resultantBond >= 0 || unitAmountYield >= uint(-resultantBond));
-		//we ensure that the vault has valid balances thus it does not matter if the position passes the check
-		IFixCapitalPool(_FCPsupplied).transferPositionFrom(msg.sender, address(this), _amountYield, _amountBond);
-		storageVault.yieldSupplied = resultantYield;
-		storageVault.bondSupplied = resultantBond;
-	}
-
-
-	/*
-		@Description: withdraw more of the borrowed asset from an existing vault
-
-		@param uint _index: the index of the vault in vaults[msg.sender] to which to supply collateral
-		@param uint _amount: the amount of the borrowed asset to withdraw from the vault
-		@param address _to: the address to which to send the newly borrowed funds
-		@param uint _priceMultiplier: a multiplier > 1
-			we ensure that after this action the vault will not be sent into the liquidation zone if the
-			cross asset price of _assetBorrowed to _assetSupplied increases by a factor of _priceMultiplier
-			(in terms of basis points)
-		@param int128 _suppliedRateChange: a multiplier > 1
-			we ensure that after this action the vault will not be sent into the liquidation zone if the
-			rate on the supplied asset increases by a factor of _suppliedRateChange
-			(in ABDK format)
-		@param int128 _borrowRateChange: a multiplier < 1
-			we ensure that after this action the vault will not be sent into the liquidation zone if the
-			rate on the borrow asset decreases by a factor of _borrowRateChange
-			(in ABDK format)
-	*/
-	function YTborrow(
-		uint _index,
-		uint _amount,
-		address _to,
-		uint _priceMultiplier,
-		int128 _suppliedRateChange,
-		int128 _borrowRateChange
-	) external {
-		require(_YTvaults[msg.sender].length > _index);
-		YTVault memory vault = _YTvaults[msg.sender][_index];
-
-		uint resultantBorrowed = vault.amountBorrowed.add(_amount);
-
-		uint unitAmountYield = getUnitValueYield(vault.FCPsupplied, vault.yieldSupplied);
-
-		validateYTvaultMultipliers(_priceMultiplier, _suppliedRateChange, _borrowRateChange, vault.bondSupplied > 0);
-		require(vaultHealthContract.YTvaultWithstandsChange(
-			vault.FCPsupplied,
-			vault.FCPborrowed,
-			unitAmountYield,
-			vault.bondSupplied,
-			resultantBorrowed,
-			_priceMultiplier,
-			_suppliedRateChange,
-			_borrowRateChange
-		));
-
-		_YTvaults[msg.sender][_index].amountBorrowed = resultantBorrowed;
-
-		IFixCapitalPool(vault.FCPborrowed).mintZCBTo(_to, _amount);
-		raiseShortInterest(vault.FCPborrowed, _amount);
-	}
-
-	/*
-		@Description: repay the borrowed asset back into a YT vault
-
-		@param address _owner: the owner of the YT vault to which to reapy
-		@param uint _index: the index of the YT vault in YTvaults[_owner] to which to repay
-		@param uint _amount: the amount of the borrowed asset to reapy to the YT vault
-	*/
-	function YTrepay(address _owner, uint _index, uint _amount) external {
-		require(_YTvaults[_owner].length > _index);
-		require(_YTvaults[_owner][_index].amountBorrowed >= _amount);
-		address FCPborrowed = _YTvaults[_owner][_index].FCPborrowed;
-		IFixCapitalPool(FCPborrowed).burnZCBFrom(msg.sender, _amount);
-		lowerShortInterest(FCPborrowed, _amount);
-		_YTvaults[_owner][_index].amountBorrowed -= _amount;
-	}
-
 
 	//----------------------------------------------------Y-T-V-a-u-l-t---L-i-q-u-i-d-a-t-i-o-n-s-------------------------------------
 

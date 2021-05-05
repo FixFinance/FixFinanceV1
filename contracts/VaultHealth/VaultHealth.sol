@@ -56,16 +56,17 @@ contract VaultHealth is IVaultHealth, Ownable {
 
 	/*
 		When a user deposits bonds we take the Maximum of the rate shown in the oracle +
-		minimumRateAdjustment[baseWrapperAsset] and the rate shown in the oracle adjusted with the
+		(upper/lower)MinimumRateAdjustment[baseWrapperAsset] and the rate shown in the oracle adjusted with the
 		corresponding rate threshold as the rate for which collateralization requirements
-		will be calculated
+		will be calculated for the (upper/lower) limit
 
 		When a user borrowes bonds we take the Maximum of the rate shown in the oracle -
-		minimumRateAdjustment[baseWrapperAsset] and the rate shown in the oracle adjusted with the
+		(upper/lower)MinimumRateAdjustment[baseWrapperAsset] and the rate shown in the oracle adjusted with the
 		corresponding rate threshold as the rate for which collateralization requirements
-		will be calculated
+		will be calculated for the (upper/lower) limit
 	*/
-	mapping(address => int128) public override minimumRateAdjustment;
+	mapping(address => int128) public override upperMinimumRateAdjustment;
+	mapping(address => int128) public override lowerMinimumRateAdjustment;
 
 	/*
 		The Collateralisation Ratio mappings hold information about the % which any vault
@@ -248,25 +249,37 @@ contract VaultHealth is IVaultHealth, Ownable {
 
 		@param int128 _startAPY: the apy given by the oracle
 		@param int128: _yearsRemaining: the time in years until the FCP matures
-		@param address _underlyingAssetAddress: the wrapper corresponding to the FCP
+		@param address _baseWrapperAddress: the wrapper corresponding to the FCP
 		@param RateAdjuster _rateAdjuster: the adjuster for which to find the rate multiplier
 		@param int128 _rateChange: a change multiplier, multiplied with APY to get changed APY
 	*/
 	function rateToRateMultiplier(
 		int128 _startAPY,
 		int128 _yearsRemaining,
-		address _underlyingAssetAddress,
+		address _baseWrapperAddress,
 		RateAdjuster _rateAdjuster,
 		int128 _rateChange
 	) internal view returns (uint) {
 		_startAPY = _startAPY.sub(ABDK_1).mul(_rateChange).add(ABDK_1);
-		int128 adjApy = _startAPY.sub(ABDK_1).mul(getRateThresholdMultiplier(_underlyingAssetAddress, _rateAdjuster)).add(ABDK_1);
+		int128 adjApy = _startAPY.sub(ABDK_1).mul(getRateThresholdMultiplier(_baseWrapperAddress, _rateAdjuster)).add(ABDK_1);
 		if (isDeposited(_rateAdjuster)) {
-			int128 temp = _startAPY.add(minimumRateAdjustment[_underlyingAssetAddress]);
+			int128 temp = _startAPY
+				.add(
+					_rateAdjuster == RateAdjuster.UPPER_DEPOSIT ?
+						upperMinimumRateAdjustment[_baseWrapperAddress]
+							:
+						lowerMinimumRateAdjustment[_baseWrapperAddress]
+				);
 			adjApy = temp > adjApy ? temp : adjApy;
 		}
 		else if (isBorrowed(_rateAdjuster)) {
-			int128 temp = _startAPY.sub(minimumRateAdjustment[_underlyingAssetAddress]);
+			int128 temp = _startAPY
+				.sub(
+					_rateAdjuster == RateAdjuster.UPPER_BORROW ?
+						upperMinimumRateAdjustment[_baseWrapperAddress]
+							:
+						lowerMinimumRateAdjustment[_baseWrapperAddress]
+				);
 			adjApy = temp < adjApy ? temp : adjApy;
 		}
 		if (adjApy <= ABDK_1) return (1 ether);
@@ -1185,13 +1198,24 @@ contract VaultHealth is IVaultHealth, Ownable {
 
 	/*
 		@Description: admin may set the minimum amount by which the rate for an asset is adjusted when calculating
-			collalteralization requirements
+			collalteralization requirements for the upper limit
 	
 		@param address _underlyingAssetAddress: the address of the wrapper asset for which to set the minimum rate adjustment
 		@param int128 _minimumRateAdjustment: the new minimum rate adjustment for _wrapperAsset
 	*/
-	function setMinimumRateAdjustment(address _wrapperAddress, int128 _minimumRateAdjustment) external override onlyOwner {
-		minimumRateAdjustment[_wrapperAddress] = _minimumRateAdjustment;
+	function setUpperMinimumRateAdjustment(address _wrapperAddress, int128 _minimumRateAdjustment) external override onlyOwner {
+		upperMinimumRateAdjustment[_wrapperAddress] = _minimumRateAdjustment;
+	}
+
+	/*
+		@Description: admin may set the minimum amount by which the rate for an asset is adjusted when calculating
+			collalteralization requirements for the lower limit
+	
+		@param address _underlyingAssetAddress: the address of the wrapper asset for which to set the minimum rate adjustment
+		@param int128 _minimumRateAdjustment: the new minimum rate adjustment for _wrapperAsset
+	*/
+	function setLowerMinimumRateAdjustment(address _wrapperAddress, int128 _minimumRateAdjustment) external override onlyOwner {
+		lowerMinimumRateAdjustment[_wrapperAddress] = _minimumRateAdjustment;
 	}
 }
 

@@ -97,7 +97,14 @@ contract DummyVaultHealth is IVaultHealth {
 		return true && toReturn;
 	}
 
-	function minimumRateAdjustment(address _underlyingAssetAddress) external view override returns (int128) {
+	function upperMinimumRateAdjustment(address _underlyingAssetAddress) external view override returns (int128) {
+		if (_underlyingAssetAddress == address(0)) {
+			return 0;
+		}
+		return 1;
+	}
+
+	function lowerMinimumRateAdjustment(address _underlyingAssetAddress) external view override returns (int128) {
 		if (_underlyingAssetAddress == address(0)) {
 			return 0;
 		}
@@ -208,7 +215,10 @@ contract DummyVaultHealth is IVaultHealth {
 	function setOrganizerAddress(address _organizerAddress) external override {
 		maximumShortInterest[_organizerAddress] = maximumShortInterest[_organizerAddress];
 	}
-	function setMinimumRateAdjustment(address _wrapperAddress, int128 _minimumRateAdjustment) external override {
+	function setUpperMinimumRateAdjustment(address _wrapperAddress, int128 _minimumRateAdjustment) external override {
+		maximumShortInterest[_wrapperAddress] = maximumShortInterest[_minimumRateAdjustment == _minimumRateAdjustment+1 ? _wrapperAddress : _wrapperAddress];
+	}
+	function setLowerMinimumRateAdjustment(address _wrapperAddress, int128 _minimumRateAdjustment) external override {
 		maximumShortInterest[_wrapperAddress] = maximumShortInterest[_minimumRateAdjustment == _minimumRateAdjustment+1 ? _wrapperAddress : _wrapperAddress];
 	}
 }

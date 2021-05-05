@@ -41,7 +41,8 @@ const TotalBasisPoints = 10000;
 
 const SecondsPerYear = 31556926;
 
-const minRateAdjustment = 0.01;
+const minUpperRateAdjustment = 0.01;
+const minLowerRateAdjustment = 0.005;
 
 const ErrorRange = Math.pow(10,-7);
 
@@ -114,8 +115,11 @@ contract('VaultHealth', async function(accounts) {
 		wAsset0 = await NGBwrapper.at(reca.receipt.logs[0].args.wrapperAddress);
 		wAsset1 = await NGBwrapper.at(recb.receipt.logs[0].args.wrapperAddress);
 
-		await vaultHealthInstance.setMinimumRateAdjustment(wAsset0.address, basisPointsToABDKString(100));
-		await vaultHealthInstance.setMinimumRateAdjustment(wAsset1.address, basisPointsToABDKString(100));
+		await vaultHealthInstance.setUpperMinimumRateAdjustment(wAsset0.address, basisPointsToABDKString(100));
+		await vaultHealthInstance.setUpperMinimumRateAdjustment(wAsset1.address, basisPointsToABDKString(100));
+
+		await vaultHealthInstance.setLowerMinimumRateAdjustment(wAsset0.address, basisPointsToABDKString(50));
+		await vaultHealthInstance.setLowerMinimumRateAdjustment(wAsset1.address, basisPointsToABDKString(50));
 
 		let rec0 = await organizerInstance.deployFixCapitalPoolInstance(wAsset0.address, maturity);
 		let rec1 = await organizerInstance.deployFixCapitalPoolInstance(wAsset1.address, maturity);
@@ -284,8 +288,8 @@ contract('VaultHealth', async function(accounts) {
 		let adjAPY0 = (APY0-1)/upperThreshold0 + 1;
 		let adjAPY1 = (APY1-1)*upperThreshold1 + 1;
 
-		let temp0 = APY0-minRateAdjustment;
-		let temp1 = APY1+minRateAdjustment;
+		let temp0 = APY0-minUpperRateAdjustment;
+		let temp1 = APY1+minUpperRateAdjustment;
 
 		adjAPY0 = Math.min(adjAPY0, temp0);
 		adjAPY1 = Math.max(adjAPY1, temp1);
@@ -315,7 +319,7 @@ contract('VaultHealth', async function(accounts) {
 		await setPrice(_10To18.mul(new BN(3)));
 		let adjAPY0 = (APY0-1)/upperThreshold0 + 1;
 
-		let temp0 = APY0-minRateAdjustment;
+		let temp0 = APY0-minUpperRateAdjustment;
 
 		adjAPY0 = Math.min(adjAPY0, temp0);
 
@@ -350,8 +354,8 @@ contract('VaultHealth', async function(accounts) {
 		let adjAPY0 = (APY0-1)/lowerThreshold0 + 1;
 		let adjAPY1 = (APY1-1)*lowerThreshold1 + 1;
 
-		let temp0 = APY0-minRateAdjustment;
-		let temp1 = APY1+minRateAdjustment;
+		let temp0 = APY0-minLowerRateAdjustment;
+		let temp1 = APY1+minLowerRateAdjustment;
 
 		adjAPY0 = Math.min(adjAPY0, temp0);
 		adjAPY1 = Math.max(adjAPY1, temp1);
@@ -382,7 +386,7 @@ contract('VaultHealth', async function(accounts) {
 		await setPrice(_10To18.mul(new BN(3)));
 		let adjAPY0 = (APY0-1)/lowerThreshold0 + 1;
 
-		let temp0 = APY0-minRateAdjustment;
+		let temp0 = APY0-minLowerRateAdjustment;
 
 		adjAPY0 = Math.min(adjAPY0, temp0);
 
@@ -417,8 +421,8 @@ contract('VaultHealth', async function(accounts) {
 		let adjAPY0 = (APY0-1)/upperThreshold0 + 1;
 		let adjAPY1 = (APY1-1)*upperThreshold1 + 1;
 
-		let temp0 = APY0-minRateAdjustment;
-		let temp1 = APY1+minRateAdjustment;
+		let temp0 = APY0-minUpperRateAdjustment;
+		let temp1 = APY1+minUpperRateAdjustment;
 
 		adjAPY0 = Math.min(adjAPY0, temp0);
 		adjAPY1 = Math.max(adjAPY1, temp1);
@@ -450,7 +454,7 @@ contract('VaultHealth', async function(accounts) {
 		await setPrice(_10To18.mul(new BN(3)));
 		let adjAPY0 = (APY0-1)/upperThreshold0 + 1;
 
-		let temp0 = APY0-minRateAdjustment;
+		let temp0 = APY0-minUpperRateAdjustment;
 
 		adjAPY0 = Math.min(adjAPY0, temp0);
 
@@ -485,8 +489,8 @@ contract('VaultHealth', async function(accounts) {
 		let adjAPY0 = (APY0-1)/lowerThreshold0 + 1;
 		let adjAPY1 = (APY1-1)*lowerThreshold1 + 1;
 
-		let temp0 = APY0-minRateAdjustment;
-		let temp1 = APY1+minRateAdjustment;
+		let temp0 = APY0-minLowerRateAdjustment;
+		let temp1 = APY1+minLowerRateAdjustment;
 
 		adjAPY0 = Math.min(adjAPY0, temp0);
 		adjAPY1 = Math.max(adjAPY1, temp1);
@@ -518,7 +522,7 @@ contract('VaultHealth', async function(accounts) {
 		await setPrice(_10To18.mul(new BN(3)));
 		let adjAPY0 = (APY0-1)/lowerThreshold0 + 1;
 
-		let temp0 = APY0-minRateAdjustment;
+		let temp0 = APY0-minLowerRateAdjustment;
 
 		adjAPY0 = Math.min(adjAPY0, temp0);
 
@@ -546,7 +550,7 @@ contract('VaultHealth', async function(accounts) {
 	it('amountSuppliedAtUpperLimit: borrow zcb with same wrapped asset as collateral asset', async () => {
 		let adjAPY0 = (APY0-1)/upperThreshold0 + 1;
 
-		let temp0 = APY0-minRateAdjustment;
+		let temp0 = APY0-minUpperRateAdjustment;
 
 		adjAPY0 = Math.min(adjAPY0, temp0);
 
@@ -591,7 +595,7 @@ contract('VaultHealth', async function(accounts) {
 
 		let adjAPYs = (APYs-1)/upperThreshold1 + 1;
 
-		let temp = APYs-minRateAdjustment;
+		let temp = APYs-minUpperRateAdjustment;
 
 		adjAPYs = Math.min(adjAPYs, temp);
 
@@ -633,7 +637,7 @@ contract('VaultHealth', async function(accounts) {
 
 		let adjAPYs = (APYs-1)*upperThreshold1 + 1;
 
-		let temp = APYs+minRateAdjustment;
+		let temp = APYs+minUpperRateAdjustment;
 
 		adjAPYs = Math.max(adjAPYs, temp);
 
@@ -657,7 +661,7 @@ contract('VaultHealth', async function(accounts) {
 		await setPrice(_10To18.mul(new BN(3)));
 		let adjAPY0 = (APY0-1)/upperThreshold0 + 1;
 
-		let temp0 = APY0-minRateAdjustment;
+		let temp0 = APY0-minUpperRateAdjustment;
 
 		adjAPY0 = Math.min(adjAPY0, temp0);
 
@@ -709,8 +713,8 @@ contract('VaultHealth', async function(accounts) {
 		let adjAPYs = (APYs-1)/upperThreshold1 + 1;
 		let adjAPY1 = (APY1-1)/upperThreshold1 + 1;
 
-		let temp = APYs-minRateAdjustment;
-		let temp1 = APY1-minRateAdjustment;
+		let temp = APYs-minUpperRateAdjustment;
+		let temp1 = APY1-minUpperRateAdjustment;
 
 		adjAPYs = Math.min(adjAPYs, temp);
 		adjAPY1 = Math.min(adjAPY1, temp1);
@@ -760,8 +764,8 @@ contract('VaultHealth', async function(accounts) {
 		let adjAPYs = (APYs-1)*upperThreshold1 + 1;
 		let adjAPY2 = (APY2-1)/upperThreshold1 + 1;
 
-		let temp = APYs+minRateAdjustment;
-		let temp2 = APY2-minRateAdjustment;
+		let temp = APYs+minUpperRateAdjustment;
+		let temp2 = APY2-minUpperRateAdjustment;
 
 		adjAPYs = Math.max(adjAPYs, temp);
 		adjAPY2 = Math.min(adjAPY2, temp2);
@@ -803,7 +807,7 @@ contract('VaultHealth', async function(accounts) {
 
 		let adjAPY0 = (APY0-1)/upperThreshold0 + 1;
 
-		let temp0 = APY0-minRateAdjustment;
+		let temp0 = APY0-minUpperRateAdjustment;
 
 		adjAPY0 = Math.min(adjAPY0, temp0);
 
@@ -832,7 +836,7 @@ contract('VaultHealth', async function(accounts) {
 		await setPrice(_10To18.mul(new BN(3)));
 		let adjAPY0 = (APY0-1)/upperThreshold0 + 1;
 
-		let temp0 = APY0-minRateAdjustment;
+		let temp0 = APY0-minUpperRateAdjustment;
 
 		adjAPY0 = Math.min(adjAPY0, temp0);
 
@@ -873,7 +877,7 @@ contract('VaultHealth', async function(accounts) {
 
 		let adjAPY0 = (APY0-1)/upperThreshold0 + 1;
 
-		let temp0 = APY0-minRateAdjustment;
+		let temp0 = APY0-minUpperRateAdjustment;
 
 		adjAPY0 = Math.min(adjAPY0, temp0);
 
@@ -902,7 +906,7 @@ contract('VaultHealth', async function(accounts) {
 		await setPrice(_10To18.mul(new BN(3)));
 		let adjAPY0 = (APY0-1)/upperThreshold0 + 1;
 
-		let temp0 = APY0-minRateAdjustment;
+		let temp0 = APY0-minUpperRateAdjustment;
 
 		adjAPY0 = Math.min(adjAPY0, temp0);
 
@@ -922,6 +926,14 @@ contract('VaultHealth', async function(accounts) {
 		let actual = parseInt(actualBN.toString());
 
 		let error = AmountError(expectedAmountBorrowed, actual);
+		if (error > ErrorRange) {
+			console.log(amountSupplied, amountBond);
+			console.log(rateMultiplier0, rateMultiplier1);
+			console.log(price, collateralizationRatio);
+			console.log(compositeSupplied);
+			console.log(expectedAmountBorrowed);
+			console.log(rec.tx);
+		}
 		assert.isBelow(error, ErrorRange, "output within acceptable error range");
 
 		let needed = new BN(Math.ceil(actual/(amountSupplied+amountBond)) + 1);
@@ -933,7 +945,7 @@ contract('VaultHealth', async function(accounts) {
 		await setPrice(_10To18.mul(new BN(3)));
 		let adjAPY0 = (APY0-1)/upperThreshold0 + 1;
 
-		let temp0 = APY0-minRateAdjustment;
+		let temp0 = APY0-minUpperRateAdjustment;
 
 		adjAPY0 = Math.min(adjAPY0, temp0);
 
@@ -962,7 +974,7 @@ contract('VaultHealth', async function(accounts) {
 		await setPrice(_10To18.mul(new BN(3)));
 		let adjAPY0 = (APY0-1)/lowerThreshold0 + 1;
 
-		let temp0 = APY0-minRateAdjustment;
+		let temp0 = APY0-minLowerRateAdjustment;
 
 		adjAPY0 = Math.min(adjAPY0, temp0);
 
@@ -991,7 +1003,7 @@ contract('VaultHealth', async function(accounts) {
 		await setPrice(_10To18.mul(new BN(3)));
 		let adjAPY0 = (APY0-1)/upperThreshold0 + 1;
 
-		let temp0 = APY0-minRateAdjustment;
+		let temp0 = APY0-minUpperRateAdjustment;
 
 		adjAPY0 = Math.min(adjAPY0, temp0);
 
@@ -999,7 +1011,7 @@ contract('VaultHealth', async function(accounts) {
 
 		let adjAPY1 = (APY1-1)*upperThreshold1 + 1;
 
-		let temp1 = APY1+minRateAdjustment;
+		let temp1 = APY1+minUpperRateAdjustment;
 
 		adjAPY1 = Math.max(adjAPY1, temp1);
 
@@ -1028,7 +1040,7 @@ contract('VaultHealth', async function(accounts) {
 		await setPrice(_10To18.mul(new BN(3)));
 		let adjAPY0 = (APY0-1)/lowerThreshold0 + 1;
 
-		let temp0 = APY0-minRateAdjustment;
+		let temp0 = APY0-minLowerRateAdjustment;
 
 		adjAPY0 = Math.min(adjAPY0, temp0);
 
@@ -1036,7 +1048,7 @@ contract('VaultHealth', async function(accounts) {
 
 		let adjAPY1 = (APY1-1)*lowerThreshold1 + 1;
 
-		let temp1 = APY1+minRateAdjustment;
+		let temp1 = APY1+minLowerRateAdjustment;
 
 		adjAPY1 = Math.max(adjAPY1, temp1);
 
@@ -1065,7 +1077,7 @@ contract('VaultHealth', async function(accounts) {
 		await setPrice(_10To18.mul(new BN(3)));
 		let adjAPY0 = (APY0-1)/upperThreshold0 + 1;
 
-		let temp0 = APY0-minRateAdjustment;
+		let temp0 = APY0-minUpperRateAdjustment;
 
 		adjAPY0 = Math.min(adjAPY0, temp0);
 
@@ -1073,7 +1085,7 @@ contract('VaultHealth', async function(accounts) {
 
 		let adjAPY1 = (APY1-1)/upperThreshold1 + 1;
 
-		let temp1 = APY1-minRateAdjustment;
+		let temp1 = APY1-minUpperRateAdjustment;
 
 		adjAPY1 = Math.min(adjAPY1, temp1);
 
@@ -1104,7 +1116,7 @@ contract('VaultHealth', async function(accounts) {
 		await setPrice(_10To18.mul(new BN(3)));
 		let adjAPY0 = (APY0-1)/lowerThreshold0 + 1;
 
-		let temp0 = APY0-minRateAdjustment;
+		let temp0 = APY0-minLowerRateAdjustment;
 
 		adjAPY0 = Math.min(adjAPY0, temp0);
 
@@ -1112,7 +1124,7 @@ contract('VaultHealth', async function(accounts) {
 
 		let adjAPY1 = (APY1-1)/lowerThreshold1 + 1;
 
-		let temp1 = APY1-minRateAdjustment;
+		let temp1 = APY1-minLowerRateAdjustment;
 
 		adjAPY1 = Math.min(adjAPY1, temp1);
 
@@ -1146,7 +1158,7 @@ contract('VaultHealth', async function(accounts) {
 
 		let adjAPY0 = (APY0-1)/upperThreshold0 + 1;
 
-		let temp0 = APY0-minRateAdjustment;
+		let temp0 = APY0-minUpperRateAdjustment;
 
 		adjAPY0 = Math.min(adjAPY0, temp0);
 
@@ -1187,7 +1199,7 @@ contract('VaultHealth', async function(accounts) {
 
 		adjAPY0 = (APY0-1)/upperThreshold0*rateChange0 + 1;
 
-		temp0 = (APY0-1)*rateChange0-minRateAdjustment + 1;
+		temp0 = (APY0-1)*rateChange0-minUpperRateAdjustment + 1;
 
 		adjAPY0 = Math.min(adjAPY0, temp0);
 
@@ -1214,8 +1226,8 @@ contract('VaultHealth', async function(accounts) {
 		let adjAPY0 = (APY0-1)/upperThreshold0 + 1;
 		let adjAPY1 = (APY1-1)*upperThreshold1 + 1;
 
-		let temp0 = APY0-minRateAdjustment;
-		let temp1 = APY1+minRateAdjustment;
+		let temp0 = APY0-minUpperRateAdjustment;
+		let temp1 = APY1+minUpperRateAdjustment;
 
 		adjAPY0 = Math.min(adjAPY0, temp0);
 		adjAPY1 = Math.max(adjAPY1, temp1);
@@ -1243,7 +1255,7 @@ contract('VaultHealth', async function(accounts) {
 		const _0 = "0";
 
 		adjAPY0 = 1.0;
-		adjAPY1 = 1.0+minRateAdjustment;
+		adjAPY1 = 1.0+minUpperRateAdjustment;
 
 		rateMultiplier0 = 1.0;
 		rateMultiplier1 = adjAPY1**(-yearsRemaining);
@@ -1264,8 +1276,8 @@ contract('VaultHealth', async function(accounts) {
 		adjAPY0 = (APY0-1)/upperThreshold0*rateChange0 + 1;
 		adjAPY1 = (APY1-1)*upperThreshold1*rateChange1 + 1;
 
-		temp0 = (APY0-1)*rateChange0-minRateAdjustment + 1;
-		temp1 = (APY1-1)*rateChange1+minRateAdjustment + 1;
+		temp0 = (APY0-1)*rateChange0-minUpperRateAdjustment + 1;
+		temp1 = (APY1-1)*rateChange1+minUpperRateAdjustment + 1;
 
 		adjAPY0 = Math.min(adjAPY0, temp0);
 		adjAPY1 = Math.max(adjAPY1, temp1);

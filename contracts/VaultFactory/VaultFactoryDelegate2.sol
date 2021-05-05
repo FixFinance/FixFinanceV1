@@ -281,9 +281,7 @@ contract VaultFactoryDelegate2 is VaultFactoryData {
 			IFixCapitalPool(vault.FCPsupplied).transferPosition(_to, vault.yieldSupplied, vault.bondSupplied);
 		}
 
-		if (len - 1 != _index)
-			_YTvaults[msg.sender][_index] = _YTvaults[msg.sender][len - 1];
-		delete _YTvaults[msg.sender][len - 1];
+		delete _YTvaults[msg.sender][_index];
 	}
 
 	/*
@@ -336,7 +334,8 @@ contract VaultFactoryDelegate2 is VaultFactoryData {
 			_FCPborrowed != mVault.FCPborrowed ||
 			_FCPsupplied != mVault.FCPsupplied ||
 			_yieldSupplied < mVault.yieldSupplied ||
-			_amountBorrowed > mVault.amountBorrowed
+			_amountBorrowed > mVault.amountBorrowed ||
+			(_yieldSupplied == mVault.yieldSupplied && _bondSupplied < mVault.bondSupplied)
 		) {
 			//index 0 in multipliers that must be converted to uint
 			require(_multipliers[0] > 0);
@@ -376,12 +375,19 @@ contract VaultFactoryDelegate2 is VaultFactoryData {
 		}
 
 		if (mVault.FCPborrowed != _FCPborrowed) {
+			if (_FCPborrowed != address(0)) {
+				raiseShortInterest(_FCPborrowed, _amountBorrowed);
+			}
+			if (mVault.FCPborrowed != address(0)) {
+				lowerShortInterest(mVault.FCPborrowed, mVault.amountBorrowed);
+			}
 			IFixCapitalPool(_FCPborrowed).mintZCBTo(_receiverAddr, _amountBorrowed);
 			sVault.FCPborrowed = _FCPborrowed;
 			sVault.amountBorrowed = _amountBorrowed;
 		}
 		else if (mVault.amountBorrowed < _amountBorrowed) {
 			IFixCapitalPool(_FCPborrowed).mintZCBTo(_receiverAddr, _amountBorrowed - mVault.amountBorrowed);
+			raiseShortInterest(_FCPborrowed, _amountBorrowed - mVault.amountBorrowed);
 			sVault.amountBorrowed = _amountBorrowed;
 		}
 		else if (mVault.amountBorrowed > _amountBorrowed) {
@@ -412,6 +418,7 @@ contract VaultFactoryDelegate2 is VaultFactoryData {
 			}
 		}
 		else if (mVault.amountBorrowed > _amountBorrowed) {
+			lowerShortInterest(_FCPborrowed, mVault.amountBorrowed - _amountBorrowed);
 			IFixCapitalPool(_FCPborrowed).burnZCBFrom(msg.sender,  mVault.amountBorrowed - _amountBorrowed);
 		}
 	}

@@ -249,9 +249,7 @@ contract VaultFactoryDelegate is VaultFactoryData {
 		if (vault.amountSupplied > 0)
 			IERC20(vault.assetSupplied).transfer(_to, vault.amountSupplied);
 
-		if (len - 1 != _index)
-			_vaults[msg.sender][_index] = _vaults[msg.sender][len - 1];
-		delete _vaults[msg.sender][len - 1];
+		delete _vaults[msg.sender][_index];
 	}
 
 	/*
@@ -334,18 +332,28 @@ contract VaultFactoryDelegate is VaultFactoryData {
 			sVault.amountSupplied = _amountSupplied;
 		}
 
+		IFixCapitalPool oldFCPBorrowed;
 		if (mVault.assetBorrowed != _assetBorrowed) {
-			IFixCapitalPool fcp = IFixCapitalPool(IZeroCouponBond(_assetBorrowed).FixCapitalPoolAddress());
-			fcp.mintZCBTo(_receiverAddr, _amountBorrowed);
+			if (address(_assetBorrowed) != address(0)) {
+				IFixCapitalPool newFCPBorrowed = IFixCapitalPool(IZeroCouponBond(_assetBorrowed).FixCapitalPoolAddress());
+				raiseShortInterest(address(newFCPBorrowed), _amountBorrowed);
+				newFCPBorrowed.mintZCBTo(_receiverAddr, _amountBorrowed);
+			}
+			if (address(mVault.assetBorrowed) != address(0)) {
+				oldFCPBorrowed = IFixCapitalPool(IZeroCouponBond(mVault.assetBorrowed).FixCapitalPoolAddress());
+				lowerShortInterest(address(oldFCPBorrowed), mVault.amountBorrowed);
+			}
 			sVault.assetBorrowed = _assetBorrowed;
 			sVault.amountBorrowed = _amountBorrowed;
 		}
 		else if (mVault.amountBorrowed < _amountBorrowed) {
-			IFixCapitalPool fcp = IFixCapitalPool(IZeroCouponBond(_assetBorrowed).FixCapitalPoolAddress());
-			fcp.mintZCBTo(_receiverAddr, _amountBorrowed - mVault.amountBorrowed);
+			oldFCPBorrowed = IFixCapitalPool(IZeroCouponBond(_assetBorrowed).FixCapitalPoolAddress());
+			raiseShortInterest(address(oldFCPBorrowed), _amountBorrowed - mVault.amountBorrowed);
+			oldFCPBorrowed.mintZCBTo(_receiverAddr, _amountBorrowed - mVault.amountBorrowed);
 			sVault.amountBorrowed = _amountBorrowed;
 		}
 		else if (mVault.amountBorrowed > _amountBorrowed) {
+			oldFCPBorrowed = IFixCapitalPool(IZeroCouponBond(_assetBorrowed).FixCapitalPoolAddress());
 			sVault.amountBorrowed = _amountBorrowed;
 		}
 
@@ -366,13 +374,12 @@ contract VaultFactoryDelegate is VaultFactoryData {
 
 		if (mVault.assetBorrowed != _assetBorrowed) {
 			if (mVault.amountBorrowed > 0) {
-				IFixCapitalPool fcp = IFixCapitalPool(IZeroCouponBond(mVault.assetBorrowed).FixCapitalPoolAddress());
-				fcp.burnZCBFrom(msg.sender, mVault.amountBorrowed);
+				oldFCPBorrowed.burnZCBFrom(msg.sender, mVault.amountBorrowed);
 			}
 		}
 		else if (mVault.amountBorrowed > _amountBorrowed) {
-			IFixCapitalPool fcp = IFixCapitalPool(IZeroCouponBond(_assetBorrowed).FixCapitalPoolAddress());
-			fcp.burnZCBFrom(msg.sender,  mVault.amountBorrowed - _amountBorrowed);
+			lowerShortInterest(address(oldFCPBorrowed), mVault.amountBorrowed - _amountBorrowed);
+			oldFCPBorrowed.burnZCBFrom(msg.sender,  mVault.amountBorrowed - _amountBorrowed);
 		}
 	}
 
@@ -397,7 +404,7 @@ contract VaultFactoryDelegate is VaultFactoryData {
 		uint maxBid = vault.amountSupplied * _amtIn / vault.amountBorrowed;
 		require(maxBid >= _bid);
 		if (satisfiesLimit(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied, vault.amountBorrowed, true)) {
-			uint maturity = IFixCapitalPool(vault.assetBorrowed).maturity();
+			uint maturity = IZeroCouponBond(vault.assetBorrowed).maturity();
 			require(maturity < block.timestamp + MAX_TIME_TO_MATURITY);
 		}
 		//burn borrowed ZCB
@@ -504,7 +511,7 @@ contract VaultFactoryDelegate is VaultFactoryData {
 		require(vault.assetSupplied == _assetSupplied);
 		require(vault.amountBorrowed <= _maxIn);
 		require(vault.amountSupplied >= _minOut && _minOut > 0);
-		require(IFixCapitalPool(_assetBorrowed).maturity() < block.timestamp + CRITICAL_TIME_TO_MATURITY || 
+		require(IZeroCouponBond(_assetBorrowed).maturity() < block.timestamp + CRITICAL_TIME_TO_MATURITY || 
 			!satisfiesLimit(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied, vault.amountBorrowed, false));
 
 		//burn borrowed ZCB

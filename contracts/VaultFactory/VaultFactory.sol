@@ -9,9 +9,10 @@ import "../interfaces/IVaultFactory.sol";
 import "../interfaces/IWrapper.sol";
 import "../interfaces/IERC20.sol";
 import "../helpers/Ownable.sol";
+import "../helpers/nonReentrant.sol";
 import "./VaultFactoryData.sol";
 
-contract VaultFactory is VaultFactoryData, IVaultFactory, Ownable {
+contract VaultFactory is VaultFactoryData, IVaultFactory, Ownable, nonReentrant {
 	using SafeMath for uint;
 	using SignedSafeMath for int;
 
@@ -198,7 +199,7 @@ contract VaultFactory is VaultFactoryData, IVaultFactory, Ownable {
 		@param uint _index: the vault to close is at vaults[msg.sender][_index]
 		@param address _to: the address to which to send all collateral after closing the vault
 	*/
-	function closeVault(uint _index, address _to) external override {
+	function closeVault(uint _index, address _to) external override noReentry {
 		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
 			"closeVault(uint256,address)",
 			_index,
@@ -242,7 +243,7 @@ contract VaultFactory is VaultFactoryData, IVaultFactory, Ownable {
 		int128[3] calldata _multipliers,
 		bytes calldata _data,
 		address _receiverAddr
-	) external override {
+	) external override noReentry {
 		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
 			"adjustVault(address,uint256,address,address,uint256,uint256,int128[3],bytes,address)",
 			_owner,
@@ -313,7 +314,7 @@ contract VaultFactory is VaultFactoryData, IVaultFactory, Ownable {
 		@param uint _index: the YT vault to close is at YTvaults[msg.sender][_index]
 		@param address _to: the address to which to send all collateral after closing the vault
 	*/
-	function closeYTVault(uint _index, address _to) external override {
+	function closeYTVault(uint _index, address _to) external override noReentry {
 		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
 			"closeYTVault(uint256,address)",
 			_index,
@@ -360,7 +361,7 @@ contract VaultFactory is VaultFactoryData, IVaultFactory, Ownable {
 		int128[3] calldata _multipliers,
 		bytes calldata _data,
 		address _receiverAddr
-	) external override {
+	) external override noReentry {
 		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
 			"adjustYTVault(address,uint256,address,address,uint256,int256,uint256,int128[3],bytes,address)",
 			_owner,
@@ -388,7 +389,7 @@ contract VaultFactory is VaultFactoryData, IVaultFactory, Ownable {
 		@param uint _bid: the first bid (in _assetSupplied) made by msg.sender
 		@param uint _maxIn: the maximum amount of _assetBorrowed to send in
 	*/
-	function auctionLiquidation(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _bid, uint _maxIn) external override {
+	function auctionLiquidation(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _bid, uint _maxIn) external override noReentry {
 		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
 			"auctionLiquidation(address,uint256,address,address,uint256,uint256)",
 			_owner,
@@ -447,7 +448,7 @@ contract VaultFactory is VaultFactoryData, IVaultFactory, Ownable {
 		@param uint _minOut: the minimum amount of assetSupplied that msg.sender wants to receive from this liquidation
 		@param address _to: the address to which to send all of the collateral from the vault
 	*/
-	function instantLiquidation(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _maxIn, uint _minOut, address _to) external override {
+	function instantLiquidation(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _maxIn, uint _minOut, address _to) external override noReentry {
 		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
 			"instantLiquidation(address,uint256,address,address,uint256,uint256,address)",
 			_owner,
@@ -475,7 +476,7 @@ contract VaultFactory is VaultFactoryData, IVaultFactory, Ownable {
 		@param uint _minOut: the minimum amount of assetSupplied that msg.sender wants to receive from this liquidation
 		@param address _to: the address to which to send all of the collateral from the vault
 	*/
-	function partialLiquidationSpecificIn(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _in, uint _minOut, address _to) external override {
+	function partialLiquidationSpecificIn(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _in, uint _minOut, address _to) external override noReentry{
 		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
 			"partialLiquidationSpecificIn(address,uint256,address,address,uint256,uint256,address)",
 			_owner,
@@ -503,7 +504,7 @@ contract VaultFactory is VaultFactoryData, IVaultFactory, Ownable {
 		@param uint _maxIn: the maximum amount of assetBorrowed that msg.sender is willing to bid on the vault
 		@param address _to: the address to which to send all of the collateral from the vault
 	*/
-	function partialLiquidationSpecificOut(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _out, uint _maxIn, address _to) external override {
+	function partialLiquidationSpecificOut(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _out, uint _maxIn, address _to) external override noReentry {
 		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
 			"partialLiquidationSpecificOut(address,uint256,address,address,uint256,uint256,address)",
 			_owner,
@@ -559,7 +560,7 @@ contract VaultFactory is VaultFactoryData, IVaultFactory, Ownable {
 			if ratio is below _minBondRatio tx will revert
 		@param uint _amtIn: the amount of the borrowed ZCB to send in
 	*/
-	function auctionYTLiquidation(address _owner, uint _index, address _FCPborrowed, address _FCPsupplied, uint _bidYield, int _minBondRatio, uint _amtIn) external override {
+	function auctionYTLiquidation(address _owner, uint _index, address _FCPborrowed, address _FCPsupplied, uint _bidYield, int _minBondRatio, uint _amtIn) external override noReentry {
 		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
 			"auctionYTLiquidation(address,uint256,address,address,uint256,int256,uint256)",
 			_owner,
@@ -621,7 +622,7 @@ contract VaultFactory is VaultFactoryData, IVaultFactory, Ownable {
 		@param uint _minOut: the minimum amount of YT from _FCPsupplied that msg.sender wants to receive from this liquidation
 		@param address _to: the address to which to send all of the collateral from the vault
 	*/
-	function instantYTLiquidation(address _owner, uint _index, address _FCPborrowed, address _FCPsupplied, uint _maxIn, uint _minOut, int _minBondRatio, address _to) external override {
+	function instantYTLiquidation(address _owner, uint _index, address _FCPborrowed, address _FCPsupplied, uint _maxIn, uint _minOut, int _minBondRatio, address _to) external override noReentry {
 		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
 			"instantYTLiquidation(address,uint256,address,address,uint256,uint256,int256,address)",
 			_owner,
@@ -652,7 +653,7 @@ contract VaultFactory is VaultFactoryData, IVaultFactory, Ownable {
 		@param uint _minOut: the minimum amount of YT from _FCPsupplied that msg.sender wants to receive from this liquidation
 		@param address _to: the address to which to send all of the collateral from the vault
 	*/
-	function partialYTLiquidationSpecificIn(address _owner, uint _index, address _FCPborrowed, address _FCPsupplied, uint _in, uint _minOut, int _minBondRatio, address _to) external override {
+	function partialYTLiquidationSpecificIn(address _owner, uint _index, address _FCPborrowed, address _FCPsupplied, uint _in, uint _minOut, int _minBondRatio, address _to) external override noReentry {
 		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
 			"partialYTLiquidationSpecificIn(address,uint256,address,address,uint256,uint256,int256,address)",
 			_owner,
@@ -683,7 +684,7 @@ contract VaultFactory is VaultFactoryData, IVaultFactory, Ownable {
 		@param uint _maxIn: the maximum amount of assetBorrowed that msg.sender is willing to bid on the vault
 		@param address _to: the address to which to send all of the collateral from the vault
 	*/
-	function partialYTLiquidationSpecificOut(address _owner, uint _index, address _FCPborrowed, address _FCPsupplied, uint _out, int _minBondRatio, uint _maxIn, address _to) external override {
+	function partialYTLiquidationSpecificOut(address _owner, uint _index, address _FCPborrowed, address _FCPsupplied, uint _out, int _minBondRatio, uint _maxIn, address _to) external override noReentry {
 		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
 			"partialYTLiquidationSpecificOut(address,uint256,address,address,uint256,int256,uint256,address)",
 			_owner,

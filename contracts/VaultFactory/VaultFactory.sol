@@ -190,7 +190,7 @@ contract VaultFactory is VaultFactoryData, IVaultFactory, Ownable, nonReentrant 
 			_borrowRateChange
 		));
 		require(success);
-		emit OpenVault(_assetSupplied, _assetBorrowed, _amountSupplied, _amountBorrowed);
+		emit OpenVault(msg.sender, _assetSupplied, _assetBorrowed, _amountSupplied, _amountBorrowed);
 	}
 
 	/*
@@ -257,6 +257,7 @@ contract VaultFactory is VaultFactoryData, IVaultFactory, Ownable, nonReentrant 
 			_receiverAddr
 		));
 		require(success);
+		emit AdjustVault(_owner, _index, _assetSupplied, _assetBorrowed, _amountSupplied, _amountBorrowed);
 	}
 
 	//--------------------------------------YT vault management-----------------------------------
@@ -306,6 +307,7 @@ contract VaultFactory is VaultFactoryData, IVaultFactory, Ownable, nonReentrant 
 			_borrowRateChange
 		));
 		require(success);
+		emit OpenYTVault(msg.sender, _FCPsupplied, _FCPborrowed, _yieldSupplied, _bondSupplied, _amountBorrowed);
 	}
 
 	/*
@@ -321,6 +323,7 @@ contract VaultFactory is VaultFactoryData, IVaultFactory, Ownable, nonReentrant 
 			_to
 		));
 		require(success);
+		emit CloseYTVault(msg.sender, _index);
 	}
 
 	/*
@@ -376,7 +379,29 @@ contract VaultFactory is VaultFactoryData, IVaultFactory, Ownable, nonReentrant 
 			_receiverAddr
 		));
 		require(success);
+		emit AdjustYTVault(_owner, _index, _FCPsupplied, _FCPborrowed, _yieldSupplied, _bondSupplied, _amountBorrowed);
 	}
+
+	//--------------------------------f-o-r---b-o-t-h---s-t-a-n-d-a-r-d---v-a-u-l-t-s---a-n-d---Y-T-v-a-u-l-t-s---------------
+
+	/*
+		@Description: assign a vault/YTvault to a new owner
+
+		@param uint _index: the index within vaults/YTvaults[msg.sender] at which the vault to transfer is located
+		@param address _to: the new owner of the vault/YTvault
+		@param bool _isYTVault: true when the vault to transfer is a YTvault, false otherwise
+	*/
+	function transferVault(uint _index, address _to, bool _isYTVault) external override noReentry {
+		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
+			"transferVault(uint256,address,bool)",
+			_index,
+			_to,
+			_isYTVault
+		));
+		require(success);
+		emit TransferVault(msg.sender, _index, _to, _isYTVault);
+	}
+
 	//----------------------------------------------_Liquidations------------------------------------------
 
 	/*

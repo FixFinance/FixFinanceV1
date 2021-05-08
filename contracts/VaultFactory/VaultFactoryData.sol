@@ -100,6 +100,7 @@ contract VaultFactoryData {
 	IVaultHealth internal vaultHealthContract;
 
 	event OpenVault(
+		address owner,
 		address assetSupplied,
 		address assetBorrowed,
 		uint amountSupplied,
@@ -111,28 +112,43 @@ contract VaultFactoryData {
 		uint index
 	);
 
-	event Remove (
+	event AdjustVault(
 		address owner,
 		uint index,
-		uint amount
+		address newAssetSupplied,
+		address newAssetBorrowed,
+		uint newAmountSupplied,
+		uint newAmountBorrowed
 	);
 
-	event Deposit (
+	event OpenYTVault(
+		address owner,
+		address FCPsupplied,
+		address FCPborrowed,
+		uint yieldSupplied,
+		int bondSupplied,
+		uint amountBorrowed		
+	);
+
+	event CloseYTVault(
+		address owner,
+		uint index
+	);
+
+	event AdjustYTVault(
 		address owner,
 		uint index,
-		uint amount
+		address newFCPsupplied,
+		address newFCPborrowed,
+		uint newYieldSupplied,
+		int newBondSupplied,
+		uint newAmountBorrowed		
 	);
 
-	event Borrow (
-		address owner,
-		uint index,
-		uint amount
+	event TransferVault(
+		address prevOwner,
+		uint prevIndex,
+		address newOwner,
+		bool isYTVault
 	);
-
-	event Repay (
-		address owner,
-		uint index,
-		uint amount
-	);
-
 }

@@ -97,6 +97,8 @@ interface IVaultFactory {
 		address _receiverAddr
 	) external;
 	function closeYTVault(uint _index, address _to) external;
+	//--------------------------------f-o-r---b-o-t-h---s-t-a-n-d-a-r-d---v-a-u-l-t-s---a-n-d---Y-T-v-a-u-l-t-s---------------
+	function transferVault(uint _index, address _to, bool _isYTVault) external;
 	//----------------------------------------------L-i-q-u-i-d-a-t-i-o-n-s------------------------------------------
 	function claimRebate(address _asset) external;
 	function auctionLiquidation(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _bid, uint _amtIn) external;

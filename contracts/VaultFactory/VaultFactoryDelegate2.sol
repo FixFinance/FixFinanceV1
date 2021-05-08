@@ -396,7 +396,15 @@ contract VaultFactoryDelegate2 is VaultFactoryData {
 
 		//-----------------------------flashloan------------------
 		if (_data.length > 0) {
-			IYTVaultManagerFlashReceiver(_receiverAddr).onFlashLoan(msg.sender, _data);
+			IYTVaultManagerFlashReceiver(_receiverAddr).onFlashLoan(
+				msg.sender,
+				mVault.FCPsupplied,
+				mVault.FCPborrowed,
+				mVault.yieldSupplied,
+				mVault.bondSupplied,
+				mVault.amountBorrowed,
+				_data
+			);
 		}
 
 		//-----------------------------get funds-------------------------

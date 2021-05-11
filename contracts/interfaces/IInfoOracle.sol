@@ -14,9 +14,11 @@ interface IInfoOracle {
 	function getZCBammFeeConstant(address _fixCapitalPoolAddress) external view returns (uint FeeConstant);
 	function getYTammFeeConstant(address _fixCapitalPoolAddress) external view returns (uint FeeConstant);
 	function getSlippageConstant(address _fixCapitalPoolAddress) external view returns (uint SlippageConstant);
+	function DelegatedControllers(address _owner) external view returns (address delegate);
 
 	//---------management--------------
 
+	function setDelegatedController(address _delegate) external;
 	function wrapperSetFeeConstants(address _wrapper, uint _ZCBammFeeConstant, uint _YTammFeeConstant) external;
 	function wrapperSetSlippageConst(address _wrapper, uint _SlippageConstant) external;
 	function setFeeConstants(address _fixCapitalPoolAddress, uint _ZCBammFeeConstant, uint _YTammFeeConstant) external;

@@ -38,6 +38,8 @@ contract InfoOracle is IInfoOracle, Ownable {
 
 	mapping(address => uint) public override YTammFeeConstants;
 
+	mapping(address => address) public override DelegatedControllers;
+
 	/*
 		init
 	*/
@@ -50,6 +52,31 @@ contract InfoOracle is IInfoOracle, Ownable {
 	}
 
 	/*
+		@Description: ensure that msg.sender is either owner of contract for which to set params
+			or msg.sender is delegated to set the params
+
+		@param address _contractAddr: the contract for which to set params
+	*/
+	modifier maySetContractParameters(address _contractAddr) {
+		address contractOwner = Ownable(_contractAddr).owner();
+		if (msg.sender != contractOwner) {
+			address delegatedController = DelegatedControllers[msg.sender];
+			require(msg.sender == delegatedController);
+		}
+		_;
+	}
+
+
+	/*
+		@Description: delegate ability to customise parameters for wrappers and FCPs to another address
+
+		@param address _delegate: the address that shall customise parameters for msg.sender
+	*/
+	function setDelegatedController(address _delegate) external override {
+		DelegatedControllers[msg.sender] = _delegate;
+	}
+
+	/*
 		@Description: owner of a wrapper may set the default fee constants for ZCB and YT amms that trade ZCB & YT
 			that utilise their wrapper
 
@@ -58,8 +85,7 @@ contract InfoOracle is IInfoOracle, Ownable {
 		@param uint _ZCBammFeeConstant: the fee constant for ZCBamms, must be >= 1, inflated by (1 ether)
 		@param uint _YTammFeeConstant: the fee constant for YTamms, must be >= 1, inflated by (1 ether)
 	*/
-	function wrapperSetFeeConstants(address _wrapper, uint _ZCBammFeeConstant, uint _YTammFeeConstant) external override {
-		require(msg.sender == Ownable(_wrapper).owner());
+	function wrapperSetFeeConstants(address _wrapper, uint _ZCBammFeeConstant, uint _YTammFeeConstant) external override  maySetContractParameters(_wrapper) {
 		require(_ZCBammFeeConstant >= 1 ether && _YTammFeeConstant >= 1 ether);
 		WrapperToZCBFeeConst[_wrapper] = _ZCBammFeeConstant;
 		WrapperToYTFeeConst[_wrapper] = _YTammFeeConstant;
@@ -73,8 +99,7 @@ contract InfoOracle is IInfoOracle, Ownable {
 			slippage constant for
 		@param uint _SlippageConstant: the sliippage constant for YTamms, inflated by 1 ether
 	*/
-	function wrapperSetSlippageConst(address _wrapper, uint _SlippageConstant) external override {
-		require(msg.sender == Ownable(_wrapper).owner());
+	function wrapperSetSlippageConst(address _wrapper, uint _SlippageConstant) external override maySetContractParameters(_wrapper) {
 		WrapperToYTSlippageConst[_wrapper] = _SlippageConstant;
 	}
 
@@ -86,8 +111,7 @@ contract InfoOracle is IInfoOracle, Ownable {
 		@param uint _ZCBammFeeConstant: the fee constant for the ZCBamm, must be >= 1, inflated by (1 ether)
 		@param uint _YTammFeeConstant: the fee constant for the YTamm, must be >= 1, inflated by (1 ether)
 	*/
-	function setFeeConstants(address _fixCapitalPoolAddress, uint _ZCBammFeeConstant, uint _YTammFeeConstant) external override {
-		require(msg.sender == Ownable(_fixCapitalPoolAddress).owner());
+	function setFeeConstants(address _fixCapitalPoolAddress, uint _ZCBammFeeConstant, uint _YTammFeeConstant) external override maySetContractParameters(_fixCapitalPoolAddress) {
 		require(_ZCBammFeeConstant >= 1 ether && _YTammFeeConstant >= 1 ether);
 		ZCBammFeeConstants[_fixCapitalPoolAddress] = _ZCBammFeeConstant;
 		YTammFeeConstants[_fixCapitalPoolAddress] = _YTammFeeConstant;
@@ -100,8 +124,7 @@ contract InfoOracle is IInfoOracle, Ownable {
 		@param address _fixCapitalPoolAddress: address of fix capital pool contract for which to set YTamm slippage
 		@param uint _SlippageConstant: the sliippage constant for YTamms, inflated by 1 ether
 	*/
-	function setSlippageConstant(address _fixCapitalPoolAddress, uint256 _SlippageConstant) external override {
-		require(msg.sender == Ownable(_fixCapitalPoolAddress).owner());
+	function setSlippageConstant(address _fixCapitalPoolAddress, uint256 _SlippageConstant) external override maySetContractParameters(_fixCapitalPoolAddress) {
 		YTammSlippageConstants[_fixCapitalPoolAddress] = _SlippageConstant;
 	}
 

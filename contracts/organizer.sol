@@ -44,7 +44,6 @@ contract organizer {
 	address public YTammDeployerAddress;
 	address public SwapRouterAddress;
 	address public InfoOracleAddress;
-	address public treasuryAddress;
 
 	address internal SwapRouterDeployerAddress;
 
@@ -57,8 +56,7 @@ contract organizer {
 		address _ZCBammDeployerAddress,
 		address _YTammDeployerAddress,
 		address _SwapRouterDeployerAddress,
-		address _InfoOracleAddress,
-		address _treasuryAddress
+		address _InfoOracleAddress
 	) public {
 		yieldTokenDeployerAddress = _yieldTokenDeployerAddress;	
 		FixCapitalPoolDeployerAddress = _CapitalhandlerDeployerAddress;
@@ -66,7 +64,6 @@ contract organizer {
 		YTammDeployerAddress = _YTammDeployerAddress;
 		SwapRouterDeployerAddress = _SwapRouterDeployerAddress;
 		InfoOracleAddress = _InfoOracleAddress;
-		treasuryAddress = _treasuryAddress;
 	}
 
 	/*
@@ -84,7 +81,7 @@ contract organizer {
 		@param address _assetAddress: the NGB asset for which to deploy an NGBwrapper
 	*/
 	function deployAssetWrapper(address _assetAddress) public {
-		NGBwrapper temp = new NGBwrapper(_assetAddress, treasuryAddress, DEFAULT_SBPS_RETAINED);
+		NGBwrapper temp = new NGBwrapper(_assetAddress, InfoOracleAddress, DEFAULT_SBPS_RETAINED);
 		temp.transferOwnership(msg.sender);
 		emit WrapperDeployment(address(temp), _assetAddress, 0);
 	}
@@ -102,7 +99,7 @@ contract organizer {
 			_maturity,
 			yieldTokenDeployerAddress,
 			msg.sender,
-			treasuryAddress
+			InfoOracleAddress
 		);
 		emit FixCapitalPoolDeployment(fixCapitalPoolAddress);
 		fixCapitalPoolToWrapper[fixCapitalPoolAddress] = _wrapperAddress;

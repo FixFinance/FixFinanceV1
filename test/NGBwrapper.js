@@ -1,6 +1,6 @@
 const dummyAToken = artifacts.require('dummyAToken');
 const NGBwrapper = artifacts.require('NGBwrapper');
-const fixCapitalPool = artifacts.require('FixCapitalPool');
+const InfoOracle = artifacts.require('InfoOracle');
 const BN = web3.utils.BN;
 const _10To18 = (new BN('10')).pow(new BN('18'));
 
@@ -30,9 +30,11 @@ function AmountError(actual, expected) {
 contract('NGBwrapper', async function(accounts){
 	it('before each', async () => {
 		dummyATokenInstance = await dummyAToken.new("DMY");
-		NGBwrapperInstance = await NGBwrapper.new(dummyATokenInstance.address, accounts[4], SBPSretained);
+		sendTo = accounts[4];
+		infoOracleInstance = await InfoOracle.new(0, sendTo);
+		NGBwrapperInstance = await NGBwrapper.new(dummyATokenInstance.address, infoOracleInstance.address, SBPSretained);
 		inflation = await dummyATokenInstance.inflation();
-		treasuryAddress = await NGBwrapperInstance.treasuryAddress();
+		treasuryAddress = sendTo;
 		await NGBwrapperInstance.transferOwnership(treasuryAddress);
 		assert.equal(await NGBwrapperInstance.underlyingAssetAddress(), dummyATokenInstance.address, 'correct address for aToken');
 		assert.equal((await NGBwrapperInstance.totalSupply()).toString(), "0", "correct total supply");

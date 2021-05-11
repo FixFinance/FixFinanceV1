@@ -76,8 +76,7 @@ contract('VaultFactory', async function(accounts) {
 			ZCBammDeployerInstance.address,
 			YTammDeployerInstance.address,
 			nullAddress,
-			infoOracleInstance.address,
-			accounts[0]
+			infoOracleInstance.address
 		);
 
 		maturity = ((await web3.eth.getBlock('latest')).timestamp + _8days).toString();

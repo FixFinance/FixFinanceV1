@@ -101,8 +101,7 @@ contract('VaultHealth', async function(accounts) {
 			ZCBammDeployerInstance.address,
 			YTammDeployerInstance.address,
 			nullAddress,
-			infoOracleInstance.address,
-			accounts[4]
+			infoOracleInstance.address
 		);
 		await vaultHealthInstance.setOrganizerAddress(organizerInstance.address);
 

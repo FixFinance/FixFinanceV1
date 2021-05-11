@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.6.0;
 import "./helpers/Ownable.sol";
+import './interfaces/IInfoOracle.sol';
 import "./interfaces/IFixCapitalPool.sol";
 import "./libraries/SafeMath.sol";
 import "./libraries/ABDKMath64x64.sol";
 import "./libraries/BigMath.sol";
 
-contract InfoOracle is Ownable {
+contract InfoOracle is IInfoOracle, Ownable {
 
 	using ABDKMath64x64 for int128;
 	using SafeMath for uint256;
@@ -21,25 +22,21 @@ contract InfoOracle is Ownable {
 	// the treasury should receive no more than 40% of total fee revenue
 	uint16 private constant MaxBipsToTreasury = 4_000;
 
+	uint16 public override bipsToTreasury;
 
-	//pct fee paid on swap with 1 year to maturity
-	int128 public annualRate;
+	address public override sendTo;
 
-	uint16 public bipsToTreasury;
+	mapping(address => uint) public override WrapperToYTSlippageConst;
 
-	address public sendTo;
+	mapping(address => uint) public override WrapperToZCBFeeConst;
 
-	mapping(address => uint) public WrapperToYTSlippageConst;
+	mapping(address => uint) public override WrapperToYTFeeConst;
 
-	mapping(address => uint) public WrapperToZCBFeeConst;
+	mapping(address => uint) public override YTammSlippageConstants;
 
-	mapping(address => uint) public WrapperToYTFeeConst;
+	mapping(address => uint) public override ZCBammFeeConstants;
 
-	mapping(address => uint) public YTammSlippageConstants;
-
-	mapping(address => uint) public ZCBammFeeConstants;
-
-	mapping(address => uint) public YTammFeeConstants;
+	mapping(address => uint) public override YTammFeeConstants;
 
 	/*
 		init
@@ -61,7 +58,7 @@ contract InfoOracle is Ownable {
 		@param uint _ZCBammFeeConstant: the fee constant for ZCBamms, must be >= 1, inflated by (1 ether)
 		@param uint _YTammFeeConstant: the fee constant for YTamms, must be >= 1, inflated by (1 ether)
 	*/
-	function wrapperSetFeeConstants(address _wrapper, uint _ZCBammFeeConstant, uint _YTammFeeConstant) public {
+	function wrapperSetFeeConstants(address _wrapper, uint _ZCBammFeeConstant, uint _YTammFeeConstant) external override {
 		require(msg.sender == Ownable(_wrapper).owner());
 		require(_ZCBammFeeConstant >= 1 ether && _YTammFeeConstant >= 1 ether);
 		WrapperToZCBFeeConst[_wrapper] = _ZCBammFeeConstant;
@@ -76,7 +73,7 @@ contract InfoOracle is Ownable {
 			slippage constant for
 		@param uint _SlippageConstant: the sliippage constant for YTamms, inflated by 1 ether
 	*/
-	function wrapperSetSlippageConst(address _wrapper, uint _SlippageConstant) public {
+	function wrapperSetSlippageConst(address _wrapper, uint _SlippageConstant) external override {
 		require(msg.sender == Ownable(_wrapper).owner());
 		WrapperToYTSlippageConst[_wrapper] = _SlippageConstant;
 	}
@@ -89,7 +86,7 @@ contract InfoOracle is Ownable {
 		@param uint _ZCBammFeeConstant: the fee constant for the ZCBamm, must be >= 1, inflated by (1 ether)
 		@param uint _YTammFeeConstant: the fee constant for the YTamm, must be >= 1, inflated by (1 ether)
 	*/
-	function setFeeConstants(address _fixCapitalPoolAddress, uint _ZCBammFeeConstant, uint _YTammFeeConstant) public {
+	function setFeeConstants(address _fixCapitalPoolAddress, uint _ZCBammFeeConstant, uint _YTammFeeConstant) external override {
 		require(msg.sender == Ownable(_fixCapitalPoolAddress).owner());
 		require(_ZCBammFeeConstant >= 1 ether && _YTammFeeConstant >= 1 ether);
 		ZCBammFeeConstants[_fixCapitalPoolAddress] = _ZCBammFeeConstant;
@@ -103,7 +100,7 @@ contract InfoOracle is Ownable {
 		@param address _fixCapitalPoolAddress: address of fix capital pool contract for which to set YTamm slippage
 		@param uint _SlippageConstant: the sliippage constant for YTamms, inflated by 1 ether
 	*/
-	function setSlippageConstant(address _fixCapitalPoolAddress, uint256 _SlippageConstant) public {
+	function setSlippageConstant(address _fixCapitalPoolAddress, uint256 _SlippageConstant) external override {
 		require(msg.sender == Ownable(_fixCapitalPoolAddress).owner());
 		YTammSlippageConstants[_fixCapitalPoolAddress] = _SlippageConstant;
 	}
@@ -120,7 +117,7 @@ contract InfoOracle is Ownable {
 		@return uint toTreasury: the amount of fee that must be sent to the treasury
 		@return address _sendTo: the address that shall receive the treasury fee
 	*/
-	function treasuryFee(uint larger, uint smaller) external view returns (uint toTreasury, address _sendTo) {
+	function treasuryFee(uint larger, uint smaller) external view override returns (uint toTreasury, address _sendTo) {
 		require(larger >= smaller);
 		uint totalFee = larger - smaller;
 		toTreasury = totalFee * bipsToTreasury / totalBasisPoints;
@@ -137,7 +134,7 @@ contract InfoOracle is Ownable {
 
 		@return uint FeeConstant: the ZCBamm fee constant corresponding to the fix capital pool contract
 	*/
-	function getZCBammFeeConstant(address _fixCapitalPoolAddress) external view returns (uint FeeConstant) {
+	function getZCBammFeeConstant(address _fixCapitalPoolAddress) external view override returns (uint FeeConstant) {
 		FeeConstant = ZCBammFeeConstants[_fixCapitalPoolAddress];
 		if (FeeConstant == 0) {
 			FeeConstant = WrapperToZCBFeeConst[address(IFixCapitalPool(_fixCapitalPoolAddress).wrapper())];
@@ -154,7 +151,7 @@ contract InfoOracle is Ownable {
 
 		@return uint FeeConstant: the YTamm fee constant corresponding to the fix capital pool contract
 	*/
-	function getYTammFeeConstant(address _fixCapitalPoolAddress) external view returns (uint FeeConstant) {
+	function getYTammFeeConstant(address _fixCapitalPoolAddress) external view override returns (uint FeeConstant) {
 		FeeConstant = YTammFeeConstants[_fixCapitalPoolAddress];
 		if (FeeConstant == 0) {
 			FeeConstant = WrapperToYTFeeConst[address(IFixCapitalPool(_fixCapitalPoolAddress).wrapper())];
@@ -171,21 +168,21 @@ contract InfoOracle is Ownable {
 
 		@return uint FeeConstant: the YTamm slippage constant corresponding to the fix capital pool contract
 	*/
-	function getSlippageConstant(address _fixCapitalPoolAddress) external view returns (uint SlippageConstant) {
+	function getSlippageConstant(address _fixCapitalPoolAddress) external view override returns (uint SlippageConstant) {
 		SlippageConstant = YTammSlippageConstants[_fixCapitalPoolAddress];
 		if (SlippageConstant == 0) {
 			SlippageConstant = WrapperToYTSlippageConst[address(IFixCapitalPool(_fixCapitalPoolAddress).wrapper())];
 		}
 	}
 
-	//--------------------------A-m-m-I-n-f-o-O-r-a-c-l-e---a-d-m-i-n-----------------------------
+	//-----------------------I-n-f-o-O-r-a-c-l-e---a-d-m-i-n-----------------------------
 
 	/*
 		@Description: admin may set the % of LP fees that go to the treasury
 		
 		@param uint16 _bipsToTreasury: the % of LP fees that shall go the treasury (denominated in basis points)
 	*/
-	function setToTreasuryFee(uint16 _bipsToTreasury) public onlyOwner {
+	function setToTreasuryFee(uint16 _bipsToTreasury) public override onlyOwner {
 		require(_bipsToTreasury <= MaxBipsToTreasury);
 		bipsToTreasury = _bipsToTreasury;
 	}
@@ -195,7 +192,7 @@ contract InfoOracle is Ownable {
 
 		@param address _sendTo: the address that shall receive all treasury fees
 	*/
-	function setSendTo(address _sendTo) external onlyOwner {
+	function setSendTo(address _sendTo) external override onlyOwner {
 		sendTo = _sendTo;
 	}
 

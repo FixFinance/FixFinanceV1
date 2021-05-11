@@ -79,8 +79,7 @@ module.exports = async function(deployer) {
 		ZCBammDeployerInstance.address,
 		YTammDeployerInstance.address,
 		swapRouterDeployerInstance.address,
-		infoOracle.address,
-		accounts[0]
+		infoOracle.address
 	);
 	await organizerInstance.DeploySwapRouter();
 	let rec = await organizerInstance.deployAssetWrapper(dummyATokenInstance.address);

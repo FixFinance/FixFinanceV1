@@ -2,6 +2,7 @@
 pragma solidity >=0.6.5 <0.7.0;
 import "../interfaces/IERC20.sol";
 import "../interfaces/IWrapper.sol";
+import "../interfaces/IInfoOracle.sol";
 import "../libraries/SafeMath.sol";
 import "../libraries/ABDKMath64x64.sol";
 import "../libraries/BigMath.sol";
@@ -50,20 +51,20 @@ contract NGBwrapper is IWrapper, nonReentrant, Ownable {
 
 	uint8 public immutable override decimals;
 
-	address public immutable treasuryAddress;
+	address public immutable infoOracleAddress;
 
 	uint public lastHarvest;
 
 	/*
 		init
 	*/
-	constructor (address _underlyingAssetAddress, address _treasuryAddress, uint32 _SBPSRetained) public {
+	constructor (address _underlyingAssetAddress, address _infoOralceAddress, uint32 _SBPSRetained) public {
 		require(_SBPSRetained > 0 && _SBPSRetained <= totalSBPS);
 		underlyingAssetAddress = _underlyingAssetAddress;
 		decimals = IERC20(_underlyingAssetAddress).decimals();
 		name = string(abi.encodePacked('wrapped ',IERC20(_underlyingAssetAddress).name()));
 		symbol = string(abi.encodePacked('w', IERC20(_underlyingAssetAddress).symbol()));
-		treasuryAddress = _treasuryAddress;
+		infoOracleAddress = _infoOralceAddress;
 		SBPSRetained = _SBPSRetained;
 	}
 
@@ -220,9 +221,10 @@ contract NGBwrapper is IWrapper, nonReentrant, Ownable {
 			prevRatio = effectiveRatio;
 		}
 		lastHarvest = block.timestamp;
-		uint dividend = newTotalSupply.sub(prevTotalSupply) >> 1;
-		balanceOf[treasuryAddress] += dividend;
-		balanceOf[owner] += dividend;
+		uint dividend = newTotalSupply.sub(prevTotalSupply);
+		address sendTo = IInfoOracle(infoOracleAddress).sendTo();
+		balanceOf[sendTo] += dividend >> 1;
+		balanceOf[owner] += dividend - (dividend >> 1);
 		totalSupply = newTotalSupply;
 	}
 

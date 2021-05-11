@@ -94,7 +94,11 @@ async function setRate(amm, rate, account) {
 contract('YTamm', async function(accounts){
 	it('before each', async () => {
 		aTokenInstance = await aToken.new("aCOIN");
-		NGBwrapperInstance = await NGBwrapper.new(aTokenInstance.address, accounts[4], SBPSretained);
+		infoOracleInstance = await InfoOracle.new(
+			BipsToTreasury,
+			nullAddress
+		);
+		NGBwrapperInstance = await NGBwrapper.new(aTokenInstance.address, infoOracleInstance.address, SBPSretained);
 		EiInstance = await Ei.new();
 		await BigMath.link("Ei", EiInstance.address);
 		BigMathInstance = await BigMath.new();
@@ -102,16 +106,12 @@ contract('YTamm', async function(accounts){
 		let timestamp = (await web3.eth.getBlock('latest')).timestamp;
 		//maturity is 110 days out
 		maturity = timestamp + 110*24*60*60;
-		fixCapitalPoolInstance = await fixCapitalPool.new(NGBwrapperInstance.address, maturity, zcbYtDeployerInstance.address, accounts[3]);
+		fixCapitalPoolInstance = await fixCapitalPool.new(NGBwrapperInstance.address, maturity, zcbYtDeployerInstance.address, infoOracleInstance.address);
 		zcbInstance = await zeroCouponBond.at(await fixCapitalPoolInstance.zeroCouponBondAddress());
 		yieldTokenInstance = await yieldToken.at(await fixCapitalPoolInstance.yieldTokenAddress());
 		await ZCBamm.link("BigMath", BigMathInstance.address);
 		await YTamm.link("BigMath", BigMathInstance.address);
 		await YTammDelegate.link("BigMath", BigMathInstance.address);
-		infoOracleInstance = await InfoOracle.new(
-			BipsToTreasury,
-			nullAddress
-		);
 		await infoOracleInstance.setSlippageConstant(fixCapitalPoolInstance.address, SlippageConstant);
 		await infoOracleInstance.setFeeConstants(fixCapitalPoolInstance.address, ZCBammFeeConstant, YTammFeeConstant);
 		amm0 = await ZCBamm.new(fixCapitalPoolInstance.address, infoOracleInstance.address);

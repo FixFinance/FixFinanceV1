@@ -2,6 +2,7 @@ const dummyAToken = artifacts.require('dummyAToken');
 const NGBwrapper = artifacts.require('NGBwrapper');
 const fixCapitalPool = artifacts.require('FixCapitalPool');
 const zcbYtDeployer = artifacts.require('ZCB_YT_Deployer');
+const InfoOracle = artifacts.require('InfoOracle');
 const IERC20 = artifacts.require("IERC20");
 
 const helper = require("../helper/helper.js");
@@ -14,11 +15,13 @@ const SBPSretained = 999_000;
 
 contract('FixCapitalPool', async function(accounts){
 	it('before each', async () => {
+		sendTo = accounts[3];
+		infoOracleInstance = await InfoOracle.new(0, sendTo);
 		dummyATokenInstance = await dummyAToken.new("aCOIN");
-		NGBwrapperInstance = await NGBwrapper.new(dummyATokenInstance.address, accounts[4], SBPSretained);
+		NGBwrapperInstance = await NGBwrapper.new(dummyATokenInstance.address, infoOracleInstance.address, SBPSretained);
 		zcbYtDeployerInstance = await zcbYtDeployer.new();
 		timeNow = (await web3.eth.getBlock('latest')).timestamp;
-		fixCapitalPoolInstance = await fixCapitalPool.new(NGBwrapperInstance.address, timeNow+86400, zcbYtDeployerInstance.address, accounts[3]);
+		fixCapitalPoolInstance = await fixCapitalPool.new(NGBwrapperInstance.address, timeNow+86400, zcbYtDeployerInstance.address, infoOracleInstance.address);
 		inflation = await dummyATokenInstance.inflation();
 		yieldTokenInstance = await IERC20.at(await fixCapitalPoolInstance.yieldTokenAddress());
 		zcbInstance = await IERC20.at(await fixCapitalPoolInstance.zeroCouponBondAddress());

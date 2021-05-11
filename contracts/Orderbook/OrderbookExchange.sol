@@ -84,45 +84,45 @@ contract OrderbookExchange {
 
 	//---------------i-n-t-e-r-n-a-l---m-o-d-i-f-y---o-r-d-e-r-b-o-o-k--------------------
 
-	function manageCollateral_MakeLimitBuyZCB(uint _amount) internal {
+	function manageCollateral_BuyZCB(address _addr, uint _amount) internal {
 		require(_amount < uint(type(int256).max));
-		uint YD = YieldDeposited[msg.sender];
-		int BD = BondDeposited[msg.sender];
-		uint wrappedAmtLockedYT = lockedYT[msg.sender];
+		uint YD = YieldDeposited[_addr];
+		int BD = BondDeposited[_addr];
+		uint wrappedAmtLockedYT = lockedYT[_addr];
 		uint ratio = wrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
 
 		int resultantBD = BD.sub(int(_amount));
 
 		requireValidCollateral(YD, resultantBD, wrappedAmtLockedYT, ratio);
 
-		BondDeposited[msg.sender] = resultantBD;
+		BondDeposited[_addr] = resultantBD;
 	}
 
-	function manageCollateral_CancelLimitBuyZCB(uint _amount) internal {
+	function manageCollateral_ReceiveZCB(address _addr, uint _amount) internal {
 		require(_amount < uint(type(int256).max));
-		int BD = BondDeposited[msg.sender];
-		BondDeposited[msg.sender] = BD.add(int(_amount));
+		int BD = BondDeposited[_addr];
+		BondDeposited[_addr] = BD.add(int(_amount));
 	}
 
 
-	function manageCollateral_MakeLimitBuyYT(uint _amount) internal {
+	function manageCollateral_BuyYT_makeOrder(address _addr, uint _amount) internal {
 		require(_amount < uint(type(int256).max));
-		uint YD = YieldDeposited[msg.sender];
-		int BD = BondDeposited[msg.sender];
-		uint wrappedAmtLockedYT = lockedYT[msg.sender];
+		uint YD = YieldDeposited[_addr];
+		int BD = BondDeposited[_addr];
+		uint wrappedAmtLockedYT = lockedYT[_addr];
 		uint ratio = wrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
 
 		uint newWrappedAmtLockedYT = wrappedAmtLockedYT.add(_amount);
 
 		requireValidCollateral(YD, BD, newWrappedAmtLockedYT, ratio);
 
-		lockedYT[msg.sender] = newWrappedAmtLockedYT;
+		lockedYT[_addr] = newWrappedAmtLockedYT;
 	}
 
-	function manageCollateral_CancelLimitBuyYT(uint _amount) internal {
+	function manageCollateral_ReceiveYT_makeOrder(address _addr, uint _amount) internal {
 		require(_amount < uint(type(int256).max));
-		uint _lockedYT = lockedYT[msg.sender];
-		lockedYT[msg.sender] = _lockedYT.add(_amount);
+		uint _lockedYT = lockedYT[_addr];
+		lockedYT[_addr] = _lockedYT.add(_amount);
 	}
 
  	function insertFromHead_BuyZCB(uint _amount, uint _maturityConversionRate, uint _newID) internal {
@@ -395,7 +395,7 @@ contract OrderbookExchange {
 		else {
 			insertWithHint_BuyZCB(_amount, _maturityConversionRate, _hintID, newID);
 		}
-		manageCollateral_MakeLimitBuyZCB(_amount);
+		manageCollateral_BuyZCB(msg.sender, _amount);
 		totalNumOrders = newID;
 	}
 
@@ -407,7 +407,7 @@ contract OrderbookExchange {
 		else {
 			insertWithHint_BuyYT(_amount, _maturityConversionRate, _hintID, newID);
 		}
-		manageCollateral_MakeLimitBuyYT(_amount);
+		manageCollateral_BuyYT(msg.sender, _amount);
 		totalNumOrders = newID;
 	}
 
@@ -422,10 +422,10 @@ contract OrderbookExchange {
 			change = modifyWithHint_BuyZCB(_amount, _targetID, _hintID, _maxSteps);
 		}
 		if (change > 0) {
-			manageCollateral_MakeLimitBuyZCB(uint(_amount));
+			manageCollateral_BuyZCB(msg.sender, uint(_amount));
 		}
 		else {
-			manageCollateral_CancelLimitBuyZCB(uint(-_amount));
+			manageCollateral_ReceiveZCB(msg.sender, uint(-_amount));
 		}
 	}
 
@@ -440,27 +440,34 @@ contract OrderbookExchange {
 			change = modifyWithHint_BuyYT(_amount, _targetID, _hintID, _maxSteps);
 		}
 		if (change > 0) {
-			manageCollateral_MakeLimitBuyYT(uint(_amount));
+			manageCollateral_BuyYT_makeOrder(msg.sender, uint(_amount));
 		}
 		else {
-			manageCollateral_CancelLimitBuyYT(uint(-_amount));
+			manageCollateral_ReceiveYT_makeOrder(msg.sender, uint(-_amount));
 		}
 	}
-/*
-	function marketBuyYT() public {
+
+	function marketBuyYT(uint _amountYT, uint _maxMaturityConversionRate, uint _maxIterations) public {
 
 	}
 
-	function marketBuyZCB() public {
+	function marketSellYT(uint _amountYT, uint _minMaturityConversionRate, uint _maxIterations) public {
 
 	}
 
-	function trimBuyZCBList() public {
+	function marketBuyZCB(uint _amountZCB, uint _minMaturityConversionRate, uint _maxIterations) public {
 
 	}
 
-	function trimBuyYTList() public {
+	function marketSellZCB(uint _amountZCB, uint _maxMaturityConversionRate, uint _maxIterations) public {
 
 	}
-*/
+
+	function takeOrderZCBtoYT_Uout(uint _amountZCB, uint _amountYT) public {
+
+	}
+
+	function takeOrderYTtoZCB_Uout(uint _amountZCB, uint _amountYT) public {
+
+	}
 }

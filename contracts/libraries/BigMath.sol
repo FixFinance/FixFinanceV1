@@ -6,7 +6,7 @@ import "./SignedSafeMath.sol";
 import "./SafeMath.sol";
 import "./Ei.sol";
 
-import "../AmmInfoOracle.sol";
+import "../InfoOracle.sol";
 
 library BigMath {
   using ABDKMath64x64 for int128;
@@ -187,9 +187,9 @@ library BigMath {
       change in reserve of after the swap
     @param uint r: seconds remaining ABDK format divided by anchor
     @param int128: the effect on reserve0 of the user's swap transaction
-    @param address AmmInfoOracleAddress: the address of the contract which tells us how much of the
+    @param address InfoOracleAddress: the address of the contract which tells us how much of the
       total fee to send to the treasury
-    @param flipFee: when we get the feeConstant from AmmInfoOracle if this is true assign it to 1/itself
+    @param flipFee: when we get the feeConstant from InfoOracle if this is true assign it to 1/itself
       This should be true when the swap is selling U for ZCB and false when selling ZCB for U
 
     @return uint change: the change in the reserve1 due to the swap transaction
@@ -201,7 +201,7 @@ library BigMath {
     uint reserve1,
     uint r,
     int128 changeReserve0,
-    address AmmInfoOracleAddress,
+    address InfoOracleAddress,
     address fixCapitalPoolAddress,
     bool flipFee
   ) public view returns (uint change, uint treasuryFee, address sendTo) {
@@ -214,7 +214,7 @@ library BigMath {
       changeReserve0
     )).abs());
 
-    uint feeConstant = AmmInfoOracle(AmmInfoOracleAddress).getZCBammFeeConstant(fixCapitalPoolAddress);
+    uint feeConstant = InfoOracle(InfoOracleAddress).getZCBammFeeConstant(fixCapitalPoolAddress);
     if (flipFee) {
       feeConstant = uint((1 ether)**2).div(feeConstant);
     }
@@ -228,7 +228,7 @@ library BigMath {
 
     (uint larger, uint smaller) = nonFeeAdjustedChange > change ? (nonFeeAdjustedChange, change) : (change, nonFeeAdjustedChange) ;
 
-    (treasuryFee, sendTo) = AmmInfoOracle(AmmInfoOracleAddress).treasuryFee(larger, smaller);
+    (treasuryFee, sendTo) = InfoOracle(InfoOracleAddress).treasuryFee(larger, smaller);
 
   }
 

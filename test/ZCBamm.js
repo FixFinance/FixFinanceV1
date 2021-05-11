@@ -7,7 +7,7 @@ const yieldToken = artifacts.require("IYieldToken");
 const zeroCouponBond = artifacts.require("IZeroCouponBond");
 const zcbYtDeployer = artifacts.require("ZCB_YT_Deployer");
 const ZCBamm = artifacts.require("ZCBamm");
-const AmmInfoOracle = artifacts.require("AmmInfoOracle");
+const InfoOracle = artifacts.require("InfoOracle");
 
 const helper = require("../helper/helper.js");
 const ZCBammMath = require("../helper/ZCB-U-Math.js");
@@ -57,10 +57,10 @@ contract('ZCBamm', async function(accounts){
 		zcbInstance = await zeroCouponBond.at(await fixCapitalPoolInstance.zeroCouponBondAddress());
 		yieldTokenInstance = await yieldToken.at(await fixCapitalPoolInstance.yieldTokenAddress());
 		await ZCBamm.link("BigMath", BigMathInstance.address);
-		ammInfoOracleInstance = await AmmInfoOracle.new(BipsToTreasury, nullAddress);
-		await ammInfoOracleInstance.setSlippageConstant(fixCapitalPoolInstance.address, SlippageConstant);
-		await ammInfoOracleInstance.setFeeConstants(fixCapitalPoolInstance.address, ZCBammFeeConstant, YTammFeeConstant);
-		amm = await ZCBamm.new(fixCapitalPoolInstance.address, ammInfoOracleInstance.address);
+		infoOracleInstance = await InfoOracle.new(BipsToTreasury, nullAddress);
+		await infoOracleInstance.setSlippageConstant(fixCapitalPoolInstance.address, SlippageConstant);
+		await infoOracleInstance.setFeeConstants(fixCapitalPoolInstance.address, ZCBammFeeConstant, YTammFeeConstant);
+		amm = await ZCBamm.new(fixCapitalPoolInstance.address, infoOracleInstance.address);
 		anchor = (await amm.anchor()).toNumber();
 
 		//simulate generation of 100% returns in money market

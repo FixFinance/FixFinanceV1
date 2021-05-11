@@ -9,7 +9,7 @@ const zcbYtDeployer = artifacts.require("ZCB_YT_Deployer");
 const ZCBamm = artifacts.require("ZCBamm");
 const YTamm = artifacts.require("YTamm");
 const YTammDelegate = artifacts.require('YTammDelegate');
-const AmmInfoOracle = artifacts.require("AmmInfoOracle");
+const InfoOracle = artifacts.require("InfoOracle");
 
 const helper = require("../helper/helper.js");
 const YT_U_math = require("../helper/YT-U-Math.js");
@@ -108,13 +108,13 @@ contract('YTamm', async function(accounts){
 		await ZCBamm.link("BigMath", BigMathInstance.address);
 		await YTamm.link("BigMath", BigMathInstance.address);
 		await YTammDelegate.link("BigMath", BigMathInstance.address);
-		ammInfoOracleInstance = await AmmInfoOracle.new(
+		infoOracleInstance = await InfoOracle.new(
 			BipsToTreasury,
 			nullAddress
 		);
-		await ammInfoOracleInstance.setSlippageConstant(fixCapitalPoolInstance.address, SlippageConstant);
-		await ammInfoOracleInstance.setFeeConstants(fixCapitalPoolInstance.address, ZCBammFeeConstant, YTammFeeConstant);
-		amm0 = await ZCBamm.new(fixCapitalPoolInstance.address, ammInfoOracleInstance.address);
+		await infoOracleInstance.setSlippageConstant(fixCapitalPoolInstance.address, SlippageConstant);
+		await infoOracleInstance.setFeeConstants(fixCapitalPoolInstance.address, ZCBammFeeConstant, YTammFeeConstant);
+		amm0 = await ZCBamm.new(fixCapitalPoolInstance.address, infoOracleInstance.address);
 
 
 		//simulate generation of 100% returns in money market
@@ -150,7 +150,7 @@ contract('YTamm', async function(accounts){
 		await amm0.burn(await amm0.balanceOf(accounts[0]));
 
 		YTammDelegateInstance = await YTammDelegate.new();
-		amm1 = await YTamm.new(amm0.address, ammInfoOracleInstance.address, YTammDelegateInstance.address);
+		amm1 = await YTamm.new(amm0.address, infoOracleInstance.address, YTammDelegateInstance.address);
 		YTtoLmultiplierBN = await amm1.YTtoLmultiplier();
 		YTtoLmultiplierBN_p1 = YTtoLmultiplierBN.add(_10To18BN);
 		YTtoLmultiplier = parseInt(YTtoLmultiplierBN.toString()) * Math.pow(10, -18);

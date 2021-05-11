@@ -12,7 +12,7 @@ const YTammDelegate = artifacts.require('YTammDelegate');
 const YTammDeployer = artifacts.require('YTammDeployer');
 const SwapRouterDelegate = artifacts.require('SwapRouterDelegate');
 const SwapRouterDeployer = artifacts.require('SwapRouterDeployer');
-const AmmInfoOracle = artifacts.require("AmmInfoOracle");
+const InfoOracle = artifacts.require("InfoOracle");
 const BigMath = artifacts.require("BigMath");
 const Ei = artifacts.require("Ei");
 
@@ -64,7 +64,7 @@ module.exports = async function(deployer) {
 	capitalHandlerDeployerInstance = await deployer.deploy(FixCapitalPoolDeployer);
 	swapRouterDelegateInstance = await deployer.deploy(SwapRouterDelegate);
 	swapRouterDeployerInstance = await deployer.deploy(SwapRouterDeployer, swapRouterDelegateInstance.address);
-	ammInfoOracle = await deployer.deploy(AmmInfoOracle, "0", nullAddress);
+	infoOracle = await deployer.deploy(InfoOracle, "0", nullAddress);
 	EiInstance = await deployer.deploy(Ei);
 	await deployer.link(Ei, BigMath);
 	bigMathInstance = await deployer.deploy(BigMath);
@@ -79,7 +79,7 @@ module.exports = async function(deployer) {
 		ZCBammDeployerInstance.address,
 		YTammDeployerInstance.address,
 		swapRouterDeployerInstance.address,
-		ammInfoOracle.address,
+		infoOracle.address,
 		accounts[0]
 	);
 	await organizerInstance.DeploySwapRouter();

@@ -11,7 +11,7 @@ import "../../interfaces/IYieldToken.sol";
 import "../../interfaces/IWrapper.sol";
 import "../../interfaces/IERC20.sol";
 import "../../helpers/IZCBamm.sol";
-import "../../AmmInfoOracle.sol";
+import "../../InfoOracle.sol";
 
 contract YTammDelegate is DividendEnabledData, IYTammData {
 	using SafeMath for uint256;
@@ -255,7 +255,7 @@ contract YTammDelegate is DividendEnabledData, IYTammData {
 			YTtoLmultiplier == internalTotalSupply / YTreserves
 		*/
 		YTtoLmultiplier = internalTotalSupply.mul(1 ether) / _YTreserves;
-		SlippageConstant = AmmInfoOracle(AmmInfoOracleAddress).getSlippageConstant(FCPaddress);
+		SlippageConstant = InfoOracle(InfoOracleAddress).getSlippageConstant(FCPaddress);
 		lastRecalibration = block.timestamp;
 		//ensure noone reserves quote before recalibrating and is then able to take the quote
 		quoteSignature = bytes32(0);

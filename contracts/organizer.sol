@@ -7,7 +7,7 @@ import "./amm/YTamm/YTammDeployer.sol";
 import "./FixCapitalPoolDeployer.sol";
 import "./SwapRouter/SwapRouterDeployer.sol";
 import "./SwapRouter/SwapRouter.sol";
-import "./AmmInfoOracle.sol";
+import "./InfoOracle.sol";
 
 contract organizer {
 
@@ -43,7 +43,7 @@ contract organizer {
 	address public ZCBammDeployerAddress;
 	address public YTammDeployerAddress;
 	address public SwapRouterAddress;
-	address public AmmInfoOracleAddress;
+	address public InfoOracleAddress;
 	address public treasuryAddress;
 
 	address internal SwapRouterDeployerAddress;
@@ -57,7 +57,7 @@ contract organizer {
 		address _ZCBammDeployerAddress,
 		address _YTammDeployerAddress,
 		address _SwapRouterDeployerAddress,
-		address _AmmInfoOracleAddress,
+		address _InfoOracleAddress,
 		address _treasuryAddress
 	) public {
 		yieldTokenDeployerAddress = _yieldTokenDeployerAddress;	
@@ -65,7 +65,7 @@ contract organizer {
 		ZCBammDeployerAddress = _ZCBammDeployerAddress;
 		YTammDeployerAddress = _YTammDeployerAddress;
 		SwapRouterDeployerAddress = _SwapRouterDeployerAddress;
-		AmmInfoOracleAddress = _AmmInfoOracleAddress;
+		InfoOracleAddress = _InfoOracleAddress;
 		treasuryAddress = _treasuryAddress;
 	}
 
@@ -117,7 +117,7 @@ contract organizer {
 	function deployZCBamm(address _fixCapitalPoolAddress) public {
 		require(ZCBamms[_fixCapitalPoolAddress] == address(0));
 		require(fixCapitalPoolToWrapper[_fixCapitalPoolAddress] != address(0));
-		ZCBamms[_fixCapitalPoolAddress] = ZCBammDeployer(ZCBammDeployerAddress).deploy(_fixCapitalPoolAddress, AmmInfoOracleAddress);
+		ZCBamms[_fixCapitalPoolAddress] = ZCBammDeployer(ZCBammDeployerAddress).deploy(_fixCapitalPoolAddress, InfoOracleAddress);
 	}
 
 	/*
@@ -129,7 +129,7 @@ contract organizer {
 		require(YTamms[_fixCapitalPoolAddress] == address(0));
 		address ZCBammAddress = ZCBamms[_fixCapitalPoolAddress];
 		require(ZCBammAddress != address(0));
-		YTamms[_fixCapitalPoolAddress] = YTammDeployer(YTammDeployerAddress).deploy(ZCBammAddress, AmmInfoOracleAddress);
+		YTamms[_fixCapitalPoolAddress] = YTammDeployer(YTammDeployerAddress).deploy(ZCBammAddress, InfoOracleAddress);
 	}
 
 }

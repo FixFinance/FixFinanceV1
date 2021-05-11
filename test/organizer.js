@@ -17,7 +17,7 @@ const YTammDeployer = artifacts.require('YTammDeployer');
 const SwapRouterDeployer = artifacts.require('SwapRouterDeployer');
 const SwapRouterDelegate = artifacts.require('SwapRouterDelegate');
 const SwapRouter = artifacts.require("SwapRouter");
-const AmmInfoOracle = artifacts.require("AmmInfoOracle");
+const InfoOracle = artifacts.require("InfoOracle");
 
 const helper = require("../helper/helper.js");
 
@@ -44,17 +44,17 @@ contract('organizer', function(accounts) {
 		fixCapitalPoolDeployerInstance = await FixCapitalPoolDeployer.new();
 		swapRouterDelegateInstance = await SwapRouterDelegate.new();
 		swapRouterDeployerInstance = await SwapRouterDeployer.new(swapRouterDelegateInstance.address);
-		ammInfoOracleInstance = await AmmInfoOracle.new("0", nullAddress);
+		infoOracleInstance = await InfoOracle.new("0", nullAddress);
 		organizerInstance = await organizer.new(
 			zcbYtDeployerInstance.address,
 			fixCapitalPoolDeployerInstance.address,
 			ZCBammDeployerInstance.address,
 			YTammDeployerInstance.address,
 			swapRouterDeployerInstance.address,
-			ammInfoOracleInstance.address,
+			infoOracleInstance.address,
 			accounts[4]
 		);
-		assert.equal(await organizerInstance.AmmInfoOracleAddress(), ammInfoOracleInstance.address);
+		assert.equal(await organizerInstance.InfoOracleAddress(), infoOracleInstance.address);
 		await organizerInstance.DeploySwapRouter();
 		router = await SwapRouter.at(await organizerInstance.SwapRouterAddress());
 

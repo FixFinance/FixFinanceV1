@@ -10,7 +10,7 @@ import "../../interfaces/IYieldToken.sol";
 import "../../interfaces/IWrapper.sol";
 import "../../interfaces/IERC20.sol";
 import "../../helpers/IZCBamm.sol";
-import "../../AmmInfoOracle.sol";
+import "../../InfoOracle.sol";
 
 contract YTamm is IYTamm {
 
@@ -38,8 +38,8 @@ contract YTamm is IYTamm {
 		require(apy > 0);
 		maturity = _maturity;
 		ZCBammAddress = _ZCBammAddress;
-		AmmInfoOracleAddress = _feeOracleAddress;
-		SlippageConstant = AmmInfoOracle(_feeOracleAddress).getSlippageConstant(_FCPaddress);
+		InfoOracleAddress = _feeOracleAddress;
+		SlippageConstant = InfoOracle(_feeOracleAddress).getSlippageConstant(_FCPaddress);
 		wrapper = IFixCapitalPool(_FCPaddress).wrapper();
 		YTtoLmultiplier = BigMath.YT_U_ratio(
 			apy,
@@ -365,11 +365,11 @@ contract YTamm is IYTamm {
 			inflTotalSupply,
 			_TimeRemaining,
 			SlippageConstant,
-			(1 ether)**2 / AmmInfoOracle(AmmInfoOracleAddress).getYTammFeeConstant(FCPaddress),
+			(1 ether)**2 / InfoOracle(InfoOracleAddress).getYTammFeeConstant(FCPaddress),
 			OracleRate,
 			_amount
 		));
-		(uint treasuryFee, address sendTo) = AmmInfoOracle(AmmInfoOracleAddress).treasuryFee(nonFeeAdjustedUout, Uout);
+		(uint treasuryFee, address sendTo) = InfoOracle(InfoOracleAddress).treasuryFee(nonFeeAdjustedUout, Uout);
 		uint reserveDecrease = Uout.add(treasuryFee);
 
 		require(Ureserves >= reserveDecrease);
@@ -411,11 +411,11 @@ contract YTamm is IYTamm {
 			inflTotalSupply,
 			_TimeRemaining,
 			SlippageConstant,
-			AmmInfoOracle(AmmInfoOracleAddress).getYTammFeeConstant(FCPaddress),
+			InfoOracle(InfoOracleAddress).getYTammFeeConstant(FCPaddress),
 			OracleRate,
 			-_amount
 		));
-		(uint treasuryFee, address sendTo) = AmmInfoOracle(AmmInfoOracleAddress).treasuryFee(Uin, nonFeeAdjustedUin);
+		(uint treasuryFee, address sendTo) = InfoOracle(InfoOracleAddress).treasuryFee(Uin, nonFeeAdjustedUin);
 		uint reserveIncrease = Uin.sub(treasuryFee);
 
 		sendYTgetU(uint(_amount), Uin, treasuryFee, sendTo);
@@ -484,11 +484,11 @@ contract YTamm is IYTamm {
 			inflTotalSupply,
 			_TimeRemaining,
 			SlippageConstant,
-			(1 ether)**2 / AmmInfoOracle(AmmInfoOracleAddress).getYTammFeeConstant(FCPaddress),
+			(1 ether)**2 / InfoOracle(InfoOracleAddress).getYTammFeeConstant(FCPaddress),
 			OracleRate,
 			_amount
 		));
-		(uint treasuryFee, ) = AmmInfoOracle(AmmInfoOracleAddress).treasuryFee(nonFeeAdjustedUout, Uout);
+		(uint treasuryFee, ) = InfoOracle(InfoOracleAddress).treasuryFee(nonFeeAdjustedUout, Uout);
 		uint reserveDecrease = Uout.add(treasuryFee);
 		require(Ureserves >= reserveDecrease);
 		writeQuoteSignature(true, _amount, Uout, treasuryFee);
@@ -523,11 +523,11 @@ contract YTamm is IYTamm {
 			inflTotalSupply,
 			_TimeRemaining,
 			SlippageConstant,
-			AmmInfoOracle(AmmInfoOracleAddress).getYTammFeeConstant(FCPaddress),
+			InfoOracle(InfoOracleAddress).getYTammFeeConstant(FCPaddress),
 			OracleRate,
 			-_amount
 		));
-		(uint treasuryFee, ) = AmmInfoOracle(AmmInfoOracleAddress).treasuryFee(Uin, nonFeeAdjustedUin);
+		(uint treasuryFee, ) = InfoOracle(InfoOracleAddress).treasuryFee(Uin, nonFeeAdjustedUin);
 		writeQuoteSignature(false, _amount, Uin, treasuryFee);
 		return Uin;
 	}
@@ -542,7 +542,7 @@ contract YTamm is IYTamm {
 	*/
 	function TakeQuote(uint _amountU, int128 _amountYT, bool _YTin) external override verifyQuote(_amountU, _amountYT, _YTin) {
 		uint _quotedTreasuryFee = quotedTreasuryFee;
-		address sendTo = AmmInfoOracle(AmmInfoOracleAddress).sendTo();
+		address sendTo = InfoOracle(InfoOracleAddress).sendTo();
 		if (_YTin) {
 			uint reserveDecrease = _amountU.add(_quotedTreasuryFee);
 			require(Ureserves >= reserveDecrease);

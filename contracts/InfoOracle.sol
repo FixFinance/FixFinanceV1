@@ -6,7 +6,7 @@ import "./libraries/SafeMath.sol";
 import "./libraries/ABDKMath64x64.sol";
 import "./libraries/BigMath.sol";
 
-contract AmmInfoOracle is Ownable {
+contract InfoOracle is Ownable {
 
 	using ABDKMath64x64 for int128;
 	using SafeMath for uint256;

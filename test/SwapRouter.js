@@ -17,7 +17,7 @@ const YTammDeployer = artifacts.require('YTammDeployer');
 const SwapRouter = artifacts.require("SwapRouter");
 const SwapRouterDeployer = artifacts.require("SwapRouterDeployer");
 const SwapRouterDelegate = artifacts.require('SwapRouterDelegate');
-const AmmInfoOracle = artifacts.require("AmmInfoOracle");
+const InfoOracle = artifacts.require("InfoOracle");
 
 const helper = require("../helper/helper.js");
 
@@ -51,7 +51,7 @@ contract('SwapRouter', async function(accounts) {
 		fixCapitalPoolDeployerInstance = await FixCapitalPoolDeployer.new();
 		swapRouterDelegateInstance = await SwapRouterDelegate.new();
 		swapRouterDeployerInstance = await SwapRouterDeployer.new(swapRouterDelegateInstance.address);
-		ammInfoOracleInstance = await AmmInfoOracle.new(
+		infoOracleInstance = await InfoOracle.new(
 			BipsToTreasury,
 			nullAddress
 		);
@@ -61,7 +61,7 @@ contract('SwapRouter', async function(accounts) {
 			ZCBammDeployerInstance.address,
 			YTammDeployerInstance.address,
 			swapRouterDeployerInstance.address,
-			ammInfoOracleInstance.address,
+			infoOracleInstance.address,
 			accounts[4]
 		);
 		await organizerInstance.DeploySwapRouter();
@@ -77,8 +77,8 @@ contract('SwapRouter', async function(accounts) {
 		rec = await organizerInstance.deployFixCapitalPoolInstance(NGBwrapperInstance.address, maturity);
 		fixCapitalPoolInstance = await FixCapitalPool.at(rec.receipt.logs[0].args.addr);
 
-		await ammInfoOracleInstance.setSlippageConstant(fixCapitalPoolInstance.address, SlippageConstant);
-		await ammInfoOracleInstance.setFeeConstants(fixCapitalPoolInstance.address, ZCBammFeeConstant, YTammFeeConstant);
+		await infoOracleInstance.setSlippageConstant(fixCapitalPoolInstance.address, SlippageConstant);
+		await infoOracleInstance.setFeeConstants(fixCapitalPoolInstance.address, ZCBammFeeConstant, YTammFeeConstant);
 
 		zcbInstance = await IERC20.at(await fixCapitalPoolInstance.zeroCouponBondAddress());
 		yieldTokenInstance = await YieldToken.at(await fixCapitalPoolInstance.yieldTokenAddress());

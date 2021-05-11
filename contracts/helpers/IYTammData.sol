@@ -7,7 +7,7 @@ contract IYTammData {
 	uint64 public maturity;
 	uint YTreserves;
 	uint Ureserves;
-	address AmmInfoOracleAddress;
+	address InfoOracleAddress;
 	bytes32 quoteSignature;
 	int128 quotedAmountYT;
 	uint256 quotedAmountU;

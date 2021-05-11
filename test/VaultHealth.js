@@ -15,7 +15,7 @@ const FixCapitalPoolDeployer = artifacts.require('FixCapitalPoolDeployer');
 const ZCBammDeployer = artifacts.require('ZCBammDeployer');
 const YTammDelegate = artifacts.require('YTammDelegate');
 const YTammDeployer = artifacts.require('YTammDeployer');
-const AmmInfoOracle = artifacts.require("AmmInfoOracle");
+const InfoOracle = artifacts.require("InfoOracle");
 const OracleContainer = artifacts.require("OracleContainer");
 const dummyAggregator = artifacts.require("dummyAggregator");
 const ZCBamm = artifacts.require("ZCBamm");
@@ -94,14 +94,14 @@ contract('VaultHealth', async function(accounts) {
 		YTammDelegateInstance = await YTammDelegate.new();
 		YTammDeployerInstance = await YTammDeployer.new(YTammDelegateInstance.address);
 		FixCapitalPoolDeployerInstance = await FixCapitalPoolDeployer.new();
-		ammInfoOracleInstance = await AmmInfoOracle.new("0", nullAddress);
+		infoOracleInstance = await InfoOracle.new("0", nullAddress);
 		organizerInstance = await organizer.new(
 			zcbYtDeployerInstance.address,
 			FixCapitalPoolDeployerInstance.address,
 			ZCBammDeployerInstance.address,
 			YTammDeployerInstance.address,
 			nullAddress,
-			ammInfoOracleInstance.address,
+			infoOracleInstance.address,
 			accounts[4]
 		);
 		await vaultHealthInstance.setOrganizerAddress(organizerInstance.address);

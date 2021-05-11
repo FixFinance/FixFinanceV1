@@ -15,7 +15,7 @@ const FixCapitalPoolDeployer = artifacts.require('FixCapitalPoolDeployer');
 const ZCBammDeployer = artifacts.require('ZCBammDeployer');
 const YTammDelegate = artifacts.require('YTammDelegate');
 const YTammDeployer = artifacts.require('YTammDeployer');
-const AmmInfoOracle = artifacts.require("AmmInfoOracle");
+const InfoOracle = artifacts.require("InfoOracle");
 
 const helper = require("../helper/helper.js");
 
@@ -69,14 +69,14 @@ contract('VaultFactory', async function(accounts) {
 		YTammDelegateInstance = await YTammDelegate.new();
 		YTammDeployerInstance = await YTammDeployer.new(YTammDelegateInstance.address);
 		fixCapitalPoolDeployerInstance = await FixCapitalPoolDeployer.new();
-		ammInfoOracleInstance = await AmmInfoOracle.new("0", nullAddress);
+		infoOracleInstance = await InfoOracle.new("0", nullAddress);
 		organizerInstance = await organizer.new(
 			zcbYtDeployerInstance.address,
 			fixCapitalPoolDeployerInstance.address,
 			ZCBammDeployerInstance.address,
 			YTammDeployerInstance.address,
 			nullAddress,
-			ammInfoOracleInstance.address,
+			infoOracleInstance.address,
 			accounts[0]
 		);
 

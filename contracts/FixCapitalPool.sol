@@ -56,7 +56,7 @@ contract FixCapitalPool is IFixCapitalPool, Ownable, nonReentrant {
 	address public override yieldTokenAddress;
 	address public override zeroCouponBondAddress;
 
-	address public override vaultFactoryAddress;
+	mapping(address => bool) public override whitelistedVaultFactories;
 
 	//data for flashloans
     bytes32 public constant CALLBACK_SUCCESS = keccak256("FCPFlashBorrower.onFlashLoan");
@@ -220,7 +220,7 @@ contract FixCapitalPool is IFixCapitalPool, Ownable, nonReentrant {
 		@param uint _amount: amount of ZCB to credit to _owner
     */
 	function mintZCBTo(address _owner, uint _amount) external override {
-		require(msg.sender == vaultFactoryAddress);
+		require(whitelistedVaultFactories[msg.sender]);
 		balanceBonds[_owner] += int(_amount);
 	}
 
@@ -232,7 +232,7 @@ contract FixCapitalPool is IFixCapitalPool, Ownable, nonReentrant {
 		@param uint _amount: the amount of ZCB to remove from cirulation		
 	*/
 	function burnZCBFrom(address _owner, uint _amount) external override {
-		require(msg.sender == vaultFactoryAddress);
+		require(whitelistedVaultFactories[msg.sender]);
 		require(minimumUnitAmountAtMaturity(_owner) >= _amount);
 		balanceBonds[_owner] -= int(_amount);
 	}
@@ -346,19 +346,18 @@ contract FixCapitalPool is IFixCapitalPool, Ownable, nonReentrant {
 	}
 
 	//---------------------------------a-d-m-i-n------------------------------
-	//when isFinalized, vaultFactoryAddress may not be changed
+	//when isFinalized, whitelistedVaultFactories mapping may not be changed
 	bool public override isFinalized;
 
 	/*
-		@Description: before isFinalized admin may change the VaultFactory contract address
-			the vaultFactoryAddress is allowed to mint and burn ZCB so users should be careful and observant of this
+		@Description: before isFinalized admin may whitelist a VaultFactory contract address
+			whitelisted VaultFactories are allowed to mint and burn ZCB so users should be careful and observant of this
 
-		@param address _vaultFactoryAddress: the address of the new bond minter contract that this fix capital pool
-			will adhere to
+		@param address _vaultFactoryAddress: the address of the new vault factory contract that this fix capital pool whitelist
 	*/
 	function setVaultFactoryAddress(address _vaultFactoryAddress) external override onlyOwner {
 		require(!isFinalized);
-		vaultFactoryAddress = _vaultFactoryAddress;
+		whitelistedVaultFactories[_vaultFactoryAddress] = true;
 	}
 
 	/*

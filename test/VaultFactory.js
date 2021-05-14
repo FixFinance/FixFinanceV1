@@ -5,9 +5,9 @@ const fixCapitalPool = artifacts.require('FixCapitalPool');
 const IYieldToken = artifacts.require("IYieldToken");
 const zcbYtDeployer = artifacts.require('ZCB_YT_Deployer');
 const organizer = artifacts.require('organizer');
-const VaultFactoryDelegate = artifacts.require("VaultFactoryDelegate");
-const VaultFactoryDelegate2 = artifacts.require("VaultFactoryDelegate2");
-const VaultFactory = artifacts.require('VaultFactory');
+const NSFVaultFactoryDelegate1 = artifacts.require("NSFVaultFactoryDelegate1");
+const NSFVaultFactoryDelegate2 = artifacts.require("NSFVaultFactoryDelegate2");
+const NSFVaultFactory = artifacts.require('NSFVaultFactory');
 const IERC20 = artifacts.require("IERC20");
 const BigMath = artifacts.require("BigMath");
 const Ei = artifacts.require("Ei");
@@ -50,14 +50,14 @@ contract('VaultFactory', async function(accounts) {
 		asset1 = await dummyAToken.new("aTOKEN");
 		zcbYtDeployerInstance = await zcbYtDeployer.new();
 		vaultHealthInstance = await dummyVaultHealth.new();
-		vaultFactoryDelegateInstance = await VaultFactoryDelegate.new();
-		vaultFactoryDelegate2Instance = await VaultFactoryDelegate2.new();
+		nsfVaultFactoryDelegate1Instance = await NSFVaultFactoryDelegate1.new();
+		nsfVaultFactoryDelegate2Instance = await NSFVaultFactoryDelegate2.new();
 		treasuryAccount = accounts[5];
-		vaultFactoryInstance = await VaultFactory.new(
+		vaultFactoryInstance = await NSFVaultFactory.new(
 			vaultHealthInstance.address,
 			treasuryAccount,
-			vaultFactoryDelegateInstance.address,
-			vaultFactoryDelegate2Instance.address
+			nsfVaultFactoryDelegate1Instance.address,
+			nsfVaultFactoryDelegate2Instance.address
 		);
 		EiInstance = await Ei.new();
 		await BigMath.link("Ei", EiInstance.address);

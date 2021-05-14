@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma experimental ABIEncoderV2;
 pragma solidity >=0.6.0;
-import "../VaultFactory/VaultFactoryData.sol";
+import "../VaultFactory/SameBaseNSF/SBNSFVaultFactoryData.sol";
 
-interface IVaultFactory {
+interface ISBNSFVaultFactory {
 	function treasuryAddress() external view returns(address);
 	function vaultsLength(address _owner) external view returns(uint);
 	function YTvaultsLength(address _owner) external view returns(uint);
-	function allVaults(address _owner) external view returns(VaultFactoryData.Vault[] memory _vaults);
+	function allVaults(address _owner) external view returns(SBNSFVaultFactoryData.Vault[] memory _vaults);
 	function liquidationsLength() external view returns (uint);
 	function YTLiquidationsLength() external view returns (uint);
 	//-----------------------------------------V-a-u-l-t---M-a-n-a-g-e-m-e-n-t-----------------------------

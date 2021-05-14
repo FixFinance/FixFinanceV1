@@ -2,18 +2,18 @@
 pragma experimental ABIEncoderV2;
 pragma solidity >=0.6.5 <0.7.0;
 
-import "../libraries/SafeMath.sol";
-import "../libraries/SignedSafeMath.sol";
-import "../interfaces/IFixCapitalPool.sol";
-import "../interfaces/IVaultHealth.sol";
-import "../interfaces/IVaultFactory.sol";
-import "../interfaces/IWrapper.sol";
-import "../interfaces/IERC20.sol";
-import "../helpers/Ownable.sol";
-import "../helpers/nonReentrant.sol";
-import "./VaultFactoryData.sol";
+import "../../libraries/SafeMath.sol";
+import "../../libraries/SignedSafeMath.sol";
+import "../../interfaces/IFixCapitalPool.sol";
+import "../../interfaces/IVaultHealth.sol";
+import "../../interfaces/INSFVaultFactory.sol";
+import "../../interfaces/IWrapper.sol";
+import "../../interfaces/IERC20.sol";
+import "../../helpers/Ownable.sol";
+import "../../helpers/nonReentrant.sol";
+import "./NSFVaultFactoryData.sol";
 
-contract VaultFactory is VaultFactoryData, IVaultFactory, Ownable, nonReentrant {
+contract NSFVaultFactory is NSFVaultFactoryData, INSFVaultFactory, Ownable, nonReentrant {
 	using SafeMath for uint;
 	using SignedSafeMath for int;
 

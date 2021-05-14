@@ -1058,6 +1058,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 		@Description: ensure that a vault will not be sent into liquidation zone if price changes a specified amount
 			and rates change by a multiplier
 
+		@param bool _reqSameBase: if true require that base wrapper of supplied and borrowed are the same
 		@param address _assetSupplied: the address of the asset supplied to the vault
 		@param address _assetBorrowed: the address of the asset borrowed from the vault
 		@param uint _amountSupplied: the amount of _assetSupplied that has been supplied to the vault
@@ -1073,6 +1074,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 			false otherwise
 	*/
 	function vaultWithstandsChange(
+		bool _reqSameBase,
 		address _assetSupplied,
 		address _assetBorrowed,
 		uint _amountSupplied,
@@ -1083,6 +1085,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 	) public view override returns(bool) {
 
 		(address _baseSupplied, address _baseBorrowed, address fcpSupplied, address fcpBorrowed) = baseAssetAddresses(_assetSupplied, _assetBorrowed);
+		require(!_reqSameBase || _baseSupplied == _baseBorrowed);
 
 		//wierd hack to prevent stack too deep
 		_amountBorrowed = _amountBorrowed
@@ -1119,6 +1122,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 			false otherwise
 	*/
 	function YTvaultWithstandsChange(
+		bool _reqSameBase,
 		address _FCPsupplied,
 		address _FCPborrowed,
 		uint _amountYield,
@@ -1129,6 +1133,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 		int128 _borrowedRateChange
 	) external view override returns (bool) {
 		(address _baseSupplied, address _baseBorrowed) = bothFCPtoBaseAddresses(_FCPsupplied, _FCPborrowed);
+		require(!_reqSameBase || _baseSupplied == _baseBorrowed);
 
 		bool positiveBond = _amountBond >= 0;
 		uint maxBorrowed;

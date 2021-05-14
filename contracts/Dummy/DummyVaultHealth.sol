@@ -122,6 +122,7 @@ contract DummyVaultHealth is IVaultHealth {
 		this way this dummy contract implements the IVaultHealth interface
 	*/
 	function vaultWithstandsChange(
+		bool _reqSameBase,
 		address _assetSupplied,
 		address _assetBorrowed,
 		uint _amountSupplied,
@@ -134,6 +135,7 @@ contract DummyVaultHealth is IVaultHealth {
 			silence warnings about not using parameters
 		*/
 		if (
+			_reqSameBase ||
 			_assetSupplied == address(0) ||
 			_assetBorrowed == address(0) ||
 			_amountSupplied == 0 ||
@@ -147,6 +149,7 @@ contract DummyVaultHealth is IVaultHealth {
 	}
 
 	function YTvaultWithstandsChange(
+		bool _reqSameBase,
 		address _FCPsupplied,
 		address _FCPborrowed,
 		uint _amountYield,
@@ -160,6 +163,7 @@ contract DummyVaultHealth is IVaultHealth {
 			silence warnings about not using parameters
 		*/
 		if (
+			_reqSameBase ||
 			_FCPsupplied == address(0) ||
 			_FCPborrowed == address(0) ||
 			_amountYield == 0 ||

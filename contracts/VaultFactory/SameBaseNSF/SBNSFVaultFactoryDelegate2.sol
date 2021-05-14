@@ -1,20 +1,20 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.6.0;
 
-import "../libraries/SafeMath.sol";
-import "../libraries/SignedSafeMath.sol";
-import "../interfaces/IYTVaultManagerFlashReceiver.sol";
-import "../interfaces/IFixCapitalPool.sol";
-import "../interfaces/IVaultHealth.sol";
-import "../interfaces/IWrapper.sol";
-import "../interfaces/IERC20.sol";
-import "../helpers/Ownable.sol";
-import "./VaultFactoryData.sol";
+import "../../libraries/SafeMath.sol";
+import "../../libraries/SignedSafeMath.sol";
+import "../../interfaces/IYTVaultManagerFlashReceiver.sol";
+import "../../interfaces/IFixCapitalPool.sol";
+import "../../interfaces/IVaultHealth.sol";
+import "../../interfaces/IWrapper.sol";
+import "../../interfaces/IERC20.sol";
+import "../../helpers/Ownable.sol";
+import "./SBNSFVaultFactoryData.sol";
 
 /*
 	This contract is specifically for handling YTVault functionality
 */
-contract VaultFactoryDelegate2 is VaultFactoryData {
+contract SBNSFVaultFactoryDelegate2 is SBNSFVaultFactoryData {
 	using SafeMath for uint;
 	using SignedSafeMath for int;
 
@@ -243,6 +243,7 @@ contract VaultFactoryDelegate2 is VaultFactoryData {
 		uint _unitYieldSupplied = getUnitValueYield(_FCPsupplied, _yieldSupplied);
 
 		require(vaultHealthContract.YTvaultWithstandsChange(
+			true,
 			_FCPsupplied,
 			_FCPborrowed,
 			_unitYieldSupplied,
@@ -342,6 +343,7 @@ contract VaultFactoryDelegate2 is VaultFactoryData {
 			require(_multipliers[0] > 0);
 			require(msg.sender == _owner);
 			require(vaultHealthContract.YTvaultWithstandsChange(
+				true,
 				_FCPsupplied,
 				_FCPborrowed,
 				_yieldSupplied,

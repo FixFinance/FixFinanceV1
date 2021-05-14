@@ -19,6 +19,7 @@ interface IVaultHealth {
 	function YTvaultSatisfiesLowerLimit(address _FCPsupplied, address _FCPborrowed, uint _amountYield, int _amountBond, uint _amountBorrowed) external view returns (bool);
 
 	function vaultWithstandsChange(
+		bool _reqSameBase,
 		address _assetSupplied,
 		address _assetBorrowed,
 		uint _amountSupplied,
@@ -29,6 +30,7 @@ interface IVaultHealth {
 	) external view returns (bool);
 
 	function YTvaultWithstandsChange(
+		bool _reqSameBase,
 		address _FCPsupplied,
 		address _FCPborrowed,
 		uint _amountYield,

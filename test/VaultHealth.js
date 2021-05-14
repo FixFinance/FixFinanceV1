@@ -5,9 +5,9 @@ const fixCapitalPool = artifacts.require('FixCapitalPool');
 const YieldToken = artifacts.require("YieldToken");
 const zcbYtDeployer = artifacts.require('ZCB_YT_Deployer');
 const organizer = artifacts.require('organizer');
-const VaultFactoryDelegate = artifacts.require('VaultFactoryDelegate');
-const VaultFactoryDelegate2 = artifacts.require('VaultFactoryDelegate2');
-const VaultFactory = artifacts.require('VaultFactory');
+const NSFVaultFactoryDelegate1 = artifacts.require('NSFVaultFactoryDelegate1');
+const NSFVaultFactoryDelegate2 = artifacts.require('NSFVaultFactoryDelegate2');
+const NSFVaultFactory = artifacts.require('NSFVaultFactory');
 const IERC20 = artifacts.require("IERC20");
 const BigMath = artifacts.require("BigMath");
 const Ei = artifacts.require("Ei");
@@ -77,13 +77,13 @@ contract('VaultHealth', async function(accounts) {
 		OracleContainerInstance = await OracleContainer.new(nullAddress.substring(0, nullAddress.length-1)+"1");
 		zcbYtDeployerInstance = await zcbYtDeployer.new();
 		vaultHealthInstance = await VaultHealth.new(OracleContainerInstance.address);
-		vaultFactoryDelegateInstance = await VaultFactoryDelegate.new();
-		vaultFactoryDelegate2Instance = await VaultFactoryDelegate2.new();
-		vaultFactoryInstance = await VaultFactory.new(
+		nsfVaultFactoryDelegate1Instance = await NSFVaultFactoryDelegate1.new();
+		nsfVaultFactoryDelegate2Instance = await NSFVaultFactoryDelegate2.new();
+		vaultFactoryInstance = await NSFVaultFactory.new(
 			vaultHealthInstance.address,
 			nullAddress,
-			vaultFactoryDelegateInstance.address,
-			vaultFactoryDelegate2Instance.address
+			nsfVaultFactoryDelegate1Instance.address,
+			nsfVaultFactoryDelegate2Instance.address
 		);
 		EiInstance = await Ei.new();
 		await BigMath.link("Ei", EiInstance.address);
@@ -1174,10 +1174,10 @@ contract('VaultHealth', async function(accounts) {
 		let actualBN = await vaultHealthInstance.amountBorrowedAtUpperLimit(wAsset1.address, zcbAsset0.address, amountSupplied);
 		let actual = parseInt(actualBN.toString());
 
-		let res = await vaultHealthInstance.vaultWithstandsChange(wAsset1.address, zcbAsset0.address, amountSupplied, actualBN, TotalBasisPoints, ABDK_1, ABDK_1);
+		let res = await vaultHealthInstance.vaultWithstandsChange(false, wAsset1.address, zcbAsset0.address, amountSupplied, actualBN, TotalBasisPoints, ABDK_1, ABDK_1);
 		assert.equal(res, true, "correct value returned by vaultWithstandsChange");
 
-		res = await vaultHealthInstance.vaultWithstandsChange(wAsset1.address, zcbAsset0.address, amountSupplied, actualBN, TotalBasisPoints+1, ABDK_1, ABDK_1);
+		res = await vaultHealthInstance.vaultWithstandsChange(false, wAsset1.address, zcbAsset0.address, amountSupplied, actualBN, TotalBasisPoints+1, ABDK_1, ABDK_1);
 		assert.equal(res, false, "correct value returned by vaultWithstandsChange");
 
 		const _0 = "0";
@@ -1187,10 +1187,10 @@ contract('VaultHealth', async function(accounts) {
 
 		let priceChange = Math.floor(TotalBasisPoints * amountSupplied / (actual * price * collateralizationRatio * rateMultiplier0 / rateMultiplier1));
 
-		res = await vaultHealthInstance.vaultWithstandsChange(wAsset1.address, zcbAsset0.address, amountSupplied, actualBN, priceChange, _0, _0);
+		res = await vaultHealthInstance.vaultWithstandsChange(false, wAsset1.address, zcbAsset0.address, amountSupplied, actualBN, priceChange, _0, _0);
 		assert.equal(res, true, "correct value returned by vaultWithstandsChange");
 
-		res = await vaultHealthInstance.vaultWithstandsChange(wAsset1.address, zcbAsset0.address, amountSupplied, actualBN, priceChange+1, _0, _0);
+		res = await vaultHealthInstance.vaultWithstandsChange(false, wAsset1.address, zcbAsset0.address, amountSupplied, actualBN, priceChange+1, _0, _0);
 		assert.equal(res, false, "correct value returned by vaultWithstandsChange");
 
 		const rateChange0 = 2.43;
@@ -1208,10 +1208,10 @@ contract('VaultHealth', async function(accounts) {
 
 		priceChange = Math.floor(TotalBasisPoints * amountSupplied / (actual * price * collateralizationRatio * rateMultiplier0 / rateMultiplier1));
 
-		res = await vaultHealthInstance.vaultWithstandsChange(wAsset1.address, zcbAsset0.address, amountSupplied, actualBN, priceChange, _0, rateChange0Str);
+		res = await vaultHealthInstance.vaultWithstandsChange(false, wAsset1.address, zcbAsset0.address, amountSupplied, actualBN, priceChange, _0, rateChange0Str);
 		assert.equal(res, true, "correct value returned by vaultWithstandsChange");
 
-		res = await vaultHealthInstance.vaultWithstandsChange(wAsset1.address, zcbAsset0.address, amountSupplied, actualBN, priceChange+1, _0, rateChange0Str);
+		res = await vaultHealthInstance.vaultWithstandsChange(false, wAsset1.address, zcbAsset0.address, amountSupplied, actualBN, priceChange+1, _0, rateChange0Str);
 		assert.equal(res, false, "correct value returned by vaultWithstandsChange");
 	});
 
@@ -1245,10 +1245,10 @@ contract('VaultHealth', async function(accounts) {
 		let actualBN = await vaultHealthInstance.amountBorrowedAtUpperLimit(zcbAsset1.address, zcbAsset0.address, amountSupplied);
 		let actual = parseInt(actualBN.toString());
 
-		let res = await vaultHealthInstance.vaultWithstandsChange(zcbAsset1.address, zcbAsset0.address, amountSupplied, actualBN, TotalBasisPoints, ABDK_1, ABDK_1);
+		let res = await vaultHealthInstance.vaultWithstandsChange(false, zcbAsset1.address, zcbAsset0.address, amountSupplied, actualBN, TotalBasisPoints, ABDK_1, ABDK_1);
 		assert.equal(res, true, "correct value returned by vaultWithstandsChange");
 
-		res = await vaultHealthInstance.vaultWithstandsChange(zcbAsset1.address, zcbAsset0.address, amountSupplied, actualBN, TotalBasisPoints+1, ABDK_1, ABDK_1);
+		res = await vaultHealthInstance.vaultWithstandsChange(false, zcbAsset1.address, zcbAsset0.address, amountSupplied, actualBN, TotalBasisPoints+1, ABDK_1, ABDK_1);
 		assert.equal(res, false, "correct value returned by vaultWithstandsChange");
 
 		const _0 = "0";
@@ -1261,10 +1261,10 @@ contract('VaultHealth', async function(accounts) {
 
 		let priceChange = Math.floor(TotalBasisPoints * amountSupplied / (actual * price * collateralizationRatio * rateMultiplier0 / rateMultiplier1));
 
-		res = await vaultHealthInstance.vaultWithstandsChange(zcbAsset1.address, zcbAsset0.address, amountSupplied, actualBN, priceChange, _0, _0);
+		res = await vaultHealthInstance.vaultWithstandsChange(false, zcbAsset1.address, zcbAsset0.address, amountSupplied, actualBN, priceChange, _0, _0);
 		assert.equal(res, true, "correct value returned by vaultWithstandsChange");
 
-		res = await vaultHealthInstance.vaultWithstandsChange(zcbAsset1.address, zcbAsset0.address, amountSupplied, actualBN, priceChange+1, _0, _0);
+		res = await vaultHealthInstance.vaultWithstandsChange(false, zcbAsset1.address, zcbAsset0.address, amountSupplied, actualBN, priceChange+1, _0, _0);
 		assert.equal(res, false, "correct value returned by vaultWithstandsChange");
 
 		const rateChange0 = 1.5;
@@ -1289,10 +1289,10 @@ contract('VaultHealth', async function(accounts) {
 
 		priceChange = Math.floor(TotalBasisPoints * amountSupplied / (actual * price * collateralizationRatio * rateMultiplier0 / rateMultiplier1));
 
-		res = await vaultHealthInstance.vaultWithstandsChange(zcbAsset1.address, zcbAsset0.address, amountSupplied, actualBN, priceChange, rateChange1Str, rateChange0Str);
+		res = await vaultHealthInstance.vaultWithstandsChange(false, zcbAsset1.address, zcbAsset0.address, amountSupplied, actualBN, priceChange, rateChange1Str, rateChange0Str);
 		assert.equal(res, true, "correct value returned by vaultWithstandsChange");
 
-		res = await vaultHealthInstance.vaultWithstandsChange(zcbAsset1.address, zcbAsset0.address, amountSupplied, actualBN, priceChange+1, rateChange1Str, rateChange0Str);
+		res = await vaultHealthInstance.vaultWithstandsChange(false, zcbAsset1.address, zcbAsset0.address, amountSupplied, actualBN, priceChange+1, rateChange1Str, rateChange0Str);
 		assert.equal(res, false, "correct value returned by vaultWithstandsChange");
 	});
 

@@ -2,18 +2,18 @@
 pragma experimental ABIEncoderV2;
 pragma solidity >=0.6.5 <0.7.0;
 
-import "../libraries/SafeMath.sol";
-import "../libraries/SignedSafeMath.sol";
-import "../interfaces/IVaultManagerFlashReceiver.sol";
-import "../interfaces/IFixCapitalPool.sol";
-import "../interfaces/IZeroCouponBond.sol";
-import "../interfaces/IVaultHealth.sol";
-import "../interfaces/IWrapper.sol";
-import "../interfaces/IERC20.sol";
-import "../helpers/Ownable.sol";
-import "./VaultFactoryData.sol";
+import "../../libraries/SafeMath.sol";
+import "../../libraries/SignedSafeMath.sol";
+import "../../interfaces/IVaultManagerFlashReceiver.sol";
+import "../../interfaces/IFixCapitalPool.sol";
+import "../../interfaces/IZeroCouponBond.sol";
+import "../../interfaces/IVaultHealth.sol";
+import "../../interfaces/IWrapper.sol";
+import "../../interfaces/IERC20.sol";
+import "../../helpers/Ownable.sol";
+import "./SBNSFVaultFactoryData.sol";
 
-contract VaultFactoryDelegate is VaultFactoryData {
+contract SBNSFVaultFactoryDelegate1 is SBNSFVaultFactoryData {
 	using SafeMath for uint;
 	using SignedSafeMath for int;
 
@@ -145,6 +145,7 @@ contract VaultFactoryDelegate is VaultFactoryData {
 		(address _suppliedAddrToPass, uint _suppliedAmtToPass) = passInfoToVaultManager(_assetSupplied, _amountSupplied);
 
 		return vaultHealthContract.vaultWithstandsChange(
+			true,
 			_suppliedAddrToPass,
 			_assetBorrowed,
 			_suppliedAmtToPass,

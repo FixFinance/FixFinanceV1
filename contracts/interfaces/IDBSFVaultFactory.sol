@@ -118,7 +118,7 @@ interface IDBSFVaultFactory {
 	function partialYTLiquidationSpecificOut(address _owner, uint _index, address _FCPborrowed, address _FCPsupplied, uint _out, int _minBondRatio, uint _maxIn, address _to) external;
 	//--------------------------------------------a-d-m-i-n---------------------------------------------
 	function setLiquidationRebate(uint _rebateBips) external;
-	function whitelistWrapper(address _wrapeprAddress) external;
+	function whitelistWrapper(address _wrapeprAddress, uint64 _stabilityFee) external;
 	function whitelistAsset(address _assetAddress) external;
 	function whitelistFixCapitalPool(address _fixCapitalPoolAddress) external;
 	function claimRevenue(address _asset) external;

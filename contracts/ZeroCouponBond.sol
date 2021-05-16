@@ -27,6 +27,10 @@ contract ZeroCouponBond is IZeroCouponBond {
         maturity = _maturity;
 	}
 
+    function lastUpdate() external view override returns(uint) {
+        return wrapper.lastUpdate();
+    }
+
 	function balanceOf(address _owner) public view override returns (uint balance) {
 		balance = ch.totalBalanceZCB(_owner);
 	}
@@ -81,5 +85,12 @@ contract ZeroCouponBond is IZeroCouponBond {
     */
     function FixCapitalPoolAddress() external view override returns (address) {
         return address(ch);
+    }
+
+    /*
+        @Description: get the address of the IWrapper contract corresponding to this ZCB
+    */
+    function WrapperAddress() external view override returns (address) {
+        return address(wrapper);
     }
 }

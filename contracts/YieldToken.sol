@@ -28,6 +28,10 @@ contract YieldToken is IYieldToken {
         maturity = _maturity;
 	}
 
+    function lastUpdate() external view override returns(uint) {
+        return wrapper.lastUpdate();
+    }
+
 	function totalSupply() public view override returns (uint _supply){
 		_supply = wrapper.balanceOf(address(ch));
 	}
@@ -82,6 +86,13 @@ contract YieldToken is IYieldToken {
     */
     function FixCapitalPoolAddress() external view override returns (address) {
         return address(ch);
+    }
+
+    /*
+        @Description: get the address of the IWrapper contract corresponding to this YT
+    */
+    function WrapperAddress() external view override returns (address) {
+        return address(wrapper);
     }
 
     /*

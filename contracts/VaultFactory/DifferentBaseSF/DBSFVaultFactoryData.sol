@@ -13,6 +13,8 @@ contract DBSFVaultFactoryData {
 		address assetBorrowed;
 		uint amountSupplied;
 		uint amountBorrowed;
+		uint64 timestampOpened;
+		uint64 stabilityFeeAPR; //inflated by 32 bits
 	}
 
 	struct Liquidation {
@@ -56,9 +58,14 @@ contract DBSFVaultFactoryData {
 
 	uint internal constant AUCTION_COOLDOWN = 10 minutes;
 
+	uint64 internal constant NO_STABILITY_FEE = 1 << 32;
+
 	//acts as a wrapper whitelist
 	//wrapper => underlying asset
 	mapping(address => address) internal _wrapperToUnderlyingAsset;
+
+	//wrapper => StabilityFee rate
+	mapping(address => uint64) internal _wrapperStabilityFees;
 
 	//acts as a whitelist for ZCBs & YTs that may be supplied as collateral
 	//fixCapitalPool => wrapper

@@ -4,7 +4,9 @@ import "./IERC20.sol";
 
 interface IYieldToken is IERC20 {
 	function FixCapitalPoolAddress() external view returns(address);
+	function WrapperAddress() external view returns(address);
 	function maturity() external view returns(uint);
+	function lastUpdate() external view returns(uint);
 
 	function balanceOf_2(address _owner, bool _roundUp) external view returns (uint);
     function transfer_2(address _to, uint256 _value, bool _roundUp) external;

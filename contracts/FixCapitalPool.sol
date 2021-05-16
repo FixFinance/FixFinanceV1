@@ -112,6 +112,13 @@ contract FixCapitalPool is IFixCapitalPool, Ownable, nonReentrant {
 	}
 
 	/*
+		@Description: allow easy access to last update without going to wrapper contract directly
+	*/
+	function lastUpdate() external view override returns(uint) {
+		return wrapper.lastUpdate();
+	}
+
+	/*
 		@Description: send wrapped asest to this fix capital pool, receive ZCB & YT
 
 		@param address _to: the address that shall receive the ZCB and YT

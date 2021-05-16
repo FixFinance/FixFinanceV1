@@ -4,6 +4,7 @@ pragma solidity >=0.6.5 <0.7.0;
 
 import "../../libraries/SafeMath.sol";
 import "../../libraries/SignedSafeMath.sol";
+import "../../libraries/BigMath.sol";
 import "../../interfaces/IVaultManagerFlashReceiver.sol";
 import "../../interfaces/IFixCapitalPool.sol";
 import "../../interfaces/IZeroCouponBond.sol";
@@ -37,8 +38,10 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
 		@param uint _amount: the amount by which to decrease short interest
 	*/
 	function lowerShortInterest(address _fixCapitalPoolAddress, uint _amount) internal {
-		address underlyingAssetAddress = IFixCapitalPool(_fixCapitalPoolAddress).underlyingAssetAddress();
-		_shortInterestAllDurations[underlyingAssetAddress] = _shortInterestAllDurations[underlyingAssetAddress].sub(_amount);
+		if (_amount > 0) {
+			address underlyingAssetAddress = IFixCapitalPool(_fixCapitalPoolAddress).underlyingAssetAddress();
+			_shortInterestAllDurations[underlyingAssetAddress] = _shortInterestAllDurations[underlyingAssetAddress].sub(_amount);
+		}
 	}
 	
 	/*
@@ -53,6 +56,20 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
 		uint retainedSurplus = _amount * _liquidationRebateBips / TOTAL_BASIS_POINTS;
 		_liquidationRebates[_vaultOwner][_asset] += retainedSurplus;
 		_revenue[_asset] += _amount-retainedSurplus;
+	}
+
+	/*
+		@Description: when stability fee is encured pay out to holders
+
+		@param address _ZCBaddr: the ZCB for which to distribute the stability fee
+		@param address _FCPaddr: the FCP which corresponds to the ZCB which the stability fee is paid in
+		@param uint _amount: the amount of ZCB which has been collected from the stability fee
+	*/
+	function claimStabilityFee(address _ZCBaddr, address _FCPaddr, uint _amount) internal {
+		if (_amount > 0) {
+			IFixCapitalPool(_FCPaddr).mintZCBTo(address(this), _amount);
+			_revenue[_ZCBaddr] += _amount;
+		}
 	}
 
 	/*
@@ -80,25 +97,68 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
 	}
 
 	/*
+		@Description: find the multiplier which is multiplied with amount borrowed (when vault was opened)
+			to find the current liability
+
+		@param address _FCPborrrowed: the address of the FCP contract associated with the debt asset of the Vault
+		@param uint64 _timestampOpened: the time at which the vault was opened
+		@param uint64 _stabiliityFeeAPR: the annual rate which must be paid for stability fees
+
+		@return uint: the stability rate debt multiplier
+			inflated by (1 ether)
+	*/
+	function getStabilityFeeMultiplier(address _FCPborrrowed, uint64 _timestampOpened, uint64 _stabilityFeeAPR) internal view returns(uint) {
+		uint lastUpdate = IFixCapitalPool(_FCPborrrowed).lastUpdate();
+		int128 yearsOpen = int128(uint((lastUpdate - _timestampOpened) << 64) / BigMath.SecondsPerYear);
+		if (yearsOpen == 0)
+			return (1 ether);
+		int128 stabilityFeeMultiplier = BigMath.Pow(int128(_stabilityFeeAPR << 32), yearsOpen);
+		return uint(stabilityFeeMultiplier).mul(1 ether) >> 64;
+	}
+
+	/*
+		@Description: find the new amount of ZCBs which is a vault's obligation
+
+		@param address _FCPborrrowed: the address of the FCP contract associated with the debt asset of the Vault
+		@param uint _amountBorrowed: the Vault's previous obligation in ZCBs at _timestampOpened
+		@param uint64 _timestampOpened: the time at which the vault was opened
+		@param uint64 _stabiliityFeeAPR: the annual rate which must be paid for stability fees
+
+		@return uint: the stability rate debt multiplier
+			inflated by (1 ether)
+	*/
+	function stabilityFeeAdjAmountBorrowed(address _FCPborrrowed, uint _amountBorrowed, uint64 _timestampOpened, uint64 _stabilityFeeAPR) internal view returns (uint) {
+		uint ratio = getStabilityFeeMultiplier(_FCPborrrowed, _timestampOpened, _stabilityFeeAPR);
+		return ratio.mul(_amountBorrowed) / (1 ether);
+	}
+
+	/*
 		@Description: ensure that we pass the address of the underlying asset of wrapper assets to
 			the vault health contract rather than the address of the wrapper asset
 			also ensure that we adjust the amount from the wrapped amount to the non wrapped amount
 			if necessary
 
-		@param address _suppliedAsset: the address of the asset that is supplied as collateral
-		@param uint _suppliedAmount: the amount of the supplied asset that is being used as collateral
+		@param Vault memory _vault: the vault for which to find the info to pass to the vault health contract
 
 		@return address addr: the address for assetSupplied to pass to the vault health contract
-		@return uint amt: the amount for amountSupplied to pass to the vault health contract
+		@return uint sAmt: the amount for amountSupplied to pass to the vault health contract
+		@return uint bAmt: the amounf for amountBorrowed to pass to the vault health contract
 	*/
-	function passInfoToVaultManager(address _suppliedAsset, uint _suppliedAmount) internal view returns (address addr, uint amt) {
-		addr = _wrapperToUnderlyingAsset[_suppliedAsset];
+	function passInfoToVaultManager(Vault memory _vault) internal view returns (address addr, uint sAmt, uint bAmt) {
+		addr = _wrapperToUnderlyingAsset[_vault.assetSupplied];
 		if (addr == address(0) || addr == address(1)) {
-			addr = _suppliedAsset;
-			amt = _suppliedAmount;
+			addr = _vault.assetSupplied;
+			sAmt = _vault.amountSupplied;
 		}
 		else {
-			amt = IWrapper(_suppliedAsset).WrappedAmtToUnitAmt_RoundDown(_suppliedAmount);
+			sAmt = IWrapper(_vault.assetSupplied).WrappedAmtToUnitAmt_RoundDown(_vault.amountSupplied);
+		}
+		if (_vault.stabilityFeeAPR == 0 || _vault.stabilityFeeAPR == NO_STABILITY_FEE) {
+			bAmt = _vault.amountBorrowed;
+		}
+		else {
+			address FCPaddr = IZeroCouponBond(_vault.assetBorrowed).FixCapitalPoolAddress();
+			bAmt = stabilityFeeAdjAmountBorrowed(FCPaddr, _vault.amountBorrowed, _vault.timestampOpened, _vault.stabilityFeeAPR);
 		}
 	}
 
@@ -129,10 +189,7 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
 			false otherwise
 	*/
 	function vaultWithstandsChange(
-		address _assetSupplied,
-		address _assetBorrowed,
-		uint _amountSupplied,
-		uint _amountBorrowed,
+		Vault memory vault,
 		uint _priceMultiplier,
 		int128 _suppliedRateChange,
 		int128 _borrowRateChange
@@ -142,14 +199,14 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
 		require(_suppliedRateChange >= ABDK_1);
 		require(_borrowRateChange <= ABDK_1);
 
-		(address _suppliedAddrToPass, uint _suppliedAmtToPass) = passInfoToVaultManager(_assetSupplied, _amountSupplied);
+		(address _suppliedAddrToPass, uint _suppliedAmtToPass, uint _borrowAmtToPass) = passInfoToVaultManager(vault);
 
 		return vaultHealthContract.vaultWithstandsChange(
 			false,
 			_suppliedAddrToPass,
-			_assetBorrowed,
+			vault.assetBorrowed,
 			_suppliedAmtToPass,
-			_amountBorrowed,
+			_borrowAmtToPass,
 			_priceMultiplier,
 			_suppliedRateChange,
 			_borrowRateChange
@@ -159,11 +216,7 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
 	/*
 		@Description: check if a vault is above the upper or lower collateralization limit
 
-		@param address _assetSupplied: the asset used as collateral
-			this asset may be a ZCB or any other asset that is whitelisted
-		@param address _assetBorrowed: the ZCB that is borrowed from the new vault
-`		@param uint _amountSupplied: the amount of _assetSupplied posed as collateral
-		@param uint _amountBorrowed: the amount of _assetBorrowed borrowed
+		@param Vault memory _vault: vault for which to check if limit is satisfied
 		@param bool _upper: true if we are to check the upper collateralization limit,
 			false otherwise
 
@@ -171,19 +224,16 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
 			false otherwise
 	*/
 	function satisfiesLimit(
-		address _assetSupplied,
-		address _assetBorrowed,
-		uint _amountSupplied,
-		uint _amountBorrowed,
+		Vault memory _vault,
 		bool _upper
-		) internal view returns (bool) {
+	) internal view returns (bool) {
 
-		(address _suppliedAddrToPass, uint _suppliedAmtToPass) = passInfoToVaultManager(_assetSupplied, _amountSupplied);
+		(address _suppliedAddrToPass, uint _suppliedAmtToPass, uint _borrowAmtToPass) = passInfoToVaultManager(_vault);
 
 		return ( _upper ?
-			vaultHealthContract.satisfiesUpperLimit(_suppliedAddrToPass, _assetBorrowed, _suppliedAmtToPass, _amountBorrowed)
+			vaultHealthContract.satisfiesUpperLimit(_suppliedAddrToPass, _vault.assetBorrowed, _suppliedAmtToPass, _borrowAmtToPass)
 				:
-			vaultHealthContract.satisfiesLowerLimit(_suppliedAddrToPass, _assetBorrowed, _suppliedAmtToPass, _amountBorrowed)
+			vaultHealthContract.satisfiesLowerLimit(_suppliedAddrToPass, _vault.assetBorrowed, _suppliedAmtToPass, _borrowAmtToPass)
 			);
 	}
 
@@ -217,18 +267,24 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
 		uint _priceMultiplier,
 		int128 _suppliedRateChange,
 		int128 _borrowRateChange
-		) external {
+	) external {
 
 		require(_assetSupplied != _assetBorrowed);
 		require(_fixCapitalPoolToWrapper[_assetSupplied] != address(0) || _wrapperToUnderlyingAsset[_assetSupplied] != address(0));
-		require(vaultWithstandsChange(_assetSupplied, _assetBorrowed, _amountSupplied, _amountBorrowed, _priceMultiplier, _suppliedRateChange, _borrowRateChange));
+
+		address FCPborrowed = IZeroCouponBond(_assetBorrowed).FixCapitalPoolAddress();
+		IWrapper baseBorrowed = IFixCapitalPool(FCPborrowed).wrapper();
+		uint64 timestampOpened = uint64(baseBorrowed.lastUpdate());
+		uint64 wrapperFee = _wrapperStabilityFees[address(baseBorrowed)];
+		Vault memory vault = Vault(_assetSupplied, _assetBorrowed, _amountSupplied, _amountBorrowed, timestampOpened, wrapperFee);
+
+		require(vaultWithstandsChange(vault, _priceMultiplier, _suppliedRateChange, _borrowRateChange));
 
 		IERC20(_assetSupplied).transferFrom(msg.sender, address(this), _amountSupplied);
-		address FCPborrowed = IZeroCouponBond(_assetBorrowed).FixCapitalPoolAddress();
 		IFixCapitalPool(FCPborrowed).mintZCBTo(msg.sender, _amountBorrowed);
 		raiseShortInterest(FCPborrowed, _amountBorrowed);
 
-		_vaults[msg.sender].push(Vault(_assetSupplied, _assetBorrowed, _amountSupplied, _amountBorrowed));
+		_vaults[msg.sender].push(vault);
 	}
 
 	/*
@@ -294,27 +350,155 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
 		Vault memory mVault = _vaults[_owner][_index];
 		Vault storage sVault = _vaults[_owner][_index];
 
-		//ensure that after operations vault will be in good health
-		//only check health if at any point funds are being removed from the vault
-		if (
-			_assetBorrowed != mVault.assetBorrowed ||
-			_assetSupplied != mVault.assetSupplied ||
-			_amountSupplied < mVault.amountSupplied ||
-			_amountBorrowed > mVault.amountBorrowed
-		) {
-			//index 0 in multipliers that must be converted to uint
+		if (_assetBorrowed != mVault.assetBorrowed) {
+			//ensure that after operations vault will be in good health
 			require(_multipliers[0] > 0);
 			require(msg.sender == _owner);
 			require(vaultWithstandsChange(
-				_assetSupplied,
-				_assetBorrowed,
-				_amountSupplied,
-				_amountBorrowed,
+				Vault(
+					_assetSupplied,
+					_assetBorrowed,
+					_amountSupplied,
+					_amountBorrowed,
+					0,
+					NO_STABILITY_FEE
+				),
 				uint(_multipliers[0]),
 				_multipliers[1],
 				_multipliers[2]
 			));
+			adjVaultChangeBorrow(
+				mVault,
+				sVault,
+				_assetSupplied,
+				_assetBorrowed,
+				_amountSupplied,
+				_amountBorrowed,
+				_data,
+				_receiverAddr
+			);
 		}
+		else {
+			//ensure that after operations vault will be in good health
+			//only check health if at any point funds are being removed from the vault
+			if (
+				_assetSupplied != mVault.assetSupplied ||
+				_amountSupplied < mVault.amountSupplied ||
+				_amountBorrowed > mVault.amountBorrowed
+			) {
+				//index 0 in multipliers that must be converted to uint
+				require(_multipliers[0] > 0);
+				require(msg.sender == _owner);
+				require(vaultWithstandsChange(
+					Vault(
+						_assetSupplied,
+						_assetBorrowed,
+						_amountSupplied,
+						_amountBorrowed,
+						mVault.timestampOpened,
+						mVault.stabilityFeeAPR
+					),
+					uint(_multipliers[0]),
+					_multipliers[1],
+					_multipliers[2]
+				));
+			}
+			adjVaultSameBorrow(
+				mVault,
+				sVault,
+				_assetSupplied,
+				_assetBorrowed,
+				_amountSupplied,
+				_amountBorrowed,
+				_data,
+				_receiverAddr
+			);
+		}
+	}
+
+	function adjVaultSameBorrow(
+		Vault memory mVault,
+		Vault storage sVault,
+		address _assetSupplied,
+		address _assetBorrowed,
+		uint _amountSupplied,
+		uint _amountBorrowed,
+		bytes memory _data,
+		address _receiverAddr
+	) internal {
+
+		//------------------distribute funds----------------------
+		if (mVault.assetSupplied != _assetSupplied) {
+			if (mVault.amountSupplied != 0) {
+				bool success = IERC20(mVault.assetSupplied).transfer(_receiverAddr, mVault.amountSupplied);
+				require(success);
+			}
+			sVault.assetSupplied = _assetSupplied;
+			sVault.amountSupplied = _amountSupplied;
+		}
+		else if (mVault.amountSupplied > _amountSupplied) {
+			bool succes = IERC20(_assetSupplied).transfer(_receiverAddr, mVault.amountSupplied - _amountSupplied);
+			require(succes);
+			sVault.amountSupplied = _amountSupplied;
+		}
+		else if (mVault.amountSupplied < _amountSupplied) {
+			sVault.amountSupplied = _amountSupplied;
+		}
+
+		IFixCapitalPool FCPBorrowed;
+		if (mVault.amountBorrowed < _amountBorrowed) {
+			FCPBorrowed = IFixCapitalPool(IZeroCouponBond(_assetBorrowed).FixCapitalPoolAddress());
+			raiseShortInterest(address(FCPBorrowed), _amountBorrowed - mVault.amountBorrowed);
+			uint stabilityFeeMultiplier = getStabilityFeeMultiplier(address(FCPBorrowed), mVault.timestampOpened, mVault.stabilityFeeAPR);
+			uint toMint = (_amountBorrowed - mVault.amountBorrowed).mul(stabilityFeeMultiplier) / (1 ether);
+			FCPBorrowed.mintZCBTo(_receiverAddr, toMint);
+			sVault.amountBorrowed = _amountBorrowed;
+		}
+		else if (mVault.amountBorrowed > _amountBorrowed) {
+			FCPBorrowed = IFixCapitalPool(IZeroCouponBond(_assetBorrowed).FixCapitalPoolAddress());
+			sVault.amountBorrowed = _amountBorrowed;
+		}
+
+		//-----------------------------flashloan------------------
+		if (_data.length > 0) {
+			IVaultManagerFlashReceiver(_receiverAddr).onFlashLoan(
+				msg.sender,
+				mVault.assetSupplied,
+				mVault.assetBorrowed,
+				mVault.amountSupplied,
+				mVault.amountBorrowed,
+				_data
+			);
+		}
+
+		//-----------------------------get funds-------------------------
+		if (mVault.assetSupplied != _assetSupplied) {
+			bool success = IERC20(_assetSupplied).transferFrom(msg.sender, address(this), _amountSupplied);
+			require(success);
+		}
+		else if (mVault.amountSupplied < _amountSupplied) {
+			bool success = IERC20(_assetSupplied).transferFrom(msg.sender, address(this), _amountSupplied - mVault.amountSupplied);
+			require(success);
+		}
+
+		if (mVault.amountBorrowed > _amountBorrowed) {
+			lowerShortInterest(address(FCPBorrowed), mVault.amountBorrowed - _amountBorrowed);
+			uint stabilityFeeMultiplier = getStabilityFeeMultiplier(address(FCPBorrowed), mVault.timestampOpened, mVault.stabilityFeeAPR);
+			uint toBurn = (mVault.amountBorrowed - _amountBorrowed).mul(stabilityFeeMultiplier) / (1 ether);
+			FCPBorrowed.burnZCBFrom(msg.sender,  toBurn);
+		}
+	}
+
+	function adjVaultChangeBorrow(
+		Vault memory mVault,
+		Vault storage sVault,
+		address _assetSupplied,
+		address _assetBorrowed,
+		uint _amountSupplied,
+		uint _amountBorrowed,
+		bytes memory _data,
+		address _receiverAddr
+	) internal {
 
 		//------------------distribute funds----------------------
 		if (mVault.assetSupplied != _assetSupplied) {
@@ -335,33 +519,30 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
 		}
 
 		IFixCapitalPool oldFCPBorrowed;
-		if (mVault.assetBorrowed != _assetBorrowed) {
-			if (address(_assetBorrowed) != address(0)) {
-				IFixCapitalPool newFCPBorrowed = IFixCapitalPool(IZeroCouponBond(_assetBorrowed).FixCapitalPoolAddress());
-				raiseShortInterest(address(newFCPBorrowed), _amountBorrowed);
-				newFCPBorrowed.mintZCBTo(_receiverAddr, _amountBorrowed);
-			}
-			if (address(mVault.assetBorrowed) != address(0)) {
-				oldFCPBorrowed = IFixCapitalPool(IZeroCouponBond(mVault.assetBorrowed).FixCapitalPoolAddress());
-				lowerShortInterest(address(oldFCPBorrowed), mVault.amountBorrowed);
-			}
-			sVault.assetBorrowed = _assetBorrowed;
-			sVault.amountBorrowed = _amountBorrowed;
+		//nominal value debt at close / nominal value debt now
+		uint feeAdjBorrowAmt;
+		if (address(_assetBorrowed) != address(0)) {
+			IFixCapitalPool newFCPBorrowed = IFixCapitalPool(IZeroCouponBond(_assetBorrowed).FixCapitalPoolAddress());
+			raiseShortInterest(address(newFCPBorrowed), _amountBorrowed);
+			newFCPBorrowed.mintZCBTo(_receiverAddr, _amountBorrowed);
 		}
-		else if (mVault.amountBorrowed < _amountBorrowed) {
-			oldFCPBorrowed = IFixCapitalPool(IZeroCouponBond(_assetBorrowed).FixCapitalPoolAddress());
-			raiseShortInterest(address(oldFCPBorrowed), _amountBorrowed - mVault.amountBorrowed);
-			oldFCPBorrowed.mintZCBTo(_receiverAddr, _amountBorrowed - mVault.amountBorrowed);
-			sVault.amountBorrowed = _amountBorrowed;
+		if (mVault.amountBorrowed > 0) {
+			oldFCPBorrowed = IFixCapitalPool(IZeroCouponBond(mVault.assetBorrowed).FixCapitalPoolAddress());
+			feeAdjBorrowAmt = stabilityFeeAdjAmountBorrowed(address(oldFCPBorrowed), mVault.amountBorrowed, mVault.timestampOpened, mVault.stabilityFeeAPR);
+			lowerShortInterest(address(oldFCPBorrowed), mVault.amountBorrowed);
 		}
-		else if (mVault.amountBorrowed > _amountBorrowed) {
-			oldFCPBorrowed = IFixCapitalPool(IZeroCouponBond(_assetBorrowed).FixCapitalPoolAddress());
-			sVault.amountBorrowed = _amountBorrowed;
+		sVault.assetBorrowed = _assetBorrowed;
+		sVault.amountBorrowed = _amountBorrowed;
+		{
+			address wrapperAddr = IZeroCouponBond(_assetBorrowed).WrapperAddress();
+			sVault.stabilityFeeAPR = _wrapperStabilityFees[wrapperAddr];
+			sVault.timestampOpened = uint64(IWrapper(wrapperAddr).lastUpdate());
 		}
 
 		//-----------------------------flashloan------------------
 		if (_data.length > 0) {
-			IVaultManagerFlashReceiver(_receiverAddr).onFlashLoan(msg.sender,
+			IVaultManagerFlashReceiver(_receiverAddr).onFlashLoan(
+				msg.sender,
 				mVault.assetSupplied,
 				mVault.assetBorrowed,
 				mVault.amountSupplied,
@@ -380,14 +561,9 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
 			require(success);
 		}
 
-		if (mVault.assetBorrowed != _assetBorrowed) {
-			if (mVault.amountBorrowed > 0) {
-				oldFCPBorrowed.burnZCBFrom(msg.sender, mVault.amountBorrowed);
-			}
-		}
-		else if (mVault.amountBorrowed > _amountBorrowed) {
-			lowerShortInterest(address(oldFCPBorrowed), mVault.amountBorrowed - _amountBorrowed);
-			oldFCPBorrowed.burnZCBFrom(msg.sender,  mVault.amountBorrowed - _amountBorrowed);
+		if (mVault.amountBorrowed > 0) {
+			oldFCPBorrowed.burnZCBFrom(msg.sender, feeAdjBorrowAmt);
+			claimStabilityFee(mVault.assetBorrowed, address(oldFCPBorrowed), feeAdjBorrowAmt - mVault.amountBorrowed);
 		}
 	}
 
@@ -411,13 +587,15 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
 		require(vault.amountBorrowed >= _amtIn && _amtIn > 0);
 		uint maxBid = vault.amountSupplied * _amtIn / vault.amountBorrowed;
 		require(maxBid >= _bid);
-		if (satisfiesLimit(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied, vault.amountBorrowed, true)) {
+		if (satisfiesLimit(vault, true)) {
 			uint maturity = IZeroCouponBond(vault.assetBorrowed).maturity();
 			require(maturity < block.timestamp + MAX_TIME_TO_MATURITY);
 		}
 		//burn borrowed ZCB
 		address FCPborrowed = IZeroCouponBond(_assetBorrowed).FixCapitalPoolAddress();
-		collectBid(msg.sender, FCPborrowed, _amtIn);
+		uint feeAdjAmtIn = stabilityFeeAdjAmountBorrowed(FCPborrowed, _amtIn, vault.timestampOpened, vault.stabilityFeeAPR);
+		collectBid(msg.sender, FCPborrowed, feeAdjAmtIn);
+		claimStabilityFee(vault.assetBorrowed, FCPborrowed, feeAdjAmtIn - _amtIn);
 		lowerShortInterest(FCPborrowed, _amtIn);
 		//any surplus in the bid may be added as _revenue
 		if (_bid < maxBid){
@@ -520,7 +698,7 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
 		require(vault.amountBorrowed <= _maxIn);
 		require(vault.amountSupplied >= _minOut && _minOut > 0);
 		require(IZeroCouponBond(_assetBorrowed).maturity() < block.timestamp + CRITICAL_TIME_TO_MATURITY || 
-			!satisfiesLimit(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied, vault.amountBorrowed, false));
+			!satisfiesLimit(vault, false));
 
 		//burn borrowed ZCB
 		address FCPborrowed = IZeroCouponBond(vault.assetBorrowed).FixCapitalPoolAddress();
@@ -554,7 +732,7 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
 		uint amtOut = _in*vault.amountSupplied/vault.amountBorrowed;
 		require(amtOut >= _minOut);
 		require(IFixCapitalPool(_assetBorrowed).maturity() < block.timestamp + (1 days) || 
-			!satisfiesLimit(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied, vault.amountBorrowed, false));
+			!satisfiesLimit(vault, false));
 
 		//burn borrowed ZCB
 		address FCPborrowed = IZeroCouponBond(vault.assetBorrowed).FixCapitalPoolAddress();
@@ -590,7 +768,7 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
 		amtIn = amtIn/vault.amountSupplied + (amtIn%vault.amountSupplied == 0 ? 0 : 1);
 		require(0 < amtIn && amtIn <= _maxIn);
 		require(IFixCapitalPool(_assetBorrowed).maturity() < block.timestamp + (1 days) || 
-			!satisfiesLimit(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied, vault.amountBorrowed, false));
+			!satisfiesLimit(vault, false));
 
 		//burn borrowed ZCB
 		address FCPborrowed = IZeroCouponBond(_assetBorrowed).FixCapitalPoolAddress();

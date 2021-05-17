@@ -22,7 +22,9 @@ interface IDBSFVaultFactory {
 		address assetSupplied,
 		address assetBorrowed,
 		uint amountSupplied,
-		uint amountBorrowed
+		uint amountBorrowed,
+		uint64 timestampOpened,
+		uint64 stabilityFeeAPR
 	);
 	function Liquidations(uint _index) external view returns (
 		address vaultOwner,
@@ -118,7 +120,8 @@ interface IDBSFVaultFactory {
 	function partialYTLiquidationSpecificOut(address _owner, uint _index, address _FCPborrowed, address _FCPsupplied, uint _out, int _minBondRatio, uint _maxIn, address _to) external;
 	//--------------------------------------------a-d-m-i-n---------------------------------------------
 	function setLiquidationRebate(uint _rebateBips) external;
-	function whitelistWrapper(address _wrapeprAddress, uint64 _stabilityFee) external;
+	function whitelistWrapper(address _wrapeprAddress) external;
+	function setStabilityFee(address _wrapperAddress, uint64 _stabilityFee) external;
 	function whitelistAsset(address _assetAddress) external;
 	function whitelistFixCapitalPool(address _fixCapitalPoolAddress) external;
 	function claimRevenue(address _asset) external;

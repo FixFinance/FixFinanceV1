@@ -102,17 +102,19 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
 
 		@param address _FCPborrrowed: the address of the FCP contract associated with the debt asset of the Vault
 		@param uint64 _timestampOpened: the time at which the vault was opened
-		@param uint64 _stabiliityFeeAPR: the annual rate which must be paid for stability fees
+		@param uint64 _stabilityFeeAPR: the annual rate which must be paid for stability fees
 
 		@return uint: the stability rate debt multiplier
 			inflated by (1 ether)
 	*/
 	function getStabilityFeeMultiplier(address _FCPborrrowed, uint64 _timestampOpened, uint64 _stabilityFeeAPR) internal view returns(uint) {
+		if (_stabilityFeeAPR == 0 || _stabilityFeeAPR == NO_STABILITY_FEE)
+			return (1 ether);
 		uint lastUpdate = IFixCapitalPool(_FCPborrrowed).lastUpdate();
-		int128 yearsOpen = int128(uint((lastUpdate - _timestampOpened) << 64) / BigMath.SecondsPerYear);
+		int128 yearsOpen = int128((uint(lastUpdate - _timestampOpened) << 64) / BigMath.SecondsPerYear);
 		if (yearsOpen == 0)
 			return (1 ether);
-		int128 stabilityFeeMultiplier = BigMath.Pow(int128(_stabilityFeeAPR << 32), yearsOpen);
+		int128 stabilityFeeMultiplier = BigMath.Pow(int128(uint(_stabilityFeeAPR) << 32), yearsOpen);
 		return uint(stabilityFeeMultiplier).mul(1 ether) >> 64;
 	}
 
@@ -122,7 +124,7 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
 		@param address _FCPborrrowed: the address of the FCP contract associated with the debt asset of the Vault
 		@param uint _amountBorrowed: the Vault's previous obligation in ZCBs at _timestampOpened
 		@param uint64 _timestampOpened: the time at which the vault was opened
-		@param uint64 _stabiliityFeeAPR: the annual rate which must be paid for stability fees
+		@param uint64 _stabilityFeeAPR: the annual rate which must be paid for stability fees
 
 		@return uint: the stability rate debt multiplier
 			inflated by (1 ether)
@@ -301,7 +303,8 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
 		//burn borrowed ZCB
 		if (vault.amountBorrowed > 0) {
 			address FCPborrowed = IZeroCouponBond(vault.assetBorrowed).FixCapitalPoolAddress();
-			IFixCapitalPool(FCPborrowed).burnZCBFrom(msg.sender, vault.amountBorrowed);
+			uint feeAdjBorrowAmt = stabilityFeeAdjAmountBorrowed(FCPborrowed, vault.amountBorrowed, vault.timestampOpened, vault.stabilityFeeAPR);
+			IFixCapitalPool(FCPborrowed).burnZCBFrom(msg.sender, feeAdjBorrowAmt);
 			lowerShortInterest(FCPborrowed, vault.amountBorrowed);
 		}
 		if (vault.amountSupplied > 0)
@@ -612,7 +615,7 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
 			_owner,
 			vault.assetSupplied,
 			vault.assetBorrowed,
-			_amtIn,
+			feeAdjAmtIn,
 			msg.sender,
 			_bid,
 			block.timestamp

@@ -79,13 +79,17 @@ contract DBSFVaultFactory is DBSFVaultFactoryData, IDBSFVaultFactory, Ownable, n
 		address assetSupplied,
 		address assetBorrowed,
 		uint amountSupplied,
-		uint amountBorrowed
+		uint amountBorrowed,
+		uint64 timestampOpened,
+		uint64 stabilityFeeAPR
 	) {
 		Vault memory vault = _vaults[_owner][_index];
 		assetSupplied = vault.assetSupplied;
 		assetBorrowed = vault.assetBorrowed;
 		amountSupplied = vault.amountSupplied;
 		amountBorrowed = vault.amountBorrowed;
+		timestampOpened = vault.timestampOpened;
+		stabilityFeeAPR = vault.stabilityFeeAPR;
 	}
 
 	function Liquidations(uint _index) external view override returns (
@@ -733,9 +737,7 @@ contract DBSFVaultFactory is DBSFVaultFactoryData, IDBSFVaultFactory, Ownable, n
 
 		@param address _wrapperAddress: address of the wrapper asset to whitelist
 	*/
-	function whitelistWrapper(address _wrapperAddress, uint64 _stabilityFee) external override onlyOwner {
-		require(_stabilityFee >= NO_STABILITY_FEE);
-		_wrapperStabilityFees[_wrapperAddress] = _stabilityFee;
+	function whitelistWrapper(address _wrapperAddress) external override onlyOwner {
 		_wrapperToUnderlyingAsset[_wrapperAddress] = IWrapper(_wrapperAddress).underlyingAssetAddress();
 	}
 
@@ -754,7 +756,7 @@ contract DBSFVaultFactory is DBSFVaultFactoryData, IDBSFVaultFactory, Ownable, n
 
 		@param address _wrapperAddress: the address of the wrapper contract for whcih to set the stability fee
 		@param uint64 _stabilityFee: the annual rate which is to be paid as a stability fee
-	*//*
+	*/
 	function setStabilityFee(address _wrapperAddress, uint64 _stabilityFee) external override onlyOwner {
 		require(_stabilityFee >= NO_STABILITY_FEE);
 		_wrapperStabilityFees[_wrapperAddress] = _stabilityFee;

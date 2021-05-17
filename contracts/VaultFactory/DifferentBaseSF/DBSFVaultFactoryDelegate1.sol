@@ -9,6 +9,7 @@ import "../../interfaces/IVaultManagerFlashReceiver.sol";
 import "../../interfaces/IFixCapitalPool.sol";
 import "../../interfaces/IZeroCouponBond.sol";
 import "../../interfaces/IVaultHealth.sol";
+import "../../interfaces/IInfoOracle.sol";
 import "../../interfaces/IWrapper.sol";
 import "../../interfaces/IERC20.sol";
 import "../../helpers/Ownable.sol";
@@ -277,7 +278,7 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
 		address FCPborrowed = IZeroCouponBond(_assetBorrowed).FixCapitalPoolAddress();
 		IWrapper baseBorrowed = IFixCapitalPool(FCPborrowed).wrapper();
 		uint64 timestampOpened = uint64(baseBorrowed.lastUpdate());
-		uint64 wrapperFee = _wrapperStabilityFees[address(baseBorrowed)];
+		uint64 wrapperFee = IInfoOracle(_infoOracleAddress).StabilityFeeAPR(owner, address(baseBorrowed));
 		Vault memory vault = Vault(_assetSupplied, _assetBorrowed, _amountSupplied, _amountBorrowed, timestampOpened, wrapperFee);
 
 		require(vaultWithstandsChange(vault, _priceMultiplier, _suppliedRateChange, _borrowRateChange));
@@ -538,7 +539,7 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
 		sVault.amountBorrowed = _amountBorrowed;
 		{
 			address wrapperAddr = IZeroCouponBond(_assetBorrowed).WrapperAddress();
-			sVault.stabilityFeeAPR = _wrapperStabilityFees[wrapperAddr];
+			sVault.stabilityFeeAPR = IInfoOracle(_infoOracleAddress).StabilityFeeAPR(owner, wrapperAddr);
 			sVault.timestampOpened = uint64(IWrapper(wrapperAddr).lastUpdate());
 		}
 

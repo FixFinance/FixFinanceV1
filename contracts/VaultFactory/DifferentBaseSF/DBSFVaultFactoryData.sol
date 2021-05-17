@@ -2,8 +2,9 @@
 pragma solidity >=0.6.5 <0.7.0;
 
 import "../../interfaces/IVaultHealth.sol";
+import "../../helpers/Ownable.sol";
 
-contract DBSFVaultFactoryData {
+contract DBSFVaultFactoryData is Ownable {
 	uint internal constant TOTAL_BASIS_POINTS = 10_000;
 
 	int128 internal constant ABDK_1 = 1<<64;
@@ -64,9 +65,6 @@ contract DBSFVaultFactoryData {
 	//wrapper => underlying asset
 	mapping(address => address) internal _wrapperToUnderlyingAsset;
 
-	//wrapper => StabilityFee rate
-	mapping(address => uint64) internal _wrapperStabilityFees;
-
 	//acts as a whitelist for ZCBs & YTs that may be supplied as collateral
 	//fixCapitalPool => wrapper
 	mapping(address => address) internal _fixCapitalPoolToWrapper;
@@ -91,6 +89,8 @@ contract DBSFVaultFactoryData {
 
 	//user => vault index => vault
 	mapping(address => YTVault[]) internal _YTvaults;
+
+	address internal _infoOracleAddress;
 
 	//receives half of all liquidation revenue
 	address internal _treasuryAddress;

@@ -121,7 +121,6 @@ interface IDBSFVaultFactory {
 	//--------------------------------------------a-d-m-i-n---------------------------------------------
 	function setLiquidationRebate(uint _rebateBips) external;
 	function whitelistWrapper(address _wrapeprAddress) external;
-	function setStabilityFee(address _wrapperAddress, uint64 _stabilityFee) external;
 	function whitelistAsset(address _assetAddress) external;
 	function whitelistFixCapitalPool(address _fixCapitalPoolAddress) external;
 	function claimRevenue(address _asset) external;

@@ -13,16 +13,17 @@ import "../../helpers/Ownable.sol";
 import "../../helpers/nonReentrant.sol";
 import "./DBSFVaultFactoryData.sol";
 
-contract DBSFVaultFactory is DBSFVaultFactoryData, IDBSFVaultFactory, Ownable, nonReentrant {
+contract DBSFVaultFactory is DBSFVaultFactoryData, IDBSFVaultFactory, nonReentrant {
 	using SafeMath for uint;
 	using SignedSafeMath for int;
 
 	address delegateAddress;
 	address delegate2Address;
 
-	constructor(address _vaultHealthContract, address _treasuryAddr, address _delegateAddress, address _delegate2Address) public {
+	constructor(address _vaultHealthContract, address _treasuryAddr, address _infoOracleAddr, address _delegateAddress, address _delegate2Address) public {
 		vaultHealthContract = IVaultHealth(_vaultHealthContract);
 		_treasuryAddress = _treasuryAddr;
+		_infoOracleAddress = _infoOracleAddr;
 		delegateAddress = _delegateAddress;
 		delegate2Address = _delegate2Address;
 	}
@@ -749,17 +750,6 @@ contract DBSFVaultFactory is DBSFVaultFactoryData, IDBSFVaultFactory, Ownable, n
 	function whitelistAsset(address _assetAddress) external override onlyOwner {
 		//all non wrapped assets have a pair value of address(1) in the _wrapperToUnderlyingAsset mapping
 		_wrapperToUnderlyingAsset[_assetAddress] = address(1);
-	}
-
-	/*
-		@Description: set the annual rate of the borrowed asset which is to be paid in stability fees
-
-		@param address _wrapperAddress: the address of the wrapper contract for whcih to set the stability fee
-		@param uint64 _stabilityFee: the annual rate which is to be paid as a stability fee
-	*/
-	function setStabilityFee(address _wrapperAddress, uint64 _stabilityFee) external override onlyOwner {
-		require(_stabilityFee >= NO_STABILITY_FEE);
-		_wrapperStabilityFees[_wrapperAddress] = _stabilityFee;
 	}
 
 	/*

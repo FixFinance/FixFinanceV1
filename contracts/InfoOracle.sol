@@ -40,6 +40,8 @@ contract InfoOracle is IInfoOracle, Ownable {
 
 	mapping(address => address) public override DelegatedControllers;
 
+	mapping(address => mapping(address => uint64)) public override StabilityFeeAPR;
+
 	/*
 		init
 	*/
@@ -126,6 +128,16 @@ contract InfoOracle is IInfoOracle, Ownable {
 	*/
 	function setSlippageConstant(address _fixCapitalPoolAddress, uint256 _SlippageConstant) external override maySetContractParameters(_fixCapitalPoolAddress) {
 		YTammSlippageConstants[_fixCapitalPoolAddress] = _SlippageConstant;
+	}
+
+	/*
+		@Description: set the desired stability fee of a VaultFactory admin (msg.sender) for a specific wrapper asset
+
+		@param address _wrapperAsset: the address of the IWrapper contract for which to set the desired stability fee
+		@param uint64 _stabilityFeeAPR: the new stability fee for the wrapper asset
+	*/
+	function setStabilityFeeAPR(address _wrapperAsset, uint64 _stabilityFeeAPR) external override {
+		StabilityFeeAPR[msg.sender][_wrapperAsset] = _stabilityFeeAPR;
 	}
 
 	//--------------------------------------------v-i-e-w-s------------------------------

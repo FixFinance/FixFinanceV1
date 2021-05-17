@@ -65,15 +65,6 @@ contract('DBSFVaultFactory', async function(accounts) {
 		asset1 = await dummyAToken.new("aTOKEN");
 		zcbYtDeployerInstance = await zcbYtDeployer.new();
 		vaultHealthInstance = await dummyVaultHealth.new();
-		dbsfVaultFactoryDelegate1Instance = await DBSFVaultFactoryDelegate1.new();
-		dbsfVaultFactoryDelegate2Instance = await DBSFVaultFactoryDelegate2.new();
-		treasuryAccount = accounts[5];
-		vaultFactoryInstance = await DBSFVaultFactory.new(
-			vaultHealthInstance.address,
-			treasuryAccount,
-			dbsfVaultFactoryDelegate1Instance.address,
-			dbsfVaultFactoryDelegate2Instance.address
-		);
 		EiInstance = await Ei.new();
 		await BigMath.link("Ei", EiInstance.address);
 		BigMathInstance = await BigMath.new();
@@ -92,6 +83,16 @@ contract('DBSFVaultFactory', async function(accounts) {
 			YTammDeployerInstance.address,
 			nullAddress,
 			infoOracleInstance.address
+		);
+		dbsfVaultFactoryDelegate1Instance = await DBSFVaultFactoryDelegate1.new();
+		dbsfVaultFactoryDelegate2Instance = await DBSFVaultFactoryDelegate2.new();
+		treasuryAccount = accounts[5];
+		vaultFactoryInstance = await DBSFVaultFactory.new(
+			vaultHealthInstance.address,
+			treasuryAccount,
+			infoOracleInstance.address,
+			dbsfVaultFactoryDelegate1Instance.address,
+			dbsfVaultFactoryDelegate2Instance.address
 		);
 
 		maturity = ((await web3.eth.getBlock('latest')).timestamp + _8days).toString();
@@ -128,7 +129,7 @@ contract('DBSFVaultFactory', async function(accounts) {
 
 		stabilityFee0 = 1.05;
 		stabilityFee0BN = (new BN(21)).mul(NO_STABILITY_FEE).div(new BN(20));
-		await vaultFactoryInstance.setStabilityFee(wAsset0.address, stabilityFee0BN);
+		await infoOracleInstance.setStabilityFeeAPR(wAsset0.address, stabilityFee0BN);
 
 		let _10To19 = _10To18.mul(new BN(10));
 
@@ -679,6 +680,9 @@ contract('DBSFVaultFactory', async function(accounts) {
 	it('liquidates vaults due to time', async () => {
 		await helper.advanceTime(1000);
 		let amountSupplied = _10To18;
+
+		upperRatio = amountSupplied.mul(_10To18).div(new BN(amountBorrowed)).div(new BN(2));
+		await vaultHealthInstance.setUpper(asset1.address, zcbAsset0.address, upperRatio);
 
 		await vaultFactoryInstance.openVault(wAsset1.address, zcbAsset0.address, amountSupplied, amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
 		await vaultFactoryInstance.openVault(wAsset1.address, zcbAsset0.address, amountSupplied, amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);

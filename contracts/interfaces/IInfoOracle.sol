@@ -15,6 +15,7 @@ interface IInfoOracle {
 	function getYTammFeeConstant(address _fixCapitalPoolAddress) external view returns (uint FeeConstant);
 	function getSlippageConstant(address _fixCapitalPoolAddress) external view returns (uint SlippageConstant);
 	function DelegatedControllers(address _owner) external view returns (address delegate);
+	function StabilityFeeAPR(address _admin, address _wrapperAddress) external view returns (uint64 stabilityFeeAPR);
 
 	//---------management--------------
 
@@ -23,6 +24,7 @@ interface IInfoOracle {
 	function wrapperSetSlippageConst(address _wrapper, uint _SlippageConstant) external;
 	function setFeeConstants(address _fixCapitalPoolAddress, uint _ZCBammFeeConstant, uint _YTammFeeConstant) external;
 	function setSlippageConstant(address _fixCapitalPoolAddress, uint256 _SlippageConstant) external;
+	function setStabilityFeeAPR(address _wrapperAddress, uint64 _stabilityFeeAPR) external;
 
 	//---------InfoOracle-Admin--------
 

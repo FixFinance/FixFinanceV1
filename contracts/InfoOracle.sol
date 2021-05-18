@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.6.0;
 import "./helpers/Ownable.sol";
-import './interfaces/IInfoOracle.sol';
+import "./interfaces/IWrapper.sol";
+import "./interfaces/IInfoOracle.sol";
 import "./interfaces/IFixCapitalPool.sol";
 import "./libraries/SafeMath.sol";
 import "./libraries/ABDKMath64x64.sol";
@@ -41,6 +42,11 @@ contract InfoOracle is IInfoOracle, Ownable {
 	mapping(address => address) public override DelegatedControllers;
 
 	mapping(address => mapping(address => uint64)) public override StabilityFeeAPR;
+
+	/*
+		VaultFactory => collateralAsset => (collateralAsset is IWrapper ? underlyingAsset : address(1) )
+	*/
+	mapping(address => mapping(address => address)) public override collateralWhitelist;
 
 	/*
 		init
@@ -131,13 +137,22 @@ contract InfoOracle is IInfoOracle, Ownable {
 	}
 
 	/*
-		@Description: set the desired stability fee of a VaultFactory admin (msg.sender) for a specific wrapper asset
+		@Description: set the desired stability fee of a VaultFactory for a specific wrapper asset
 
+		@param address _vaultFactoryAddress: the address of the VaultFactory for which to set the stability fee
 		@param address _wrapperAsset: the address of the IWrapper contract for which to set the desired stability fee
 		@param uint64 _stabilityFeeAPR: the new stability fee for the wrapper asset
 	*/
-	function setStabilityFeeAPR(address _wrapperAsset, uint64 _stabilityFeeAPR) external override {
-		StabilityFeeAPR[msg.sender][_wrapperAsset] = _stabilityFeeAPR;
+	function setStabilityFeeAPR(address _vaultFactoryAddress, address _wrapperAsset, uint64 _stabilityFeeAPR) external override maySetContractParameters(_vaultFactoryAddress) {
+		StabilityFeeAPR[_vaultFactoryAddress][_wrapperAsset] = _stabilityFeeAPR;
+	}
+
+	function whitelistWrapper(address _vaultFactoryAddress, address _wrapperAddress) external override maySetContractParameters(_vaultFactoryAddress) {
+		collateralWhitelist[_vaultFactoryAddress][_wrapperAddress] = IWrapper(_wrapperAddress).underlyingAssetAddress();
+	}
+
+	function whitelistAsset(address _vaultFactoryAddress, address _assetAddress) external override maySetContractParameters(_vaultFactoryAddress) {
+		collateralWhitelist[_vaultFactoryAddress][_assetAddress] = address(1);
 	}
 
 	//--------------------------------------------v-i-e-w-s------------------------------

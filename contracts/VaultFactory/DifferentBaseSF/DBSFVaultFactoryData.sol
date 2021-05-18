@@ -61,10 +61,6 @@ contract DBSFVaultFactoryData is Ownable {
 
 	uint64 internal constant NO_STABILITY_FEE = 1 << 32;
 
-	//acts as a wrapper whitelist
-	//wrapper => underlying asset
-	mapping(address => address) internal _wrapperToUnderlyingAsset;
-
 	//acts as a whitelist for ZCBs & YTs that may be supplied as collateral
 	//fixCapitalPool => wrapper
 	mapping(address => address) internal _fixCapitalPoolToWrapper;

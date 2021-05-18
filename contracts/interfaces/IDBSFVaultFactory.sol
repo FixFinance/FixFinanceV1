@@ -12,7 +12,6 @@ interface IDBSFVaultFactory {
 	function YTLiquidationsLength() external view returns (uint);
 	//-----------------------------------------V-a-u-l-t---M-a-n-a-g-e-m-e-n-t-----------------------------
 	//----------------------------v-i-e-w-s----------------------------
-	function wrapperToUnderlyingAsset(address _wrapeprAddress) external view returns (address);
 	function fixCapitalPoolToWrapper(address _fixCapitalPoolAddress) external view returns (address);
 	function shortInterestAllDurations(address _wrapper) external view returns (uint);
 	function VaultHealthAddress() external view returns (address);
@@ -120,8 +119,6 @@ interface IDBSFVaultFactory {
 	function partialYTLiquidationSpecificOut(address _owner, uint _index, address _FCPborrowed, address _FCPsupplied, uint _out, int _minBondRatio, uint _maxIn, address _to) external;
 	//--------------------------------------------a-d-m-i-n---------------------------------------------
 	function setLiquidationRebate(uint _rebateBips) external;
-	function whitelistWrapper(address _wrapeprAddress) external;
-	function whitelistAsset(address _assetAddress) external;
 	function whitelistFixCapitalPool(address _fixCapitalPoolAddress) external;
 	function claimRevenue(address _asset) external;
 	function claimYTRevenue(address _FCP, int _bondIn) external;

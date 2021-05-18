@@ -124,12 +124,12 @@ contract('DBSFVaultFactory', async function(accounts) {
 		await fcp0.setVaultFactoryAddress(vaultFactoryInstance.address);
 		await fcp1.setVaultFactoryAddress(vaultFactoryInstance.address);
 
-		await vaultFactoryInstance.whitelistWrapper(wAsset1.address);
+		await infoOracleInstance.whitelistWrapper(vaultFactoryInstance.address, wAsset1.address);
 		await vaultFactoryInstance.setLiquidationRebate(rebate_bips);
 
 		stabilityFee0 = 1.05;
 		stabilityFee0BN = (new BN(21)).mul(NO_STABILITY_FEE).div(new BN(20));
-		await infoOracleInstance.setStabilityFeeAPR(wAsset0.address, stabilityFee0BN);
+		await infoOracleInstance.setStabilityFeeAPR(vaultFactoryInstance.address, wAsset0.address, stabilityFee0BN);
 
 		let _10To19 = _10To18.mul(new BN(10));
 

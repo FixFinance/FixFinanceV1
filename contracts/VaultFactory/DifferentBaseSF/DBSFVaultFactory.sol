@@ -54,10 +54,6 @@ contract DBSFVaultFactory is DBSFVaultFactoryData, IDBSFVaultFactory, nonReentra
 		return _YTLiquidations.length;
 	}
 
-	function wrapperToUnderlyingAsset(address _wrapeprAddress) external view override returns (address) {
-		return _wrapperToUnderlyingAsset[_wrapeprAddress];
-	}
-
 	function fixCapitalPoolToWrapper(address _fixCapitalPoolAddress) external view override returns (address) {
 		return _fixCapitalPoolToWrapper[_fixCapitalPoolAddress];
 	}
@@ -732,25 +728,6 @@ contract DBSFVaultFactory is DBSFVaultFactoryData, IDBSFVaultFactory, nonReentra
 
 
 	//-------------------------------------a-d-m-i-n---m-a-n-a-g-e-m-e-n-t----------------------------------------------
-
-	/*
-		@Description: admin may call this function to allow a specific wrapped asset to be provided as collateral
-
-		@param address _wrapperAddress: address of the wrapper asset to whitelist
-	*/
-	function whitelistWrapper(address _wrapperAddress) external override onlyOwner {
-		_wrapperToUnderlyingAsset[_wrapperAddress] = IWrapper(_wrapperAddress).underlyingAssetAddress();
-	}
-
-	/*
-		@Description: admin may call this function to allow a non wrapped asset to be provided as collateral
-
-		@param address _asset: address of the asset that will be allows to be provided as collateral
-	*/
-	function whitelistAsset(address _assetAddress) external override onlyOwner {
-		//all non wrapped assets have a pair value of address(1) in the _wrapperToUnderlyingAsset mapping
-		_wrapperToUnderlyingAsset[_assetAddress] = address(1);
-	}
 
 	/*
 		@Description: admin may call this function to allow a specific ZCB to be provided as collateral

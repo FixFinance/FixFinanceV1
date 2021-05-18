@@ -148,7 +148,7 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
 		@return uint bAmt: the amounf for amountBorrowed to pass to the vault health contract
 	*/
 	function passInfoToVaultManager(Vault memory _vault) internal view returns (address addr, uint sAmt, uint bAmt) {
-		addr = _wrapperToUnderlyingAsset[_vault.assetSupplied];
+		addr = IInfoOracle(_infoOracleAddress).collateralWhitelist(address(this), _vault.assetSupplied);
 		if (addr == address(0) || addr == address(1)) {
 			addr = _vault.assetSupplied;
 			sAmt = _vault.amountSupplied;
@@ -273,12 +273,13 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
 	) external {
 
 		require(_assetSupplied != _assetBorrowed);
-		require(_fixCapitalPoolToWrapper[_assetSupplied] != address(0) || _wrapperToUnderlyingAsset[_assetSupplied] != address(0));
+		IInfoOracle info = IInfoOracle(_infoOracleAddress);
+		require(_fixCapitalPoolToWrapper[_assetSupplied] != address(0) || info.collateralWhitelist(address(this), _assetSupplied) != address(0));
 
 		address FCPborrowed = IZeroCouponBond(_assetBorrowed).FixCapitalPoolAddress();
 		IWrapper baseBorrowed = IFixCapitalPool(FCPborrowed).wrapper();
 		uint64 timestampOpened = uint64(baseBorrowed.lastUpdate());
-		uint64 wrapperFee = IInfoOracle(_infoOracleAddress).StabilityFeeAPR(owner, address(baseBorrowed));
+		uint64 wrapperFee = info.StabilityFeeAPR(address(this), address(baseBorrowed));
 		Vault memory vault = Vault(_assetSupplied, _assetBorrowed, _amountSupplied, _amountBorrowed, timestampOpened, wrapperFee);
 
 		require(vaultWithstandsChange(vault, _priceMultiplier, _suppliedRateChange, _borrowRateChange));
@@ -539,7 +540,7 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
 		sVault.amountBorrowed = _amountBorrowed;
 		{
 			address wrapperAddr = IZeroCouponBond(_assetBorrowed).WrapperAddress();
-			sVault.stabilityFeeAPR = IInfoOracle(_infoOracleAddress).StabilityFeeAPR(owner, wrapperAddr);
+			sVault.stabilityFeeAPR = IInfoOracle(_infoOracleAddress).StabilityFeeAPR(address(this), wrapperAddr);
 			sVault.timestampOpened = uint64(IWrapper(wrapperAddr).lastUpdate());
 		}
 

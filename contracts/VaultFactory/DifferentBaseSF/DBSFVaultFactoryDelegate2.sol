@@ -6,6 +6,7 @@ import "../../libraries/SignedSafeMath.sol";
 import "../../interfaces/IYTVaultManagerFlashReceiver.sol";
 import "../../interfaces/IFixCapitalPool.sol";
 import "../../interfaces/IVaultHealth.sol";
+import "../../interfaces/IInfoOracle.sol";
 import "../../interfaces/IWrapper.sol";
 import "../../interfaces/IERC20.sol";
 import "../../helpers/Ownable.sol";
@@ -107,7 +108,7 @@ contract DBSFVaultFactoryDelegate2 is DBSFVaultFactoryData {
 		@return uint amt: the amount for amountSupplied to pass to the vault health contract
 	*/
 	function passInfoToVaultManager(address _suppliedAsset, uint _suppliedAmount) internal view returns (address addr, uint amt) {
-		addr = _wrapperToUnderlyingAsset[_suppliedAsset];
+		addr = IInfoOracle(_infoOracleAddress).collateralWhitelist(address(this), _suppliedAsset);
 		if (addr == address(0) || addr == address(1)) {
 			addr = _suppliedAsset;
 			amt = _suppliedAmount;

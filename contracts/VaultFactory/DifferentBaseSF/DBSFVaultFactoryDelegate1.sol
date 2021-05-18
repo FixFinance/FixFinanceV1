@@ -358,6 +358,22 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
 		}
 	}
 
+	/*
+		@Description: performs same task as adjustVault except this function is specific to the case where
+			the borrowed asset is not changed
+
+		@param Vault memory mVault: holds the state of the Vault prior to execution
+		@param Vault storage sVault: pointer to storage location of the Vault
+		@param address _assetSupplied: the new asset(may be the same as previous) that is to be used as
+			collateral in the vault
+		@param address _assetBorrowed: the new asset(same as previous) that is to be borrowed
+			from the vault
+		@param uint _amountSupplied: the total amount of collateral that shall be in the vault after execution
+		@param uint _amountBorrowed: the total amount of debt of the vault after execution
+		@param bytes calldata _data: data to be send to the flashloan receiver if a flashloan is to be done
+			if _data.length == 0 there will be no flashloan
+		@param  address _receiverAddr: the address of the flashloan receiver contract
+	*/
 	function adjVaultSameBorrow(
 		Vault memory mVault,
 		Vault storage sVault,
@@ -431,6 +447,22 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
 		}
 	}
 
+	/*
+		@Description: performs same task as adjustVault except this function is specific to the case where
+			the borrowed asset is changed
+
+		@param Vault memory mVault: holds the state of the Vault prior to execution
+		@param Vault storage sVault: pointer to storage location of the Vault
+		@param address _assetSupplied: the new asset(may be the same as previous) that is to be used as
+			collateral in the vault
+		@param address _assetBorrowed: the new asset(NOT the same as previous) that is to be borrowed
+			from the vault
+		@param uint _amountSupplied: the total amount of collateral that shall be in the vault after execution
+		@param uint _amountBorrowed: the total amount of debt of the vault after execution
+		@param bytes calldata _data: data to be send to the flashloan receiver if a flashloan is to be done
+			if _data.length == 0 there will be no flashloan
+		@param  address _receiverAddr: the address of the flashloan receiver contract
+	*/
 	function adjVaultChangeBorrow(
 		Vault memory mVault,
 		Vault storage sVault,

@@ -41,7 +41,9 @@ interface IDBSFVaultFactory {
 		address FCPborrowed,
 		uint yieldSupplied,
 		int bondSupplied,
-		uint amountBorrowed
+		uint amountBorrowed,
+		uint64 timestampOpened,
+		uint64 stabilityFeeAPR
 	);
 	function YTLiquidations(uint _index) external view returns (
 		address vaultOwner,

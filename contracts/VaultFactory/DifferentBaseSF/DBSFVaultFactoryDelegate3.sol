@@ -259,7 +259,11 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryData {
 		IFixCapitalPool(_FCPborrowed).mintZCBTo(msg.sender, _amountBorrowed);
 		raiseShortInterest(_FCPborrowed, _amountBorrowed);
 
-		_YTvaults[msg.sender].push(YTVault(_FCPsupplied, _FCPborrowed, _yieldSupplied, _bondSupplied, _amountBorrowed));
+		IWrapper baseBorrowed = IFixCapitalPool(_FCPborrowed).wrapper();
+		uint64 timestampOpened = uint64(baseBorrowed.lastUpdate());
+		uint64 wrapperFee = IInfoOracle(_infoOracleAddress).StabilityFeeAPR(address(this), address(baseBorrowed));
+
+		_YTvaults[msg.sender].push(YTVault(_FCPsupplied, _FCPborrowed, _yieldSupplied, _bondSupplied, _amountBorrowed, timestampOpened, wrapperFee));
 
 	}
 

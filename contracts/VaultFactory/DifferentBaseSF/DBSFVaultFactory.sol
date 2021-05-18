@@ -125,7 +125,9 @@ contract DBSFVaultFactory is DBSFVaultFactoryData, IDBSFVaultFactory, nonReentra
 		address FCPborrowed,
 		uint yieldSupplied,
 		int bondSupplied,
-		uint amountBorrowed
+		uint amountBorrowed,
+		uint64 timestampOpened,
+		uint64 stabilityFeeAPR
 	) {
 		YTVault memory vault = _YTvaults[_owner][_index];
 		FCPsupplied = vault.FCPsupplied;
@@ -133,6 +135,8 @@ contract DBSFVaultFactory is DBSFVaultFactoryData, IDBSFVaultFactory, nonReentra
 		yieldSupplied = vault.yieldSupplied;
 		bondSupplied = vault.bondSupplied;
 		amountBorrowed = vault.amountBorrowed;
+		timestampOpened = vault.timestampOpened;
+		stabilityFeeAPR = vault.stabilityFeeAPR;
 	}
 
 	function YTLiquidations(uint _index) external view override returns (

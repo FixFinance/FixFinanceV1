@@ -34,6 +34,8 @@ contract DBSFVaultFactoryData is Ownable {
 		uint yieldSupplied;
 		int bondSupplied;
 		uint amountBorrowed;
+		uint64 timestampOpened;
+		uint64 stabilityFeeAPR; //inflated by 32 bits
 	}
 
 	struct YTLiquidation {

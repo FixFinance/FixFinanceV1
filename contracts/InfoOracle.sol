@@ -147,10 +147,22 @@ contract InfoOracle is IInfoOracle, Ownable {
 		StabilityFeeAPR[_vaultFactoryAddress][_wrapperAsset] = _stabilityFeeAPR;
 	}
 
+	/*
+		@Description: admin of a DBSFVaultFactory may call this function to allow usage of a IWrapper asset as collateral
+
+		@param address _vaultFactoryAddress: the address of the DBSFVaultFactory for which to allow the IWrapper as collateral
+		@param address _wrapperAddress: the address of the IWrapper to add as collateral
+	*/
 	function whitelistWrapper(address _vaultFactoryAddress, address _wrapperAddress) external override maySetContractParameters(_vaultFactoryAddress) {
 		collateralWhitelist[_vaultFactoryAddress][_wrapperAddress] = IWrapper(_wrapperAddress).underlyingAssetAddress();
 	}
 
+	/*
+		@Description: admin of a DBSFVaultFactory may call this function to allow usage of a non IWrapper asset as collateral
+
+		@param address _vaultFactoryAddress: the address of the DBSFVaultFactory for which to allow the non IWrapper as collateral
+		@param address _assetAddress: the address of the non IWrapper asset to add as collateral
+	*/
 	function whitelistAsset(address _vaultFactoryAddress, address _assetAddress) external override maySetContractParameters(_vaultFactoryAddress) {
 		collateralWhitelist[_vaultFactoryAddress][_assetAddress] = address(1);
 	}

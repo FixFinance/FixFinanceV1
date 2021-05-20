@@ -816,25 +816,32 @@ contract('DBSFVaultFactory', async function(accounts) {
 		await fcp0.setVaultFactoryAddress(vaultFactoryInstance.address);
 		await fcp1.setVaultFactoryAddress(vaultFactoryInstance.address);
 
+		let _10To19 = _10To18.mul(new BN(10));
+
 		//mint assets to account 0
-		await asset1.mintTo(accounts[0], _10To18.mul(new BN("10")).toString());
-		await asset1.approve(wAsset1.address, _10To18.mul(new BN("10")).toString());
-		await wAsset1.depositUnitAmount(accounts[0], _10To18.mul(new BN("10")).toString());
-		await wAsset1.approve(vaultFactoryInstance.address, _10To18.mul(new BN("10")).toString());
-		await wAsset1.approve(fcp1.address, _10To18.mul(new BN("10")).toString());
-		await fcp1.depositWrappedToken(accounts[0], _10To18.mul(new BN("10")).toString());
-		await zcbAsset1.approve(vaultFactoryInstance.address, _10To18.mul(new BN("10")).toString());
+		await asset1.mintTo(accounts[0], _10To19);
+		await asset1.approve(wAsset1.address, _10To19);
+		await wAsset1.depositUnitAmount(accounts[0], _10To19);
+		await wAsset1.approve(vaultFactoryInstance.address, _10To19);
+		await wAsset1.approve(fcp1.address, _10To19);
+		await fcp1.depositWrappedToken(accounts[0], _10To19);
+		await zcbAsset1.approve(vaultFactoryInstance.address, _10To19);
+
+		await asset0.mintTo(accounts[0], _10To19);
+		await asset0.approve(wAsset0.address, _10To19);
+		await wAsset0.depositUnitAmount(accounts[0], _10To19);
+		await wAsset0.approve(fcp0.address, _10To19);
+		await fcp0.depositWrappedToken(accounts[0], _10To19);
+		await zcbAsset0.approve(vaultFactoryInstance.address, _10To19);
 
 		//mint assets to account 1
-		await asset0.mintTo(accounts[1], _10To18.mul(new BN("10")).toString());
-		await asset0.approve(wAsset0.address, _10To18.mul(new BN("10")).toString(), {from: accounts[1]});
-		await wAsset0.depositUnitAmount(accounts[1], _10To18.mul(new BN("10")).toString(), {from: accounts[1]});
-		await wAsset0.approve(fcp0.address, _10To18.mul(new BN("10")).toString(), {from: accounts[1]});
-		await fcp0.depositWrappedToken(accounts[1], _10To18.mul(new BN("10")).toString(), {from: accounts[1]});
-		await zcbAsset0.approve(vaultFactoryInstance.address, _10To18.mul(new BN("10")).toString(), {from: accounts[1]});
+		await asset0.mintTo(accounts[1], _10To19);
+		await asset0.approve(wAsset0.address, _10To19, {from: accounts[1]});
+		await wAsset0.depositUnitAmount(accounts[1], _10To19, {from: accounts[1]});
+		await wAsset0.approve(fcp0.address, _10To19, {from: accounts[1]});
+		await fcp0.depositWrappedToken(accounts[1], _10To19, {from: accounts[1]});
+		await zcbAsset0.approve(vaultFactoryInstance.address, _10To19, {from: accounts[1]});
 	});
-
-
 
 	it('cannot open YT vault without whitelisting supplied asset', async () => {
 		//mint ZCB to accounts[0]
@@ -1105,12 +1112,13 @@ contract('DBSFVaultFactory', async function(accounts) {
 	});
 
 	it('repays YT vault', async () => {
+		await helper.advanceTime(1000);
 		toRepay = vault.amountBorrowed.div(new BN('2'));
 
 		let prevVault = vault;
 		var prevBalanceZCB0 = await zcbAsset0.balanceOf(accounts[0]);
 		let newDebt = vault.amountBorrowed.sub(toRepay);
-		await vaultFactoryInstance.adjustYTVault(
+		let rec = await vaultFactoryInstance.adjustYTVault(
 			accounts[0],
 			0,
 			vault.FCPsupplied,
@@ -1123,22 +1131,30 @@ contract('DBSFVaultFactory', async function(accounts) {
 			accounts[0]
 		);
 
-		vault = await vaultFactoryInstance.YTvaults(accounts[0], 0);
-		var currentBalanceZCB0 = await zcbAsset0.balanceOf(accounts[0]);
+		let timestamp = (await web3.eth.getBlock(rec.receipt.blockNumber)).timestamp;
 
-		assert.equal(prevBalanceZCB0.sub(currentBalanceZCB0).toString(), toRepay.toString(), "correct amount ZCB transferedFrom sender");
+		let secondsOpen = timestamp - vault.timestampOpened.toNumber();
+		let yearsOpen = secondsOpen / secondsPerYear;
+		let multiplier = Math.pow(stabilityFee0, yearsOpen);
+		let expectedRepayment = multiplier * parseInt(toRepay.toString());
+		vault = await vaultFactoryInstance.YTvaults(accounts[0], 0);
+		let currentBalanceZCB0 = await zcbAsset0.balanceOf(accounts[0]);
+		let actualRepayment = parseInt(prevBalanceZCB0.sub(currentBalanceZCB0).toString());
+
+		assert.isBelow(AmountError(expectedRepayment, actualRepayment), AcceptableMarginOfError, "repayment is within error range");
 		assert.equal(prevVault.amountBorrowed.sub(vault.amountBorrowed).toString(), toRepay.toString(), "correct amount repaid");
 		assert.equal(vault.amountBorrowed.toString(), newDebt.toString(), "correct value of vault.amountBorrowed");
 	});
 
 	it('borrows from YT vault', async () => {
+		await helper.advanceTime(1000);
 		toBorrow = toRepay;
 
 		let prevVault = vault;
 		var prevBalanceZCB0 = await zcbAsset0.balanceOf(accounts[0]);
 
 		let newDebt = vault.amountBorrowed.add(toBorrow);
-		await vaultFactoryInstance.adjustYTVault(
+		let rec = await vaultFactoryInstance.adjustYTVault(
 			accounts[0],
 			0,
 			vault.FCPsupplied,
@@ -1151,10 +1167,17 @@ contract('DBSFVaultFactory', async function(accounts) {
 			accounts[0]
 		);
 
-		vault = await vaultFactoryInstance.YTvaults(accounts[0], 0);
-		var currentBalanceZCB0 = await zcbAsset0.balanceOf(accounts[0]);
+		let timestamp = (await web3.eth.getBlock(rec.receipt.blockNumber)).timestamp;
 
-		assert.equal(currentBalanceZCB0.sub(prevBalanceZCB0).toString(), toBorrow.toString(), "correct amount of borrowed asset transfered to _to");
+		let secondsOpen = timestamp - vault.timestampOpened.toNumber();
+		let yearsOpen = secondsOpen / secondsPerYear;
+		let multiplier = Math.pow(stabilityFee0, yearsOpen);
+		let expectedBorrow = multiplier * parseInt(toBorrow.toString());
+		vault = await vaultFactoryInstance.YTvaults(accounts[0], 0);
+		let currentBalanceZCB0 = await zcbAsset0.balanceOf(accounts[0]);
+		let actualBorrow = parseInt(currentBalanceZCB0.sub(prevBalanceZCB0).toString());
+
+		assert.isBelow(AmountError(expectedBorrow, actualBorrow), AcceptableMarginOfError, "received amount is within error range");
 		assert.equal(vault.amountBorrowed.sub(prevVault.amountBorrowed).toString(), toBorrow.toString(), "correct amount borrowed");
 		assert.equal(vault.amountBorrowed.toString(), newDebt.toString(), "correct value of vault.amountBorrowed");
 	});
@@ -1204,23 +1227,31 @@ contract('DBSFVaultFactory', async function(accounts) {
 	});
 
 	it('close YT vault', async () => {
+		await helper.advanceTime(1000);
 		let prevVault = vault;
 		oldVault = vault;
 		let prevBonds1 = await fcp1.balanceBonds(accounts[0]);
 		let prevYield1 = await fcp1.balanceYield(accounts[0]);
 		let prevBalanceZCB0 = await zcbAsset0.balanceOf(accounts[0]);
 
-		await vaultFactoryInstance.closeYTVault(1, accounts[0]);
+		let rec = await vaultFactoryInstance.closeYTVault(1, accounts[0]);
 
 		let newBonds1 = await fcp1.balanceBonds(accounts[0]);
 		let newYield1 = await fcp1.balanceYield(accounts[0]);
 		let newBalanceZCB0 = await zcbAsset0.balanceOf(accounts[0]);
+
+		let timestamp = (await web3.eth.getBlock(rec.receipt.blockNumber)).timestamp;
+		let secondsOpen = timestamp - vault.timestampOpened.toNumber();
+		let yearsOpen = secondsOpen / secondsPerYear;
+		let multiplier = Math.pow(stabilityFee0, yearsOpen);
+		let expectedRepayment = multiplier * parseInt(oldVault.amountBorrowed.toString());
 
 		vault = await vaultFactoryInstance.YTvaults(accounts[0], 1);
 
 		let changeYield = newYield1.sub(prevYield1);
 		let changeBond = newBonds1.sub(prevBonds1);
 		let changeDebtAsset = prevBalanceZCB0.sub(newBalanceZCB0);
+		let actualRepayment = parseInt(changeDebtAsset.toString());
 
 		assert.equal(vault.FCPsupplied, nullAddress, "correct value of vault.FCPsupplied");
 		assert.equal(vault.FCPborrowed, nullAddress, "correct value of vault.FCPborrowed");
@@ -1229,7 +1260,7 @@ contract('DBSFVaultFactory', async function(accounts) {
 		assert.equal(vault.amountBorrowed.toString(), "0", "correct value of vault.amountBorrowed");
 		assert.equal(changeYield.toString(), prevVault.yieldSupplied.toString(), "correct change in balanceYield of collateral FCP");
 		assert.equal(changeBond.toString(), prevVault.bondSupplied.toString(), "correct change in balanceBonds of collateral FCP");
-		assert.equal(changeDebtAsset.toString(), prevVault.amountBorrowed.toString(), "correct change in balance of debt asset");
+		assert.isBelow(AmountError(expectedRepayment, actualRepayment), AcceptableMarginOfError, "repayment is within acceptable margin of error");
 	});
 
 	it('reopen YT vault via adjustment', async () => {
@@ -1273,6 +1304,7 @@ contract('DBSFVaultFactory', async function(accounts) {
 	});
 
 	it('send undercollateralised YT vaults to liquidation', async () => {
+		await helper.advanceTime(1000);
 		//tx should revert when vault satisfies limit
 		await vaultHealthInstance.setToReturn(true);
 		let surplusYield = new BN("10000");
@@ -1298,6 +1330,10 @@ contract('DBSFVaultFactory', async function(accounts) {
 		let rec = await vaultFactoryInstance.auctionYTLiquidation(accounts[0], 0, fcp0.address, fcp1.address, bid, minBondRatio, vault.amountBorrowed, {from: accounts[1]});
 
 		let timestamp = (await web3.eth.getBlock(rec.receipt.blockNumber)).timestamp;
+		let secondsOpen = timestamp - vault.timestampOpened.toNumber();
+		let yearsOpen = secondsOpen / secondsPerYear;
+		let multiplier = Math.pow(stabilityFee0, yearsOpen);
+		let expectedAmtIn = multiplier * parseInt(vault.amountBorrowed.toString());
 
 		let currentRevenue = await vaultFactoryInstance.YTrevenue(fcp1.address);
 
@@ -1317,7 +1353,7 @@ contract('DBSFVaultFactory', async function(accounts) {
 		assert.equal(liquidation.vaultOwner, accounts[0], "correct value of liquidation.vaultOwner");
 		assert.equal(liquidation.FCPborrowed, fcp0.address, "correct value of liquidation.FCPborrowed");
 		assert.equal(liquidation.FCPsupplied, fcp1.address, "correct value of liquidation.FCPsupplied");
-		assert.equal(liquidation.amountBorrowed.toString(), vault.amountBorrowed.toString(), "correct value of liquidation.amountBorrowed");
+		assert.isBelow(AmountError(expectedAmtIn, parseInt(liquidation.amountBorrowed.toString())), AcceptableMarginOfError, "liquidation.amountBorrowed is within acceptable margin of error");
 		assert.equal(liquidation.bidder, accounts[1], "correct value of liqudiation.bidder");
 		assert.equal(liquidation.bondRatio.toString(), actualBondRatio.toString(), "correct value of liquidation.bondRatio");
 		assert.equal(liquidation.bidAmount.toString(), bid.toString(), "correct value of liquidation.bidAmount");
@@ -1518,6 +1554,10 @@ contract('DBSFVaultFactory', async function(accounts) {
 
 		let rec = await vaultFactoryInstance.auctionYTLiquidation(accounts[0], vaultIndex, fcp0.address, fcp1.address, bid, minBondRatio, amountBorrowed, {from: accounts[1]});
 		let timestamp = (await web3.eth.getBlock(rec.receipt.blockNumber)).timestamp;
+		let secondsOpen = timestamp - vault.timestampOpened.toNumber();
+		let yearsOpen = secondsOpen / secondsPerYear;
+		let multiplier = Math.pow(stabilityFee0, yearsOpen);
+		let expectedAmtIn = multiplier * parseInt(amountBorrowed.toString());
 
 		assert.equal((await vaultFactoryInstance.YTLiquidationsLength()).toString(), "2", "correct length of liquidations array");
 
@@ -1528,7 +1568,7 @@ contract('DBSFVaultFactory', async function(accounts) {
 		assert.equal(liquidation.vaultOwner, accounts[0], "correct value of liquidation.vaultOwner");
 		assert.equal(liquidation.FCPborrowed, fcp0.address, "correct value of liquidation.FCPborrowed");
 		assert.equal(liquidation.FCPsupplied, fcp1.address, "correct value of liquidation.FCPsupplied");
-		assert.equal(liquidation.amountBorrowed.toString(), amountBorrowed.toString(), "correct value of liquidation.amountBorrowed");
+		assert.isBelow(AmountError(expectedAmtIn, parseInt(liquidation.amountBorrowed.toString())), AcceptableMarginOfError, "liquidation.amountBorrowed is within acceptable margin of error");
 		assert.equal(liquidation.bondRatio.toString(), expectedBondRatio.toString(), "correct value of liquidation.bondRatio")
 		assert.equal(liquidation.bidder, accounts[1], "correct value of liqudiation.bidder");
 		assert.equal(liquidation.bidAmount.toString(), bid.toString(), "correct value of liquidation.bidAmount");

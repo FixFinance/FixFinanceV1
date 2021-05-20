@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.6.0;
 
+import "../../libraries/BigMath.sol";
 import "../../libraries/SafeMath.sol";
 import "../../libraries/SignedSafeMath.sol";
 import "../../interfaces/IYTVaultManagerFlashReceiver.sol";
@@ -93,6 +94,20 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryData {
 	*/
 	function collectBid(address _bidder, address _asset, uint _amount) internal {
 		IFixCapitalPool(_asset).burnZCBFrom(_bidder, _amount);
+	}
+
+	/*
+		@Description: when stability fee is encured pay out to holders
+
+		@param address _ZCBaddr: the ZCB for which to distribute the stability fee
+		@param address _FCPaddr: the FCP which corresponds to the ZCB which the stability fee is paid in
+		@param uint _amount: the amount of ZCB which has been collected from the stability fee
+	*/
+	function claimStabilityFee(address _ZCBaddr, address _FCPaddr, uint _amount) internal {
+		if (_amount > 0) {
+			IFixCapitalPool(_FCPaddr).mintZCBTo(address(this), _amount);
+			_revenue[_ZCBaddr] += _amount;
+		}
 	}
 
 	/*
@@ -207,6 +222,59 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryData {
 	}
 
 	/*
+		@Description: find the multiplier which is multiplied with amount borrowed (when vault was opened)
+			to find the current liability
+
+		@param address _FCPborrrowed: the address of the FCP contract associated with the debt asset of the Vault
+		@param uint64 _timestampOpened: the time at which the vault was opened
+		@param uint64 _stabilityFeeAPR: the annual rate which must be paid for stability fees
+
+		@return uint: the stability rate debt multiplier
+			inflated by (1 ether)
+	*/
+	function getStabilityFeeMultiplier(address _FCPborrrowed, uint64 _timestampOpened, uint64 _stabilityFeeAPR) internal view returns(uint) {
+		if (_stabilityFeeAPR == 0 || _stabilityFeeAPR == NO_STABILITY_FEE)
+			return (1 ether);
+		uint lastUpdate = IFixCapitalPool(_FCPborrrowed).lastUpdate();
+		int128 yearsOpen = int128((uint(lastUpdate - _timestampOpened) << 64) / BigMath.SecondsPerYear);
+		if (yearsOpen == 0)
+			return (1 ether);
+		int128 stabilityFeeMultiplier = BigMath.Pow(int128(uint(_stabilityFeeAPR) << 32), yearsOpen);
+		return uint(stabilityFeeMultiplier).mul(1 ether) >> 64;
+	}
+
+	/*
+		@Description: find the new amount of ZCBs which is a vault's obligation
+
+		@param address _FCPborrrowed: the address of the FCP contract associated with the debt asset of the Vault
+		@param uint _amountBorrowed: the Vault's previous obligation in ZCBs at _timestampOpened
+		@param uint64 _timestampOpened: the time at which the vault was opened
+		@param uint64 _stabilityFeeAPR: the annual rate which must be paid for stability fees
+
+		@return uint: the stability rate debt multiplier
+			inflated by (1 ether)
+	*/
+	function stabilityFeeAdjAmountBorrowed(address _FCPborrrowed, uint _amountBorrowed, uint64 _timestampOpened, uint64 _stabilityFeeAPR) internal view returns (uint) {
+		uint ratio = getStabilityFeeMultiplier(_FCPborrrowed, _timestampOpened, _stabilityFeeAPR);
+		return ratio.mul(_amountBorrowed) / (1 ether);
+	}
+
+	function YTvaultWithstandsChange(YTVault memory vault, uint _priceMultiplier, int128 _suppliedRateChange, int128 _borrowRateChange) internal view returns (bool) {
+		validateYTvaultMultipliers(_priceMultiplier, _suppliedRateChange, _borrowRateChange, vault.bondSupplied > 0);
+		return vaultHealthContract.YTvaultWithstandsChange(
+			false,
+			vault.FCPsupplied,
+			vault.FCPborrowed,
+			getUnitValueYield(vault.FCPsupplied, vault.yieldSupplied),
+			vault.bondSupplied,
+			stabilityFeeAdjAmountBorrowed(vault.FCPborrowed, vault.amountBorrowed, vault.timestampOpened, vault.stabilityFeeAPR),
+			_priceMultiplier,
+			_suppliedRateChange,
+			_borrowRateChange
+		);
+	}
+
+	/*
 		@Description: create a new YT vault, deposit some ZCB + YT of a FCP and borrow some ZCB from it
 
 		@param address _FCPsupplied: the address of the FCP contract for which to supply ZCB and YT
@@ -243,13 +311,16 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryData {
 		validateYTvaultMultipliers(_priceMultiplier, _suppliedRateChange, _borrowRateChange, _bondSupplied > 0);
 		uint _unitYieldSupplied = getUnitValueYield(_FCPsupplied, _yieldSupplied);
 
-		require(vaultHealthContract.YTvaultWithstandsChange(
-			false,
-			_FCPsupplied,
-			_FCPborrowed,
-			_unitYieldSupplied,
-			_bondSupplied,
-			_amountBorrowed,
+		require(YTvaultWithstandsChange(
+			YTVault(
+				_FCPsupplied,
+				_FCPborrowed,
+				_unitYieldSupplied,
+				_bondSupplied,
+				_amountBorrowed,
+				0,
+				NO_STABILITY_FEE
+			),
 			_priceMultiplier,
 			_suppliedRateChange,
 			_borrowRateChange
@@ -280,7 +351,8 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryData {
 
 		//burn borrowed ZCB
 		if (vault.amountBorrowed > 0) {
-			IFixCapitalPool(vault.FCPborrowed).burnZCBFrom(msg.sender, vault.amountBorrowed);
+			uint feeAdjBorrowAmt = stabilityFeeAdjAmountBorrowed(vault.FCPborrowed, vault.amountBorrowed, vault.timestampOpened, vault.stabilityFeeAPR);
+			IFixCapitalPool(vault.FCPborrowed).burnZCBFrom(msg.sender, feeAdjBorrowAmt);
 			lowerShortInterest(vault.FCPborrowed, vault.amountBorrowed);
 		}
 		if (vault.yieldSupplied > 0 || vault.bondSupplied != 0) {
@@ -335,32 +407,86 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryData {
 		YTVault memory mVault = _YTvaults[_owner][_index];
 		YTVault storage sVault = _YTvaults[_owner][_index];
 
-		//ensure that after operations vault will be in good health
-		//only check health if at any point funds are being removed from the vault
-		if (
-			_FCPborrowed != mVault.FCPborrowed ||
-			_FCPsupplied != mVault.FCPsupplied ||
-			_yieldSupplied < mVault.yieldSupplied ||
-			_amountBorrowed > mVault.amountBorrowed ||
-			(_yieldSupplied == mVault.yieldSupplied && _bondSupplied < mVault.bondSupplied)
-		) {
-			//index 0 in multipliers that must be converted to uint
-			require(_multipliers[0] > 0);
-			require(msg.sender == _owner);
-			require(vaultHealthContract.YTvaultWithstandsChange(
-				false,
+		if (mVault.FCPborrowed == _FCPborrowed) {
+			//ensure that after operations vault will be in good health
+			//only check health if at any point funds are being removed from the vault
+			if (
+				_FCPsupplied != mVault.FCPsupplied ||
+				_yieldSupplied < mVault.yieldSupplied ||
+				_amountBorrowed > mVault.amountBorrowed ||
+				(_yieldSupplied == mVault.yieldSupplied && _bondSupplied < mVault.bondSupplied)
+			) {
+				require(_multipliers[0] > 0);
+				require(msg.sender == _owner);
+				require(YTvaultWithstandsChange(
+					YTVault(
+						_FCPsupplied,
+						_FCPborrowed,
+						_yieldSupplied,
+						_bondSupplied,
+						_amountBorrowed,
+						mVault.timestampOpened,
+						mVault.stabilityFeeAPR
+					),
+					uint(_multipliers[0]),
+					_multipliers[1],
+					_multipliers[2]
+				));
+			}
+			adjYTVaultSameBorrow(
+				mVault,
+				sVault,
 				_FCPsupplied,
 				_FCPborrowed,
 				_yieldSupplied,
 				_bondSupplied,
 				_amountBorrowed,
+				_data,
+				_receiverAddr
+			);
+		}
+		else {
+			require(_multipliers[0] > 0);
+			require(msg.sender == _owner);
+			require(YTvaultWithstandsChange(
+				YTVault(
+					_FCPsupplied,
+					_FCPborrowed,
+					_yieldSupplied,
+					_bondSupplied,
+					_amountBorrowed,
+					0,
+					NO_STABILITY_FEE
+				),
 				uint(_multipliers[0]),
 				_multipliers[1],
 				_multipliers[2]
 			));
+			adjYTVaultChangeBorrow(
+				mVault,
+				sVault,
+				_FCPsupplied,
+				_FCPborrowed,
+				_yieldSupplied,
+				_bondSupplied,
+				_amountBorrowed,
+				_data,
+				_receiverAddr
+			);
 		}
+	}
 
-		//------------------distribute funds----------------------
+	function adjYTVaultSameBorrow(
+		YTVault memory mVault,
+		YTVault storage sVault,
+		address _FCPsupplied,
+		address _FCPborrowed,
+		uint _yieldSupplied,
+		int _bondSupplied,
+		uint _amountBorrowed,
+		bytes memory _data,
+		address _receiverAddr
+	) internal {
 		if (mVault.FCPsupplied != _FCPsupplied) {
 			if (mVault.FCPsupplied != address(0)) {
 				IFixCapitalPool(mVault.FCPsupplied).transferPosition(_receiverAddr, mVault.yieldSupplied, mVault.bondSupplied);
@@ -382,19 +508,9 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryData {
 			sVault.bondSupplied = _bondSupplied;
 		}
 
-		if (mVault.FCPborrowed != _FCPborrowed) {
-			if (_FCPborrowed != address(0)) {
-				raiseShortInterest(_FCPborrowed, _amountBorrowed);
-			}
-			if (mVault.FCPborrowed != address(0)) {
-				lowerShortInterest(mVault.FCPborrowed, mVault.amountBorrowed);
-			}
-			IFixCapitalPool(_FCPborrowed).mintZCBTo(_receiverAddr, _amountBorrowed);
-			sVault.FCPborrowed = _FCPborrowed;
-			sVault.amountBorrowed = _amountBorrowed;
-		}
-		else if (mVault.amountBorrowed < _amountBorrowed) {
-			IFixCapitalPool(_FCPborrowed).mintZCBTo(_receiverAddr, _amountBorrowed - mVault.amountBorrowed);
+		if (mVault.amountBorrowed < _amountBorrowed) {
+			uint toMint = stabilityFeeAdjAmountBorrowed(_FCPborrowed, _amountBorrowed - mVault.amountBorrowed, mVault.timestampOpened, mVault.stabilityFeeAPR);
+			IFixCapitalPool(_FCPborrowed).mintZCBTo(_receiverAddr, toMint);
 			raiseShortInterest(_FCPborrowed, _amountBorrowed - mVault.amountBorrowed);
 			sVault.amountBorrowed = _amountBorrowed;
 		}
@@ -428,14 +544,93 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryData {
 			IFixCapitalPool(_FCPsupplied).transferPositionFrom(_receiverAddr, address(this), 0, _bondSupplied.sub(mVault.bondSupplied));
 		}
 
-		if (mVault.FCPborrowed != _FCPborrowed) {
-			if (mVault.amountBorrowed > 0) {
-				IFixCapitalPool(mVault.FCPborrowed).burnZCBFrom(msg.sender, mVault.amountBorrowed);
+		if (mVault.amountBorrowed > _amountBorrowed) {
+			lowerShortInterest(_FCPborrowed, mVault.amountBorrowed - _amountBorrowed);
+			uint toBurn = stabilityFeeAdjAmountBorrowed(_FCPborrowed, mVault.amountBorrowed - _amountBorrowed, mVault.timestampOpened, mVault.stabilityFeeAPR);
+			IFixCapitalPool(_FCPborrowed).burnZCBFrom(msg.sender,  toBurn);
+			address ZCBborrowed = IFixCapitalPool(_FCPborrowed).zeroCouponBondAddress();
+			claimStabilityFee(ZCBborrowed, address(_FCPborrowed), toBurn - (mVault.amountBorrowed - _amountBorrowed));
+		}
+	}
+
+	function adjYTVaultChangeBorrow(
+		YTVault memory mVault,
+		YTVault storage sVault,
+		address _FCPsupplied,
+		address _FCPborrowed,
+		uint _yieldSupplied,
+		int _bondSupplied,
+		uint _amountBorrowed,
+		bytes memory _data,
+		address _receiverAddr
+	) internal {
+		if (mVault.FCPsupplied != _FCPsupplied) {
+			if (mVault.FCPsupplied != address(0)) {
+				IFixCapitalPool(mVault.FCPsupplied).transferPosition(_receiverAddr, mVault.yieldSupplied, mVault.bondSupplied);
+			}
+			sVault.FCPsupplied = _FCPsupplied;
+			sVault.yieldSupplied = _yieldSupplied;
+			sVault.bondSupplied = _bondSupplied;
+		}
+		else if (mVault.yieldSupplied != _yieldSupplied) {
+			if (mVault.yieldSupplied > _yieldSupplied) {
+				IFixCapitalPool(_FCPsupplied).transferPosition(_receiverAddr, mVault.yieldSupplied - _yieldSupplied, mVault.bondSupplied.sub(_bondSupplied));
+			}
+			sVault.yieldSupplied = _yieldSupplied;
+		}
+		if (mVault.bondSupplied != _bondSupplied) {
+			if (mVault.bondSupplied > _bondSupplied && mVault.yieldSupplied == _yieldSupplied) {
+				IFixCapitalPool(_FCPsupplied).transferPosition(_receiverAddr, 0, mVault.bondSupplied.sub(_bondSupplied));
+			}
+			sVault.bondSupplied = _bondSupplied;
+		}
+
+		if (_FCPborrowed != address(0)) {
+			raiseShortInterest(_FCPborrowed, _amountBorrowed);
+		}
+		if (mVault.FCPborrowed != address(0)) {
+			lowerShortInterest(mVault.FCPborrowed, mVault.amountBorrowed);
+		}
+		IFixCapitalPool(_FCPborrowed).mintZCBTo(_receiverAddr, _amountBorrowed);
+		sVault.FCPborrowed = _FCPborrowed;
+		sVault.amountBorrowed = _amountBorrowed;
+		{
+			IWrapper wrapper = IFixCapitalPool(_FCPborrowed).wrapper();
+			sVault.timestampOpened = uint64(wrapper.lastUpdate());
+			sVault.stabilityFeeAPR = IInfoOracle(_infoOracleAddress).StabilityFeeAPR(address(this), address(wrapper));
+		}
+
+		//-----------------------------flashloan------------------
+		if (_data.length > 0) {
+			IYTVaultManagerFlashReceiver(_receiverAddr).onFlashLoan(
+				msg.sender,
+				mVault.FCPsupplied,
+				mVault.FCPborrowed,
+				mVault.yieldSupplied,
+				mVault.bondSupplied,
+				mVault.amountBorrowed,
+				_data
+			);
+		}
+
+		//-----------------------------get funds-------------------------
+		if (mVault.FCPsupplied != _FCPsupplied) {
+			IFixCapitalPool(_FCPsupplied).transferPositionFrom(msg.sender, address(this), _yieldSupplied, _bondSupplied);
+		}
+		else if (mVault.yieldSupplied != _yieldSupplied) {
+			if (mVault.yieldSupplied < _yieldSupplied) {
+				IFixCapitalPool(_FCPsupplied).transferPositionFrom(msg.sender, address(this), _yieldSupplied - mVault.yieldSupplied, _bondSupplied.sub(mVault.bondSupplied));
 			}
 		}
-		else if (mVault.amountBorrowed > _amountBorrowed) {
-			lowerShortInterest(_FCPborrowed, mVault.amountBorrowed - _amountBorrowed);
-			IFixCapitalPool(_FCPborrowed).burnZCBFrom(msg.sender,  mVault.amountBorrowed - _amountBorrowed);
+		else if (mVault.bondSupplied < _bondSupplied) {
+			IFixCapitalPool(_FCPsupplied).transferPositionFrom(_receiverAddr, address(this), 0, _bondSupplied.sub(mVault.bondSupplied));
+		}
+
+		if (mVault.amountBorrowed > 0) {
+			uint toBurn = stabilityFeeAdjAmountBorrowed(mVault.FCPborrowed, mVault.amountBorrowed, mVault.timestampOpened, mVault.stabilityFeeAPR);
+			IFixCapitalPool(mVault.FCPborrowed).burnZCBFrom(msg.sender, toBurn);
+			address ZCBborrowed = IFixCapitalPool(mVault.FCPborrowed).zeroCouponBondAddress();
+			claimStabilityFee(ZCBborrowed, mVault.FCPborrowed, toBurn - mVault.amountBorrowed);
 		}
 	}
 
@@ -474,8 +669,10 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryData {
 			require(maturity < block.timestamp + MAX_TIME_TO_MATURITY);
 		}
 		//burn borrowed ZCB
-		collectBid(msg.sender, vault.FCPborrowed, _amtIn);
-		lowerShortInterest(vault.FCPborrowed, _amtIn);
+		uint feeAdjAmtIn = stabilityFeeAdjAmountBorrowed(_FCPborrowed, _amtIn, vault.timestampOpened, vault.stabilityFeeAPR);
+		collectBid(msg.sender, _FCPborrowed, feeAdjAmtIn);
+		claimStabilityFee(IFixCapitalPool(_FCPborrowed).zeroCouponBondAddress(), _FCPborrowed, feeAdjAmtIn - _amtIn);
+		lowerShortInterest(_FCPborrowed, _amtIn);
 		//any surplus in the bid may be added as _revenue
 		if (_bidYield < maxBid){
 			int bondBid = bondRatio.mul(int(_bidYield)) / (1 ether);
@@ -497,7 +694,7 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryData {
 			vault.FCPsupplied,
 			vault.FCPborrowed,
 			bondRatio,
-			_amtIn,
+			feeAdjAmtIn,
 			msg.sender,
 			_bidYield,
 			block.timestamp

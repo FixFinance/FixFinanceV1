@@ -217,7 +217,7 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
 		IWrapper baseBorrowed = IFixCapitalPool(FCPborrowed).wrapper();
 		uint64 timestampOpened = uint64(baseBorrowed.lastUpdate());
 		uint64 wrapperFee = info.StabilityFeeAPR(address(this), address(baseBorrowed));
-		Vault memory vault = Vault(_assetSupplied, _assetBorrowed, _amountSupplied, _amountBorrowed, timestampOpened, wrapperFee);
+		Vault memory vault = Vault(_assetSupplied, _assetBorrowed, _amountSupplied, _amountBorrowed, 0, timestampOpened, wrapperFee);
 
 		require(vaultWithstandsChange(vault, _priceMultiplier, _suppliedRateChange, _borrowRateChange));
 
@@ -303,6 +303,7 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
 					_amountSupplied,
 					_amountBorrowed,
 					0,
+					0,
 					NO_STABILITY_FEE
 				),
 				uint(_multipliers[0]),
@@ -337,6 +338,7 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
 						_assetBorrowed,
 						_amountSupplied,
 						_amountBorrowed,
+						0,
 						mVault.timestampOpened,
 						mVault.stabilityFeeAPR
 					),
@@ -404,26 +406,60 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
 		}
 
 		IFixCapitalPool FCPBorrowed;
+		uint change;
+		uint adjSFee;
 		if (mVault.amountBorrowed < _amountBorrowed) {
 			FCPBorrowed = IFixCapitalPool(IZeroCouponBond(_assetBorrowed).FixCapitalPoolAddress());
-			raiseShortInterest(address(FCPBorrowed), _amountBorrowed - mVault.amountBorrowed);
-			uint toMint = stabilityFeeAdjAmountBorrowed(address(FCPBorrowed), _amountBorrowed - mVault.amountBorrowed, mVault.timestampOpened, mVault.stabilityFeeAPR);
-			FCPBorrowed.mintZCBTo(_receiverAddr, toMint);
-			sVault.amountBorrowed = _amountBorrowed;
+			uint stabilityFeeMultiplier = getStabilityFeeMultiplier(address(FCPBorrowed), mVault.timestampOpened, mVault.stabilityFeeAPR);
+			change = stabilityFeeMultiplier.mul(_amountBorrowed - mVault.amountBorrowed) / (1 ether); //amt to mint
+			FCPBorrowed.mintZCBTo(_receiverAddr, change);
+			uint adjBorrowed = stabilityFeeMultiplier.mul(_amountBorrowed) / (1 ether);
+			raiseShortInterest(address(FCPBorrowed), adjBorrowed - mVault.amountBorrowed);
+			sVault.amountBorrowed = adjBorrowed;
+			{
+				uint temp = stabilityFeeMultiplier.sub(1 ether).mul(mVault.amountBorrowed) / (1 ether);
+				adjSFee = mVault.amountSFee.add(temp);
+				sVault.amountSFee = adjSFee;
+			}
+			sVault.timestampOpened = uint64(FCPBorrowed.lastUpdate());
 		}
 		else if (mVault.amountBorrowed > _amountBorrowed) {
 			FCPBorrowed = IFixCapitalPool(IZeroCouponBond(_assetBorrowed).FixCapitalPoolAddress());
-			sVault.amountBorrowed = _amountBorrowed;
+			uint stabilityFeeMultiplier = getStabilityFeeMultiplier(address(FCPBorrowed), mVault.timestampOpened, mVault.stabilityFeeAPR);
+			change = stabilityFeeMultiplier.mul(mVault.amountBorrowed - _amountBorrowed) / (1 ether); //amt to burn
+			uint adjBorrowed = stabilityFeeMultiplier.mul(_amountBorrowed) / (1 ether);
+			if (adjBorrowed > mVault.amountBorrowed) {
+				raiseShortInterest(address(FCPBorrowed), adjBorrowed - mVault.amountBorrowed);
+			}
+			else {
+				lowerShortInterest(address(FCPBorrowed), mVault.amountBorrowed - adjBorrowed);
+			}
+			sVault.amountBorrowed = adjBorrowed;
+			{
+				uint temp = stabilityFeeMultiplier.sub(1 ether).mul(mVault.amountBorrowed) / (1 ether);
+				adjSFee = mVault.amountSFee.add(temp);
+				if (change > adjSFee) {
+					sVault.amountSFee = 0;
+				}
+				else {
+					sVault.amountSFee = adjSFee - change;
+				}
+			}
+			sVault.timestampOpened = uint64(FCPBorrowed.lastUpdate());
 		}
 
 		//-----------------------------flashloan------------------
 		if (_data.length > 0) {
+			address assetSupplied = mVault.assetSupplied;
+			address assetBorrowed = mVault.assetBorrowed;
+			uint amountSupplied = mVault.amountSupplied;
+			uint amountBorrowed = mVault.amountBorrowed;
 			IVaultManagerFlashReceiver(_receiverAddr).onFlashLoan(
 				msg.sender,
-				mVault.assetSupplied,
-				mVault.assetBorrowed,
-				mVault.amountSupplied,
-				mVault.amountBorrowed,
+				assetSupplied,
+				assetBorrowed,
+				amountSupplied,
+				amountBorrowed,
 				_data
 			);
 		}
@@ -439,10 +475,9 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
 		}
 
 		if (mVault.amountBorrowed > _amountBorrowed) {
-			lowerShortInterest(address(FCPBorrowed), mVault.amountBorrowed - _amountBorrowed);
-			uint toBurn = stabilityFeeAdjAmountBorrowed(address(FCPBorrowed), mVault.amountBorrowed - _amountBorrowed, mVault.timestampOpened, mVault.stabilityFeeAPR);
-			FCPBorrowed.burnZCBFrom(msg.sender,  toBurn);
-			claimStabilityFee(mVault.assetBorrowed, address(FCPBorrowed), toBurn - (mVault.amountBorrowed - _amountBorrowed));
+			//lowerShortInterest(address(FCPBorrowed), mVault.amountBorrowed - _amountBorrowed);
+			FCPBorrowed.burnZCBFrom(msg.sender,  change);
+			claimStabilityFee(mVault.assetBorrowed, address(FCPBorrowed), adjSFee < change ? adjSFee : change);
 		}
 	}
 
@@ -509,6 +544,9 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
 			sVault.stabilityFeeAPR = IInfoOracle(_infoOracleAddress).StabilityFeeAPR(address(this), wrapperAddr);
 			sVault.timestampOpened = uint64(IWrapper(wrapperAddr).lastUpdate());
 		}
+		if (mVault.amountSFee > 0) {
+			sVault.amountSFee = 0;
+		}
 
 		//-----------------------------flashloan------------------
 		if (_data.length > 0) {
@@ -535,7 +573,7 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
 		if (mVault.amountBorrowed > 0) {
 			uint feeAdjBorrowAmt = stabilityFeeAdjAmountBorrowed(address(oldFCPBorrowed), mVault.amountBorrowed, mVault.timestampOpened, mVault.stabilityFeeAPR);
 			oldFCPBorrowed.burnZCBFrom(msg.sender, feeAdjBorrowAmt);
-			claimStabilityFee(mVault.assetBorrowed, address(oldFCPBorrowed), feeAdjBorrowAmt - mVault.amountBorrowed);
+			claimStabilityFee(mVault.assetBorrowed, address(oldFCPBorrowed), mVault.amountSFee + feeAdjBorrowAmt - mVault.amountBorrowed);
 		}
 	}
 

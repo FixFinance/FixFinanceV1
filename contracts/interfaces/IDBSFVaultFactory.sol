@@ -22,6 +22,7 @@ interface IDBSFVaultFactory {
 		address assetBorrowed,
 		uint amountSupplied,
 		uint amountBorrowed,
+		uint amountSFee,
 		uint64 timestampOpened,
 		uint64 stabilityFeeAPR
 	);

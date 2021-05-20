@@ -89,6 +89,7 @@ contract DBSFVaultFactory is DBSFVaultFactoryData, IDBSFVaultFactory, nonReentra
 		address assetBorrowed,
 		uint amountSupplied,
 		uint amountBorrowed,
+		uint amountSFee,
 		uint64 timestampOpened,
 		uint64 stabilityFeeAPR
 	) {
@@ -97,6 +98,7 @@ contract DBSFVaultFactory is DBSFVaultFactoryData, IDBSFVaultFactory, nonReentra
 		assetBorrowed = vault.assetBorrowed;
 		amountSupplied = vault.amountSupplied;
 		amountBorrowed = vault.amountBorrowed;
+		amountSFee = vault.amountSFee;
 		timestampOpened = vault.timestampOpened;
 		stabilityFeeAPR = vault.stabilityFeeAPR;
 	}

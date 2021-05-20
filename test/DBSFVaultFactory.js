@@ -30,7 +30,7 @@ const NO_STABILITY_FEE = (new BN(2)).pow(new BN(32));
 const _8days = 8*24*60*60;
 
 const secondsPerYear = 31556926;
-const AcceptableMarginOfError = Math.pow(10, -7);
+const AcceptableMarginOfError = Math.pow(10, -8);
 
 const TOTAL_BASIS_POINTS = 10000;
 
@@ -368,15 +368,17 @@ contract('DBSFVaultFactory', async function(accounts) {
 
 		vault = await vaultFactoryInstance.vaults(accounts[0], 0);
 		let currentBalanceZCB = await zcbAsset0.balanceOf(accounts[0]);
-		let secondsOpen = timestamp - vault.timestampOpened.toNumber();
+		let secondsOpen = timestamp - prevVault.timestampOpened.toNumber();
 		let yearsOpen = secondsOpen / secondsPerYear;
 		let multiplier = Math.pow(stabilityFee0, yearsOpen);
-		let adjustedRepayment = multiplier * parseInt(toRepay.toString());
+		let expectedRepayment = multiplier * parseInt(toRepay.toString());
+		let expectedDebt = multiplier * parseInt(newDebt.toString());
 
 		let actualRepayment = parseInt(prevBalanceZCB.sub(currentBalanceZCB).toString());
+		let actualDebt = parseInt(vault.amountBorrowed.toString());
 
-		assert.isBelow(AmountError(actualRepayment, adjustedRepayment), AcceptableMarginOfError, "repayment amount within error range");
-		assert.equal(prevVault.amountBorrowed.sub(vault.amountBorrowed).toString(), toRepay.toString(), "correct amount repaid");
+		assert.isBelow(AmountError(actualRepayment, expectedRepayment), AcceptableMarginOfError, "repayment amount within error range");
+		assert.isBelow(AmountError(actualDebt, expectedDebt), AcceptableMarginOfError, "vault.amountBorrowed is within error range");
 	});
 
 	it('borrows from vault', async () => {
@@ -403,15 +405,17 @@ contract('DBSFVaultFactory', async function(accounts) {
 
 		vault = await vaultFactoryInstance.vaults(accounts[0], 0);
 		let currentBalanceZCB = await zcbAsset0.balanceOf(accounts[0]);
-		let secondsOpen = timestamp - vault.timestampOpened.toNumber();
+		let secondsOpen = timestamp - prevVault.timestampOpened.toNumber();
 		let yearsOpen = secondsOpen / secondsPerYear;
 		let multiplier = Math.pow(stabilityFee0, yearsOpen);
-		let adjustedBorrow = multiplier * parseInt(toBorrow.toString());
+		let expectedBorrow = multiplier * parseInt(toBorrow.toString());
+		let expectedDebt = multiplier * parseInt(newDebt.toString());
 
 		let actualBorrow = parseInt(currentBalanceZCB.sub(prevBalanceZCB).toString())
+		let actualDebt = parseInt(vault.amountBorrowed.toString());
 
-		assert.isBelow(AmountError(adjustedBorrow, actualBorrow), AcceptableMarginOfError, "borrowed amount within error range");
-		assert.equal(vault.amountBorrowed.sub(prevVault.amountBorrowed).toString(), toBorrow.toString(), "correct amount repaid");
+		assert.isBelow(AmountError(expectedBorrow, actualBorrow), AcceptableMarginOfError, "borrowed amount within error range");
+		assert.isBelow(AmountError(expectedDebt, actualDebt), AcceptableMarginOfError, "vault.amountBorrowed is within error range");
 	});
 
 	it('transfer standard vault', async () => {

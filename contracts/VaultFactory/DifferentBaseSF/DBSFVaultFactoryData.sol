@@ -14,6 +14,7 @@ contract DBSFVaultFactoryData is Ownable {
 		address assetBorrowed;
 		uint amountSupplied;
 		uint amountBorrowed;
+		uint amountSFee; //amount of debt at timestampOpened that was due to stability fee, < amountBorrowed
 		uint64 timestampOpened;
 		uint64 stabilityFeeAPR; //inflated by 32 bits
 	}

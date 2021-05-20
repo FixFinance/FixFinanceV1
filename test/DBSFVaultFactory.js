@@ -8,6 +8,7 @@ const organizer = artifacts.require('organizer');
 const DBSFVaultFactoryDelegate1 = artifacts.require("DBSFVaultFactoryDelegate1");
 const DBSFVaultFactoryDelegate2 = artifacts.require("DBSFVaultFactoryDelegate2");
 const DBSFVaultFactoryDelegate3 = artifacts.require("DBSFVaultFactoryDelegate3");
+const DBSFVaultFactoryDelegate4 = artifacts.require("DBSFVaultFactoryDelegate4");
 const DBSFVaultFactory = artifacts.require('DBSFVaultFactory');
 const IERC20 = artifacts.require("IERC20");
 const BigMath = artifacts.require("BigMath");
@@ -88,6 +89,7 @@ contract('DBSFVaultFactory', async function(accounts) {
 		dbsfVaultFactoryDelegate1Instance = await DBSFVaultFactoryDelegate1.new();
 		dbsfVaultFactoryDelegate2Instance = await DBSFVaultFactoryDelegate2.new();
 		dbsfVaultFactoryDelegate3Instance = await DBSFVaultFactoryDelegate3.new();
+		dbsfVaultFactoryDelegate4Instance = await DBSFVaultFactoryDelegate4.new();
 		treasuryAccount = accounts[5];
 		vaultFactoryInstance = await DBSFVaultFactory.new(
 			vaultHealthInstance.address,
@@ -96,7 +98,7 @@ contract('DBSFVaultFactory', async function(accounts) {
 			dbsfVaultFactoryDelegate1Instance.address,
 			dbsfVaultFactoryDelegate2Instance.address,
 			dbsfVaultFactoryDelegate3Instance.address,
-			nullAddress
+			dbsfVaultFactoryDelegate4Instance.address,
 		);
 
 		maturity = ((await web3.eth.getBlock('latest')).timestamp + _8days).toString();

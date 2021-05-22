@@ -94,11 +94,32 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryData {
 	/*
 		@Description: given a fix capital pool and a balance from the balanceYield mapping
 			convert the value from wrapped amount to unit amount
+			note that when opening a YTValut this function should NOT be called because it bypasses checking with the
+			FCP whitelist in order to avoid an extra SLOAD opcode, rather when opening a YTVault wrappedToUnitAmount
+			should be called and the address of InfoOracle.FCPtoWrapper(addr(this), FCP) should be passed as the wrapper address
+
+		@param address _FCP: the address of the FCP contract
+		@param uint _amountYield: the wrapper amount to convert to unit amount
+
+		@return uint unitAmountYield: _amountYield of FCP wrapped yield converted to unit amount
 	*/
 	function getUnitValueYield(address _FCP, uint _amountYield) internal view returns (uint unitAmountYield) {
-		address wrapperAddr = _fixCapitalPoolToWrapper[_FCP];
-		require(wrapperAddr != address(0));
-		unitAmountYield = IWrapper(wrapperAddr).WrappedAmtToUnitAmt_RoundDown(_amountYield);
+		address wrapperAddr = address(IFixCapitalPool(_FCP).wrapper());
+		unitAmountYield = wrappedToUnitAmount(wrapperAddr, _amountYield);
+	}
+
+	/*
+		@Description: given an address of an IWrapper contract convert a wrapped amount to unit amount
+			useful for finding what values to pass to VaultHealth
+
+		@param address _wrapperAddress: the address of the IWrapper contract
+		@param uint _amountWrapped: the wrapper amount to convert to unit amount
+
+		@return uint unitAmountYield: _amountWrapped of the IWrapper contract's wrapped amount converted to unit amount
+	*/
+	function wrappedToUnitAmount(address _wrapperAddress, uint _amountWrapped) internal view returns (uint unitAmountYield) {
+		require(_wrapperAddress != address(0));
+		unitAmountYield = IWrapper(_wrapperAddress).WrappedAmtToUnitAmt_RoundDown(_amountWrapped);
 	}
 
 	/*
@@ -284,7 +305,7 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryData {
 	) external {
 		require(_yieldSupplied >= MIN_YIELD_SUPPLIED);
 		validateYTvaultMultipliers(_priceMultiplier, _suppliedRateChange, _borrowRateChange, _bondSupplied > 0);
-		uint _unitYieldSupplied = getUnitValueYield(_FCPsupplied, _yieldSupplied);
+		uint _unitYieldSupplied = wrappedToUnitAmount(IInfoOracle(_infoOracleAddress).FCPtoWrapper(address(this), _FCPsupplied), _yieldSupplied);
 
 		require(YTvaultWithstandsChange(
 			YTVault(

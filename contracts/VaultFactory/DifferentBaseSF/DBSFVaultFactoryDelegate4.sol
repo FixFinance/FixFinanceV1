@@ -124,9 +124,14 @@ contract DBSFVaultFactoryDelegate4 is DBSFVaultFactoryData {
 	/*
 		@Description: given a fix capital pool and a balance from the balanceYield mapping
 			convert the value from wrapped amount to unit amount
+
+		@param address _FCP: the address of the FCP contract
+		@param uint _amountYield: the wrapper amount to convert to unit amount
+
+		@return uint unitAmountYield: _amountYield of FCP wrapped yield converted to unit amount
 	*/
 	function getUnitValueYield(address _FCP, uint _amountYield) internal view returns (uint unitAmountYield) {
-		address wrapperAddr = _fixCapitalPoolToWrapper[_FCP];
+		address wrapperAddr = address(IFixCapitalPool(_FCP).wrapper());
 		require(wrapperAddr != address(0));
 		unitAmountYield = IWrapper(wrapperAddr).WrappedAmtToUnitAmt_RoundDown(_amountYield);
 	}

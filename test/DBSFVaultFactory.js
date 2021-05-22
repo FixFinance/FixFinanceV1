@@ -876,7 +876,7 @@ contract('DBSFVaultFactory', async function(accounts) {
 			caught = true;
 		}
 		if (!caught) assert.fail('only whitelisted assets may be supplied');
-		await vaultFactoryInstance.whitelistFixCapitalPool(fcp1.address);
+		await infoOracleInstance.whitelistFixCapitalPool(vaultFactoryInstance.address, fcp1.address);
 	});
 
 	it('opens YT vault', async () => {

@@ -48,6 +48,12 @@ contract InfoOracle is IInfoOracle, Ownable {
 	*/
 	mapping(address => mapping(address => address)) public override collateralWhitelist;
 
+	/*	
+		VaultFactory => FCPaddress => wrapperAddress
+		acts as FCP whitelist, if FCP is not listed in here it is not whitelisted
+	*/
+	mapping(address => mapping(address => address)) public override FCPtoWrapper;
+
 	/*
 		init
 	*/
@@ -165,6 +171,16 @@ contract InfoOracle is IInfoOracle, Ownable {
 	*/
 	function whitelistAsset(address _vaultFactoryAddress, address _assetAddress) external override maySetContractParameters(_vaultFactoryAddress) {
 		collateralWhitelist[_vaultFactoryAddress][_assetAddress] = address(1);
+	}
+
+	/*
+		@Description: admin of a DBSFVaultFactory may call this function to whitelist an FCP to be used as collateral
+
+		@param address _vaultFactoryAddress: the address of the DBSFVaultFactory for which to allow the FCP as collateral
+		@param address _FCPaddress: the address of the FCP which to add as collateral
+	*/
+	function whitelistFixCapitalPool(address _vaultFactoryAddress, address _FCPaddress) external override maySetContractParameters(_vaultFactoryAddress) {
+		FCPtoWrapper[_vaultFactoryAddress][_FCPaddress] = address(IFixCapitalPool(_FCPaddress).wrapper());
 	}
 
 	//--------------------------------------------v-i-e-w-s------------------------------

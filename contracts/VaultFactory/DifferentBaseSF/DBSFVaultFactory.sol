@@ -66,10 +66,6 @@ contract DBSFVaultFactory is DBSFVaultFactoryData, IDBSFVaultFactory, nonReentra
 		return _YTLiquidations.length;
 	}
 
-	function fixCapitalPoolToWrapper(address _fixCapitalPoolAddress) external view override returns (address) {
-		return _fixCapitalPoolToWrapper[_fixCapitalPoolAddress];
-	}
-
 	function shortInterestAllDurations(address _wrapper) external view override returns (uint) {
 		return _shortInterestAllDurations[_wrapper];
 	}
@@ -748,15 +744,6 @@ contract DBSFVaultFactory is DBSFVaultFactoryData, IDBSFVaultFactory, nonReentra
 
 
 	//-------------------------------------a-d-m-i-n---m-a-n-a-g-e-m-e-n-t----------------------------------------------
-
-	/*
-		@Description: admin may call this function to allow a specific ZCB to be provided as collateral
-
-		@param address _fixCapitalPoolAddress: address of the ZCB to whitelist
-	*/
-	function whitelistFixCapitalPool(address _fixCapitalPoolAddress) external override onlyOwner {
-		_fixCapitalPoolToWrapper[_fixCapitalPoolAddress] = address(IFixCapitalPool(_fixCapitalPoolAddress).wrapper());
-	}
 
 	/*
 		@Description: admin may call this function to set the percentage of excess collateral that is retained

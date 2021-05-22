@@ -211,7 +211,7 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
 
 		require(_assetSupplied != _assetBorrowed);
 		IInfoOracle info = IInfoOracle(_infoOracleAddress);
-		require(_fixCapitalPoolToWrapper[_assetSupplied] != address(0) || info.collateralWhitelist(address(this), _assetSupplied) != address(0));
+		require(info.FCPtoWrapper(address(this), _assetSupplied) != address(0) || info.collateralWhitelist(address(this), _assetSupplied) != address(0));
 
 		address FCPborrowed = IZeroCouponBond(_assetBorrowed).FixCapitalPoolAddress();
 		IWrapper baseBorrowed = IFixCapitalPool(FCPborrowed).wrapper();

@@ -15,9 +15,10 @@ interface IInfoOracle {
 	function getYTammFeeConstant(address _fixCapitalPoolAddress) external view returns (uint FeeConstant);
 	function getSlippageConstant(address _fixCapitalPoolAddress) external view returns (uint SlippageConstant);
 	function DelegatedControllers(address _owner) external view returns (address delegate);
-	//for use by VaultFactory
+	//for use by DBSFVaultFactory
 	function StabilityFeeAPR(address _vaultFactoryAddress, address _wrapperAddress) external view returns (uint64 stabilityFeeAPR);
 	function collateralWhitelist(address _vaultFactoryAddress, address _wrapperAddress) external view returns (address underlyingAsset);
+	function FCPtoWrapper(address _vaultFactoryAddress, address _FCPaddress) external view returns (address wrapperAddress);
 
 	//---------management--------------
 
@@ -26,10 +27,11 @@ interface IInfoOracle {
 	function wrapperSetSlippageConst(address _wrapper, uint _SlippageConstant) external;
 	function setFeeConstants(address _fixCapitalPoolAddress, uint _ZCBammFeeConstant, uint _YTammFeeConstant) external;
 	function setSlippageConstant(address _fixCapitalPoolAddress, uint256 _SlippageConstant) external;
-	//for use by VaultFactory admins
+	//for use by DBSFVaultFactory admins
 	function setStabilityFeeAPR(address _vaultFactoryAddress, address _wrapperAddress, uint64 _stabilityFeeAPR) external;
 	function whitelistWrapper(address _vaultFactoryAddress, address _wrapperAddress) external;
 	function whitelistAsset(address _vaultFactoryAddress, address _assetAddress) external;
+	function whitelistFixCapitalPool(address _vaultFactoryAddress, address _FCPaddress) external;
 
 	//---------InfoOracle-Admin--------
 

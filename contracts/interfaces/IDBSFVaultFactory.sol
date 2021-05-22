@@ -43,6 +43,7 @@ interface IDBSFVaultFactory {
 		uint yieldSupplied,
 		int bondSupplied,
 		uint amountBorrowed,
+		uint amountSFee,
 		uint64 timestampOpened,
 		uint64 stabilityFeeAPR
 	);

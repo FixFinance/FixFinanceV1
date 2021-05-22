@@ -245,6 +245,11 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
 			uint feeAdjBorrowAmt = stabilityFeeAdjAmountBorrowed(FCPborrowed, vault.amountBorrowed, vault.timestampOpened, vault.stabilityFeeAPR);
 			IFixCapitalPool(FCPborrowed).burnZCBFrom(msg.sender, feeAdjBorrowAmt);
 			lowerShortInterest(FCPborrowed, vault.amountBorrowed);
+			uint sFee = vault.amountSFee;
+			sFee += feeAdjBorrowAmt - vault.amountBorrowed;
+			if (sFee > 0) {
+				claimStabilityFee(vault.assetBorrowed, FCPborrowed, sFee);
+			}
 		}
 		if (vault.amountSupplied > 0)
 			IERC20(vault.assetSupplied).transfer(_to, vault.amountSupplied);
@@ -528,10 +533,16 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
 
 		IFixCapitalPool oldFCPBorrowed;
 		//nominal value debt at close / nominal value debt now
-		if (address(_assetBorrowed) != address(0)) {
+		if (_assetBorrowed != address(0)) {
 			IFixCapitalPool newFCPBorrowed = IFixCapitalPool(IZeroCouponBond(_assetBorrowed).FixCapitalPoolAddress());
 			raiseShortInterest(address(newFCPBorrowed), _amountBorrowed);
 			newFCPBorrowed.mintZCBTo(_receiverAddr, _amountBorrowed);
+			address wrapperAddr = IZeroCouponBond(_assetBorrowed).WrapperAddress();
+			sVault.stabilityFeeAPR = IInfoOracle(_infoOracleAddress).StabilityFeeAPR(address(this), wrapperAddr);
+			sVault.timestampOpened = uint64(IWrapper(wrapperAddr).lastUpdate());
+		}
+		else {
+			require(_amountBorrowed == 0);
 		}
 		if (mVault.amountBorrowed > 0) {
 			oldFCPBorrowed = IFixCapitalPool(IZeroCouponBond(mVault.assetBorrowed).FixCapitalPoolAddress());
@@ -539,11 +550,6 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
 		}
 		sVault.assetBorrowed = _assetBorrowed;
 		sVault.amountBorrowed = _amountBorrowed;
-		{
-			address wrapperAddr = IZeroCouponBond(_assetBorrowed).WrapperAddress();
-			sVault.stabilityFeeAPR = IInfoOracle(_infoOracleAddress).StabilityFeeAPR(address(this), wrapperAddr);
-			sVault.timestampOpened = uint64(IWrapper(wrapperAddr).lastUpdate());
-		}
 		if (mVault.amountSFee > 0) {
 			sVault.amountSFee = 0;
 		}

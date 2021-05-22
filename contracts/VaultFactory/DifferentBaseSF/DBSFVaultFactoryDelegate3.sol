@@ -56,14 +56,14 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryData {
 	/*
 		@Description: when stability fee is encured pay out to holders
 
-		@param address _ZCBaddr: the ZCB for which to distribute the stability fee
 		@param address _FCPaddr: the FCP which corresponds to the ZCB which the stability fee is paid in
 		@param uint _amount: the amount of ZCB which has been collected from the stability fee
 	*/
-	function claimStabilityFee(address _ZCBaddr, address _FCPaddr, uint _amount) internal {
+	function claimStabilityFee(address _FCPaddr, uint _amount) internal {
+		address ZCBaddr = IFixCapitalPool(_FCPaddr).zeroCouponBondAddress();
 		if (_amount > 0) {
 			IFixCapitalPool(_FCPaddr).mintZCBTo(address(this), _amount);
-			_revenue[_ZCBaddr] += _amount;
+			_revenue[ZCBaddr] += _amount;
 		}
 	}
 
@@ -294,6 +294,7 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryData {
 				_bondSupplied,
 				_amountBorrowed,
 				0,
+				0,
 				NO_STABILITY_FEE
 			),
 			_priceMultiplier,
@@ -309,7 +310,7 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryData {
 		uint64 timestampOpened = uint64(baseBorrowed.lastUpdate());
 		uint64 wrapperFee = IInfoOracle(_infoOracleAddress).StabilityFeeAPR(address(this), address(baseBorrowed));
 
-		_YTvaults[msg.sender].push(YTVault(_FCPsupplied, _FCPborrowed, _yieldSupplied, _bondSupplied, _amountBorrowed, timestampOpened, wrapperFee));
+		_YTvaults[msg.sender].push(YTVault(_FCPsupplied, _FCPborrowed, _yieldSupplied, _bondSupplied, _amountBorrowed, 0, timestampOpened, wrapperFee));
 
 	}
 
@@ -329,6 +330,11 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryData {
 			uint feeAdjBorrowAmt = stabilityFeeAdjAmountBorrowed(vault.FCPborrowed, vault.amountBorrowed, vault.timestampOpened, vault.stabilityFeeAPR);
 			IFixCapitalPool(vault.FCPborrowed).burnZCBFrom(msg.sender, feeAdjBorrowAmt);
 			lowerShortInterest(vault.FCPborrowed, vault.amountBorrowed);
+			uint sFee = vault.amountSFee;
+			sFee += feeAdjBorrowAmt - vault.amountBorrowed;
+			if (sFee > 0) {
+				claimStabilityFee(vault.FCPborrowed, sFee);
+			}
 		}
 		if (vault.yieldSupplied > 0 || vault.bondSupplied != 0) {
 			//we already know the vault would pass the check so no need to check
@@ -400,6 +406,7 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryData {
 						_yieldSupplied,
 						_bondSupplied,
 						_amountBorrowed,
+						0,
 						mVault.timestampOpened,
 						mVault.stabilityFeeAPR
 					),
@@ -430,6 +437,7 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryData {
 					_yieldSupplied,
 					_bondSupplied,
 					_amountBorrowed,
+					0,
 					0,
 					NO_STABILITY_FEE
 				),
@@ -505,26 +513,63 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryData {
 			sVault.bondSupplied = _bondSupplied;
 		}
 
+
+		uint change;
+		uint adjSFee;
 		if (mVault.amountBorrowed < _amountBorrowed) {
-			uint toMint = stabilityFeeAdjAmountBorrowed(_FCPborrowed, _amountBorrowed - mVault.amountBorrowed, mVault.timestampOpened, mVault.stabilityFeeAPR);
-			IFixCapitalPool(_FCPborrowed).mintZCBTo(_receiverAddr, toMint);
-			raiseShortInterest(_FCPborrowed, _amountBorrowed - mVault.amountBorrowed);
-			sVault.amountBorrowed = _amountBorrowed;
+			uint stabilityFeeMultiplier = getStabilityFeeMultiplier(_FCPborrowed, mVault.timestampOpened, mVault.stabilityFeeAPR);
+			change = stabilityFeeMultiplier.mul(_amountBorrowed - mVault.amountBorrowed) / (1 ether);
+			IFixCapitalPool(_FCPborrowed).mintZCBTo(_receiverAddr, change);
+			uint adjBorrowed = stabilityFeeMultiplier.mul(_amountBorrowed) / (1 ether);
+			raiseShortInterest(_FCPborrowed, adjBorrowed - mVault.amountBorrowed);
+			sVault.amountBorrowed = adjBorrowed;
+			{
+				uint temp = stabilityFeeMultiplier.sub(1 ether).mul(mVault.amountBorrowed) / (1 ether);
+				adjSFee = mVault.amountSFee.add(temp);
+				sVault.amountSFee = adjSFee;
+			}
+			sVault.timestampOpened = uint64(IFixCapitalPool(_FCPborrowed).lastUpdate());
 		}
 		else if (mVault.amountBorrowed > _amountBorrowed) {
-			sVault.amountBorrowed = _amountBorrowed;
+			uint stabilityFeeMultiplier = getStabilityFeeMultiplier(_FCPborrowed, mVault.timestampOpened, mVault.stabilityFeeAPR);
+			change = stabilityFeeMultiplier.mul(mVault.amountBorrowed - _amountBorrowed) / (1 ether); //amt to burn
+			uint adjBorrowed = stabilityFeeMultiplier.mul(_amountBorrowed) / (1 ether);
+			if (adjBorrowed > mVault.amountBorrowed) {
+				raiseShortInterest(_FCPborrowed, adjBorrowed - mVault.amountBorrowed);
+			}
+			else {
+				lowerShortInterest(_FCPborrowed, mVault.amountBorrowed - adjBorrowed);
+			}
+			sVault.amountBorrowed = adjBorrowed;
+			{
+				uint temp = stabilityFeeMultiplier.sub(1 ether).mul(mVault.amountBorrowed) / (1 ether);
+				adjSFee = mVault.amountSFee.add(temp);
+				if (change > adjSFee) {
+					sVault.amountSFee = 0;
+				}
+				else {
+					sVault.amountSFee = adjSFee - change;
+				}
+			}
+			sVault.timestampOpened = uint64(IFixCapitalPool(_FCPborrowed).lastUpdate());
 		}
 
 		//-----------------------------flashloan------------------
 		if (_data.length > 0) {
+			address FCPsupplied = mVault.FCPsupplied;
+			address FCPborrowed = mVault.FCPborrowed;
+			uint yieldSupplied = mVault.yieldSupplied;
+			int bondSupplied = mVault.bondSupplied;
+			uint amountBorrowed = mVault.amountBorrowed;
+			bytes memory data = _data;
 			IYTVaultManagerFlashReceiver(_receiverAddr).onFlashLoan(
 				msg.sender,
-				mVault.FCPsupplied,
-				mVault.FCPborrowed,
-				mVault.yieldSupplied,
-				mVault.bondSupplied,
-				mVault.amountBorrowed,
-				_data
+				FCPsupplied,
+				FCPborrowed,
+				yieldSupplied,
+				bondSupplied,
+				amountBorrowed,
+				data
 			);
 		}
 
@@ -534,19 +579,19 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryData {
 		}
 		else if (mVault.yieldSupplied != _yieldSupplied) {
 			if (mVault.yieldSupplied < _yieldSupplied) {
-				IFixCapitalPool(_FCPsupplied).transferPositionFrom(msg.sender, address(this), _yieldSupplied - mVault.yieldSupplied, _bondSupplied.sub(mVault.bondSupplied));
+				uint yield = _yieldSupplied - mVault.yieldSupplied;
+				int bond = _bondSupplied.sub(mVault.bondSupplied);
+				IFixCapitalPool(_FCPsupplied).transferPositionFrom(msg.sender, address(this), yield, bond);
 			}
 		}
 		else if (mVault.bondSupplied < _bondSupplied) {
-			IFixCapitalPool(_FCPsupplied).transferPositionFrom(_receiverAddr, address(this), 0, _bondSupplied.sub(mVault.bondSupplied));
+			int bond = _bondSupplied.sub(mVault.bondSupplied);
+			IFixCapitalPool(_FCPsupplied).transferPositionFrom(_receiverAddr, address(this), 0, bond);
 		}
 
 		if (mVault.amountBorrowed > _amountBorrowed) {
-			lowerShortInterest(_FCPborrowed, mVault.amountBorrowed - _amountBorrowed);
-			uint toBurn = stabilityFeeAdjAmountBorrowed(_FCPborrowed, mVault.amountBorrowed - _amountBorrowed, mVault.timestampOpened, mVault.stabilityFeeAPR);
-			IFixCapitalPool(_FCPborrowed).burnZCBFrom(msg.sender,  toBurn);
-			address ZCBborrowed = IFixCapitalPool(_FCPborrowed).zeroCouponBondAddress();
-			claimStabilityFee(ZCBborrowed, address(_FCPborrowed), toBurn - (mVault.amountBorrowed - _amountBorrowed));
+			IFixCapitalPool(_FCPborrowed).burnZCBFrom(msg.sender,  change);
+			claimStabilityFee(_FCPborrowed, adjSFee < change ? adjSFee : change);
 		}
 	}
 
@@ -606,6 +651,12 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryData {
 
 		if (_FCPborrowed != address(0)) {
 			raiseShortInterest(_FCPborrowed, _amountBorrowed);
+			IWrapper wrapper = IFixCapitalPool(_FCPborrowed).wrapper();
+			sVault.timestampOpened = uint64(wrapper.lastUpdate());
+			sVault.stabilityFeeAPR = IInfoOracle(_infoOracleAddress).StabilityFeeAPR(address(this), address(wrapper));
+		}
+		else {
+			require(_amountBorrowed == 0);
 		}
 		if (mVault.FCPborrowed != address(0)) {
 			lowerShortInterest(mVault.FCPborrowed, mVault.amountBorrowed);
@@ -613,10 +664,8 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryData {
 		IFixCapitalPool(_FCPborrowed).mintZCBTo(_receiverAddr, _amountBorrowed);
 		sVault.FCPborrowed = _FCPborrowed;
 		sVault.amountBorrowed = _amountBorrowed;
-		{
-			IWrapper wrapper = IFixCapitalPool(_FCPborrowed).wrapper();
-			sVault.timestampOpened = uint64(wrapper.lastUpdate());
-			sVault.stabilityFeeAPR = IInfoOracle(_infoOracleAddress).StabilityFeeAPR(address(this), address(wrapper));
+		if (mVault.amountSFee > 0) {
+			sVault.amountSFee = 0;
 		}
 
 		//-----------------------------flashloan------------------
@@ -648,8 +697,7 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryData {
 		if (mVault.amountBorrowed > 0) {
 			uint toBurn = stabilityFeeAdjAmountBorrowed(mVault.FCPborrowed, mVault.amountBorrowed, mVault.timestampOpened, mVault.stabilityFeeAPR);
 			IFixCapitalPool(mVault.FCPborrowed).burnZCBFrom(msg.sender, toBurn);
-			address ZCBborrowed = IFixCapitalPool(mVault.FCPborrowed).zeroCouponBondAddress();
-			claimStabilityFee(ZCBborrowed, mVault.FCPborrowed, toBurn - mVault.amountBorrowed);
+			claimStabilityFee(mVault.FCPborrowed, toBurn - mVault.amountBorrowed);
 		}
 	}
 }

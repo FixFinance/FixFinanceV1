@@ -1146,10 +1146,12 @@ contract('DBSFVaultFactory', async function(accounts) {
 		vault = await vaultFactoryInstance.YTvaults(accounts[0], 0);
 		let currentBalanceZCB0 = await zcbAsset0.balanceOf(accounts[0]);
 		let actualRepayment = parseInt(prevBalanceZCB0.sub(currentBalanceZCB0).toString());
+		let expectedDebt = multiplier * parseInt(newDebt.toString());
+		let actualDebt = parseInt(vault.amountBorrowed.toString());
 
 		assert.isBelow(AmountError(expectedRepayment, actualRepayment), AcceptableMarginOfError, "repayment is within error range");
-		assert.equal(prevVault.amountBorrowed.sub(vault.amountBorrowed).toString(), toRepay.toString(), "correct amount repaid");
-		assert.equal(vault.amountBorrowed.toString(), newDebt.toString(), "correct value of vault.amountBorrowed");
+		assert.isBelow(AmountError(expectedDebt, actualDebt), AcceptableMarginOfError, "actual vault debt error is within acceptable error range");
+		assert.equal(vault.timestampOpened.toNumber(), timestamp, "vault.tiemstampOpened updates");
 	});
 
 	it('borrows from YT vault', async () => {
@@ -1182,10 +1184,12 @@ contract('DBSFVaultFactory', async function(accounts) {
 		vault = await vaultFactoryInstance.YTvaults(accounts[0], 0);
 		let currentBalanceZCB0 = await zcbAsset0.balanceOf(accounts[0]);
 		let actualBorrow = parseInt(currentBalanceZCB0.sub(prevBalanceZCB0).toString());
+		let expectedDebt = multiplier * parseInt(newDebt.toString());
+		let actualDebt = parseInt(vault.amountBorrowed.toString());
 
 		assert.isBelow(AmountError(expectedBorrow, actualBorrow), AcceptableMarginOfError, "received amount is within error range");
-		assert.equal(vault.amountBorrowed.sub(prevVault.amountBorrowed).toString(), toBorrow.toString(), "correct amount borrowed");
-		assert.equal(vault.amountBorrowed.toString(), newDebt.toString(), "correct value of vault.amountBorrowed");
+		assert.isBelow(AmountError(expectedDebt, actualDebt), AcceptableMarginOfError, "vault.amountBorrowed is within accpetable error range");
+		assert.equal(vault.timestampOpened.toNumber(), timestamp, "vault.tiemstampOpened updates");
 	});
 
 	it('transfer YT vault', async () => {

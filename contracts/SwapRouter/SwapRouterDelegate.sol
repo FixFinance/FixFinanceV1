@@ -5,11 +5,11 @@ import "../helpers/IYTamm.sol";
 import "../interfaces/IFixCapitalPool.sol";
 import "../interfaces/IZeroCouponBond.sol";
 import "../interfaces/IYieldToken.sol";
-import "../organizer.sol";
+import "../interfaces/IOrganizer.sol";
 
 contract SwapRouterDelegate {
 	//data
-	organizer org;
+	IOrganizer org;
 
 	int128 private constant MAX = 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
 
@@ -27,7 +27,7 @@ contract SwapRouterDelegate {
 	function UnitToZCB(address _fixCapitalPoolAddress, uint _amount, uint _minZCBout) external {
 		require(_amount > MinBalance && _amount < uint(MAX));
 		IFixCapitalPool ch = IFixCapitalPool(_fixCapitalPoolAddress);
-		organizer _org = org;
+		IOrganizer _org = org;
 		IERC20 underlyingAsset = IERC20(IFixCapitalPool(_fixCapitalPoolAddress).underlyingAssetAddress());
 		IWrapper wrapper = IFixCapitalPool(_fixCapitalPoolAddress).wrapper();
 		IZCBamm amm = IZCBamm(_org.ZCBamms(_fixCapitalPoolAddress));
@@ -73,7 +73,7 @@ contract SwapRouterDelegate {
 		_amountYT++;	//account for rounding error when transfering funds out of YTamm
 		require(_amountYT > int128(MinBalance));
 		IFixCapitalPool ch = IFixCapitalPool(_fixCapitalPoolAddress);
-		organizer _org = org;
+		IOrganizer _org = org;
 		IERC20 underlyingAsset = IERC20(IFixCapitalPool(_fixCapitalPoolAddress).underlyingAssetAddress());
 		IWrapper wrapper = IFixCapitalPool(_fixCapitalPoolAddress).wrapper();
 		IYTamm amm = IYTamm(_org.YTamms(_fixCapitalPoolAddress));

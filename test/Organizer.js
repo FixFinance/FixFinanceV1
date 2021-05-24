@@ -4,7 +4,7 @@ const NGBwrapper = artifacts.require('NGBwrapper');
 const FixCapitalPool = artifacts.require('FixCapitalPool');
 const YieldToken = artifacts.require('YieldToken');
 const zcbYtDeployer = artifacts.require('ZCB_YT_Deployer');
-const organizer = artifacts.require('organizer');
+const organizer = artifacts.require('Organizer');
 const IERC20 = artifacts.require("IERC20");
 const BigMath = artifacts.require("BigMath");
 const Ei = artifacts.require("Ei");
@@ -26,7 +26,7 @@ const nullAddress = "0x0000000000000000000000000000000000000000";
 const _10To18BN = (new BN("10")).pow(new BN("18"));
 const LENGTH_RATE_SERIES = 31;
 
-contract('organizer', function(accounts) {
+contract('Organizer', function(accounts) {
 
 	it('before each', async () => {
 

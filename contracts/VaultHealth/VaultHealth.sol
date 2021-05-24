@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.6.0;
-import "../organizer.sol";
 import "../helpers/IZCBamm.sol";
 import "../helpers/Ownable.sol";
 import "../interfaces/IWrapper.sol";
+import "../interfaces/IOrganizer.sol";
 import "../interfaces/IVaultHealth.sol";
 import "../interfaces/IFixCapitalPool.sol";
+import "../interfaces/IZeroCouponBond.sol";
 import "../libraries/ABDKMath64x64.sol";
 import "../libraries/SafeMath.sol";
+import "../libraries/BigMath.sol";
 import "../oracle/interfaces/IOracleContainer.sol";
 
 
@@ -197,7 +199,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 	function getYieldToMaturityFromOracle(address _fixCapitalPoolAddress, int128 _yearsRemaining) internal view returns (int128) {
 		//we call impliedYieldOverYears rather than impliedYieldToMaturity
 		//because this prevents using another Sload to find maturity again
-		return IZCBamm(organizer(organizerAddress).ZCBamms(_fixCapitalPoolAddress)).impliedYieldOverYears(_yearsRemaining);
+		return IZCBamm(IOrganizer(organizerAddress).ZCBamms(_fixCapitalPoolAddress)).impliedYieldOverYears(_yearsRemaining);
 	}
 
 	/*
@@ -208,7 +210,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 		@return int128: the APY in ABDK64.64 format
 	*/
 	function getAPYFromOracle(address _fixCapitalPoolAddress) internal view returns (int128) {
-		return IZCBamm(organizer(organizerAddress).ZCBamms(_fixCapitalPoolAddress)).getAPYFromOracle();
+		return IZCBamm(IOrganizer(organizerAddress).ZCBamms(_fixCapitalPoolAddress)).getAPYFromOracle();
 	}
 
 	/*
@@ -523,7 +525,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 		address fcpDeposited,
 		address fcpBorrowed
 	) {
-		organizer org = organizer(organizerAddress);
+		IOrganizer org = IOrganizer(organizerAddress);
 		if (UpperRateThreshold[_deposited] == 0) { //deposited is ZCB
 			fcpDeposited = IZeroCouponBond(_deposited).FixCapitalPoolAddress();
 			baseDepositedAsset = org.fixCapitalPoolToWrapper(fcpDeposited);
@@ -540,7 +542,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 		@Description: take 2 FixCapitalPool addresses and find their corresponding base asset addresses
 	*/
 	function bothFCPtoBaseAddresses(address _addr0, address _addr1) internal view returns (address baseAddr0, address baseAddr1) {
-		organizer org = organizer(organizerAddress);
+		IOrganizer org = IOrganizer(organizerAddress);
 		baseAddr0 = org.fixCapitalPoolToWrapper(_addr0);
 		baseAddr1 = org.fixCapitalPoolToWrapper(_addr1);
 	}
@@ -706,7 +708,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 		int128 _borrowedRateChange
 	) internal view returns (uint) {
 		bool positiveBond = _amountBond > 0;
-		address base = organizer(organizerAddress).fixCapitalPoolToWrapper(_FCP);
+		address base = IOrganizer(organizerAddress).fixCapitalPoolToWrapper(_FCP);
 		uint totalToBorrowAgainst  = _amountYield
 			.mul(1 ether)
 			.div(getRateMultiplier(_FCP, base, RateAdjuster.UPPER_BORROW, _borrowedRateChange));
@@ -829,7 +831,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 		int128 _borrowedRateChange
 	) internal view returns (uint) {
 		bool positiveBond = _amountBond > 0;
-		address base = organizer(organizerAddress).fixCapitalPoolToWrapper(_FCP);
+		address base = IOrganizer(organizerAddress).fixCapitalPoolToWrapper(_FCP);
 		uint totalToBorrowAgainst  = _amountYield
 			.mul(1 ether)
 			.div(getRateMultiplier(_FCP, base, RateAdjuster.LOW_BORROW, _borrowedRateChange));
@@ -1162,7 +1164,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 	function setCollateralizationRatios(address _underlyingAssetAddress, uint120 _upper, uint120 _lower) external override onlyOwner {
 		require(_upper >= _lower && _lower > ABDK_1);
 		//ensure that the contract at _underlyingAssetAddress is not a fix capital pool contract
-		require(organizer(organizerAddress).fixCapitalPoolToWrapper(_underlyingAssetAddress) == address(0));
+		require(IOrganizer(organizerAddress).fixCapitalPoolToWrapper(_underlyingAssetAddress) == address(0));
 		UpperCollateralizationRatio[_underlyingAssetAddress] = _upper;
 		LowerCollateralizationRatio[_underlyingAssetAddress] = _lower;
 	}
@@ -1179,7 +1181,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 	function setRateThresholds(address _underlyingAssetAddress, uint120 _upper, uint120 _lower) external override onlyOwner {
 		require(_upper >= _lower && _lower > ABDK_1);
 		//ensure that the contract at _underlyingAssetAddress is not a fix capital pool contract
-		require(organizer(organizerAddress).fixCapitalPoolToWrapper(_underlyingAssetAddress) == address(0));
+		require(IOrganizer(organizerAddress).fixCapitalPoolToWrapper(_underlyingAssetAddress) == address(0));
 		UpperRateThreshold[_underlyingAssetAddress] = _upper;
 		LowerRateThreshold[_underlyingAssetAddress] = _lower;
 	}

@@ -8,12 +8,12 @@ import "../interfaces/IYieldToken.sol";
 import "../interfaces/IWrapper.sol";
 import "../interfaces/ISwapRouter.sol";
 import "../interfaces/IERC20.sol";
-import "../organizer.sol";
+import "../interfaces/IOrganizer.sol";
 import "./SwapRouterDelegate.sol";
 
 contract SwapRouter is ISwapRouter {
 	//data
-	organizer org;
+	IOrganizer org;
 	address delegateAddress;
 
 	int128 private constant MAX = 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
@@ -26,7 +26,7 @@ contract SwapRouter is ISwapRouter {
 		@Description: init swap router
 	*/
 	constructor(address _organizerAddress, address _delegateAddress) public {
-		org = organizer(_organizerAddress);
+		org = IOrganizer(_organizerAddress);
 		delegateAddress = _delegateAddress;
 	}
 
@@ -152,7 +152,7 @@ contract SwapRouter is ISwapRouter {
 		require(_amountYT < uint(MAX));
 		IFixCapitalPool ch = IFixCapitalPool(_fixCapitalPoolAddress);
 		IYieldToken yt = IYieldToken(ch.yieldTokenAddress());
-		organizer _org = org;
+		IOrganizer _org = org;
 		IZCBamm zAmm = IZCBamm(_org.ZCBamms(_fixCapitalPoolAddress));
 		IYTamm yAmm = IYTamm(_org.YTamms(_fixCapitalPoolAddress));
 		IZeroCouponBond zcb = IZeroCouponBond(ch.zeroCouponBondAddress());
@@ -183,7 +183,7 @@ contract SwapRouter is ISwapRouter {
 		IFixCapitalPool ch = IFixCapitalPool(_fixCapitalPoolAddress);
 		IYieldToken yt = IYieldToken(ch.yieldTokenAddress());
 		IZeroCouponBond zcb = IZeroCouponBond(ch.zeroCouponBondAddress());
-		organizer _org = org;
+		IOrganizer _org = org;
 		IZCBamm zAmm = IZCBamm(_org.ZCBamms(_fixCapitalPoolAddress));
 		IYTamm yAmm = IYTamm(_org.YTamms(_fixCapitalPoolAddress));
 

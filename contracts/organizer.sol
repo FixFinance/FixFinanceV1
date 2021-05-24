@@ -7,9 +7,10 @@ import "./amm/YTamm/YTammDeployer.sol";
 import "./FixCapitalPoolDeployer.sol";
 import "./SwapRouter/SwapRouterDeployer.sol";
 import "./SwapRouter/SwapRouter.sol";
+import "./helpers/Ownable.sol";
 import "./InfoOracle.sol";
 
-contract organizer {
+contract organizer is Ownable {
 
 	/*
 		100 sbps (super basis points) is 1 bip (basis point)
@@ -37,6 +38,8 @@ contract organizer {
 	mapping(address => address) public ZCBamms;
 	//CapitlHandler => YTamm address
 	mapping(address => address) public YTamms;
+	//IWrapper => isVerified
+	mapping(address => bool) public wrapperIsVerified;
 
 	address public yieldTokenDeployerAddress;
 	address public FixCapitalPoolDeployerAddress;
@@ -80,9 +83,10 @@ contract organizer {
 		
 		@param address _underlyingAssetAddress: the NGB asset for which to deploy an NGBwrapper
 	*/
-	function deployNGBWrapper(address _underlyingAssetAddress) public {
+	function deployNGBWrapper(address _underlyingAssetAddress) external {
 		NGBwrapper temp = new NGBwrapper(_underlyingAssetAddress, InfoOracleAddress, DEFAULT_SBPS_RETAINED);
 		temp.transferOwnership(msg.sender);
+		wrapperIsVerified[address(temp)] = true;
 		emit WrapperDeployment(address(temp), _underlyingAssetAddress, 0);
 	}
 
@@ -92,7 +96,7 @@ contract organizer {
 		@param address _wrapperAddress: the address of the IWrapper for which to deploy the FixCapitalPool
 		@param uint64 _maturity: the maturity of the new FixCapitalPool to deploy
 	*/
-	function deployFixCapitalPoolInstance(address _wrapperAddress, uint64 _maturity) public {
+	function deployFixCapitalPoolInstance(address _wrapperAddress, uint64 _maturity) external {
 		require(_maturity > block.timestamp+(1 weeks), "maturity must be at least 1 weeks away");
 		address fixCapitalPoolAddress = FixCapitalPoolDeployer(FixCapitalPoolDeployerAddress).deploy(
 			_wrapperAddress,
@@ -111,7 +115,7 @@ contract organizer {
 
 		@param address _fixCapitalPoolAddress: the address of the FixCapitalPool for which to deploy a ZCBamm
 	*/
-	function deployZCBamm(address _fixCapitalPoolAddress) public {
+	function deployZCBamm(address _fixCapitalPoolAddress) external {
 		require(ZCBamms[_fixCapitalPoolAddress] == address(0));
 		require(fixCapitalPoolToWrapper[_fixCapitalPoolAddress] != address(0));
 		ZCBamms[_fixCapitalPoolAddress] = ZCBammDeployer(ZCBammDeployerAddress).deploy(_fixCapitalPoolAddress, InfoOracleAddress);
@@ -122,11 +126,23 @@ contract organizer {
 			only one YTamm may be deployed, a YTamm cannot be deployed until after the ZCBamm for the same
 			fix capital pool has been deployed and published the first rate in its native oracle
 	*/
-	function deployYTamm(address _fixCapitalPoolAddress) public {
+	function deployYTamm(address _fixCapitalPoolAddress) external {
 		require(YTamms[_fixCapitalPoolAddress] == address(0));
 		address ZCBammAddress = ZCBamms[_fixCapitalPoolAddress];
 		require(ZCBammAddress != address(0));
 		YTamms[_fixCapitalPoolAddress] = YTammDeployer(YTammDeployerAddress).deploy(ZCBammAddress, InfoOracleAddress);
 	}
 
+	/*
+		@Description: owner of this contract may override is verified for a specific address
+			this is useful in the case that a unique IWrapper contract that is not an NGBwrapper
+			is deployed and qualifys to be verified or if the underlying asset behind a verified
+			IWrapper is shown to contain malicious code
+
+		@param address _wrapperAddress: the addres of the IWrapper contract for which to set isVerified
+		@param bool _setTo: true to verify wrapper, false to unverify wrapper
+	*/
+	function setVerified(address _wrapperAddress, bool _setTo) external onlyOwner {
+		wrapperIsVerified[_wrapperAddress] = _setTo;
+	}
 }

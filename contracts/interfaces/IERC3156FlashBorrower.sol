@@ -2,7 +2,7 @@
 /*
     credit to the authors of EIP 3156
 */
-pragma solidity >=0.6.0;
+pragma solidity >=0.6.8 <0.7.0;
 
 interface IERC3156FlashBorrower {
 

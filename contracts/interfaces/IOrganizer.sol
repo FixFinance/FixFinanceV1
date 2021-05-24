@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity >=0.6.0 <0.7.0;
+pragma solidity >=0.6.8 <0.7.0;
 
 interface IOrganizer {
 	function fixCapitalPoolToWrapper(address _FCPaddress) external view returns (address wrapperAddress);

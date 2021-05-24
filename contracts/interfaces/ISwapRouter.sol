@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity >=0.6.0;
+pragma solidity >=0.6.8 <0.7.0;
 
 interface ISwapRouter {
 	function UnitToZCB(address _fixCapitalPoolAddress, uint _amount, uint _minZCBout) external;

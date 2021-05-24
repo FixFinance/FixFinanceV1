@@ -62,8 +62,8 @@ contract('organizer', function(accounts) {
 		asset0 = await dummyAToken.new("aCOIN");
 	});
 
-	it('deploy aToken wrapper', async () => {
-		let rec = await organizerInstance.deployAssetWrapper(asset0.address);
+	it('deploy NGB wrapper', async () => {
+		let rec = await organizerInstance.deployNGBWrapper(asset0.address);
 		assert.equal(rec.receipt.logs[0].args.underlyingAddress, asset0.address, "correct value in event of underlyingAddress");
 		assert.notEqual(rec.receipt.logs[0].args.wrapperAddress, nullAddress, "wrapper address must be non null");
 		wAsset0 = await NGBwrapper.at(rec.receipt.logs[0].args.wrapperAddress);

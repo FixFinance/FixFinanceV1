@@ -78,12 +78,12 @@ contract organizer {
 	/*
 		@Description: deploy a new NGBwrapper and transfer ownership to msg.sender
 		
-		@param address _assetAddress: the NGB asset for which to deploy an NGBwrapper
+		@param address _underlyingAssetAddress: the NGB asset for which to deploy an NGBwrapper
 	*/
-	function deployAssetWrapper(address _assetAddress) public {
-		NGBwrapper temp = new NGBwrapper(_assetAddress, InfoOracleAddress, DEFAULT_SBPS_RETAINED);
+	function deployNGBWrapper(address _underlyingAssetAddress) public {
+		NGBwrapper temp = new NGBwrapper(_underlyingAssetAddress, InfoOracleAddress, DEFAULT_SBPS_RETAINED);
 		temp.transferOwnership(msg.sender);
-		emit WrapperDeployment(address(temp), _assetAddress, 0);
+		emit WrapperDeployment(address(temp), _underlyingAssetAddress, 0);
 	}
 
 	/*

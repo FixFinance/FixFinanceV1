@@ -82,7 +82,7 @@ module.exports = async function(deployer) {
 		infoOracle.address
 	);
 	await organizerInstance.DeploySwapRouter();
-	let rec = await organizerInstance.deployAssetWrapper(dummyATokenInstance.address);
+	let rec = await organizerInstance.deployNGBWrapper(dummyATokenInstance.address);
 	wAsset = await NGBwrapper.at(rec.receipt.logs[0].args.wrapperAddress);
 	await organizerInstance.deployFixCapitalPoolInstance(wAsset.address, start2026);
 };

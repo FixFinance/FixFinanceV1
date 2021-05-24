@@ -103,8 +103,8 @@ contract('DBSFVaultFactory', async function(accounts) {
 
 		maturity = ((await web3.eth.getBlock('latest')).timestamp + _8days).toString();
 
-		let reca = await organizerInstance.deployAssetWrapper(asset0.address);
-		let recb = await organizerInstance.deployAssetWrapper(asset1.address);
+		let reca = await organizerInstance.deployNGBWrapper(asset0.address);
+		let recb = await organizerInstance.deployNGBWrapper(asset1.address);
 
 		wAsset0 = await NGBwrapper.at(reca.receipt.logs[0].args.wrapperAddress);
 		wAsset1 = await NGBwrapper.at(recb.receipt.logs[0].args.wrapperAddress);

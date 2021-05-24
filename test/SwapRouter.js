@@ -71,7 +71,7 @@ contract('SwapRouter', async function(accounts) {
 		maturity = timestamp + 110*24*60*60;
 
 		aTokenInstance = await dummyAToken.new("aCOIN");
-		let rec = await organizerInstance.deployAssetWrapper(aTokenInstance.address);
+		let rec = await organizerInstance.deployNGBWrapper(aTokenInstance.address);
 		NGBwrapperInstance = await NGBwrapper.at(rec.receipt.logs[0].args.wrapperAddress);
 		rec = await organizerInstance.deployFixCapitalPoolInstance(NGBwrapperInstance.address, maturity);
 		fixCapitalPoolInstance = await FixCapitalPool.at(rec.receipt.logs[0].args.addr);

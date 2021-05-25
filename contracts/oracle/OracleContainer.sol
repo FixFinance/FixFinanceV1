@@ -31,9 +31,9 @@ contract OracleContainer is Ownable, IOracleContainer {
 		}
 	}
 
-	function AddAToken(address _aTokenAddress, string calldata claim) external onlyOwner {
+	function AddAToken(address _aTokenAddress, string calldata phrase) external onlyOwner {
 		require(abi.encodePacked(Phrases[_aTokenAddress]).length == 0);
-		Phrases[_aTokenAddress] = claim;
+		Phrases[_aTokenAddress] = phrase;
 	}
 
 	function BaseAggregatorAddress(string calldata _phrase) external view override returns (address addr) {
@@ -68,12 +68,6 @@ contract OracleContainer is Ownable, IOracleContainer {
 
 	function toFullPhrase(string memory phrase) internal pure returns (string memory) {
 		return string(abi.encodePacked(phrase, ConcatWith));
-	}
-
-	function removeFirstCharacter(string memory str) internal pure returns (string memory) {
-		uint length = bytes(str).length;
-		require(length > 1);
-		return substring(str, 1, length);
 	}
 
 	function stringEquals(string memory a, string memory b) internal pure returns (bool) {

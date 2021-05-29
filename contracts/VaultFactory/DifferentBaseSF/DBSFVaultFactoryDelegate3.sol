@@ -4,7 +4,7 @@ pragma solidity >=0.6.8 <0.7.0;
 import "../../libraries/BigMath.sol";
 import "../../libraries/SafeMath.sol";
 import "../../libraries/SignedSafeMath.sol";
-import "../../interfaces/IYTVaultManagerFlashReceiver.sol";
+import "../../interfaces/IDBSFYTVaultManagerFlashReceiver.sol";
 import "../../interfaces/IFixCapitalPool.sol";
 import "../../interfaces/IVaultHealth.sol";
 import "../../interfaces/IInfoOracle.sol";
@@ -581,15 +581,26 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryData {
 			address FCPborrowed = mVault.FCPborrowed;
 			uint yieldSupplied = mVault.yieldSupplied;
 			int bondSupplied = mVault.bondSupplied;
-			uint amountBorrowed = mVault.amountBorrowed;
+			uint prevAmtBorrowed = mVault.amountBorrowed; //prevent stack too deep
+			int changeBorrowed;
+			if (change == 0) {
+				changeBorrowed = 0;
+			}
+			else if (prevAmtBorrowed > _amountBorrowed) {
+				changeBorrowed = int(change);
+			}
+			else {
+				changeBorrowed = -int(change);
+			}
+			//int changeBorrowed = change == 0 ? 0 : (mVault.amountBorrowed < _amountBorrowed ? int(change) : -int(change));
 			bytes memory data = _data;
-			IYTVaultManagerFlashReceiver(_receiverAddr).onFlashLoan(
+			IDBSFYTVaultManagerFlashReceiver(_receiverAddr).onFlashLoan(
 				msg.sender,
 				FCPsupplied,
 				FCPborrowed,
 				yieldSupplied,
 				bondSupplied,
-				amountBorrowed,
+				changeBorrowed,
 				data
 			);
 		}
@@ -691,13 +702,13 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryData {
 
 		//-----------------------------flashloan------------------
 		if (_data.length > 0) {
-			IYTVaultManagerFlashReceiver(_receiverAddr).onFlashLoan(
+			IDBSFYTVaultManagerFlashReceiver(_receiverAddr).onFlashLoan(
 				msg.sender,
 				mVault.FCPsupplied,
 				mVault.FCPborrowed,
 				mVault.yieldSupplied,
 				mVault.bondSupplied,
-				mVault.amountBorrowed,
+				-int(mVault.amountBorrowed),
 				_data
 			);
 		}

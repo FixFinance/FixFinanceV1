@@ -4,7 +4,6 @@ pragma solidity >=0.6.8 <0.7.0;
 import "../../libraries/BigMath.sol";
 import "../../libraries/SafeMath.sol";
 import "../../libraries/SignedSafeMath.sol";
-import "../../interfaces/IYTVaultManagerFlashReceiver.sol";
 import "../../interfaces/IFixCapitalPool.sol";
 import "../../interfaces/IVaultHealth.sol";
 import "../../interfaces/IInfoOracle.sol";

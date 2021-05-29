@@ -5,7 +5,7 @@ pragma solidity >=0.6.8 <0.7.0;
 import "../../libraries/SafeMath.sol";
 import "../../libraries/SignedSafeMath.sol";
 import "../../libraries/BigMath.sol";
-import "../../interfaces/IVaultManagerFlashReceiver.sol";
+import "../../interfaces/IDBSFVaultManagerFlashReceiver.sol";
 import "../../interfaces/IFixCapitalPool.sol";
 import "../../interfaces/IZeroCouponBond.sol";
 import "../../interfaces/IVaultHealth.sol";
@@ -458,13 +458,13 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
 			address assetSupplied = mVault.assetSupplied;
 			address assetBorrowed = mVault.assetBorrowed;
 			uint amountSupplied = mVault.amountSupplied;
-			uint amountBorrowed = mVault.amountBorrowed;
-			IVaultManagerFlashReceiver(_receiverAddr).onFlashLoan(
+			int changeBorrowed = change == 0 ? 0 : (mVault.amountBorrowed < _amountBorrowed ? int(change) : -int(change));
+			IDBSFVaultManagerFlashReceiver(_receiverAddr).onFlashLoan(
 				msg.sender,
 				assetSupplied,
 				assetBorrowed,
 				amountSupplied,
-				amountBorrowed,
+				changeBorrowed,
 				_data
 			);
 		}
@@ -556,12 +556,12 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
 
 		//-----------------------------flashloan------------------
 		if (_data.length > 0) {
-			IVaultManagerFlashReceiver(_receiverAddr).onFlashLoan(
+			IDBSFVaultManagerFlashReceiver(_receiverAddr).onFlashLoan(
 				msg.sender,
 				mVault.assetSupplied,
 				mVault.assetBorrowed,
 				mVault.amountSupplied,
-				mVault.amountBorrowed,
+				-int(mVault.amountBorrowed),
 				_data
 			);
 		}

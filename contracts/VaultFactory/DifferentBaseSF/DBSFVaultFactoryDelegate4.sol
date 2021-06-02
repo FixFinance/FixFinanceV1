@@ -364,6 +364,10 @@ contract DBSFVaultFactoryDelegate4 is DBSFVaultFactoryData {
 		autopayYTVault(_owner, _index, vault);
 		require(vault.FCPborrowed == _FCPborrowed);
 		require(vault.FCPsupplied == _FCPsupplied);
+		/*
+			if instant liquidations are happening we do not care about collecting stability fees, we care about system solvency
+		*/
+		vault.amountBorrowed = vault.amountBorrowed.sub(vault.amountSFee);
 		require(vault.amountBorrowed <= _maxIn);
 		require(vault.yieldSupplied >= _minOut && _minOut > 0);
 
@@ -417,6 +421,10 @@ contract DBSFVaultFactoryDelegate4 is DBSFVaultFactoryData {
 		autopayYTVault(_owner, _index, vault);
 		require(vault.FCPborrowed == _FCPborrowed);
 		require(vault.FCPsupplied == _FCPsupplied);
+		/*
+			if instant liquidations are happening we do not care about collecting stability fees, we care about system solvency
+		*/
+		vault.amountBorrowed = vault.amountBorrowed.sub(vault.amountSFee);
 		require(0 < _in && _in <= vault.amountBorrowed);
 
 		//when we find bondRatio here we don't need to account for the rounding error because the only prupose of this variable is 
@@ -443,9 +451,10 @@ contract DBSFVaultFactoryDelegate4 is DBSFVaultFactoryData {
 		lowerShortInterest(_FCPborrowed, _in);
 		IFixCapitalPool(_FCPsupplied).transferPosition(_to, yieldOut, bondOut);
 
-		_YTvaults[_owner][_index].amountBorrowed -= _in;
+		_YTvaults[_owner][_index].amountBorrowed = vault.amountBorrowed - _in;
 		_YTvaults[_owner][_index].yieldSupplied -= yieldOut;
 		_YTvaults[_owner][_index].bondSupplied -= bondOut;
+		_YTvaults[_owner][_index].amountSFee = 0;
 	}
 
 	/*
@@ -471,6 +480,10 @@ contract DBSFVaultFactoryDelegate4 is DBSFVaultFactoryData {
 		require(vault.FCPborrowed == _FCPborrowed);
 		require(vault.FCPsupplied == _FCPsupplied);
 		require(vault.yieldSupplied >= _out);
+		/*
+			if instant liquidations are happening we do not care about collecting stability fees, we care about system solvency
+		*/
+		vault.amountBorrowed = vault.amountBorrowed.sub(vault.amountSFee);
 		uint amtIn = _out*vault.amountBorrowed;
 		amtIn = amtIn/vault.yieldSupplied + (amtIn%vault.yieldSupplied == 0 ? 0 : 1);
 		require(0 < amtIn && amtIn <= _maxIn);
@@ -495,9 +508,10 @@ contract DBSFVaultFactoryDelegate4 is DBSFVaultFactoryData {
 		lowerShortInterest(_FCPborrowed, amtIn);
 		IFixCapitalPool(_FCPsupplied).transferPosition(_to, _out, bondOut);
 
-		_YTvaults[_owner][_index].amountBorrowed -= amtIn;
+		_YTvaults[_owner][_index].amountBorrowed = vault.amountBorrowed - amtIn;
 		_YTvaults[_owner][_index].yieldSupplied -= _out;
 		_YTvaults[_owner][_index].bondSupplied -= bondOut;
+		_YTvaults[_owner][_index].amountSFee = 0;
 	}
 
 }

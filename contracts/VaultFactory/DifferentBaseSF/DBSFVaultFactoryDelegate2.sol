@@ -353,6 +353,10 @@ contract DBSFVaultFactoryDelegate2 is DBSFVaultFactoryData {
 		Vault memory vault = _vaults[_owner][_index];
 		require(vault.assetBorrowed == _assetBorrowed);
 		require(vault.assetSupplied == _assetSupplied);
+		/*
+			if instant liquidations are happening we do not care about collecting stability fees, we care about system solvency
+		*/
+		vault.amountBorrowed = vault.amountBorrowed.sub(vault.amountSFee);
 		require(vault.amountBorrowed <= _maxIn);
 		require(vault.amountSupplied >= _minOut && _minOut > 0);
 		require(IZeroCouponBond(_assetBorrowed).maturity() < block.timestamp + CRITICAL_TIME_TO_MATURITY || 
@@ -386,6 +390,10 @@ contract DBSFVaultFactoryDelegate2 is DBSFVaultFactoryData {
 		Vault memory vault = _vaults[_owner][_index];
 		require(vault.assetBorrowed == _assetBorrowed);
 		require(vault.assetSupplied == _assetSupplied);
+		/*
+			if instant liquidations are happening we do not care about collecting stability fees, we care about system solvency
+		*/
+		vault.amountBorrowed = vault.amountBorrowed.sub(vault.amountSFee);
 		require(0 < _in && _in <= vault.amountBorrowed);
 		uint amtOut = _in*vault.amountSupplied/vault.amountBorrowed;
 		require(amtOut >= _minOut);
@@ -398,8 +406,9 @@ contract DBSFVaultFactoryDelegate2 is DBSFVaultFactoryData {
 		lowerShortInterest(FCPborrowed, _in);
 		IERC20(_assetSupplied).transfer(_to, amtOut);
 
-		_vaults[_owner][_index].amountBorrowed -= _in;
+		_vaults[_owner][_index].amountBorrowed = vault.amountBorrowed - _in;
 		_vaults[_owner][_index].amountSupplied -= amtOut;
+		_vaults[_owner][_index].amountSFee = 0;
 	}
 
 	/*
@@ -422,6 +431,10 @@ contract DBSFVaultFactoryDelegate2 is DBSFVaultFactoryData {
 		require(vault.assetBorrowed == _assetBorrowed);
 		require(vault.assetSupplied == _assetSupplied);
 		require(vault.amountSupplied >= _out);
+		/*
+			if instant liquidations are happening we do not care about collecting stability fees, we care about system solvency
+		*/
+		vault.amountBorrowed = vault.amountBorrowed.sub(vault.amountSFee);
 		uint amtIn = _out*vault.amountBorrowed;
 		amtIn = amtIn/vault.amountSupplied + (amtIn%vault.amountSupplied == 0 ? 0 : 1);
 		require(0 < amtIn && amtIn <= _maxIn);
@@ -434,8 +447,9 @@ contract DBSFVaultFactoryDelegate2 is DBSFVaultFactoryData {
 		lowerShortInterest(FCPborrowed, amtIn);
 		IERC20(_assetSupplied).transfer(_to, _out);
 
-		_vaults[_owner][_index].amountBorrowed -= amtIn;
+		_vaults[_owner][_index].amountBorrowed = vault.amountBorrowed - amtIn;
 		_vaults[_owner][_index].amountSupplied -= _out;
+		_vaults[_owner][_index].amountSFee = 0;
 	}
 
 	/*

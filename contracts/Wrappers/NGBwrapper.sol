@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.6.8 <0.7.0;
 import "../interfaces/IERC20.sol";
-import "../interfaces/IWrapper.sol";
+import "../interfaces/INGBWrapper.sol";
 import "../interfaces/IInfoOracle.sol";
 import "../libraries/SafeMath.sol";
 import "../libraries/ABDKMath64x64.sol";
@@ -17,12 +17,12 @@ import "../ERC20.sol";
 
 	The balances of the underlying asset automatically grow as yield is generated
 */
-contract NGBwrapper is IWrapper, nonReentrant, Ownable {
+contract NGBwrapper is INGBWrapper, nonReentrant, Ownable {
 	using SafeMath for uint;
 	using ABDKMath64x64 for int128;
 
-    bytes32 public constant CALLBACK_SUCCESS = keccak256("ERC3156FlashBorrower.onFlashLoan");
-    uint256 public flashLoanFee; // denominated in super bips
+    bytes32 public constant override CALLBACK_SUCCESS = keccak256("ERC3156FlashBorrower.onFlashLoan");
+    uint256 public override flashLoanFee; // denominated in super bips
 
 	//SBPS == super bips == 1/100th of a bip
 	//100 * 10_000 == 1_000_000
@@ -47,13 +47,15 @@ contract NGBwrapper is IWrapper, nonReentrant, Ownable {
 
 	bool public constant override underlyingIsWrapped = false;
 
-	uint public prevRatio;
+	//amount of unit amount equivalent to (1 ether) of wrapped amount at lastHarvest
+	uint public override prevRatio;
 
 	uint8 public immutable override decimals;
 
-	address public immutable infoOracleAddress;
+	address public immutable override infoOracleAddress;
 
-	uint public lastHarvest;
+	//most recent timestamp at which harvestToTreasury() was called
+	uint public override lastHarvest;
 
 	/*
 		init

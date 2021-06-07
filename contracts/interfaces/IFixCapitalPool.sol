@@ -5,12 +5,15 @@ import "./IWrapper.sol";
 import "./IERC20.sol";
 
 interface IFixCapitalPool is IFCPFlashLender {
-	function wrappedTokenFree(address _owner) external view returns (uint wrappedTknFree);
 	function depositWrappedToken(address _to, uint _amountWrappedTkn) external;
 	function withdraw(address _to, uint _amountWrappedTkn, bool _unwrap) external;
 	function withdrawAll(address _to, bool _unwrap) external;
 	function claimBondPayout(address _to, bool _unwrap) external;
 	function enterPayoutPhase() external;
+	function transferPosition(address _to, uint _yield, int _bond) external;
+	function transferPositionFrom(address _from, address _to, uint _yield, int _bond) external;
+
+	function wrappedTokenFree(address _owner) external view returns (uint wrappedTknFree);
 	function inPayoutPhase() external view returns (bool);
 	function maturity() external view returns(uint64);
 	function maturityConversionRate() external view returns(uint);
@@ -19,12 +22,10 @@ interface IFixCapitalPool is IFCPFlashLender {
 	function balanceYield(address _owner) external view returns(uint);
 	function yieldTokenAddress() external view returns(address);
 	function zeroCouponBondAddress() external view returns(address);
-	function whitelistedVaultFactories(address _FCPaddress) external view returns(bool whitelisted);
+	function whitelistedVaultFactories(address _vaultFactoryAddress) external view returns(bool whitelisted);
 	function infoOracleAddress() external view returns(address);
 	function wrapper() external view returns(IWrapper);
 	function lastUpdate() external view returns(uint);
-	function transferPosition(address _to, uint _yield, int _bond) external;
-	function transferPositionFrom(address _from, address _to, uint _yield, int _bond) external;
 
 	//---------------Yield-Token---------------
 	function transferYield(address _from, address _to, uint _amount) external;

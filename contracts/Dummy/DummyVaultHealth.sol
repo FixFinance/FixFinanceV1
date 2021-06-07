@@ -19,6 +19,11 @@ contract DummyVaultHealth is IVaultHealth {
 	mapping(address => mapping(address => uint)) public middleRatio;
 	mapping(address => mapping(address => uint)) public lowerRatio;
 
+	mapping(address => uint120) public override LowerCollateralizationRatio;
+	mapping(address => uint120) public override UpperCollateralizationRatio;
+	mapping(address => uint120) public override LowerRateThreshold;
+	mapping(address => uint120) public override UpperRateThreshold;
+
 	//collateral above return value of this function may be withdrawn from vault
 	function satisfiesUpperLimit(
 		address _assetSupplied,
@@ -98,14 +103,14 @@ contract DummyVaultHealth is IVaultHealth {
 		return true && toReturn;
 	}
 
-	function upperMinimumRateAdjustment(address _underlyingAssetAddress) external view override returns (int128) {
+	function upperMinimumRateAdjustment(address _underlyingAssetAddress) external view override returns (uint120) {
 		if (_underlyingAssetAddress == address(0)) {
 			return 0;
 		}
 		return 1;
 	}
 
-	function lowerMinimumRateAdjustment(address _underlyingAssetAddress) external view override returns (int128) {
+	function lowerMinimumRateAdjustment(address _underlyingAssetAddress) external view override returns (uint120) {
 		if (_underlyingAssetAddress == address(0)) {
 			return 0;
 		}
@@ -220,10 +225,7 @@ contract DummyVaultHealth is IVaultHealth {
 	function setOrganizerAddress(address _organizerAddress) external override {
 		maximumShortInterest[_organizerAddress] = maximumShortInterest[_organizerAddress];
 	}
-	function setUpperMinimumRateAdjustment(address _wrapperAddress, int128 _minimumRateAdjustment) external override {
-		maximumShortInterest[_wrapperAddress] = maximumShortInterest[_minimumRateAdjustment == _minimumRateAdjustment+1 ? _wrapperAddress : _wrapperAddress];
-	}
-	function setLowerMinimumRateAdjustment(address _wrapperAddress, int128 _minimumRateAdjustment) external override {
-		maximumShortInterest[_wrapperAddress] = maximumShortInterest[_minimumRateAdjustment == _minimumRateAdjustment+1 ? _wrapperAddress : _wrapperAddress];
+	function setMinimumRateAdjustments(address _wrapperAddress, uint120 _upper, uint120 _lower) external override {
+		maximumShortInterest[_wrapperAddress] = maximumShortInterest[_upper == _lower+1 ? _wrapperAddress : _wrapperAddress];		
 	}
 }

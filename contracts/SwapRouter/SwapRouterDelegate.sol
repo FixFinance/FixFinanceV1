@@ -38,7 +38,7 @@ contract SwapRouterDelegate {
 		uint amtZCBout = amm.ReserveQuoteFromSpecificTokens(int128(_amount), false);
 		uint _amountWrapped;
 		require(amtZCBout >= _minZCBout);
-		if (wrapper.underlyingIsWrapped()) {
+		if (wrapper.underlyingIsStatic()) {
 			_amountWrapped = wrapper.UnitAmtToWrappedAmt_RoundUp(_amount);
 			underlyingAsset.transferFrom(msg.sender, address(this), _amountWrapped);
 			underlyingAsset.approve(address(wrapper), _amountWrapped);
@@ -86,7 +86,7 @@ contract SwapRouterDelegate {
 		uint _amtTransfer = _amtATkn + RoundingBuffer;
 		require(_amtTransfer <= _maxUnitAmount, "Required AToken in is Greater than _maxUnitAmount");
 		uint _amountWrapped;
-		if (wrapper.underlyingIsWrapped()) {
+		if (wrapper.underlyingIsStatic()) {
 			_amountWrapped = wrapper.UnitAmtToWrappedAmt_RoundUp(_amtTransfer);
 			underlyingAsset.transferFrom(msg.sender, address(this), _amountWrapped);
 			underlyingAsset.approve(address(wrapper), _amountWrapped);

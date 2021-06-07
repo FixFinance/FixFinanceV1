@@ -114,11 +114,10 @@ contract('VaultHealth', async function(accounts) {
 		wAsset0 = await NGBwrapper.at(reca.receipt.logs[0].args.wrapperAddress);
 		wAsset1 = await NGBwrapper.at(recb.receipt.logs[0].args.wrapperAddress);
 
-		await vaultHealthInstance.setUpperMinimumRateAdjustment(wAsset0.address, basisPointsToABDKString(100));
-		await vaultHealthInstance.setUpperMinimumRateAdjustment(wAsset1.address, basisPointsToABDKString(100));
-
-		await vaultHealthInstance.setLowerMinimumRateAdjustment(wAsset0.address, basisPointsToABDKString(50));
-		await vaultHealthInstance.setLowerMinimumRateAdjustment(wAsset1.address, basisPointsToABDKString(50));
+		let upperStr = basisPointsToABDKString(100);
+		let lowerStr = basisPointsToABDKString(50);
+		await vaultHealthInstance.setMinimumRateAdjustments(wAsset0.address, upperStr, lowerStr);
+		await vaultHealthInstance.setMinimumRateAdjustments(wAsset1.address, upperStr, lowerStr);
 
 		let rec0 = await organizerInstance.deployFixCapitalPoolInstance(wAsset0.address, maturity);
 		let rec1 = await organizerInstance.deployFixCapitalPoolInstance(wAsset1.address, maturity);
@@ -1301,7 +1300,7 @@ contract('VaultHealth', async function(accounts) {
 
 		let caught = false;
 		try {
-			await vaultHealthInstance.setMaximumShortInterest(wAsset0.address, setTo, {from: accounts[1]});
+			await vaultHealthInstance.setMaximumShortInterest(asset0.address, setTo, {from: accounts[1]});
 		} catch (err) {
 			caught = true;
 		}
@@ -1309,8 +1308,8 @@ contract('VaultHealth', async function(accounts) {
 			assert.fail('setMaximumShortInterest() should be onlyOwner');
 		}
 
-		await vaultHealthInstance.setMaximumShortInterest(wAsset0.address, setTo);
+		await vaultHealthInstance.setMaximumShortInterest(asset0.address, setTo);
 
-		assert.equal((await vaultHealthInstance.maximumShortInterest(wAsset0.address)).toString(), setTo, "correct value for maximum short interest");
+		assert.equal((await vaultHealthInstance.maximumShortInterest(asset0.address)).toString(), setTo, "correct value for maximum short interest");
 	});
 });

@@ -42,14 +42,17 @@ interface IVaultHealth {
 	) external view returns (bool);	
 
 	function maximumShortInterest(address _underlyingAssetAddress) external view returns (uint);
-	function upperMinimumRateAdjustment(address _underlyingAssetAddress) external view returns (int128);
-	function lowerMinimumRateAdjustment(address _underlyingAssetAddress) external view returns (int128);
+	function UpperCollateralizationRatio(address _wrapperAddress) external view returns(uint120);
+	function LowerCollateralizationRatio(address _wrapperAddress) external view returns(uint120);
+	function UpperRateThreshold(address _wrapperAddress) external view returns(uint120);
+	function LowerRateThreshold(address _wrapperAddress) external view returns(uint120);
+	function upperMinimumRateAdjustment(address _wrapperAddress) external view returns (uint120);
+	function lowerMinimumRateAdjustment(address _wrapperAddress) external view returns (uint120);
 
 	//-------------a-d-m-i-n---------------
-	function setCollateralizationRatios(address _underlyingAssetAddress, uint120 _upper, uint120 _lower) external;
-	function setRateThresholds(address _underlyingAssetAddress, uint120 _upper, uint120 _lower) external;
+	function setCollateralizationRatios(address _wrapperAddress, uint120 _upper, uint120 _lower) external;
+	function setRateThresholds(address _wrapperAddress, uint120 _upper, uint120 _lower) external;
 	function setOrganizerAddress(address _organizerAddress) external;
 	function setMaximumShortInterest(address _underlyingAssetAddress, uint _maximumShortInterest) external;
-	function setUpperMinimumRateAdjustment(address _wrapperAddress, int128 _minimumRateAdjustment) external;
-	function setLowerMinimumRateAdjustment(address _wrapperAddress, int128 _minimumRateAdjustment) external;
+	function setMinimumRateAdjustments(address _wrapperAddress, uint120 _upper, uint120 _lower) external;
 }

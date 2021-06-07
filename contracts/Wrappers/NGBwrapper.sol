@@ -21,8 +21,8 @@ contract NGBwrapper is INGBWrapper, nonReentrant, Ownable {
 	using SafeMath for uint;
 	using ABDKMath64x64 for int128;
 
-    bytes32 public constant override CALLBACK_SUCCESS = keccak256("ERC3156FlashBorrower.onFlashLoan");
-    uint256 public override flashLoanFee; // denominated in super bips
+    bytes32 constant CALLBACK_SUCCESS = keccak256("ERC3156FlashBorrower.onFlashLoan");
+    uint256 public override flashLoanFee = 1000; // denominated in super bips
 
 	//SBPS == super bips == 1/100th of a bip
 	//100 * 10_000 == 1_000_000
@@ -45,7 +45,7 @@ contract NGBwrapper is INGBWrapper, nonReentrant, Ownable {
 
 	address public override underlyingAssetAddress;
 
-	bool public constant override underlyingIsWrapped = false;
+	bool public constant override underlyingIsStatic = false;
 
 	//amount of unit amount equivalent to (1 ether) of wrapped amount at lastHarvest
 	uint public override prevRatio;

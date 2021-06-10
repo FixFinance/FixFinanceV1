@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.6.8 <0.7.0;
 
-contract IYTammData {
+contract AYTammData {
 
 	address public ZCBammAddress;
 	uint64 public maturity;

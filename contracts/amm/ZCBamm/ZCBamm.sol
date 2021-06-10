@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.6.8 <0.7.0;
 
-import "../../helpers/IZCBamm.sol";
+import "../../helpers/AZCBamm.sol";
 import "../../libraries/ABDKMath64x64.sol";
 import "../../libraries/BigMath.sol";
 import "../../interfaces/IFixCapitalPool.sol";
@@ -11,7 +11,7 @@ import "../../interfaces/IWrapper.sol";
 import "../../interfaces/IERC20.sol";
 import "../../InfoOracle.sol";
 
-contract ZCBamm is IZCBamm {
+contract ZCBamm is AZCBamm {
 
 	using ABDKMath64x64 for int128;
 	using SignedSafeMath for int256;

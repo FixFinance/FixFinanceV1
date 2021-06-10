@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.6.8 <0.7.0;
-import "../helpers/IZCBamm.sol";
-import "../helpers/IYTamm.sol";
+import "../interfaces/IYTamm.sol";
+import "../interfaces/IZCBamm.sol";
 import "../interfaces/IFixCapitalPool.sol";
 import "../interfaces/IZeroCouponBond.sol";
 import "../interfaces/IYieldToken.sol";

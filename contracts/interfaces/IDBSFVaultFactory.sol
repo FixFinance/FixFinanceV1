@@ -35,7 +35,7 @@ interface IDBSFVaultFactory {
 		uint bidTimestamp
 	);
 	//-------------YT-vault-related-views-----------
-	function YTrevenue(address _asset) external view returns (uint yield, int bond);
+	function YTrevenue(address _FCPaddress) external view returns (uint yield, int bond);
 	function YTvaults(address _owner, uint _index) external view returns (
 		address FCPsupplied,
 		address FCPborrowed,
@@ -113,7 +113,7 @@ interface IDBSFVaultFactory {
 	function partialLiquidationSpecificIn(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _in, uint _minOut, address _to) external;
 	function partialLiquidationSpecificOut(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _out, uint _maxIn, address _to) external;
 	//----------------------------------------------Y-T-V-a-u-l-t--L-i-q-u-i-d-a-t-i-o-n-s------------------------------------------
-	function claimYTRebate(address _asset) external;
+	function claimYTRebate(address _FCPaddress) external;
 	function auctionYTLiquidation(address _owner, uint _index, address _FCPborrowed, address _FCPsupplied, uint _bidYield, int _minBondRatio, uint _amtIn) external;
 	function bidOnYTLiquidation(uint _index, uint _bidYield, uint _amtIn) external;
 	function claimYTLiquidation(uint _index, address _to) external;

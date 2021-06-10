@@ -2,7 +2,7 @@
 pragma solidity >=0.6.8 <0.7.0;
 
 import "../../helpers/DividendEnabledData.sol";
-import "../../helpers/IYTammData.sol";
+import "../../helpers/AYTammData.sol";
 import "../../libraries/ABDKMath64x64.sol";
 import "../../libraries/SafeMath.sol";
 import "../../libraries/BigMath.sol";
@@ -10,10 +10,10 @@ import "../../interfaces/IFixCapitalPool.sol";
 import "../../interfaces/IYieldToken.sol";
 import "../../interfaces/IWrapper.sol";
 import "../../interfaces/IERC20.sol";
-import "../../helpers/IZCBamm.sol";
+import "../../interfaces/IZCBamm.sol";
 import "../../InfoOracle.sol";
 
-contract YTammDelegate is DividendEnabledData, IYTammData {
+contract YTammDelegate is DividendEnabledData, AYTammData {
 	using SafeMath for uint256;
 	using SignedSafeMath for int256;
 	using ABDKMath64x64 for int128;

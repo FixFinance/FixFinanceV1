@@ -2,9 +2,9 @@
 pragma solidity >=0.6.8 <0.7.0;
 
 import "./DividendEnabled.sol";
-import "./IYTammData.sol";
+import "./AYTammData.sol";
 
-abstract contract IYTamm is DividendEnabled, IYTammData {
+abstract contract AYTamm is DividendEnabled, AYTammData {
 	event Mint(
 		address user,
 		uint amount

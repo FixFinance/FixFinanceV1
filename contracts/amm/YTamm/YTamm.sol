@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.6.8 <0.7.0;
 
-import "../../helpers/IYTamm.sol";
+import "../../helpers/AYTamm.sol";
 import "../../libraries/ABDKMath64x64.sol";
 import "../../libraries/SafeMath.sol";
 import "../../libraries/BigMath.sol";
@@ -9,10 +9,10 @@ import "../../interfaces/IFixCapitalPool.sol";
 import "../../interfaces/IYieldToken.sol";
 import "../../interfaces/IWrapper.sol";
 import "../../interfaces/IERC20.sol";
-import "../../helpers/IZCBamm.sol";
+import "../../interfaces/IZCBamm.sol";
 import "../../InfoOracle.sol";
 
-contract YTamm is IYTamm {
+contract YTamm is AYTamm {
 
 	using ABDKMath64x64 for int128;
 	using SafeMath for uint256;

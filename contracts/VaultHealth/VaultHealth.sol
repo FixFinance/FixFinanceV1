@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.6.8 <0.7.0;
-import "../helpers/IZCBamm.sol";
 import "../helpers/Ownable.sol";
+import "../interfaces/IZCBamm.sol";
 import "../interfaces/IWrapper.sol";
 import "../interfaces/IOrganizer.sol";
 import "../interfaces/IVaultHealth.sol";

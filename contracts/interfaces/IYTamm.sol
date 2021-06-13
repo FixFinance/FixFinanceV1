@@ -14,7 +14,7 @@ interface IYTamm is IERC20, IDividend {
 	function ReserveQuoteFromYT(int128 _amount) external returns (uint);
 	function ReserveQuoteToYT(int128 _amount) external returns (uint);
 	function TakeQuote(uint _amountU, int128 _amountYT, bool _YTin) external;
-	function recalibrate(int128 _approxYTin) external;
+	function recalibrate() external;
 	function inflatedTotalSupply() external view returns (uint);
 	function getReserves() external view returns (
 		uint _Ureserves,
@@ -33,7 +33,7 @@ interface IYTamm is IERC20, IDividend {
     function activeTotalSupply() external view returns(uint);
     function lastWithdraw() external view returns(uint);
     function ineligibleBalanceOf(address _owner) external view returns(uint);
-    function contractZCBDividend(uint _index) external view returns(int);
+    function contractBondDividend(uint _index) external view returns(int);
     function contractYieldDividend(uint _index) external view returns(uint);
 
     //AYTammData

@@ -73,8 +73,7 @@ async function setRate(amm, rate, account) {
 	let secondsReamining = maturity-timestamp;
 	let t = secondsReamining/anchor;
 	let initialU = 100000000;
-	let totalSupply = initialU;amm
-
+	let totalSupply = initialU;
 	let K = 2*initialU**(1-t);
 	let Ureserves = (K / (1+rate**(1-t)))**(1/(1-t));
 	let ZCBreserves = (K - (Ureserves)**(1-t))**(1/(1-t)) - totalSupply;
@@ -86,6 +85,7 @@ async function setRate(amm, rate, account) {
 		await amm.forceRateDataUpdate();
 	}
 	await amm.setOracleRate((await amm.getImpliedRateData())._impliedRates[30].toString());
+	let actualRate = parseInt((await amm.getRateFromOracle()).toString()) * Math.pow(2, -64);
 }
 
 /*
@@ -343,77 +343,23 @@ contract('YTamm', async function(accounts){
 		assert.equal(YTbalance.sub(prevYTbalance.sub(Uin)).toString(), amtOut.toString(), "correct amount U out");
 	});
 
-	it('recalibrate() on being stuck at high APY', async () => {
-		//first the amm must encur losses
-		amt = toMint.mul(YTtoLmultiplierBN).mul(new BN(9)).div(new BN(10)).div(_10To18BN);
-		//buy YT, (amm sells YT)
-		await amm1.SwapToSpecificYT(amt);
-		OracleRate = 500;
-		await setRate(amm0, OracleRate, accounts[0]);
-		//sell YT, (amm buys YT)
-		await amm1.SwapFromSpecificYT(amt);
-		OracleRate = 1.000001;
-
-		//encur more losses
-		await setRate(amm0, OracleRate, accounts[0]);
-		//buy YT, (amm sells YT)
-		await amm1.SwapToSpecificYT(amt);
-		OracleRate = 500;
-		await setRate(amm0, OracleRate, accounts[0]);
-		//sell YT, (amm buys YT)
-		await amm1.SwapFromSpecificYT(amt);
-
-		let results = await amm1.getReserves();
-		Ureserves = results._Ureserves;
-		YTreserves = results._YTreserves;
-
-		let r = parseInt(results._TimeRemaining.toString()) * 2**-64;
-		let UpperBound = parseInt(YTreserves.toString());
-		while (parseInt(Ureserves.toString()) > 
-			YT_U_math.Uout(parseInt(YTreserves.toString()), parseInt(totalSupply.mul(_10To18BN).div(new BN(YTtoLmultiplierBN)).toString()), r, w, OracleRate, UpperBound) ) {
-			UpperBound *= 10;
+	it('recalibrate() fails before recalibration cooldown is over', async () => {
+		let caught = false;
+		try {
+			await amm1.recalibrate();
 		}
-
-		let LowerBound = 0;
-		let MaxYin = UpperBound/2;
-		let step = UpperBound/4;
-		for (let i = 0; i < 100; i++) {
-			let Uout = YT_U_math.Uout(parseInt(
-				YTreserves.toString()),
-				parseInt(totalSupply.mul(_10To18BN).div(new BN(YTtoLmultiplierBN)).toString()),
-				r,
-				w,
-				OracleRate,
-				MaxYin
-			);
-			if (Uout > parseInt(Ureserves.toString())) {
-				MaxYin -= step;
-			}
-			else if (Uout < parseInt(Ureserves.toString())) {
-				MaxYin += step;
-			}
-			else {
-				break;
-			}
-			step /= 2;
+		catch (err) {
+			caught = true;
 		}
-		MaxYin += step*2 + 1;
-		let MaxYinStr = Math.floor(MaxYin).toString();
-
-		let prevReserves = await amm1.getReserves();
-
-		await amm1.recalibrate(MaxYinStr);
-
-		let reserves = await amm1.getReserves();
-
-		amtUrevenue = prevReserves._Ureserves.sub(reserves._Ureserves);
-		amtYTrevenue = prevReserves._YTreserves.sub(reserves._YTreserves);
+		if (!caught) {
+			assert.fail("recalibration within timeframe passed when it should have failed");
+		}
 	});
 
 	it('recalibrate() on time', async () => {
 		let caught = false;
 		try {
-			await amm1.recalibrate(0);
+			await amm1.recalibrate();
 		}
 		catch (err) {
 			caught = true;
@@ -427,12 +373,12 @@ contract('YTamm', async function(accounts){
 
 		let prevReserves = await amm1.getReserves();
 
-		await amm1.recalibrate(0);
+		await amm1.recalibrate();
 
 		let reserves = await amm1.getReserves();
 
-		amtUrevenue = prevReserves._Ureserves.sub(reserves._Ureserves).add(amtUrevenue);
-		amtYTrevenue = prevReserves._YTreserves.sub(reserves._YTreserves).add(amtYTrevenue);
+		amtUrevenue = prevReserves._Ureserves.sub(reserves._Ureserves);
+		amtYTrevenue = prevReserves._YTreserves.sub(reserves._YTreserves);
 	});
 
 	it('Valid reserves', async () => {
@@ -498,10 +444,10 @@ contract('YTamm', async function(accounts){
 		}
 
 		assert.equal((await amm1.length()).toString(), "3");
-		let zcbDividendIntegral = await amm1.contractZCBDividend(2);
+		let bondDividendIntegral = await amm1.contractBondDividend(2);
 		let yieldDividendIntegral = await amm1.contractYieldDividend(2);
 		let ytDividend = await NGBwrapperInstance.WrappedAmtToUnitAmt_RoundDown(yieldDividendIntegral);
-		let zcbDividend = ytDividend.add(zcbDividendIntegral);
+		let zcbDividend = ytDividend.add(bondDividendIntegral);
 		let ts = activeTotalSupply.toString() === "0" ? totalSupply : activeTotalSupply;
 		let expectedZCBDividend = amtZCB.mul(_10To18BN).div(ts);
 		let expectedYTDividend = amtYT.mul(_10To18BN).div(ts);
@@ -596,10 +542,10 @@ contract('YTamm', async function(accounts){
 
 
 		assert.equal((await amm1.length()).toString(), "4");
-		let zcbDividendIntegral = await amm1.contractZCBDividend(3);
+		let bondDividendIntegral = await amm1.contractBondDividend(3);
 		let yieldDividendIntegral = await amm1.contractYieldDividend(3);
 		let ytDividend = await NGBwrapperInstance.WrappedAmtToUnitAmt_RoundDown(yieldDividendIntegral);
-		let zcbDividend = ytDividend.add(zcbDividendIntegral);
+		let zcbDividend = ytDividend.add(bondDividendIntegral);
 		let ts = activeTotalSupply.toString() === "0" ? totalSupply : activeTotalSupply;
 		let expectedZCBDividend = amtZCB.add(amtZCB2).mul(_10To18BN).div(ts);
 		let expectedYTDividend = amtYT.add(amtYT2).mul(_10To18BN).div(ts);

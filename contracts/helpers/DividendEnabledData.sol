@@ -30,7 +30,7 @@ contract DividendEnabledData {
 	//lastClaim represents the last index of the contractBalance arrays for each address at the most recent time that claimDividendInternal(said address) was called
 	mapping(address => uint) lastClaim;
 	//U dividends (unit amount) + ZCBdividends *may be negative*
-	int[] public contractZCBDividend;
+	int[] public contractBondDividend;
 	//increase in wrapped amount of balanceYield
 	uint[] public contractYieldDividend;
 

@@ -37,55 +37,6 @@ contract YTammDelegate is DividendEnabledData, AYTammData {
 	}
 
 	/*
-		@Description: if this pool has encured losses due to market events there is a chance that
-			the ratio of U and YT reserves is out of sync, this function should tell us if this
-			has happened or not
-
-		@param int128 _approxYTin: an approximation of the maximum amount of YT that may be swapped
-			into this amm in order to get U out. This value should be greater than the actual maximum
-			amount of YT that may be swapped in
-
-		@return bool: return true if the U and YT reserve ratio is out of sync, return false otherwise
-	*/
-	function isOutOfSync(int128 _approxYTin) internal view returns (bool) {
-		uint _YTreserves = YTreserves;
-		require(_approxYTin > 0);
-		uint effectiveTotalSupply = _inflatedTotalSupply();
-		uint Uchange = uint(-BigMath.YT_U_reserve_change(
-			_YTreserves,
-			effectiveTotalSupply,
-			timeRemaining(),
-			SlippageConstant,
-			1 ether, // fee constant of 1.0 means no fee
-			IZCBamm(ZCBammAddress).getAPYFromOracle(),
-			_approxYTin
-		));
-		if (Uchange < Ureserves) {
-			// in this case _approxYTin is of no use to us as an upper bound 
-			return false;
-		}
-		uint _MaxYTreserves = _YTreserves + uint(_approxYTin);
-		/*
-			L = effectiveTotalSupply
-
-			L/_YTreservesAtAPYo == 1
-			_YTreservesAtAPYo == L
-	
-			Thus effectiveTotalSupply == YTLiquidityAboveAPYo
-		*/
-
-		//if APYo does not exist along the amm curve return out of sync
-		if (_MaxYTreserves >= effectiveTotalSupply) {
-			return true;
-		}
-		uint YTliquidityUnderAPYo = _MaxYTreserves - effectiveTotalSupply;
-		if (YTliquidityUnderAPYo < 2*effectiveTotalSupply) {
-			return true;
-		}
-		return false;
-	}
-
-	/*
 		@Description: add new dividend round
 
 		@param uint ZCBdividend: the amount of ZCB in unit in round dividend
@@ -99,9 +50,9 @@ contract YTammDelegate is DividendEnabledData, AYTammData {
 		*/
 		int balanceBond = int(ZCBdividend) - int(scaledYield);
 
-		uint lastIndex = contractZCBDividend.length - 1;
+		uint lastIndex = contractBondDividend.length - 1;
 		uint prevYieldDividend = contractYieldDividend[lastIndex];
-		int prevZCBDividend = contractZCBDividend[lastIndex];
+		int prevZCBDividend = contractBondDividend[lastIndex];
 
 		//normalise with activeTotalSupply
 		uint _activeTotalSupply = activeTotalSupply;
@@ -111,7 +62,7 @@ contract YTammDelegate is DividendEnabledData, AYTammData {
 			//then we push the new values, thus giving those with previously non active
 			//LP shares the chance to earn the interest, also avoid div by 0
 			contractYieldDividend.push(prevYieldDividend);
-			contractZCBDividend.push(prevZCBDividend);
+			contractBondDividend.push(prevZCBDividend);
 			_activeTotalSupply = internalTotalSupply;
 		}
 
@@ -119,7 +70,7 @@ contract YTammDelegate is DividendEnabledData, AYTammData {
 		balanceBond = balanceBond.mul(1 ether).div(int(_activeTotalSupply));
 
 		contractYieldDividend.push(scaledYield + prevYieldDividend);
-		contractZCBDividend.push(balanceBond + prevZCBDividend);
+		contractBondDividend.push(balanceBond + prevZCBDividend);
 
 		totalZCBDividend += ZCBdividend;
 		totalYTDividend += YTdividend;
@@ -205,17 +156,10 @@ contract YTammDelegate is DividendEnabledData, AYTammData {
 
 	/*
 		@Description: as time progresses the optimal ratio of YT to U reserves changes
-			this function ensures that we return to that ratio every so often
-			this function may also be called when outOfSync returns true
-
-		@param int128 _approxYTin: an approximation of the maximum amount of YT that may be swapped
-			into this amm in order to get U out. This value should be greater than the actual maximum
-			amount of YT that may be swapped in
-			This param only matters if the user is trying to recalibrate based on reserves going out
-			of sync
+			this function ensures that we return to that ratio every 4 weeks
 	*/
-	function recalibrate(int128 _approxYTin) external {
-		require(block.timestamp > lastRecalibration + 4 weeks || isOutOfSync(_approxYTin));
+	function recalibrate() external {
+		require(block.timestamp > lastRecalibration + 4 weeks);
 		/*
 			Ureserves == (1 - APYo**(-timeRemaining)) * YTreserves
 

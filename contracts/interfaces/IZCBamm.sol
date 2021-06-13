@@ -32,7 +32,7 @@ interface IZCBamm is IERC20 {
 	function SwapFromSpecificTokensWithLimit(int128 _amount, bool _ZCBin, uint _minAmtOut) external returns(uint _out);
 	function SwapToSpecificTokensWithLimit(int128 _amount, bool _ZCBin, uint _maxAmtIn) external returns(uint _in);
 	function ReserveQuoteFromSpecificTokens(int128 _amount, bool _ZCBin) external returns(uint _out);
-	function ReserveQuoteToSpecificTokens(int128 _amount, bool _ZCBin) external returns(uint _out);
+	function ReserveQuoteToSpecificTokens(int128 _amount, bool _ZCBin) external returns(uint _in);
 	function TakeQuote(uint _amountIn, uint _amountOut, bool _ZCBin, bool _ToSpecific) external;
 	function recalibrate(uint lowerBoundAnchor, uint upperBoundAnchor) external;
 	function inflatedTotalSupply() external view returns (uint);

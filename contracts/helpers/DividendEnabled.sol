@@ -15,7 +15,7 @@ abstract contract DividendEnabled is IERC20, IDividend, DividendEnabledData {
 	using SignedSafeMath for int256;
 
 	//length of contractBalance arrays
-	function length() public view returns (uint) {return contractZCBDividend.length;}
+	function length() public view returns (uint) {return contractBondDividend.length;}
 
 	event DividendDistributed(
 		address _claimer,
@@ -135,7 +135,7 @@ abstract contract DividendEnabled is IERC20, IDividend, DividendEnabledData {
 	*/
 	function claimDividendInternal(address _from, address _to) internal {
 		uint mostRecent = lastClaim[_from];
-		uint lastIndex = contractZCBDividend.length - 1;	//gas savings
+		uint lastIndex = contractBondDividend.length - 1;	//gas savings
 		if (mostRecent >= lastIndex) return;
 		uint _balanceOf = internalBalanceOf[_from];	//gas savings
 		lastClaim[_from] = lastIndex;
@@ -144,10 +144,10 @@ abstract contract DividendEnabled is IERC20, IDividend, DividendEnabledData {
 		uint ZCBtoSend;
 		uint YTtoSend;
 		uint lastYieldDividend = contractYieldDividend[lastIndex];
-		int lastZCBDividend = contractZCBDividend[lastIndex];
+		int lastZCBDividend = contractBondDividend[lastIndex];
 		{
 			uint BalanceYieldChange = lastYieldDividend - contractYieldDividend[mostRecent];
-			int BalanceZCBChange = lastZCBDividend - contractZCBDividend[mostRecent];
+			int BalanceZCBChange = lastZCBDividend - contractBondDividend[mostRecent];
 			uint unitAmountYield = wrapper.WrappedAmtToUnitAmt_RoundDown(BalanceYieldChange);
 			ZCBtoSend = uint(int(unitAmountYield) + BalanceZCBChange).mul(_balanceOf).div(1 ether);
 			YTtoSend = unitAmountYield.mul(_balanceOf).div(1 ether);
@@ -156,7 +156,7 @@ abstract contract DividendEnabled is IERC20, IDividend, DividendEnabledData {
 		if (ineligibleBal != 0) {
 			if (mostRecent+1 < lastIndex) {
 				uint BalanceYieldChange = lastYieldDividend - contractYieldDividend[mostRecent+1];
-				int BalanceZCBChange = lastZCBDividend - contractZCBDividend[mostRecent+1];
+				int BalanceZCBChange = lastZCBDividend - contractBondDividend[mostRecent+1];
 				uint unitAmountYield = wrapper.WrappedAmtToUnitAmt_RoundDown(BalanceYieldChange);
 				ZCBtoSend += uint(int(unitAmountYield) + BalanceZCBChange).mul(_balanceOf).div(1 ether);
 				YTtoSend += unitAmountYield.mul(_balanceOf).div(1 ether);

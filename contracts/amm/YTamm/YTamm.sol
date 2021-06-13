@@ -49,7 +49,7 @@ contract YTamm is AYTamm {
 		ZCBaddress = _ZCBaddress;
 		YTaddress = _YTaddress;
 		delegateAddress = _delegateAddress;
-		contractZCBDividend.push(0);
+		contractBondDividend.push(0);
 		contractYieldDividend.push(0);
 	}
 
@@ -112,7 +112,7 @@ contract YTamm is AYTamm {
 		internalTotalSupply -= _amount;
 
 		//if _from is earning yield on LP funds then decrement from activeTotalSupply
-		uint lastIndex = contractZCBDividend.length-1;
+		uint lastIndex = contractBondDividend.length-1;
 		if (_lastClaim <= lastIndex) {
 			activeTotalSupply -= _amount;
 		}
@@ -274,21 +274,15 @@ contract YTamm is AYTamm {
 
 		Ureserves = _Uin;
 		YTreserves = YTin;
+		lastRecalibration = block.timestamp;
 	}
 
 	/*
 		@Description: as time progresses the optimal ratio of YT to U reserves changes
-			this function ensures that we return to that ratio every so often
-			this function may also be called when outOfSync returns true
-
-		@param int128 _approxYTin: an approximation of the maximum amount of YT that may be swapped
-			into this amm in order to get U out. This value should be greater than the actual maximum
-			amount of YT that may be swapped in
-			This param only matters if the user is trying to recalibrate based on reserves going out
-			of sync
+			this function ensures that we return to that ratio every 4 weeks
 	*/
-	function recalibrate(int128 _approxYTin) external override {
-		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature('recalibrate(int128)', _approxYTin));
+	function recalibrate() external override {
+		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature('recalibrate()'));
 		require(success);
 	}
 

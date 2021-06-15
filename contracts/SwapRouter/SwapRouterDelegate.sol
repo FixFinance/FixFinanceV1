@@ -26,13 +26,13 @@ contract SwapRouterDelegate {
 	*/
 	function UnitToZCB(address _fixCapitalPoolAddress, uint _amount, uint _minZCBout) external {
 		require(_amount > MinBalance && _amount < uint(MAX));
-		IFixCapitalPool ch = IFixCapitalPool(_fixCapitalPoolAddress);
+		IFixCapitalPool fcp = IFixCapitalPool(_fixCapitalPoolAddress);
 		IOrganizer _org = org;
 		IERC20 underlyingAsset = IERC20(IFixCapitalPool(_fixCapitalPoolAddress).underlyingAssetAddress());
 		IWrapper wrapper = IFixCapitalPool(_fixCapitalPoolAddress).wrapper();
 		IZCBamm amm = IZCBamm(_org.ZCBamms(_fixCapitalPoolAddress));
-		IYieldToken yt = IYieldToken(ch.yieldTokenAddress());
-		IZeroCouponBond zcb = IZeroCouponBond(ch.zeroCouponBondAddress());
+		IYieldToken yt = IYieldToken(fcp.yieldTokenAddress());
+		IZeroCouponBond zcb = IZeroCouponBond(fcp.zeroCouponBondAddress());
 
 		wrapper.forceHarvest();
 		uint amtZCBout = amm.ReserveQuoteFromSpecificTokens(int128(_amount), false);
@@ -53,7 +53,7 @@ contract SwapRouterDelegate {
 			_amountWrapped = wrapper.depositUnitAmount(address(this), toDeposit);
 		}
 		wrapper.approve(_fixCapitalPoolAddress, _amountWrapped);
-		ch.depositWrappedToken(address(this), _amountWrapped);
+		fcp.depositWrappedToken(address(this), _amountWrapped);
 		zcb.approve(address(amm), _amount);
 		yt.approve(address(amm), _amountWrapped);
 		amm.TakeQuote(_amount, amtZCBout, false, false);
@@ -72,13 +72,13 @@ contract SwapRouterDelegate {
 	function UnitToYT(address _fixCapitalPoolAddress, int128 _amountYT, uint _maxUnitAmount) external {
 		_amountYT++;	//account for rounding error when transfering funds out of YTamm
 		require(_amountYT > int128(MinBalance));
-		IFixCapitalPool ch = IFixCapitalPool(_fixCapitalPoolAddress);
+		IFixCapitalPool fcp = IFixCapitalPool(_fixCapitalPoolAddress);
 		IOrganizer _org = org;
 		IERC20 underlyingAsset = IERC20(IFixCapitalPool(_fixCapitalPoolAddress).underlyingAssetAddress());
 		IWrapper wrapper = IFixCapitalPool(_fixCapitalPoolAddress).wrapper();
 		IYTamm amm = IYTamm(_org.YTamms(_fixCapitalPoolAddress));
-		IYieldToken yt = IYieldToken(ch.yieldTokenAddress());
-		IZeroCouponBond zcb = IZeroCouponBond(ch.zeroCouponBondAddress());
+		IYieldToken yt = IYieldToken(fcp.yieldTokenAddress());
+		IZeroCouponBond zcb = IZeroCouponBond(fcp.zeroCouponBondAddress());
 
 		wrapper.forceHarvest();
 		uint _amtATkn = amm.ReserveQuoteToYT(_amountYT);
@@ -98,7 +98,7 @@ contract SwapRouterDelegate {
 			_amountWrapped = wrapper.depositUnitAmount(address(this), _amtTransfer);
 		}
 		wrapper.approve(_fixCapitalPoolAddress, _amountWrapped);
-		ch.depositWrappedToken(address(this), _amountWrapped);
+		fcp.depositWrappedToken(address(this), _amountWrapped);
 		zcb.approve(address(amm), _amtTransfer);
 		yt.approve(address(amm), _amountWrapped);
 		amm.TakeQuote(_amtATkn, int128(_amountYT), false);
@@ -114,14 +114,14 @@ contract SwapRouterDelegate {
 			otherwise after positions are exited the wrapped asset will be returned back to the caller of this function
 	*/
 	function LiquidateAllToUnderlying(address _fixCapitalPoolAddress, uint _minUout, bool _unwrap) external {
-		IFixCapitalPool ch = IFixCapitalPool(_fixCapitalPoolAddress);
-		IYieldToken yt = IYieldToken(ch.yieldTokenAddress());
-		IZeroCouponBond zcb = IZeroCouponBond(ch.zeroCouponBondAddress());
+		IFixCapitalPool fcp = IFixCapitalPool(_fixCapitalPoolAddress);
+		IYieldToken yt = IYieldToken(fcp.yieldTokenAddress());
+		IZeroCouponBond zcb = IZeroCouponBond(fcp.zeroCouponBondAddress());
 
 		yt.transferFrom(msg.sender, address(this), yt.balanceOf(msg.sender));
 		zcb.transferFrom(msg.sender, address(this), zcb.balanceOf(msg.sender));
 
-		int _bondBal = ch.balanceBonds(address(this));
+		int _bondBal = fcp.balanceBonds(address(this));
 
 		if (_bondBal < -int(MinBalance)) {
 			require(_bondBal >= -int(MAX));
@@ -151,6 +151,6 @@ contract SwapRouterDelegate {
 			}
 		}
 
-		ch.withdrawAll(msg.sender, _unwrap);
+		fcp.withdrawAll(msg.sender, _unwrap);
 	}
 }

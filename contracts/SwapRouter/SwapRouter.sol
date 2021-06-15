@@ -100,14 +100,14 @@ contract SwapRouter is ISwapRouter {
 			uint _minUout,
 			bool _unwrap
 	) external override {
-		IFixCapitalPool ch = IFixCapitalPool(_fixCapitalPoolAddress);
-		IYieldToken yt = IYieldToken(ch.yieldTokenAddress());
-		IZeroCouponBond zcb = IZeroCouponBond(ch.zeroCouponBondAddress());
+		IFixCapitalPool fcp = IFixCapitalPool(_fixCapitalPoolAddress);
+		IYieldToken yt = IYieldToken(fcp.yieldTokenAddress());
+		IZeroCouponBond zcb = IZeroCouponBond(fcp.zeroCouponBondAddress());
 
 		yt.transferFrom_2(msg.sender, address(this), _amountYT, false);
 		zcb.transferFrom(msg.sender, address(this), _amountZCB);
 
-		int _bondBal = ch.balanceBonds(address(this));
+		int _bondBal = fcp.balanceBonds(address(this));
 
 		if (_bondBal < -int(MinBalance)) {
 			require(_bondBal >= -int(MAX));
@@ -137,7 +137,7 @@ contract SwapRouter is ISwapRouter {
 			}
 		}
 
-		ch.withdrawAll(msg.sender, _unwrap);
+		fcp.withdrawAll(msg.sender, _unwrap);
 	}
 
 	/*
@@ -150,12 +150,12 @@ contract SwapRouter is ISwapRouter {
 	*/
 	function SwapZCBtoYT(address _fixCapitalPoolAddress, uint _amountYT, uint _maxZCBin) external override {
 		require(_amountYT < uint(MAX));
-		IFixCapitalPool ch = IFixCapitalPool(_fixCapitalPoolAddress);
-		IYieldToken yt = IYieldToken(ch.yieldTokenAddress());
+		IFixCapitalPool fcp = IFixCapitalPool(_fixCapitalPoolAddress);
+		IYieldToken yt = IYieldToken(fcp.yieldTokenAddress());
 		IOrganizer _org = org;
 		IZCBamm zAmm = IZCBamm(_org.ZCBamms(_fixCapitalPoolAddress));
 		IYTamm yAmm = IYTamm(_org.YTamms(_fixCapitalPoolAddress));
-		IZeroCouponBond zcb = IZeroCouponBond(ch.zeroCouponBondAddress());
+		IZeroCouponBond zcb = IZeroCouponBond(fcp.zeroCouponBondAddress());
 
 		uint _amtU = yAmm.ReserveQuoteToYT(int128(_amountYT+RoundingBuffer));
 		uint _amtZCB = zAmm.ReserveQuoteToSpecificTokens(int128(_amtU+RoundingBuffer), true);
@@ -180,9 +180,9 @@ contract SwapRouter is ISwapRouter {
 	*/
 	function SwapYTtoZCB(address _fixCapitalPoolAddress, uint _amountYT, uint _minZCBout) external override {
 		require(_amountYT < uint(MAX) && _amountYT > RoundingBuffer);
-		IFixCapitalPool ch = IFixCapitalPool(_fixCapitalPoolAddress);
-		IYieldToken yt = IYieldToken(ch.yieldTokenAddress());
-		IZeroCouponBond zcb = IZeroCouponBond(ch.zeroCouponBondAddress());
+		IFixCapitalPool fcp = IFixCapitalPool(_fixCapitalPoolAddress);
+		IYieldToken yt = IYieldToken(fcp.yieldTokenAddress());
+		IZeroCouponBond zcb = IZeroCouponBond(fcp.zeroCouponBondAddress());
 		IOrganizer _org = org;
 		IZCBamm zAmm = IZCBamm(_org.ZCBamms(_fixCapitalPoolAddress));
 		IYTamm yAmm = IYTamm(_org.YTamms(_fixCapitalPoolAddress));
@@ -215,9 +215,9 @@ contract SwapRouter is ISwapRouter {
 	*/
 	function _SwapZCBtoYT_ZCBamm(address _fixCapitalPoolAddress, uint _amountYT, uint _maxZCBin, bool _transferIn, bool _transferOut) internal returns (uint ZCBin) {
 		require(_amountYT < uint(MAX) && _amountYT > RoundingBuffer);
-		IFixCapitalPool ch = IFixCapitalPool(_fixCapitalPoolAddress);
-		IYieldToken yt = IYieldToken(ch.yieldTokenAddress());
-		IZeroCouponBond zcb = IZeroCouponBond(ch.zeroCouponBondAddress());
+		IFixCapitalPool fcp = IFixCapitalPool(_fixCapitalPoolAddress);
+		IYieldToken yt = IYieldToken(fcp.yieldTokenAddress());
+		IZeroCouponBond zcb = IZeroCouponBond(fcp.zeroCouponBondAddress());
 		IZCBamm zAmm = IZCBamm(org.ZCBamms(_fixCapitalPoolAddress));
 
 		uint quotedAmtIn = zAmm.ReserveQuoteToSpecificTokens(int128(_amountYT), true);
@@ -250,9 +250,9 @@ contract SwapRouter is ISwapRouter {
 	*/
 	function _SwapYTtoZCB_ZCBamm(address _fixCapitalPoolAddress, uint _amountYT, uint _minZCBout, bool _transferIn, bool _transferOut) internal returns (uint ZCBout) {
 		require(_amountYT < uint(MAX) && _amountYT > RoundingBuffer);
-		IFixCapitalPool ch = IFixCapitalPool(_fixCapitalPoolAddress);
-		IYieldToken yt = IYieldToken(ch.yieldTokenAddress());
-		IZeroCouponBond zcb = IZeroCouponBond(ch.zeroCouponBondAddress());
+		IFixCapitalPool fcp = IFixCapitalPool(_fixCapitalPoolAddress);
+		IYieldToken yt = IYieldToken(fcp.yieldTokenAddress());
+		IZeroCouponBond zcb = IZeroCouponBond(fcp.zeroCouponBondAddress());
 		IZCBamm zAmm = IZCBamm(org.ZCBamms(_fixCapitalPoolAddress));
 
 		uint quotedAmtOut = zAmm.ReserveQuoteFromSpecificTokens(int128(_amountYT), false);
@@ -308,20 +308,20 @@ contract SwapRouter is ISwapRouter {
 		@param uint _amountYT: the amount of YT which will be the output
 		@param uint _Uin: the amount of U from which to initially start
 	*/
-	function SwapUtoYT_ZCBamm(address _fixCapitalPoolAddress, uint _amountYT, int128 _Uin) external override {
+	function SwapUtoYT_ZCBamm(address _fixCapitalPoolAddress, uint _amountYT, uint _Uin) external override {
 		require(_amountYT <= uint(MAX) && _amountYT > RoundingBuffer);
-		require(_Uin > 0);
-		IFixCapitalPool ch = IFixCapitalPool(_fixCapitalPoolAddress);
-		IYieldToken yt = IYieldToken(ch.yieldTokenAddress());
-		IZeroCouponBond zcb = IZeroCouponBond(ch.zeroCouponBondAddress());
+		require(_Uin < uint(type(int128).max));
+		IFixCapitalPool fcp = IFixCapitalPool(_fixCapitalPoolAddress);
+		IYieldToken yt = IYieldToken(fcp.yieldTokenAddress());
+		IZeroCouponBond zcb = IZeroCouponBond(fcp.zeroCouponBondAddress());
 		IZCBamm zAmm = IZCBamm(org.ZCBamms(_fixCapitalPoolAddress));
 
-		uint ZCBinMiddle = zAmm.ReserveQuoteFromSpecificTokens(_Uin, false);
+		uint ZCBinMiddle = zAmm.ReserveQuoteFromSpecificTokens(int128(_Uin), false);
 
-		yt.transferFrom_2(msg.sender, address(this), uint(_Uin), true);
-		zcb.transferFrom(msg.sender, address(this), uint(_Uin));
-		yt.approve_2(address(zAmm), uint(_Uin), true);
-		zAmm.TakeQuote(uint(_Uin), ZCBinMiddle, false, false);
+		yt.transferFrom_2(msg.sender, address(this), _Uin, true);
+		zcb.transferFrom(msg.sender, address(this), _Uin);
+		yt.approve_2(address(zAmm), _Uin, true);
+		zAmm.TakeQuote(_Uin, ZCBinMiddle, false, false);
 
 		_SwapZCBtoYT_ZCBamm(_fixCapitalPoolAddress, _amountYT, ZCBinMiddle, false, true);
 	}
@@ -336,9 +336,9 @@ contract SwapRouter is ISwapRouter {
 	*/
 	function SwapYTtoU_ZCBamm(address _fixCapitalPoolAddress, uint _amountYT, uint _minUout) external override {
 		uint ZCBout = _SwapYTtoZCB_ZCBamm(_fixCapitalPoolAddress, _amountYT, _minUout, true, false);
-		IFixCapitalPool ch = IFixCapitalPool(_fixCapitalPoolAddress);
-		IYieldToken yt = IYieldToken(ch.yieldTokenAddress());
-		IZeroCouponBond zcb = IZeroCouponBond(ch.zeroCouponBondAddress());
+		IFixCapitalPool fcp = IFixCapitalPool(_fixCapitalPoolAddress);
+		IYieldToken yt = IYieldToken(fcp.yieldTokenAddress());
+		IZeroCouponBond zcb = IZeroCouponBond(fcp.zeroCouponBondAddress());
 		IZCBamm zAmm = IZCBamm(org.ZCBamms(_fixCapitalPoolAddress));
 		require(ZCBout <= uint(MAX));
 

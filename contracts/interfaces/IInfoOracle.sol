@@ -17,12 +17,12 @@ interface IInfoOracle {
 	function DelegatedControllers(address _owner) external view returns (address delegate);
 	//for use by DBSFVaultFactory
 	function StabilityFeeAPR(address _vaultFactoryAddress, address _wrapperAddress) external view returns (uint64 stabilityFeeAPR);
-	function collateralWhitelist(address _vaultFactoryAddress, address _wrapperAddress) external view returns (address underlyingAsset);
+	function collateralWhitelist(address _vaultFactoryAddress, address _assetAddress) external view returns (address underlyingAsset);
 	function FCPtoWrapper(address _vaultFactoryAddress, address _FCPaddress) external view returns (address wrapperAddress);
 
 	//---------management--------------
 
-	function setDelegatedController(address _delegate) external;
+	function setDelegatedController(address _manager) external;
 	function wrapperSetFeeConstants(address _wrapper, uint _ZCBammFeeConstant, uint _YTammFeeConstant) external;
 	function wrapperSetSlippageConst(address _wrapper, uint _SlippageConstant) external;
 	function setFeeConstants(address _fixCapitalPoolAddress, uint _ZCBammFeeConstant, uint _YTammFeeConstant) external;

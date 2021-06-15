@@ -42,7 +42,7 @@ contract Organizer is Ownable, IOrganizer {
 	//IWrapper => isVerified
 	mapping(address => bool) public override wrapperIsVerified;
 
-	address public override yieldTokenDeployerAddress;
+	address public override ZCB_YT_DeployerAddress;
 	address public override FixCapitalPoolDeployerAddress;
 	address public override ZCBammDeployerAddress;
 	address public override YTammDeployerAddress;
@@ -55,14 +55,14 @@ contract Organizer is Ownable, IOrganizer {
 		init
 	*/
 	constructor (
-		address _yieldTokenDeployerAddress,
+		address _ZCB_YT_DeployerAddress,
 		address _fixCapitalPoolDeployerAddress,
 		address _ZCBammDeployerAddress,
 		address _YTammDeployerAddress,
 		address _SwapRouterDeployerAddress,
 		address _InfoOracleAddress
 	) public {
-		yieldTokenDeployerAddress = _yieldTokenDeployerAddress;	
+		ZCB_YT_DeployerAddress = _ZCB_YT_DeployerAddress;	
 		FixCapitalPoolDeployerAddress = _fixCapitalPoolDeployerAddress;
 		ZCBammDeployerAddress = _ZCBammDeployerAddress;
 		YTammDeployerAddress = _YTammDeployerAddress;
@@ -102,7 +102,7 @@ contract Organizer is Ownable, IOrganizer {
 		address fixCapitalPoolAddress = FixCapitalPoolDeployer(FixCapitalPoolDeployerAddress).deploy(
 			_wrapperAddress,
 			_maturity,
-			yieldTokenDeployerAddress,
+			ZCB_YT_DeployerAddress,
 			msg.sender,
 			InfoOracleAddress
 		);

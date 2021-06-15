@@ -7,7 +7,7 @@ interface IOrganizer {
 	function YTamms(address _FCPaddress) external view returns (address YTammAddress);
 	function wrapperIsVerified(address _wrapperAddress) external view returns (bool isVerified);
 
-	function yieldTokenDeployerAddress() external view returns(address);
+	function ZCB_YT_DeployerAddress() external view returns(address);
 	function FixCapitalPoolDeployerAddress() external view returns(address);
 	function ZCBammDeployerAddress() external view returns(address);
 	function YTammDeployerAddress() external view returns(address);

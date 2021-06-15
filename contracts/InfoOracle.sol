@@ -84,10 +84,10 @@ contract InfoOracle is IInfoOracle, Ownable {
 	/*
 		@Description: delegate ability to customise parameters for wrappers and FCPs to another address
 
-		@param address _delegate: the address that shall customise parameters for msg.sender
+		@param address _manager: the address that shall customise parameters for msg.sender
 	*/
-	function setDelegatedController(address _delegate) external override {
-		DelegatedControllers[msg.sender] = _delegate;
+	function setDelegatedController(address _manager) external override {
+		DelegatedControllers[msg.sender] = _manager;
 	}
 
 	/*

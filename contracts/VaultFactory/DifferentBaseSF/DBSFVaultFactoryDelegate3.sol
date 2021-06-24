@@ -513,6 +513,7 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryData {
 		bytes memory _data,
 		address _receiverAddr
 	) internal {
+		int[2] memory changes;
 		if (mVault.FCPsupplied != _FCPsupplied) {
 			if (mVault.FCPsupplied != address(0)) {
 				IFixCapitalPool(mVault.FCPsupplied).transferPosition(_receiverAddr, mVault.yieldSupplied, mVault.bondSupplied);
@@ -521,20 +522,26 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryData {
 			sVault.yieldSupplied = _yieldSupplied;
 			sVault.bondSupplied = _bondSupplied;
 		}
-		else if (mVault.yieldSupplied != _yieldSupplied) {
-			if (mVault.yieldSupplied > _yieldSupplied) {
-				IFixCapitalPool(_FCPsupplied).transferPosition(_receiverAddr, mVault.yieldSupplied - _yieldSupplied, mVault.bondSupplied.sub(_bondSupplied));
+		else if (mVault.yieldSupplied != _yieldSupplied || mVault.bondSupplied != _bondSupplied) {
+			uint conversionRate = IFixCapitalPool(_FCPsupplied).currentConversionRate();
+			require(_bondSupplied >= 0 || _yieldSupplied.mul(conversionRate) / (1 ether) >= uint(-_bondSupplied));
+			//write change in YT & ZCB into yield supplied & bond supplied respectively on mVault to save stack space
+			changes[0] = int(_yieldSupplied).sub(int(mVault.yieldSupplied));
+			changes[1] = _bondSupplied.sub(mVault.bondSupplied).add(changes[0].mul(int(conversionRate)) / (1 ether));
+			if (changes[0] < 0) {
+				IFixCapitalPool(_FCPsupplied).transferYT(address(this), msg.sender, uint(-changes[0]));
+				changes[1]++; //offset rounding error when updating bond balance amounts
 			}
-			sVault.yieldSupplied = _yieldSupplied;
-		}
-		if (mVault.bondSupplied != _bondSupplied) {
-			if (mVault.bondSupplied > _bondSupplied && mVault.yieldSupplied == _yieldSupplied) {
-				IFixCapitalPool(_FCPsupplied).transferPosition(_receiverAddr, 0, mVault.bondSupplied.sub(_bondSupplied));
+			if (changes[1] < 0) {
+				IFixCapitalPool(_FCPsupplied).transferZCB(address(this), msg.sender, uint(-changes[1]));
 			}
-			sVault.bondSupplied = _bondSupplied;
+			if (mVault.yieldSupplied != _yieldSupplied) {
+				sVault.yieldSupplied = _yieldSupplied;
+			}
+			if (mVault.bondSupplied != _bondSupplied) {
+				sVault.bondSupplied = _bondSupplied;
+			}
 		}
-
-
 		uint change;
 		uint adjSFee;
 		if (mVault.amountBorrowed < _amountBorrowed) {
@@ -545,8 +552,10 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryData {
 			raiseShortInterest(_FCPborrowed, adjBorrowed - mVault.amountBorrowed);
 			sVault.amountBorrowed = adjBorrowed;
 			{
-				uint temp = stabilityFeeMultiplier.sub(1 ether).mul(mVault.amountBorrowed) / (1 ether);
-				adjSFee = mVault.amountSFee.add(temp);
+				uint temp = mVault.amountBorrowed; // prevent stack too deep
+				temp = stabilityFeeMultiplier.sub(1 ether).mul(temp) / (1 ether);
+				adjSFee = mVault.amountSFee; //prevent stack too deep
+				adjSFee = adjSFee.add(temp);
 				sVault.amountSFee = adjSFee;
 			}
 			sVault.timestampOpened = uint64(IFixCapitalPool(_FCPborrowed).lastUpdate());
@@ -559,12 +568,15 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryData {
 				raiseShortInterest(_FCPborrowed, adjBorrowed - mVault.amountBorrowed);
 			}
 			else {
-				lowerShortInterest(_FCPborrowed, mVault.amountBorrowed - adjBorrowed);
+				uint mVaultAmtBorrowed = mVault.amountBorrowed;
+				lowerShortInterest(_FCPborrowed, mVaultAmtBorrowed - adjBorrowed);
 			}
 			sVault.amountBorrowed = adjBorrowed;
 			{
-				uint temp = stabilityFeeMultiplier.sub(1 ether).mul(mVault.amountBorrowed) / (1 ether);
-				adjSFee = mVault.amountSFee.add(temp);
+				uint temp = mVault.amountBorrowed; // prevent stack too deep
+				temp = stabilityFeeMultiplier.sub(1 ether).mul(temp) / (1 ether);
+				adjSFee = mVault.amountSFee; // prevent stack too deep
+				adjSFee = adjSFee.add(temp);
 				if (change > adjSFee) {
 					sVault.amountSFee = 0;
 				}
@@ -579,28 +591,27 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryData {
 		if (_data.length > 0) {
 			address FCPsupplied = mVault.FCPsupplied;
 			address FCPborrowed = mVault.FCPborrowed;
-			uint yieldSupplied = mVault.yieldSupplied;
-			int bondSupplied = mVault.bondSupplied;
-			uint prevAmtBorrowed = mVault.amountBorrowed; //prevent stack too deep
-			int changeBorrowed;
+			bytes32[3] memory toPass;
+			toPass[0] = bytes32(mVault.yieldSupplied);
+			toPass[1] = bytes32(mVault.bondSupplied);
+			toPass[2] = bytes32(mVault.amountBorrowed);
 			if (change == 0) {
-				changeBorrowed = 0;
+				toPass[2] = bytes32(0);
 			}
-			else if (prevAmtBorrowed > _amountBorrowed) {
-				changeBorrowed = int(change);
+			else if (uint(toPass[2]) > _amountBorrowed) {
+				toPass[2] = bytes32(int(change));
 			}
 			else {
-				changeBorrowed = -int(change);
+				toPass[2] = bytes32(-int(change));
 			}
-			//int changeBorrowed = change == 0 ? 0 : (mVault.amountBorrowed < _amountBorrowed ? int(change) : -int(change));
 			bytes memory data = _data;
 			IDBSFYTVaultManagerFlashReceiver(_receiverAddr).onFlashLoan(
 				msg.sender,
 				FCPsupplied,
 				FCPborrowed,
-				yieldSupplied,
-				bondSupplied,
-				changeBorrowed,
+				uint(toPass[0]),
+				int(toPass[1]),
+				int(toPass[2]),
 				data
 			);
 		}
@@ -609,18 +620,14 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryData {
 		if (mVault.FCPsupplied != _FCPsupplied) {
 			IFixCapitalPool(_FCPsupplied).transferPositionFrom(msg.sender, address(this), _yieldSupplied, _bondSupplied);
 		}
-		else if (mVault.yieldSupplied != _yieldSupplied) {
-			if (mVault.yieldSupplied < _yieldSupplied) {
-				uint yield = _yieldSupplied - mVault.yieldSupplied;
-				int bond = _bondSupplied.sub(mVault.bondSupplied);
-				IFixCapitalPool(_FCPsupplied).transferPositionFrom(msg.sender, address(this), yield, bond);
+		else {
+			if (changes[0] > 0) {
+				IFixCapitalPool(_FCPsupplied).transferYT(msg.sender, address(this), uint(changes[0]));
+			}
+			if (changes[1] > 0) {
+				IFixCapitalPool(_FCPsupplied).transferZCB(msg.sender, address(this), uint(changes[1]));
 			}
 		}
-		else if (mVault.bondSupplied < _bondSupplied) {
-			int bond = _bondSupplied.sub(mVault.bondSupplied);
-			IFixCapitalPool(_FCPsupplied).transferPositionFrom(_receiverAddr, address(this), 0, bond);
-		}
-
 		if (mVault.amountBorrowed > _amountBorrowed) {
 			IFixCapitalPool(_FCPborrowed).burnZCBFrom(msg.sender,  change);
 			claimStabilityFee(_FCPborrowed, adjSFee < change ? adjSFee : change);
@@ -660,6 +667,7 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryData {
 		bytes memory _data,
 		address _receiverAddr
 	) internal {
+		int[2] memory changes;
 		if (mVault.FCPsupplied != _FCPsupplied) {
 			if (mVault.FCPsupplied != address(0)) {
 				IFixCapitalPool(mVault.FCPsupplied).transferPosition(_receiverAddr, mVault.yieldSupplied, mVault.bondSupplied);
@@ -668,17 +676,25 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryData {
 			sVault.yieldSupplied = _yieldSupplied;
 			sVault.bondSupplied = _bondSupplied;
 		}
-		else if (mVault.yieldSupplied != _yieldSupplied) {
-			if (mVault.yieldSupplied > _yieldSupplied) {
-				IFixCapitalPool(_FCPsupplied).transferPosition(_receiverAddr, mVault.yieldSupplied - _yieldSupplied, mVault.bondSupplied.sub(_bondSupplied));
+		else if (mVault.yieldSupplied != _yieldSupplied || mVault.bondSupplied != _bondSupplied) {
+			uint conversionRate = IFixCapitalPool(_FCPsupplied).currentConversionRate();
+			require(_bondSupplied >= 0 || _yieldSupplied.mul(conversionRate) / (1 ether) >= uint(-_bondSupplied));
+			//write change in YT & ZCB into yield supplied & bond supplied respectively on mVault to save stack space
+			changes[0] = int(_yieldSupplied).sub(int(mVault.yieldSupplied));
+			changes[1] = _bondSupplied.sub(mVault.bondSupplied).add(changes[0].mul(int(conversionRate)) / (1 ether));
+			if (changes[0] < 0) {
+				IFixCapitalPool(_FCPsupplied).transferYT(address(this), msg.sender, uint(-changes[0]));
+				changes[1]++; //offset rounding error when updating bond balance amounts
 			}
-			sVault.yieldSupplied = _yieldSupplied;
-		}
-		if (mVault.bondSupplied != _bondSupplied) {
-			if (mVault.bondSupplied > _bondSupplied && mVault.yieldSupplied == _yieldSupplied) {
-				IFixCapitalPool(_FCPsupplied).transferPosition(_receiverAddr, 0, mVault.bondSupplied.sub(_bondSupplied));
+			if (changes[1] < 0) {
+				IFixCapitalPool(_FCPsupplied).transferZCB(address(this), msg.sender, uint(-changes[1]));
 			}
-			sVault.bondSupplied = _bondSupplied;
+			if (mVault.yieldSupplied != _yieldSupplied) {
+				sVault.yieldSupplied = _yieldSupplied;
+			}
+			if (mVault.bondSupplied != _bondSupplied) {
+				sVault.bondSupplied = _bondSupplied;
+			}
 		}
 
 		if (_FCPborrowed != address(0)) {
@@ -702,13 +718,18 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryData {
 
 		//-----------------------------flashloan------------------
 		if (_data.length > 0) {
+			address FCPsupplied = mVault.FCPsupplied;
+			address FCPborrowed = mVault.FCPborrowed;
+			uint yieldSupplied = mVault.yieldSupplied;
+			int bondSupplied = mVault.bondSupplied;
+			int changeBorrowed = -int(mVault.amountBorrowed);
 			IDBSFYTVaultManagerFlashReceiver(_receiverAddr).onFlashLoan(
 				msg.sender,
-				mVault.FCPsupplied,
-				mVault.FCPborrowed,
-				mVault.yieldSupplied,
-				mVault.bondSupplied,
-				-int(mVault.amountBorrowed),
+				FCPsupplied,
+				FCPborrowed,
+				yieldSupplied,
+				bondSupplied,
+				changeBorrowed,
 				_data
 			);
 		}
@@ -717,13 +738,13 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryData {
 		if (mVault.FCPsupplied != _FCPsupplied) {
 			IFixCapitalPool(_FCPsupplied).transferPositionFrom(msg.sender, address(this), _yieldSupplied, _bondSupplied);
 		}
-		else if (mVault.yieldSupplied != _yieldSupplied) {
-			if (mVault.yieldSupplied < _yieldSupplied) {
-				IFixCapitalPool(_FCPsupplied).transferPositionFrom(msg.sender, address(this), _yieldSupplied - mVault.yieldSupplied, _bondSupplied.sub(mVault.bondSupplied));
+		else {
+			if (changes[0] > 0) {
+				IFixCapitalPool(_FCPsupplied).transferYT(msg.sender, address(this), uint(changes[0]));
 			}
-		}
-		else if (mVault.bondSupplied < _bondSupplied) {
-			IFixCapitalPool(_FCPsupplied).transferPositionFrom(_receiverAddr, address(this), 0, _bondSupplied.sub(mVault.bondSupplied));
+			if (changes[1] > 0) {
+				IFixCapitalPool(_FCPsupplied).transferZCB(msg.sender, address(this), uint(changes[1]));
+			}
 		}
 
 		if (mVault.amountBorrowed > 0) {

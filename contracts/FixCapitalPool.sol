@@ -119,6 +119,14 @@ contract FixCapitalPool is IFixCapitalPool, Ownable, nonReentrant {
 	}
 
 	/*
+		@Description: return the amount of the bond value for which the ZCB contained is equal to
+			the ZCB contained in (1 ether) of the yield value
+	*/
+	function currentConversionRate() external view override returns(uint conversionRate) {
+		return inPayoutPhase ? maturityConversionRate : wrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
+	}
+
+	/*
 		@Description: send wrapped asest to this fix capital pool, receive ZCB & YT
 
 		@param address _to: the address that shall receive the ZCB and YT
@@ -316,8 +324,9 @@ contract FixCapitalPool is IFixCapitalPool, Ownable, nonReentrant {
 		@param address _to: the address to send 
 	*/
 	function transferZCB(address _from, address _to, uint _amount) external override {
-		require(msg.sender == zeroCouponBondAddress);
-
+		if (msg.sender != _from && msg.sender != zeroCouponBondAddress) {
+			IZeroCouponBond(zeroCouponBondAddress).decrementAllowance(_from, msg.sender, _amount);
+		}
 		int intAmount = int(_amount);
 		require(intAmount >= 0);
 		balanceBonds[_to] = balanceBonds[_to].add(intAmount);
@@ -338,14 +347,16 @@ contract FixCapitalPool is IFixCapitalPool, Ownable, nonReentrant {
 		@param uint _amount: the amount of YT to move between _from and _to
 			*denominated in wrapped asset*
 	*/
-	function transferYield(address _from, address _to, uint _amount) external override {
-		require(msg.sender == yieldTokenAddress);
+	function transferYT(address _from, address _to, uint _amount) external override {
+		if (msg.sender != _from && msg.sender != yieldTokenAddress) {
+			IYieldToken(yieldTokenAddress).decrementAllowance(_from, msg.sender, _amount);
+		}
 		require(balanceYield[_from] >= _amount);
-		uint _amountATkn = inPayoutPhase ? _amount.mul(maturityConversionRate)/(1 ether) : wrapper.WrappedAmtToUnitAmt_RoundDown(_amount);
+		uint _amountBondChange = inPayoutPhase ? _amount.mul(maturityConversionRate)/(1 ether) : wrapper.WrappedAmtToUnitAmt_RoundDown(_amount);
 		balanceYield[_from] -= _amount;
 		balanceYield[_to] += _amount;
-		balanceBonds[_from] += int(_amountATkn);
-		balanceBonds[_to] -= int(_amountATkn);
+		balanceBonds[_from] += int(_amountBondChange);
+		balanceBonds[_to] -= int(_amountBondChange);
 
 		//ensure that _from address's position may be cashed out to a positive amount of wrappedToken
 		//if it cannot the following call will revert this tx

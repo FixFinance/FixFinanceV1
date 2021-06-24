@@ -12,6 +12,8 @@ interface IFixCapitalPool is IFCPFlashLender {
 	function enterPayoutPhase() external;
 	function transferPosition(address _to, uint _yield, int _bond) external;
 	function transferPositionFrom(address _from, address _to, uint _yield, int _bond) external;
+	function transferYT(address _from, address _to, uint _amount) external;
+	function transferZCB(address _from, address _to, uint _amount) external;
 
 	function wrappedTokenFree(address _owner) external view returns (uint wrappedTknFree);
 	function inPayoutPhase() external view returns (bool);
@@ -26,13 +28,8 @@ interface IFixCapitalPool is IFCPFlashLender {
 	function infoOracleAddress() external view returns(address);
 	function wrapper() external view returns(IWrapper);
 	function lastUpdate() external view returns(uint);
-
-	//---------------Yield-Token---------------
-	function transferYield(address _from, address _to, uint _amount) external;
-
-	//---------------Zero-Coupon-Bond---------
+	function currentConversionRate() external view returns(uint);
 	function totalBalanceZCB(address _owner) external view returns (uint);
-	function transferZCB(address _from, address _to, uint _amount) external;
 
 	//---------------Vault-Factory------------------------------
 	function mintZCBTo(address _owner, uint _amount) external;

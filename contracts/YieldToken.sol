@@ -41,7 +41,7 @@ contract YieldToken is IYieldToken {
     }
 
     function transfer(address _to, uint256 _value) public override returns (bool success) {
-        fcp.transferYield(msg.sender, _to, _value);
+        fcp.transferYT(msg.sender, _to, _value);
 
         emit Transfer(msg.sender, _to, _value);
 
@@ -59,7 +59,7 @@ contract YieldToken is IYieldToken {
     function transferFrom(address _from, address _to, uint256 _value) public override returns (bool success) {
         require(_value <= allowance[_from][msg.sender]);
 
-        fcp.transferYield(_from, _to, _value);
+        fcp.transferYT(_from, _to, _value);
 
         allowance[_from][msg.sender] -= _value;
 

@@ -356,6 +356,8 @@ contract NSFVaultFactoryDelegate2 is NSFVaultFactoryData {
 		}
 
 		//------------------distribute funds----------------------
+		int changeYTsupplied;
+		int changeZCBsupplied;
 		if (mVault.FCPsupplied != _FCPsupplied) {
 			if (mVault.FCPsupplied != address(0)) {
 				IFixCapitalPool(mVault.FCPsupplied).transferPosition(_receiverAddr, mVault.yieldSupplied, mVault.bondSupplied);
@@ -364,17 +366,25 @@ contract NSFVaultFactoryDelegate2 is NSFVaultFactoryData {
 			sVault.yieldSupplied = _yieldSupplied;
 			sVault.bondSupplied = _bondSupplied;
 		}
-		else if (mVault.yieldSupplied != _yieldSupplied) {
-			if (mVault.yieldSupplied > _yieldSupplied) {
-				IFixCapitalPool(_FCPsupplied).transferPosition(_receiverAddr, mVault.yieldSupplied - _yieldSupplied, mVault.bondSupplied.sub(_bondSupplied));
+		else if (mVault.yieldSupplied != _yieldSupplied || mVault.bondSupplied != _bondSupplied) {
+			uint conversionRate = IFixCapitalPool(_FCPsupplied).currentConversionRate();
+			require(_bondSupplied >= 0 || _yieldSupplied.mul(conversionRate) / (1 ether) >= uint(-_bondSupplied));
+			//write change in YT & ZCB into yield supplied & bond supplied respectively on mVault to save stack space
+			changeYTsupplied = int(_yieldSupplied).sub(int(mVault.yieldSupplied));
+			changeZCBsupplied = _bondSupplied.sub(mVault.bondSupplied).add(changeYTsupplied.mul(int(conversionRate)) / (1 ether));
+			if (changeYTsupplied < 0) {
+				IFixCapitalPool(_FCPsupplied).transferYT(address(this), msg.sender, uint(-changeYTsupplied));
+				changeZCBsupplied++; //offset rounding error when updating bond balance amounts
 			}
-			sVault.yieldSupplied = _yieldSupplied;
-		}
-		if (mVault.bondSupplied != _bondSupplied) {
-			if (mVault.bondSupplied > _bondSupplied && mVault.yieldSupplied == _yieldSupplied) {
-				IFixCapitalPool(_FCPsupplied).transferPosition(_receiverAddr, 0, mVault.bondSupplied.sub(_bondSupplied));
+			if (changeZCBsupplied < 0) {
+				IFixCapitalPool(_FCPsupplied).transferZCB(address(this), msg.sender, uint(-changeZCBsupplied));
 			}
-			sVault.bondSupplied = _bondSupplied;
+			if (mVault.yieldSupplied != _yieldSupplied) {
+				sVault.yieldSupplied = _yieldSupplied;
+			}
+			if (mVault.bondSupplied != _bondSupplied) {
+				sVault.bondSupplied = _bondSupplied;
+			}
 		}
 
 		if (mVault.FCPborrowed != _FCPborrowed) {
@@ -414,13 +424,13 @@ contract NSFVaultFactoryDelegate2 is NSFVaultFactoryData {
 		if (mVault.FCPsupplied != _FCPsupplied) {
 			IFixCapitalPool(_FCPsupplied).transferPositionFrom(msg.sender, address(this), _yieldSupplied, _bondSupplied);
 		}
-		else if (mVault.yieldSupplied != _yieldSupplied) {
-			if (mVault.yieldSupplied < _yieldSupplied) {
-				IFixCapitalPool(_FCPsupplied).transferPositionFrom(msg.sender, address(this), _yieldSupplied - mVault.yieldSupplied, _bondSupplied.sub(mVault.bondSupplied));
+		else {
+			if (changeYTsupplied > 0) {
+				IFixCapitalPool(_FCPsupplied).transferYT(msg.sender, address(this), uint(changeYTsupplied));
 			}
-		}
-		else if (mVault.bondSupplied < _bondSupplied) {
-			IFixCapitalPool(_FCPsupplied).transferPositionFrom(_receiverAddr, address(this), 0, _bondSupplied.sub(mVault.bondSupplied));
+			if (changeZCBsupplied > 0) {
+				IFixCapitalPool(_FCPsupplied).transferZCB(msg.sender, address(this), uint(changeZCBsupplied));
+			}
 		}
 
 		if (mVault.FCPborrowed != _FCPborrowed) {

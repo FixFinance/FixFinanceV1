@@ -1031,7 +1031,7 @@ contract('DBSFVaultFactory', async function(accounts) {
 
 		vault = await vaultFactoryInstance.YTvaults(accounts[0], 0);
 
-		assert.equal((await zcbAsset1.balanceOf(accounts[0])).toString(), prevBalanceZCB1.add(adjAmountYield).add(amountBond), "correct amount of ZCB received");
+		assert.equal((await zcbAsset1.balanceOf(accounts[0])).toString(), prevBalanceZCB1.add(adjAmountYield).add(amountBond).sub(new BN(1)).toString(), "correct amount of ZCB received");
 		assert.equal(prevVault.yieldSupplied.sub(vault.yieldSupplied).toString(), amountYield.toString(), "correct amount of yield removed from vault");
 		assert.equal(vault.yieldSupplied.toString(), newYield.toString(), "correct value of vault.yieldSupplied");
 		assert.equal(vault.bondSupplied.toString(), newBond.toString(), "correct value of vault.bondSupplied");

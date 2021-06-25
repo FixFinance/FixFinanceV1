@@ -12,16 +12,16 @@ contract OrderbookExchange {
 	using SafeMath for uint256;
 	using SignedSafeMath for int256;
 
-	struct LimitBuyZCB {
-		//same as LimitSellYT
+	struct LimitSellZCB {
+		//same as LimitBuyYT
 		address maker;
 		uint amount;
 		uint maturityConversionRate;
 		uint nextID;
 	}
 
-	struct LimitBuyYT {
-		//same as LimitSellZCB
+	struct LimitSellYT {
+		//same as LimitBuyZCB
 		address maker;
 		uint amount;
 		uint maturityConversionRate;
@@ -34,11 +34,11 @@ contract OrderbookExchange {
 	//amount of YT that is being used as collateral for a limit order
 	mapping(address => uint) public lockedYT;
 
-	mapping(uint => LimitBuyYT) public YTBuys;
-	mapping(uint => LimitBuyZCB) public ZCBBuys;
+	mapping(uint => LimitSellYT) public YTSells;
+	mapping(uint => LimitSellZCB) public ZCBSells;
 
-	uint headYTBuyID;
-	uint headZCBBuyID;
+	uint headYTSellID;
+	uint headZCBSellID;
 
 	//value of totalNumOrders at the time an order is created is its key in the order mapping
 	uint totalNumOrders;
@@ -101,7 +101,7 @@ contract OrderbookExchange {
 
 	//---------------i-n-t-e-r-n-a-l---m-o-d-i-f-y---o-r-d-e-r-b-o-o-k--------------------
 
-	function manageCollateral_BuyZCB(address _addr, uint _amount) internal {
+	function manageCollateral_SellZCB_makeOrder(address _addr, uint _amount) internal {
 		require(_amount < uint(type(int256).max));
 		uint YD = YieldDeposited[_addr];
 		int BD = BondDeposited[_addr];
@@ -145,7 +145,7 @@ contract OrderbookExchange {
 		}
 	}
 
-	function manageCollateral_BuyYT_makeOrder(address _addr, uint _amount) internal {
+	function manageCollateral_SellYT_makeOrder(address _addr, uint _amount) internal {
 		require(_amount < uint(type(int256).max));
 		uint YD = YieldDeposited[_addr];
 		int BD = BondDeposited[_addr];
@@ -200,122 +200,122 @@ contract OrderbookExchange {
 		}
 	}
 
- 	function insertFromHead_BuyZCB(uint _amount, uint _maturityConversionRate, uint _newID) internal {
-		uint currentID = headZCBBuyID;
+ 	function insertFromHead_SellZCB(uint _amount, uint _maturityConversionRate, uint _newID) internal {
+		uint currentID = headZCBSellID;
 		if (currentID == 0) {
-			headZCBBuyID = _newID;
-			ZCBBuys[_newID] = LimitBuyZCB(msg.sender, _amount, _maturityConversionRate, 0);
+			headZCBSellID = _newID;
+			ZCBSells[_newID] = LimitSellZCB(msg.sender, _amount, _maturityConversionRate, 0);
 			return;
 		}
-		LimitBuyZCB storage currentOrder = ZCBBuys[currentID];
-		if (_maturityConversionRate < currentOrder.maturityConversionRate) {
-			headZCBBuyID = _newID;
-			ZCBBuys[_newID] = LimitBuyZCB(msg.sender, _amount, _maturityConversionRate, currentID);
-			return;
-		}
-		LimitBuyZCB storage prevOrder; 
-		currentID = currentOrder.nextID;
-		while (currentID > 0) {
-			prevOrder = currentOrder;
-			currentOrder = ZCBBuys[currentID];
-			if (_maturityConversionRate < currentOrder.maturityConversionRate) {
-				prevOrder.nextID = _newID;
-				ZCBBuys[_newID] = LimitBuyZCB(msg.sender, _amount, _maturityConversionRate, currentID);
-				return;
-			}
-			currentID = currentOrder.nextID;
-		}
-		currentOrder.nextID = _newID;
-		ZCBBuys[_newID] = LimitBuyZCB(msg.sender, _amount, _maturityConversionRate, 0);
-	}
-
-	function insertFromHead_BuyYT(uint _amount, uint _maturityConversionRate, uint _newID) internal {
-		uint currentID = headYTBuyID;
-		if (currentID == 0) {
-			headYTBuyID = _newID;
-			YTBuys[_newID] = LimitBuyYT(msg.sender, _amount, _maturityConversionRate, 0);
-			return;
-		}
-		LimitBuyYT storage currentOrder = YTBuys[currentID];
+		LimitSellZCB storage currentOrder = ZCBSells[currentID];
 		if (_maturityConversionRate > currentOrder.maturityConversionRate) {
-			headYTBuyID = _newID;
-			YTBuys[_newID] = LimitBuyYT(msg.sender, _amount, _maturityConversionRate, currentID);
+			headZCBSellID = _newID;
+			ZCBSells[_newID] = LimitSellZCB(msg.sender, _amount, _maturityConversionRate, currentID);
 			return;
 		}
-		LimitBuyYT storage prevOrder; 
+		LimitSellZCB storage prevOrder; 
 		currentID = currentOrder.nextID;
 		while (currentID > 0) {
 			prevOrder = currentOrder;
-			currentOrder = YTBuys[currentID];
+			currentOrder = ZCBSells[currentID];
 			if (_maturityConversionRate > currentOrder.maturityConversionRate) {
 				prevOrder.nextID = _newID;
-				YTBuys[_newID] = LimitBuyYT(msg.sender, _amount, _maturityConversionRate, currentID);
+				ZCBSells[_newID] = LimitSellZCB(msg.sender, _amount, _maturityConversionRate, currentID);
 				return;
 			}
 			currentID = currentOrder.nextID;
 		}
 		currentOrder.nextID = _newID;
-		YTBuys[_newID] = LimitBuyYT(msg.sender, _amount, _maturityConversionRate, 0);
+		ZCBSells[_newID] = LimitSellZCB(msg.sender, _amount, _maturityConversionRate, 0);
 	}
 
-	function insertWithHint_BuyZCB(uint _amount, uint _maturityConversionRate, uint _hintID, uint _newID) internal {
-		uint currentID = _hintID;
-		LimitBuyZCB storage currentOrder = ZCBBuys[currentID];
-		LimitBuyZCB storage prevOrder;
-		require(_maturityConversionRate >= currentOrder.maturityConversionRate);
+	function insertFromHead_SellYT(uint _amount, uint _maturityConversionRate, uint _newID) internal {
+		uint currentID = headYTSellID;
+		if (currentID == 0) {
+			headYTSellID = _newID;
+			YTSells[_newID] = LimitSellYT(msg.sender, _amount, _maturityConversionRate, 0);
+			return;
+		}
+		LimitSellYT storage currentOrder = YTSells[currentID];
+		if (_maturityConversionRate < currentOrder.maturityConversionRate) {
+			headYTSellID = _newID;
+			YTSells[_newID] = LimitSellYT(msg.sender, _amount, _maturityConversionRate, currentID);
+			return;
+		}
+		LimitSellYT storage prevOrder; 
 		currentID = currentOrder.nextID;
 		while (currentID > 0) {
 			prevOrder = currentOrder;
-			currentOrder = ZCBBuys[currentID];
+			currentOrder = YTSells[currentID];
 			if (_maturityConversionRate < currentOrder.maturityConversionRate) {
 				prevOrder.nextID = _newID;
-				ZCBBuys[_newID] = LimitBuyZCB(msg.sender, _amount, _maturityConversionRate, currentID);
+				YTSells[_newID] = LimitSellYT(msg.sender, _amount, _maturityConversionRate, currentID);
 				return;
 			}
 			currentID = currentOrder.nextID;
 		}
 		currentOrder.nextID = _newID;
-		ZCBBuys[_newID] = LimitBuyZCB(msg.sender, _amount, _maturityConversionRate, 0);
+		YTSells[_newID] = LimitSellYT(msg.sender, _amount, _maturityConversionRate, 0);
 	}
 
-	function insertWithHint_BuyYT(uint _amount, uint _maturityConversionRate, uint _hintID, uint _newID) internal {
+	function insertWithHint_SellZCB(uint _amount, uint _maturityConversionRate, uint _hintID, uint _newID) internal {
 		uint currentID = _hintID;
-		LimitBuyYT storage currentOrder = YTBuys[currentID];
-		LimitBuyYT storage prevOrder;
+		LimitSellZCB storage currentOrder = ZCBSells[currentID];
+		LimitSellZCB storage prevOrder;
 		require(_maturityConversionRate <= currentOrder.maturityConversionRate);
 		currentID = currentOrder.nextID;
 		while (currentID > 0) {
 			prevOrder = currentOrder;
-			currentOrder = YTBuys[currentID];
+			currentOrder = ZCBSells[currentID];
 			if (_maturityConversionRate > currentOrder.maturityConversionRate) {
 				prevOrder.nextID = _newID;
-				YTBuys[_newID] = LimitBuyYT(msg.sender, _amount, _maturityConversionRate, currentID);
+				ZCBSells[_newID] = LimitSellZCB(msg.sender, _amount, _maturityConversionRate, currentID);
 				return;
 			}
 			currentID = currentOrder.nextID;
 		}
 		currentOrder.nextID = _newID;
-		YTBuys[_newID] = LimitBuyYT(msg.sender, _amount, _maturityConversionRate, 0);
+		ZCBSells[_newID] = LimitSellZCB(msg.sender, _amount, _maturityConversionRate, 0);
 	}
 
-	function modifyFromHead_BuyZCB(int _amount, uint _targetID, uint _maxSteps) internal returns (int change) {
-		uint currentID = headZCBBuyID;
+	function insertWithHint_SellYT(uint _amount, uint _maturityConversionRate, uint _hintID, uint _newID) internal {
+		uint currentID = _hintID;
+		LimitSellYT storage currentOrder = YTSells[currentID];
+		LimitSellYT storage prevOrder;
+		require(_maturityConversionRate >= currentOrder.maturityConversionRate);
+		currentID = currentOrder.nextID;
+		while (currentID > 0) {
+			prevOrder = currentOrder;
+			currentOrder = YTSells[currentID];
+			if (_maturityConversionRate < currentOrder.maturityConversionRate) {
+				prevOrder.nextID = _newID;
+				YTSells[_newID] = LimitSellYT(msg.sender, _amount, _maturityConversionRate, currentID);
+				return;
+			}
+			currentID = currentOrder.nextID;
+		}
+		currentOrder.nextID = _newID;
+		YTSells[_newID] = LimitSellYT(msg.sender, _amount, _maturityConversionRate, 0);
+	}
+
+	function modifyFromHead_SellZCB(int _amount, uint _targetID, uint _maxSteps) internal returns (int change) {
+		uint currentID = headZCBSellID;
 		if (currentID == _targetID) {
 			if (_amount > 0) {
-				uint prevAmt = ZCBBuys[currentID].amount;
-				ZCBBuys[currentID].amount = prevAmt.add(uint(_amount));
+				uint prevAmt = ZCBSells[currentID].amount;
+				ZCBSells[currentID].amount = prevAmt.add(uint(_amount));
 				return _amount;
 			}
 			else {
-				uint prevAmt = ZCBBuys[currentID].amount;
+				uint prevAmt = ZCBSells[currentID].amount;
 				if (prevAmt <= uint(-_amount)) {
 					//delete order
-					headZCBBuyID = ZCBBuys[currentID].nextID;
-					delete ZCBBuys[currentID];
+					headZCBSellID = ZCBSells[currentID].nextID;
+					delete ZCBSells[currentID];
 					return -int(prevAmt);
 				}
 				else {
-					ZCBBuys[currentID].amount = prevAmt.sub(uint(-_amount));
+					ZCBSells[currentID].amount = prevAmt.sub(uint(-_amount));
 					return _amount;
 				}
 			}
@@ -325,48 +325,48 @@ contract OrderbookExchange {
 		for (uint i = 0; currentID != _targetID; i++) {
 			require(i < _maxSteps);
 			prevID = currentID;
-			currentID = ZCBBuys[currentID].nextID;
+			currentID = ZCBSells[currentID].nextID;
 			require(currentID != 0);
 		}
 
 		if (_amount > 0) {
-			uint prevAmt = ZCBBuys[currentID].amount;
-			ZCBBuys[currentID].amount = prevAmt.add(uint(_amount));
+			uint prevAmt = ZCBSells[currentID].amount;
+			ZCBSells[currentID].amount = prevAmt.add(uint(_amount));
 			return _amount;
 		}
 		else {
-			uint prevAmt = ZCBBuys[currentID].amount;
+			uint prevAmt = ZCBSells[currentID].amount;
 			if (prevAmt <= uint(-_amount)) {
 				//delete order
-				ZCBBuys[prevID].nextID = ZCBBuys[currentID].nextID;
-				delete ZCBBuys[currentID];
+				ZCBSells[prevID].nextID = ZCBSells[currentID].nextID;
+				delete ZCBSells[currentID];
 				return -int(prevAmt);
 			}
 			else {
-				ZCBBuys[currentID].amount = prevAmt.sub(uint(-_amount));
+				ZCBSells[currentID].amount = prevAmt.sub(uint(-_amount));
 				return _amount;
 			}
 		}
 	}
 
-	function modifyFromHead_BuyYT(int _amount, uint _targetID, uint _maxSteps) internal returns (int change) {
-		uint currentID = headYTBuyID;
+	function modifyFromHead_SellYT(int _amount, uint _targetID, uint _maxSteps) internal returns (int change) {
+		uint currentID = headYTSellID;
 		if (currentID == _targetID) {
 			if (_amount > 0) {
-				uint prevAmt = YTBuys[currentID].amount;
-				YTBuys[currentID].amount = prevAmt.add(uint(_amount));
+				uint prevAmt = YTSells[currentID].amount;
+				YTSells[currentID].amount = prevAmt.add(uint(_amount));
 				return _amount;
 			}
 			else {
-				uint prevAmt = YTBuys[currentID].amount;
+				uint prevAmt = YTSells[currentID].amount;
 				if (prevAmt <= uint(-_amount)) {
 					//delete order
-					headYTBuyID = YTBuys[currentID].nextID;
-					delete YTBuys[currentID];
+					headYTSellID = YTSells[currentID].nextID;
+					delete YTSells[currentID];
 					return -int(prevAmt);
 				}
 				else {
-					YTBuys[currentID].amount = prevAmt.sub(uint(-_amount));
+					YTSells[currentID].amount = prevAmt.sub(uint(-_amount));
 					return _amount;
 				}
 			}
@@ -376,85 +376,85 @@ contract OrderbookExchange {
 		for (uint i = 0; currentID != _targetID; i++) {
 			require(i < _maxSteps);
 			prevID = currentID;
-			currentID = YTBuys[currentID].nextID;
+			currentID = YTSells[currentID].nextID;
 			require(currentID != 0);
 		}
 
 		if (_amount > 0) {
-			uint prevAmt = YTBuys[currentID].amount;
-			YTBuys[currentID].amount = prevAmt.add(uint(_amount));
+			uint prevAmt = YTSells[currentID].amount;
+			YTSells[currentID].amount = prevAmt.add(uint(_amount));
 			return _amount;
 		}
 		else {
-			uint prevAmt = YTBuys[currentID].amount;
+			uint prevAmt = YTSells[currentID].amount;
 			if (prevAmt <= uint(-_amount)) {
 				//delete order
-				YTBuys[prevID].nextID = YTBuys[currentID].nextID;
-				delete YTBuys[currentID];
+				YTSells[prevID].nextID = YTSells[currentID].nextID;
+				delete YTSells[currentID];
 				return -int(prevAmt);
 			}
 			else {
-				YTBuys[currentID].amount = prevAmt.sub(uint(-_amount));
+				YTSells[currentID].amount = prevAmt.sub(uint(-_amount));
 				return _amount;
 			}
 		}
 	}
 
-	function modifyWithHint_BuyZCB(int _amount, uint _targetID, uint _hintID, uint _maxSteps) internal returns (int change) {
+	function modifyWithHint_SellZCB(int _amount, uint _targetID, uint _hintID, uint _maxSteps) internal returns (int change) {
 		uint currentID = _hintID;
 		uint prevID;
 		for (uint i = 0; currentID != _targetID; i++) {
 			require(i < _maxSteps);
 			prevID = currentID;
-			currentID = ZCBBuys[currentID].nextID;
+			currentID = ZCBSells[currentID].nextID;
 			require(currentID != 0);
 		}
 
 		if (_amount > 0) {
-			uint prevAmt = ZCBBuys[currentID].amount;
-			ZCBBuys[currentID].amount = prevAmt.add(uint(_amount));
+			uint prevAmt = ZCBSells[currentID].amount;
+			ZCBSells[currentID].amount = prevAmt.add(uint(_amount));
 			return _amount;
 		}
 		else {
-			uint prevAmt = ZCBBuys[currentID].amount;
+			uint prevAmt = ZCBSells[currentID].amount;
 			if (prevAmt <= uint(-_amount)) {
 				//delete order
-				ZCBBuys[prevID].nextID = ZCBBuys[currentID].nextID;
-				delete ZCBBuys[currentID];
+				ZCBSells[prevID].nextID = ZCBSells[currentID].nextID;
+				delete ZCBSells[currentID];
 				return -int(prevAmt);
 			}
 			else {
-				ZCBBuys[currentID].amount = prevAmt.sub(uint(-_amount));
+				ZCBSells[currentID].amount = prevAmt.sub(uint(-_amount));
 				return _amount;
 			}
 		}
 	}
 
-	function modifyWithHint_BuyYT(int _amount, uint _targetID, uint _hintID, uint _maxSteps) internal returns (int change) {
+	function modifyWithHint_SellYT(int _amount, uint _targetID, uint _hintID, uint _maxSteps) internal returns (int change) {
 		uint currentID = _hintID;
 		uint prevID;
 		for (uint i = 0; currentID != _targetID; i++) {
 			require(i < _maxSteps);
 			prevID = currentID;
-			currentID = YTBuys[currentID].nextID;
+			currentID = YTSells[currentID].nextID;
 			require(currentID != 0);
 		}
 
 		if (_amount > 0) {
-			uint prevAmt = YTBuys[currentID].amount;
-			YTBuys[currentID].amount = prevAmt.add(uint(_amount));
+			uint prevAmt = YTSells[currentID].amount;
+			YTSells[currentID].amount = prevAmt.add(uint(_amount));
 			return _amount;
 		}
 		else {
-			uint prevAmt = YTBuys[currentID].amount;
+			uint prevAmt = YTSells[currentID].amount;
 			if (prevAmt <= uint(-_amount)) {
 				//delete order
-				YTBuys[prevID].nextID = YTBuys[currentID].nextID;
-				delete YTBuys[currentID];
+				YTSells[prevID].nextID = YTSells[currentID].nextID;
+				delete YTSells[currentID];
 				return -int(prevAmt);
 			}
 			else {
-				YTBuys[currentID].amount = prevAmt.sub(uint(-_amount));
+				YTSells[currentID].amount = prevAmt.sub(uint(-_amount));
 				return _amount;
 			}
 		}
@@ -462,60 +462,60 @@ contract OrderbookExchange {
 
 	//-------------------externally-callable-------------------
 
-	function limitBuyZCB(uint _amount, uint _maturityConversionRate, uint _hintID) public {
+	function limitSellZCB(uint _amount, uint _maturityConversionRate, uint _hintID) public {
 		uint newID = totalNumOrders+1;
 		if (_hintID == 0) {
-			insertFromHead_BuyZCB(_amount, _maturityConversionRate, newID);
+			insertFromHead_SellZCB(_amount, _maturityConversionRate, newID);
 		}
 		else {
-			insertWithHint_BuyZCB(_amount, _maturityConversionRate, _hintID, newID);
+			insertWithHint_SellZCB(_amount, _maturityConversionRate, _hintID, newID);
 		}
-		manageCollateral_BuyZCB(msg.sender, _amount);
+		manageCollateral_SellZCB_makeOrder(msg.sender, _amount);
 		totalNumOrders = newID;
 	}
 
-	function limitBuyYT(uint _amount, uint _maturityConversionRate, uint _hintID) public {
+	function limitSellYT(uint _amount, uint _maturityConversionRate, uint _hintID) public {
 		uint newID = totalNumOrders+1;
 		if (_hintID == 0) {
-			insertFromHead_BuyYT(_amount, _maturityConversionRate, newID);
+			insertFromHead_SellYT(_amount, _maturityConversionRate, newID);
 		}
 		else {
-			insertWithHint_BuyYT(_amount, _maturityConversionRate, _hintID, newID);
+			insertWithHint_SellYT(_amount, _maturityConversionRate, _hintID, newID);
 		}
-		manageCollateral_BuyYT_makeOrder(msg.sender, _amount);
+		manageCollateral_SellYT_makeOrder(msg.sender, _amount);
 		totalNumOrders = newID;
 	}
 
-	function modifyZCBLimitBuy(int _amount, uint _targetID, uint _hintID, uint _maxSteps) public {
-		require(msg.sender == ZCBBuys[_targetID].maker);
+	function modifyZCBLimitSell(int _amount, uint _targetID, uint _hintID, uint _maxSteps) public {
+		require(msg.sender == ZCBSells[_targetID].maker);
 		int change;
 		if (_hintID == 0) {
-			change = modifyFromHead_BuyZCB(_amount, _targetID, _maxSteps);
+			change = modifyFromHead_SellZCB(_amount, _targetID, _maxSteps);
 		}
 		else {
-			require(_targetID != headZCBBuyID);
-			change = modifyWithHint_BuyZCB(_amount, _targetID, _hintID, _maxSteps);
+			require(_targetID != headZCBSellID);
+			change = modifyWithHint_SellZCB(_amount, _targetID, _hintID, _maxSteps);
 		}
 		if (change > 0) {
-			manageCollateral_BuyZCB(msg.sender, uint(_amount));
+			manageCollateral_SellZCB_makeOrder(msg.sender, uint(_amount));
 		}
 		else {
 			manageCollateral_ReceiveZCB(msg.sender, uint(-_amount));
 		}
 	}
 
-	function modifyYTLimitBuy(int _amount, uint _targetID, uint _hintID, uint _maxSteps) public {
-		require(msg.sender == YTBuys[_targetID].maker);
+	function modifyYTLimitSell(int _amount, uint _targetID, uint _hintID, uint _maxSteps) public {
+		require(msg.sender == YTSells[_targetID].maker);
 		int change;
 		if (_hintID == 0) {
-			change = modifyFromHead_BuyYT(_amount, _targetID, _maxSteps);
+			change = modifyFromHead_SellYT(_amount, _targetID, _maxSteps);
 		}
 		else {
-			require(_targetID != headYTBuyID);
-			change = modifyWithHint_BuyYT(_amount, _targetID, _hintID, _maxSteps);
+			require(_targetID != headYTSellID);
+			change = modifyWithHint_SellYT(_amount, _targetID, _hintID, _maxSteps);
 		}
 		if (change > 0) {
-			manageCollateral_BuyYT_makeOrder(msg.sender, uint(_amount));
+			manageCollateral_SellYT_makeOrder(msg.sender, uint(_amount));
 		}
 		else {
 			manageCollateral_ReceiveYT_makeOrder(msg.sender, uint(-_amount));
@@ -530,33 +530,33 @@ contract OrderbookExchange {
 		bool _useInternalBalances
 	) public returns(uint YTbought, uint ZCBsold) {
 
-		uint currentID = headZCBBuyID;
-		LimitBuyZCB memory order;
+		uint currentID = headYTSellID;
+		LimitSellYT memory order;
 		uint ratio = wrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
 		for (uint16 i = 0; i < _maxIterations && currentID != 0; i++) {
-			order = ZCBBuys[currentID];
+			order = YTSells[currentID];
 			if (order.maturityConversionRate > _maxMaturityConversionRate) {
 				require(impliedMaturityConversionRate(ZCBsold, YTbought, ratio) <= _maxCumulativeMaturityConversionRate);
 				//collect & distribute to taker
 				manageCollateral_BuyYT_takeOrder(msg.sender, ZCBsold, YTbought, ratio, _useInternalBalances);
 				return (YTbought, ZCBsold);
 			}
-			uint orderYTamt = impliedYTamount(order.amount, ratio, order.maturityConversionRate);
-			if (orderYTamt >= _amountYT) {
-				uint scaledZCBamt = order.amount.mul(_amountYT);
-				scaledZCBamt = scaledZCBamt/orderYTamt + (scaledZCBamt%orderYTamt == 0 ? 0 : 1);
+			uint orderZCBamt = impliedZCBamount(order.amount, ratio, order.maturityConversionRate);
+			if (order.amount >= _amountYT) {
+				uint scaledZCBamt = orderZCBamt.mul(_amountYT);
+				scaledZCBamt = scaledZCBamt/order.amount + (scaledZCBamt%order.amount == 0 ? 0 : 1);
 
 				ZCBsold += scaledZCBamt;
 				YTbought += _amountYT;
 
 				manageCollateral_ReceiveZCB(order.maker, scaledZCBamt);
-				if (order.amount == scaledZCBamt) {
-					headZCBBuyID = order.nextID;
-					delete ZCBBuys[currentID];
+				if (order.amount == _amountYT) {
+					headYTSellID = order.nextID;
+					delete YTSells[currentID];
 				}
 				else {
-					ZCBBuys[currentID].amount = order.amount - scaledZCBamt;
-					headZCBBuyID = currentID;
+					YTSells[currentID].amount = order.amount - _amountYT;
+					headYTSellID = currentID;
 				}
 
 				require(impliedMaturityConversionRate(ZCBsold, YTbought, ratio) <= _maxCumulativeMaturityConversionRate);
@@ -566,19 +566,19 @@ contract OrderbookExchange {
 			}
 			else {
 
-				manageCollateral_ReceiveZCB(order.maker, order.amount);
-				delete ZCBBuys[currentID];
+				manageCollateral_ReceiveZCB(order.maker, orderZCBamt);
+				delete YTSells[currentID];
 
-				ZCBsold += order.amount;
-				YTbought += orderYTamt;
-				_amountYT -= orderYTamt;
+				ZCBsold += orderZCBamt;
+				YTbought += order.amount;
+				_amountYT -= order.amount;
 			}
 			currentID = order.nextID;
 		}
 		require(impliedMaturityConversionRate(ZCBsold, YTbought, ratio) <= _maxCumulativeMaturityConversionRate);
 		//collect & distribute to taker
 		manageCollateral_BuyYT_takeOrder(msg.sender, ZCBsold, YTbought, ratio, _useInternalBalances);
-		headZCBBuyID = currentID;
+		headYTSellID = currentID;
 	}
 
 	function marketSellYT(
@@ -589,32 +589,32 @@ contract OrderbookExchange {
 		bool _useInternalBalances
 	) public returns(uint ZCBbought, uint YTsold) {
 
-		uint currentID = headYTBuyID;
-		LimitBuyYT memory order;
+		uint currentID = headZCBSellID;
+		LimitSellZCB memory order;
 		uint ratio = wrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
 		for (uint16 i = 0; i < _maxIterations && currentID != 0; i++) {
-			order = YTBuys[currentID];
+			order = ZCBSells[currentID];
 			if (order.maturityConversionRate < _minMaturityConversionRate) {
 				require(impliedMaturityConversionRate(ZCBbought, YTsold, ratio) >= _minCumulativeMaturityConversionRate);
 				//collect & distribute to taker
 				manageCollateral_BuyZCB_takeOrder(msg.sender, ZCBbought, YTsold, ratio, _useInternalBalances);
 				return (ZCBbought, YTsold);
 			}
-			uint orderZCBamt = impliedZCBamount(order.amount, ratio, order.maturityConversionRate);
-			if (order.amount >= _amountYT) {
-				uint scaledZCBamt = orderZCBamt.mul(_amountYT).div(order.amount);
+			uint orderYTamt = impliedYTamount(order.amount, ratio, order.maturityConversionRate);
+			if (orderYTamt >= _amountYT) {
+				uint scaledZCBamt = order.amount.mul(_amountYT).div(orderYTamt);
 
 				ZCBbought += scaledZCBamt;
 				YTsold += _amountYT;
 
 				manageCollateral_ReceiveYT_fillOrder(order.maker, _amountYT, ratio);
-				if (order.amount == _amountYT) {
-					headYTBuyID = order.nextID;
-					delete YTBuys[currentID];
+				if (order.amount == scaledZCBamt) {
+					headZCBSellID = order.nextID;
+					delete ZCBSells[currentID];
 				}
 				else {
-					YTBuys[currentID].amount = order.amount - _amountYT;
-					headYTBuyID = currentID;
+					ZCBSells[currentID].amount = order.amount - scaledZCBamt;
+					headZCBSellID = currentID;
 				}
 
 				require(impliedMaturityConversionRate(ZCBbought, YTsold, ratio) >= _minCumulativeMaturityConversionRate);
@@ -624,19 +624,19 @@ contract OrderbookExchange {
 			}
 			else {
 
-				manageCollateral_ReceiveYT_fillOrder(order.maker, order.amount, ratio);
-				delete YTBuys[currentID];
+				manageCollateral_ReceiveYT_fillOrder(order.maker, orderYTamt, ratio);
+				delete ZCBSells[currentID];
 
-				ZCBbought += orderZCBamt;
-				YTsold += order.amount;
-				_amountYT -= order.amount;
+				ZCBbought += order.amount;
+				YTsold += orderYTamt;
+				_amountYT -= orderYTamt;
 			}
 			currentID = order.nextID;
 		}
 		require(impliedMaturityConversionRate(ZCBbought, YTsold, ratio) >= _minCumulativeMaturityConversionRate);
 		//collect & distribute to taker
 		manageCollateral_BuyZCB_takeOrder(msg.sender, ZCBbought, YTsold, ratio, _useInternalBalances);
-		headYTBuyID = currentID;
+		headZCBSellID = currentID;
 	}
 
 
@@ -648,33 +648,33 @@ contract OrderbookExchange {
 		bool _useInternalBalances
 	) public returns(uint ZCBbought, uint YTsold) {
 
-		uint currentID = headYTBuyID;
-		LimitBuyYT memory order;
+		uint currentID = headZCBSellID;
+		LimitSellZCB memory order;
 		uint ratio = wrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
 		for (uint16 i = 0; i < _maxIterations && currentID != 0; i++) {
-			order = YTBuys[currentID];
+			order = ZCBSells[currentID];
 			if (order.maturityConversionRate < _minMaturityConversionRate) {
 				require(impliedMaturityConversionRate(ZCBbought, YTsold, ratio) >= _minCumulativeMaturityConversionRate);
 				//collect & distribute to taker
 				manageCollateral_BuyZCB_takeOrder(msg.sender, ZCBbought, YTsold, ratio, _useInternalBalances);
 				return (ZCBbought, YTsold);
 			}
-			uint orderZCBamt = impliedZCBamount(order.amount, ratio, order.maturityConversionRate);
-			if (orderZCBamt >= _amountZCB) {
-				uint scaledYTamt = order.amount.mul(_amountZCB);
-				scaledYTamt = scaledYTamt/orderZCBamt + (scaledYTamt%orderZCBamt == 0 ? 0 : 1);
+			uint orderYTamt = impliedYTamount(order.amount, ratio, order.maturityConversionRate);
+			if (order.amount >= _amountZCB) {
+				uint scaledYTamt = orderYTamt.mul(_amountZCB);
+				scaledYTamt = scaledYTamt/order.amount + (scaledYTamt%order.amount == 0 ? 0 : 1);
 
 				ZCBbought += _amountZCB;
 				YTsold += scaledYTamt;
 
 				manageCollateral_ReceiveYT_fillOrder(order.maker, scaledYTamt, ratio);
-				if (order.amount == scaledYTamt) {
-					headYTBuyID = order.nextID;
-					delete YTBuys[currentID];
+				if (order.amount == _amountZCB) {
+					headZCBSellID = order.nextID;
+					delete ZCBSells[currentID];
 				}
 				else {
-					YTBuys[currentID].amount = order.amount - _amountZCB;
-					headYTBuyID = currentID;
+					ZCBSells[currentID].amount = order.amount - _amountZCB;
+					headZCBSellID = currentID;
 				}
 
 				require(impliedMaturityConversionRate(ZCBbought, YTsold, ratio) >= _minCumulativeMaturityConversionRate);
@@ -684,19 +684,19 @@ contract OrderbookExchange {
 			}
 			else {
 
-				manageCollateral_ReceiveYT_fillOrder(order.maker, order.amount, ratio);
-				delete YTBuys[currentID];
+				manageCollateral_ReceiveYT_fillOrder(order.maker, orderYTamt, ratio);
+				delete ZCBSells[currentID];
 
-				ZCBbought += orderZCBamt;
-				YTsold += order.amount;
-				_amountZCB -= orderZCBamt;
+				ZCBbought += order.amount;
+				YTsold += orderYTamt;
+				_amountZCB -= order.amount;
 			}
 			currentID = order.nextID;
 		}
 		require(impliedMaturityConversionRate(ZCBbought, YTsold, ratio) >= _minCumulativeMaturityConversionRate);
 		//collect & distribute to taker
 		manageCollateral_BuyZCB_takeOrder(msg.sender, ZCBbought, YTsold, ratio, _useInternalBalances);
-		headYTBuyID = currentID;
+		headZCBSellID = currentID;
 	}
 
 	function marketSellZCB(
@@ -707,32 +707,32 @@ contract OrderbookExchange {
 		bool _useInternalBalances
 	) public returns(uint YTbought, uint ZCBsold) {
 
-		uint currentID = headZCBBuyID;
-		LimitBuyZCB memory order;
+		uint currentID = headYTSellID;
+		LimitSellYT memory order;
 		uint ratio = wrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
 		for (uint16 i = 0; i < _maxIterations && currentID != 0; i++) {
-			order = ZCBBuys[currentID];
+			order = YTSells[currentID];
 			if (order.maturityConversionRate > _maxMaturityConversionRate) {
 				require(impliedMaturityConversionRate(ZCBsold, YTbought, ratio) <= _maxCumulativeMaturityConversionRate);
 				//collect & distribute to taker
 				manageCollateral_BuyYT_takeOrder(msg.sender, ZCBsold, YTbought, ratio, _useInternalBalances);
 				return (YTbought, ZCBsold);
 			}
-			uint orderYTamt = impliedYTamount(order.amount, ratio, order.maturityConversionRate);
-			if (order.amount >= _amountZCB) {
-				uint scaledYTamt = orderYTamt.mul(_amountZCB).div(order.amount);
+			uint orderZCBamt = impliedZCBamount(order.amount, ratio, order.maturityConversionRate);
+			if (orderZCBamt >= _amountZCB) {
+				uint scaledYTamt = order.amount.mul(_amountZCB).div(orderZCBamt);
 
 				ZCBsold += _amountZCB;
 				YTbought += scaledYTamt;
 
 				manageCollateral_ReceiveZCB(order.maker, _amountZCB);
 				if (order.amount == _amountZCB) {
-					headZCBBuyID = order.nextID;
-					delete ZCBBuys[currentID];
+					headYTSellID = order.nextID;
+					delete YTSells[currentID];
 				}
 				else {
-					ZCBBuys[currentID].amount = order.amount - _amountZCB;
-					headZCBBuyID = currentID;
+					YTSells[currentID].amount = order.amount - _amountZCB;
+					headYTSellID = currentID;
 				}
 
 				require(impliedMaturityConversionRate(ZCBsold, YTbought, ratio) <= _maxCumulativeMaturityConversionRate);
@@ -742,19 +742,19 @@ contract OrderbookExchange {
 			}
 			else {
 
-				manageCollateral_ReceiveZCB(order.maker, order.amount);
-				delete ZCBBuys[currentID];
+				manageCollateral_ReceiveZCB(order.maker, orderZCBamt);
+				delete YTSells[currentID];
 
-				ZCBsold += order.amount;
-				YTbought += orderYTamt;
-				_amountZCB -= order.amount;
+				ZCBsold += orderZCBamt;
+				YTbought += order.amount;
+				_amountZCB -= orderZCBamt;
 			}
 			currentID = order.nextID;
 		}
 		require(impliedMaturityConversionRate(ZCBsold, YTbought, ratio) <= _maxCumulativeMaturityConversionRate);
 		//collect & distribute to taker
 		manageCollateral_BuyYT_takeOrder(msg.sender, ZCBsold, YTbought, ratio, _useInternalBalances);
-		headZCBBuyID = currentID;
+		headYTSellID = currentID;
 	}
 
 	function marketSellZCBtoU(
@@ -765,11 +765,11 @@ contract OrderbookExchange {
 		bool _useInternalBalances
 	) public returns(uint YTbought, uint ZCBsold) {
 
-		uint currentID = headZCBBuyID;
-		LimitBuyZCB memory order;
+		uint currentID = headYTSellID;
+		LimitSellYT memory order;
 		uint ratio = wrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
 		for (uint16 i = 0; i < _maxIterations && currentID != 0; i++) {
-			order = ZCBBuys[currentID];
+			order = YTSells[currentID];
 			if (order.maturityConversionRate > _maxMaturityConversionRate) {
 				require(impliedMaturityConversionRate(ZCBsold, YTbought, ratio) <= _maxCumulativeMaturityConversionRate);
 				//collect & distribute to taker
@@ -777,10 +777,10 @@ contract OrderbookExchange {
 				return (YTbought, ZCBsold);
 			}
 			uint unitAmtYTbought = YTbought.mul(ratio) / (1 ether);
-			uint orderYTamt = impliedYTamount(order.amount, ratio, order.maturityConversionRate);
-			uint orderUnitYTamt = orderYTamt.mul(ratio) / (1 ether);
-			if (_amountZCB <= order.amount || orderUnitYTamt.add(unitAmtYTbought) >= _amountZCB.sub(order.amount)) {
-				uint orderRatio = order.amount.mul(1 ether).div(orderYTamt); //ratio of ZCB to YT for specific order
+			uint orderZCBamt = impliedZCBamount(order.amount, ratio, order.maturityConversionRate);
+			uint orderUnitYTamt = order.amount.mul(ratio) / (1 ether);
+			if (_amountZCB <= orderZCBamt || orderUnitYTamt.add(unitAmtYTbought) >= _amountZCB.sub(orderZCBamt)) {
+				uint orderRatio = orderZCBamt.mul(1 ether).div(order.amount); //ratio of ZCB to YT for specific order
 				/*
 					unitAmtYTbought + unitYTtoBuy == _amountZCB - ZCBtoSell
 					ZCBtoSell == YTtoBuy * orderRatio
@@ -798,12 +798,12 @@ contract OrderbookExchange {
 
 				manageCollateral_ReceiveZCB(order.maker, ZCBtoSell);
 				if (order.amount <= ZCBtoSell) {
-					headZCBBuyID = order.nextID;
-					delete ZCBBuys[currentID];
+					headYTSellID = order.nextID;
+					delete YTSells[currentID];
 				}
 				else {
-					ZCBBuys[currentID].amount = order.amount - ZCBtoSell;
-					headZCBBuyID = currentID;
+					YTSells[currentID].amount = order.amount - YTtoBuy;
+					headYTSellID = currentID;
 				}
 
 				require(impliedMaturityConversionRate(ZCBsold, YTbought, ratio) <= _maxCumulativeMaturityConversionRate);
@@ -817,17 +817,17 @@ contract OrderbookExchange {
 			else {
 
 				manageCollateral_ReceiveZCB(order.maker, order.amount);
-				delete ZCBBuys[currentID];
+				delete YTSells[currentID];
 
-				ZCBsold += order.amount;
-				YTbought += orderYTamt;
-				_amountZCB -= order.amount;
+				ZCBsold += orderZCBamt;
+				YTbought += order.amount;
+				_amountZCB -= orderZCBamt;
 			}
 		}
 		require(impliedMaturityConversionRate(ZCBsold, YTbought, ratio) <= _maxCumulativeMaturityConversionRate);
 		//collect & distribute to taker
 		manageCollateral_BuyYT_takeOrder(msg.sender, ZCBsold, YTbought, ratio, _useInternalBalances);
-		headZCBBuyID = currentID;
+		headYTSellID = currentID;
 	}
 
 	function marketSellYTtoU(
@@ -838,11 +838,11 @@ contract OrderbookExchange {
 		bool _useInternalBalances
 	) public returns(uint ZCBbought, uint YTsold) {
 
-		uint currentID = headYTBuyID;
-		LimitBuyYT memory order;
+		uint currentID = headZCBSellID;
+		LimitSellZCB memory order;
 		uint ratio = wrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
 		for (uint16 i = 0; i < _maxIterations && currentID != 0; i++) {
-			order = YTBuys[currentID];
+			order = ZCBSells[currentID];
 			if (order.maturityConversionRate < _minMaturityConversionRate) {
 				require(impliedMaturityConversionRate(ZCBbought, YTsold, ratio) >= _minCumulativeMaturityConversionRate);
 				//collect & distribute to taker
@@ -850,10 +850,10 @@ contract OrderbookExchange {
 				return (ZCBbought, YTsold);
 			}
 			uint unitAmtYT = _amountYT.mul(ratio) / (1 ether);
-			uint orderZCBamt = impliedZCBamount(order.amount, ratio, order.maturityConversionRate);
-			uint orderUnitAmtYT = order.amount.mul(ratio) / (1 ether);
-			if (orderUnitAmtYT >= unitAmtYT || ZCBbought.add(orderZCBamt) >= unitAmtYT.sub(orderUnitAmtYT)) {
-				uint orderRatio = orderZCBamt.mul(1 ether).div(order.amount); //ratio of ZCB to YT for specific order
+			uint orderYTamt = impliedYTamount(order.amount, ratio, order.maturityConversionRate);
+			uint orderUnitAmtYT = orderYTamt.mul(ratio) / (1 ether);
+			if (orderUnitAmtYT >= unitAmtYT || ZCBbought.add(order.amount) >= unitAmtYT.sub(orderUnitAmtYT)) {
+				uint orderRatio = order.amount.mul(1 ether).div(orderYTamt); //ratio of ZCB to YT for specific order
 				/*
 					unitAmtYT - unitYTtoSell == ZCBbought + ZCBtoBuy
 					ZCBtoBuy == YTtoSell * orderRatio
@@ -870,13 +870,13 @@ contract OrderbookExchange {
 				ZCBbought += ZCBtoBuy;
 
 				manageCollateral_ReceiveYT_fillOrder(order.maker, YTtoSell, ratio);
-				if (order.amount <= YTtoSell) {
-					headYTBuyID = order.nextID;
-					delete YTBuys[currentID];
+				if (order.amount <= ZCBtoBuy) {
+					headZCBSellID = order.nextID;
+					delete ZCBSells[currentID];
 				}
 				else {
-					YTBuys[currentID].amount = order.amount - YTtoSell;
-					headYTBuyID = currentID;
+					ZCBSells[currentID].amount = order.amount - ZCBtoBuy;
+					headZCBSellID = currentID;
 				}
 
 				require(impliedMaturityConversionRate(ZCBbought, YTsold, ratio) >= _minCumulativeMaturityConversionRate);
@@ -889,19 +889,19 @@ contract OrderbookExchange {
 			}
 			else {
 
-				manageCollateral_ReceiveYT_fillOrder(order.maker, order.amount, ratio);
-				delete YTBuys[currentID];
+				manageCollateral_ReceiveYT_fillOrder(order.maker, orderYTamt, ratio);
+				delete ZCBSells[currentID];
 
-				ZCBbought += orderZCBamt;
-				YTsold += order.amount;
-				_amountYT -= order.amount;
+				ZCBbought += order.amount;
+				YTsold += orderYTamt;
+				_amountYT -= orderYTamt;
 			}
 			currentID = order.nextID;
 		}
 		require(impliedMaturityConversionRate(ZCBbought, YTsold, ratio) >= _minCumulativeMaturityConversionRate);
 		//collect & distribute to taker
 		manageCollateral_BuyZCB_takeOrder(msg.sender, ZCBbought, YTsold, ratio, _useInternalBalances);
-		headYTBuyID = currentID;
+		headZCBSellID = currentID;
 	}
 
 }

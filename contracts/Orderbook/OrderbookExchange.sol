@@ -37,8 +37,8 @@ contract OrderbookExchange {
 	mapping(uint => LimitSellYT) public YTSells;
 	mapping(uint => LimitSellZCB) public ZCBSells;
 
-	uint headYTSellID;
-	uint headZCBSellID;
+	uint public headYTSellID;
+	uint public headZCBSellID;
 
 	//value of totalNumOrders at the time an order is created is its key in the order mapping
 	uint totalNumOrders;
@@ -46,6 +46,11 @@ contract OrderbookExchange {
 	IFixCapitalPool public FCP;
 	IWrapper public wrapper;
 	uint public maturity;
+
+	modifier ensureMCRAboveCurrentRatio(uint _maturityConversionRate) {
+		require(_maturityConversionRate > wrapper.WrappedAmtToUnitAmt_RoundDown(1 ether));
+		_;
+	}
 
 	constructor(address _FCPaddress) public {
 		FCP = IFixCapitalPool(_FCPaddress);
@@ -262,7 +267,8 @@ contract OrderbookExchange {
 		uint currentID = _hintID;
 		LimitSellZCB storage currentOrder = ZCBSells[currentID];
 		LimitSellZCB storage prevOrder;
-		require(_maturityConversionRate <= currentOrder.maturityConversionRate);
+		uint startMCR = currentOrder.maturityConversionRate;
+		require(_maturityConversionRate <= startMCR && startMCR > 0);
 		currentID = currentOrder.nextID;
 		while (currentID > 0) {
 			prevOrder = currentOrder;
@@ -282,7 +288,8 @@ contract OrderbookExchange {
 		uint currentID = _hintID;
 		LimitSellYT storage currentOrder = YTSells[currentID];
 		LimitSellYT storage prevOrder;
-		require(_maturityConversionRate >= currentOrder.maturityConversionRate);
+		uint startMCR = currentOrder.maturityConversionRate;
+		require(_maturityConversionRate >= startMCR && startMCR > 0);
 		currentID = currentOrder.nextID;
 		while (currentID > 0) {
 			prevOrder = currentOrder;
@@ -462,7 +469,11 @@ contract OrderbookExchange {
 
 	//-------------------externally-callable-------------------
 
-	function limitSellZCB(uint _amount, uint _maturityConversionRate, uint _hintID) public {
+	function limitSellZCB(
+		uint _amount,
+		uint _maturityConversionRate,
+		uint _hintID
+	) public ensureMCRAboveCurrentRatio(_maturityConversionRate) {
 		uint newID = totalNumOrders+1;
 		if (_hintID == 0) {
 			insertFromHead_SellZCB(_amount, _maturityConversionRate, newID);
@@ -474,7 +485,11 @@ contract OrderbookExchange {
 		totalNumOrders = newID;
 	}
 
-	function limitSellYT(uint _amount, uint _maturityConversionRate, uint _hintID) public {
+	function limitSellYT(
+		uint _amount,
+		uint _maturityConversionRate,
+		uint _hintID
+	) public ensureMCRAboveCurrentRatio(_maturityConversionRate) {
 		uint newID = totalNumOrders+1;
 		if (_hintID == 0) {
 			insertFromHead_SellYT(_amount, _maturityConversionRate, newID);
@@ -486,9 +501,13 @@ contract OrderbookExchange {
 		totalNumOrders = newID;
 	}
 
-	function modifyZCBLimitSell(int _amount, uint _targetID, uint _hintID, uint _maxSteps) public {
+	function modifyZCBLimitSell(
+		int _amount,
+		uint _targetID,
+		uint _hintID,
+		uint _maxSteps
+	) public returns(int change) {
 		require(msg.sender == ZCBSells[_targetID].maker);
-		int change;
 		if (_hintID == 0) {
 			change = modifyFromHead_SellZCB(_amount, _targetID, _maxSteps);
 		}
@@ -497,16 +516,20 @@ contract OrderbookExchange {
 			change = modifyWithHint_SellZCB(_amount, _targetID, _hintID, _maxSteps);
 		}
 		if (change > 0) {
-			manageCollateral_SellZCB_makeOrder(msg.sender, uint(_amount));
+			manageCollateral_SellZCB_makeOrder(msg.sender, uint(change));
 		}
 		else {
-			manageCollateral_ReceiveZCB(msg.sender, uint(-_amount));
+			manageCollateral_ReceiveZCB(msg.sender, uint(-change));
 		}
 	}
 
-	function modifyYTLimitSell(int _amount, uint _targetID, uint _hintID, uint _maxSteps) public {
+	function modifyYTLimitSell(
+		int _amount,
+		uint _targetID,
+		uint _hintID,
+		uint _maxSteps
+	) public returns(int change) {
 		require(msg.sender == YTSells[_targetID].maker);
-		int change;
 		if (_hintID == 0) {
 			change = modifyFromHead_SellYT(_amount, _targetID, _maxSteps);
 		}
@@ -515,10 +538,10 @@ contract OrderbookExchange {
 			change = modifyWithHint_SellYT(_amount, _targetID, _hintID, _maxSteps);
 		}
 		if (change > 0) {
-			manageCollateral_SellYT_makeOrder(msg.sender, uint(_amount));
+			manageCollateral_SellYT_makeOrder(msg.sender, uint(change));
 		}
 		else {
-			manageCollateral_ReceiveYT_makeOrder(msg.sender, uint(-_amount));
+			manageCollateral_ReceiveYT_makeOrder(msg.sender, uint(-change));
 		}
 	}
 

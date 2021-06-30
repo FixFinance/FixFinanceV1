@@ -42,10 +42,13 @@ contract('OrderbookExchange', async function(accounts) {
 		await fixCapitalPoolInstance.depositWrappedToken(accounts[0], balance);
 		await zcbInstance.approve(exchange.address, balance);
 		await yieldTokenInstance.approve(exchange.address, balance);
+		await zcbInstance.transfer(accounts[1], balance.div(new BN(2)));
+		await yieldTokenInstance.transfer(accounts[1], balance.div(new BN(2)))
+		await zcbInstance.approve(exchange.address, balance, {from: accounts[1]});
+		await yieldTokenInstance.approve(exchange.address, balance, {from: accounts[1]});
 
 		//simulate generation of 100% returns in money market
 		await aTokenInstance.setInflation("2"+_10To18.toString().substring(1));
-		await NGBwrapperInstance.forceHarvest();
 	});
 
 	it('deposit', async () => {
@@ -56,6 +59,7 @@ contract('OrderbookExchange', async function(accounts) {
 		let prevYieldBalance = await fixCapitalPoolInstance.balanceYield(accounts[0]);
 
 		await exchange.deposit(yieldToDeposit, bondToDeposit);
+		await exchange.deposit(yieldToDeposit, bondToDeposit, {from: accounts[1]});
 
 		let bondBalance = await fixCapitalPoolInstance.balanceBonds(accounts[0]);
 		let yieldBalance = await fixCapitalPoolInstance.balanceYield(accounts[0]);
@@ -396,5 +400,547 @@ contract('OrderbookExchange', async function(accounts) {
 
 	it('modifyYTLimitSell at tail, use hint', async () => {
 		await test_modify(_10To18.div(new BN(9000)).neg(), "12", "11", 10, false);
+	});
+
+	function impliedZCBamount(amountYT, ratio, MCR) {
+		let yieldToMaturity = MCR.mul(_10To18).div(ratio);
+		let dynamicYT = amountYT.mul(ratio).div(_10To18);
+		let amountZCB = dynamicYT.mul(yieldToMaturity.sub(_10To18)).div(_10To18);
+		return amountZCB;
+	}
+
+	function impliedYTamount(amountZCB, ratio, MCR) {
+		let yieldToMaturity = MCR.mul(_10To18).div(ratio);
+		let dynamicYT = amountZCB.mul(_10To18).div(yieldToMaturity.sub(_10To18));
+		let amountYT = dynamicYT.mul(_10To18).div(ratio);
+		return amountYT;
+	}
+
+	async function test_market_buy_YT(amtToBuy, maxMCR, maxCumulativeMCR, maxSteps) {
+		let orderbook = [];
+		let currentID = (await exchange.headYTSellID()).toString();
+		let ratio = await NGBwrapperInstance.WrappedAmtToUnitAmt_RoundDown(_10To18);
+		while (currentID !== "0") {
+			let order = await exchange.YTSells(currentID);
+			order.ID = currentID;
+			orderbook.push(order);
+			currentID = order.nextID.toString();
+		}
+
+		let prevBalBonds = await exchange.BondDeposited(accounts[1]);
+		let prevBalYield = await exchange.YieldDeposited(accounts[1]);
+
+		await exchange.marketBuyYT(amtToBuy, maxMCR, maxCumulativeMCR, maxSteps, true, {from: accounts[1]});
+
+		balBonds = await exchange.BondDeposited(accounts[1]);
+		balYield = await exchange.YieldDeposited(accounts[1]);
+
+		let expectedResultantOrderbook = [...orderbook];
+		for (let i = 0; i < expectedResultantOrderbook.length; i++) {
+			expectedResultantOrderbook[i] = {...expectedResultantOrderbook[i]}; //clone each object
+		}
+		let remaining = amtToBuy;
+		let ZCBsold = new BN(0);
+		while (
+			remaining.toString() !== "0" &&
+			expectedResultantOrderbook.length > 0 &&
+			expectedResultantOrderbook[0].maturityConversionRate.cmp(maxMCR) != 1
+		) {
+			let order = expectedResultantOrderbook[0];
+			let cmp = remaining.cmp(order.amount);
+			let orderZCBamt = impliedZCBamount(order.amount, ratio, order.maturityConversionRate);
+			if (cmp === -1) {
+				//partially accept order, set remaining to 0
+				let scaledZCBamt = orderZCBamt.mul(remaining);
+				scaledZCBamt = scaledZCBamt.div(order.amount).add(new BN(scaledZCBamt.mod(order.amount).toString() === "0" ? 0 : 1));
+
+				order.amount = order.amount.sub(remaining);
+				ZCBsold = ZCBsold.add(scaledZCBamt);
+				remaining = new BN(0);
+			}
+			else {
+				//delete order from list & decrement remaining
+				remaining = remaining.sub(order.amount);
+				expectedResultantOrderbook.shift();
+				ZCBsold = ZCBsold.add(orderZCBamt);
+			}
+		}
+
+		let YTbought = amtToBuy.sub(remaining);
+		orderbook = [];
+		currentID = (await exchange.headYTSellID()).toString();
+		while (currentID !== "0") {
+			let order = await exchange.YTSells(currentID);
+			order.ID = currentID;
+			orderbook.push(order);
+			currentID = order.nextID.toString();
+		}
+		assert.equal(orderbook.length, expectedResultantOrderbook.length);
+		for (let i = 0; i < orderbook.length; i++) {
+			assert.equal(orderbook[i].amount.toString(), expectedResultantOrderbook[i].amount.toString());
+			assert.equal(orderbook[i].maturityConversionRate.toString(), expectedResultantOrderbook[i].maturityConversionRate.toString());
+			assert.equal(orderbook[i].maker, expectedResultantOrderbook[i].maker);
+			assert.equal(orderbook[i].nextID.toString(), expectedResultantOrderbook[i].nextID.toString());
+		}
+
+		let dynamicYTbought = YTbought.mul(ratio).div(_10To18);
+		assert.equal(balYield.sub(prevBalYield).toString(), YTbought.toString());
+		let changeBondNum = prevBalBonds.sub(balBonds).toString();
+		assert.equal(changeBondNum, dynamicYTbought.add(ZCBsold).toString());
+	}
+
+	async function test_market_sell_ZCB(amtToSell, maxMCR, maxCumulativeMCR, maxSteps) {
+		let orderbook = [];
+		let currentID = (await exchange.headYTSellID()).toString();
+		let ratio = await NGBwrapperInstance.WrappedAmtToUnitAmt_RoundDown(_10To18);
+		while (currentID !== "0") {
+			let order = await exchange.YTSells(currentID);
+			order.ID = currentID;
+			orderbook.push(order);
+			currentID = order.nextID.toString();
+		}
+
+		let prevBalBonds = await exchange.BondDeposited(accounts[1]);
+		let prevBalYield = await exchange.YieldDeposited(accounts[1]);
+
+		await exchange.marketSellZCB(amtToSell, maxMCR, maxCumulativeMCR, maxSteps, true, {from: accounts[1]});
+
+		balBonds = await exchange.BondDeposited(accounts[1]);
+		balYield = await exchange.YieldDeposited(accounts[1]);
+
+		let expectedResultantOrderbook = [...orderbook];
+		for (let i = 0; i < expectedResultantOrderbook.length; i++) {
+			expectedResultantOrderbook[i] = {...expectedResultantOrderbook[i]}; //clone each object
+		}
+		let remaining = amtToSell;
+		let YTbought = new BN(0);
+
+		while (
+			remaining.toString() !== "0" &&
+			expectedResultantOrderbook.length > 0 &&
+			expectedResultantOrderbook[0].maturityConversionRate.cmp(maxMCR) != 1
+		) {
+			let order = expectedResultantOrderbook[0];
+			let orderZCBamount = impliedZCBamount(order.amount, ratio, order.maturityConversionRate);
+			let cmp = remaining.cmp(orderZCBamount);
+			if (cmp === -1) {
+				//partially accept order, set remaining to 0
+				let scaledYTamt = order.amount.mul(remaining).div(orderZCBamount);
+
+				order.amount = order.amount.sub(scaledYTamt);
+				YTbought = YTbought.add(scaledYTamt);
+				remaining = new BN(0);
+			}
+			else {
+				//delete order from list & decrement remaining
+				remaining = remaining.sub(orderZCBamount);
+				expectedResultantOrderbook.shift();
+				YTbought = YTbought.add(order.amount);
+			}
+		}
+
+		let ZCBsold = amtToSell.sub(remaining);
+		orderbook = [];
+		currentID = (await exchange.headYTSellID()).toString();
+		while (currentID !== "0") {
+			let order = await exchange.YTSells(currentID);
+			order.ID = currentID;
+			orderbook.push(order);
+			currentID = order.nextID.toString();
+		}
+		assert.equal(orderbook.length, expectedResultantOrderbook.length);
+		for (let i = 0; i < orderbook.length; i++) {
+			assert.equal(orderbook[i].amount.toString(), expectedResultantOrderbook[i].amount.toString());
+			assert.equal(orderbook[i].maturityConversionRate.toString(), expectedResultantOrderbook[i].maturityConversionRate.toString());
+			assert.equal(orderbook[i].maker, expectedResultantOrderbook[i].maker);
+			assert.equal(orderbook[i].nextID.toString(), expectedResultantOrderbook[i].nextID.toString());
+		}
+
+		let dynamicYTbought = YTbought.mul(ratio).div(_10To18);
+		assert.equal(balYield.sub(prevBalYield).toString(), YTbought.toString());
+		let changeBondNum = prevBalBonds.sub(balBonds).toString();
+		assert.equal(changeBondNum, dynamicYTbought.add(ZCBsold).toString());
+	}
+
+	async function test_market_buy_ZCB(amtToBuy, minMCR, minCumulativeMCR, maxSteps) {
+		let orderbook = [];
+		let currentID = (await exchange.headZCBSellID()).toString();
+		let ratio = await NGBwrapperInstance.WrappedAmtToUnitAmt_RoundDown(_10To18);
+		while (currentID !== "0") {
+			let order = await exchange.ZCBSells(currentID);
+			order.ID = currentID;
+			orderbook.push(order);
+			currentID = order.nextID.toString();
+		}
+
+		let prevBalBonds = await exchange.BondDeposited(accounts[1]);
+		let prevBalYield = await exchange.YieldDeposited(accounts[1]);
+
+		await exchange.marketBuyZCB(amtToBuy, minMCR, minCumulativeMCR, maxSteps, true, {from: accounts[1]});
+
+		balBonds = await exchange.BondDeposited(accounts[1]);
+		balYield = await exchange.YieldDeposited(accounts[1]);
+
+		let expectedResultantOrderbook = [...orderbook];
+		for (let i = 0; i < expectedResultantOrderbook.length; i++) {
+			expectedResultantOrderbook[i] = {...expectedResultantOrderbook[i]}; //clone each object
+		}
+		let remaining = amtToBuy;
+		let YTsold = new BN(0);
+		while (
+			remaining.toString() !== "0" &&
+			expectedResultantOrderbook.length > 0 &&
+			expectedResultantOrderbook[0].maturityConversionRate.cmp(minMCR) != -1
+		) {
+			let order = expectedResultantOrderbook[0];
+			let cmp = remaining.cmp(order.amount);
+			let orderYTamt = impliedYTamount(order.amount, ratio, order.maturityConversionRate);
+			if (cmp === -1) {
+				//partially accept order, set remaining to 0
+				let scaledYTamt = orderYTamt.mul(remaining);
+				scaledYTamt = scaledYTamt.div(order.amount).add(new BN(scaledYTamt.mod(order.amount).toString() === "0" ? 0 : 1));
+
+				order.amount = order.amount.sub(remaining);
+				YTsold = YTsold.add(scaledYTamt);
+				remaining = new BN(0);
+			}
+			else {
+				//delete order from list & decrement remaining
+				remaining = remaining.sub(order.amount);
+				expectedResultantOrderbook.shift();
+				YTsold = YTsold.add(orderYTamt);
+			}
+		}
+
+		let ZCBbought = amtToBuy.sub(remaining);
+		orderbook = [];
+		currentID = (await exchange.headZCBSellID()).toString();
+		while (currentID !== "0") {
+			let order = await exchange.ZCBSells(currentID);
+			order.ID = currentID;
+			orderbook.push(order);
+			currentID = order.nextID.toString();
+		}
+		assert.equal(orderbook.length, expectedResultantOrderbook.length);
+		for (let i = 0; i < orderbook.length; i++) {
+			assert.equal(orderbook[i].amount.toString(), expectedResultantOrderbook[i].amount.toString());
+			assert.equal(orderbook[i].maturityConversionRate.toString(), expectedResultantOrderbook[i].maturityConversionRate.toString());
+			assert.equal(orderbook[i].maker, expectedResultantOrderbook[i].maker);
+			assert.equal(orderbook[i].nextID.toString(), expectedResultantOrderbook[i].nextID.toString());
+		}
+
+		let dynamicYTsold = YTsold.mul(ratio).div(_10To18);
+		let change = prevBalYield.sub(balYield);
+		let expected = YTsold;
+		let diff = change.sub(expected).abs();
+		let cmp = diff.cmp(new BN(3));
+		assert.equal(cmp, -1, "acceptable range of error is 2 units");
+		let changeBondNum = balBonds.sub(prevBalBonds).toString();
+		assert.equal(changeBondNum, dynamicYTsold.add(ZCBbought).toString());
+	}
+
+	async function test_market_sell_YT(amtToSell, minMCR, minCumulativeMCR, maxSteps) {
+		let orderbook = [];
+		let currentID = (await exchange.headZCBSellID()).toString();
+		let ratio = await NGBwrapperInstance.WrappedAmtToUnitAmt_RoundDown(_10To18);
+		while (currentID !== "0") {
+			let order = await exchange.ZCBSells(currentID);
+			order.ID = currentID;
+			orderbook.push(order);
+			currentID = order.nextID.toString();
+		}
+
+		let prevBalBonds = await exchange.BondDeposited(accounts[1]);
+		let prevBalYield = await exchange.YieldDeposited(accounts[1]);
+
+		await exchange.marketSellYT(amtToSell, minMCR, minCumulativeMCR, maxSteps, true, {from: accounts[1]});
+
+		balBonds = await exchange.BondDeposited(accounts[1]);
+		balYield = await exchange.YieldDeposited(accounts[1]);
+
+		let expectedResultantOrderbook = [...orderbook];
+		for (let i = 0; i < expectedResultantOrderbook.length; i++) {
+			expectedResultantOrderbook[i] = {...expectedResultantOrderbook[i]}; //clone each object
+		}
+		let remaining = amtToSell;
+		let ZCBbought = new BN(0);
+
+		while (
+			remaining.toString() !== "0" &&
+			expectedResultantOrderbook.length > 0 &&
+			expectedResultantOrderbook[0].maturityConversionRate.cmp(minMCR) != -1
+		) {
+			let order = expectedResultantOrderbook[0];
+			let orderYTamount = impliedYTamount(order.amount, ratio, order.maturityConversionRate);
+			let cmp = remaining.cmp(orderYTamount);
+			if (cmp === -1) {
+				//partially accept order, set remaining to 0
+				let scaledZCBamt = order.amount.mul(remaining).div(orderYTamount);
+
+				order.amount = order.amount.sub(scaledZCBamt);
+				ZCBbought = ZCBbought.add(scaledZCBamt);
+				remaining = new BN(0);
+			}
+			else {
+				//delete order from list & decrement remaining
+				remaining = remaining.sub(orderYTamount);
+				expectedResultantOrderbook.shift();
+				ZCBbought = ZCBbought.add(order.amount);
+			}
+		}
+
+		let YTsold = amtToSell.sub(remaining);
+		orderbook = [];
+		currentID = (await exchange.headZCBSellID()).toString();
+		while (currentID !== "0") {
+			let order = await exchange.ZCBSells(currentID);
+			order.ID = currentID;
+			orderbook.push(order);
+			currentID = order.nextID.toString();
+		}
+		assert.equal(orderbook.length, expectedResultantOrderbook.length);
+		for (let i = 0; i < orderbook.length; i++) {
+			assert.equal(orderbook[i].amount.toString(), expectedResultantOrderbook[i].amount.toString());
+			assert.equal(orderbook[i].maturityConversionRate.toString(), expectedResultantOrderbook[i].maturityConversionRate.toString());
+			assert.equal(orderbook[i].maker, expectedResultantOrderbook[i].maker);
+			assert.equal(orderbook[i].nextID.toString(), expectedResultantOrderbook[i].nextID.toString());
+		}
+
+		let dynamicYTsold = YTsold.mul(ratio).div(_10To18);
+		let change = prevBalYield.sub(balYield);
+		let expected = YTsold;
+		let diff = change.sub(expected).abs();
+		let cmp = diff.cmp(new BN(3));
+		assert.equal(cmp, -1, "acceptable range of error is 2 units");
+		let changeBondNum = balBonds.sub(prevBalBonds).toString();
+		assert.equal(changeBondNum, dynamicYTsold.add(ZCBbought).toString());
+	}
+
+	async function market_sell_ZCB_to_U(amtToSell, maxMCR, maxCumulativeMCR, maxSteps) {
+		let orderbook = [];
+		let currentID = (await exchange.headYTSellID()).toString();
+		let ratio = await NGBwrapperInstance.WrappedAmtToUnitAmt_RoundDown(_10To18);
+		while (currentID !== "0") {
+			let order = await exchange.YTSells(currentID);
+			order.ID = currentID;
+			orderbook.push(order);
+			currentID = order.nextID.toString();
+		}
+
+		let prevBalBonds = await exchange.BondDeposited(accounts[1]);
+		let prevBalYield = await exchange.YieldDeposited(accounts[1]);
+
+		await exchange.marketSellZCBtoU(amtToSell, maxMCR, maxCumulativeMCR, maxSteps, true, {from: accounts[1]});
+
+		balBonds = await exchange.BondDeposited(accounts[1]);
+		balYield = await exchange.YieldDeposited(accounts[1]);
+
+		let expectedResultantOrderbook = [...orderbook];
+		for (let i = 0; i < expectedResultantOrderbook.length; i++) {
+			expectedResultantOrderbook[i] = {...expectedResultantOrderbook[i]}; //clone each object
+		}
+		let remaining = amtToSell;
+		let YTbought = new BN(0);
+
+		while (
+			expectedResultantOrderbook.length > 0 &&
+			expectedResultantOrderbook[0].maturityConversionRate.cmp(maxMCR) != 1
+		) {
+			let order = expectedResultantOrderbook[0];
+			let orderZCBamount = impliedZCBamount(order.amount, ratio, order.maturityConversionRate);
+			let orderUnitYTamt = order.amount.mul(ratio).div(_10To18);
+			let unitYTbought = YTbought.mul(ratio).div(_10To18);
+			let cmp = orderUnitYTamt.add(unitYTbought).cmp(remaining.sub(order.amount));
+			if (cmp === 1) {
+				//partially accept offer
+				/*
+					unitAmtYTbought + unitYTtoBuy == _amountZCB - ZCBtoSell
+					ZCBtoSell == YTtoBuy * orderRatio
+					unitYTtoBuy = YTtoBuy * ratio
+
+					unitAmtYTbought + YTtoBuy*ratio == _amountZCB - YTtoBuy*orderRatio
+					YTtoBuy * (orderRatio + ratio) == _amountZCB - unitAmtYTbought
+					YTtoBuy == (_amountZCB - unitAmtYTbought) / (orderRatio + ratio)
+				*/
+				let orderRatio = orderZCBamount.mul(_10To18).div(order.amount);
+				let YTtoBuy = remaining.sub(unitYTbought).mul(_10To18).div(orderRatio.add(ratio));
+				let ZCBtoSell = YTtoBuy.mul(orderRatio).div(_10To18);
+
+				order.amount = order.amount.sub(YTtoBuy);
+				YTbought = YTbought.add(YTtoBuy);
+				remaining = remaining.sub(ZCBtoSell);
+			}
+			else {
+				//delete order from list & decrement remaining
+				remaining = remaining.sub(orderZCBamount);
+				expectedResultantOrderbook.shift();
+				YTbought = YTbought.add(order.amount);
+			}
+			if (cmp !== -1) break; //lazy hack
+		}
+
+		let ZCBsold = amtToSell.sub(remaining);
+		orderbook = [];
+		currentID = (await exchange.headYTSellID()).toString();
+		while (currentID !== "0") {
+			let order = await exchange.YTSells(currentID);
+			order.ID = currentID;
+			orderbook.push(order);
+			currentID = order.nextID.toString();
+		}
+		assert.equal(orderbook.length, expectedResultantOrderbook.length);
+		for (let i = 0; i < orderbook.length; i++) {
+			assert.equal(orderbook[i].amount.toString(), expectedResultantOrderbook[i].amount.toString());
+			assert.equal(orderbook[i].maturityConversionRate.toString(), expectedResultantOrderbook[i].maturityConversionRate.toString());
+			assert.equal(orderbook[i].maker, expectedResultantOrderbook[i].maker);
+			assert.equal(orderbook[i].nextID.toString(), expectedResultantOrderbook[i].nextID.toString());
+		}
+
+		let dynamicYTbought = YTbought.mul(ratio).div(_10To18);
+		assert.equal(balYield.sub(prevBalYield).toString(), YTbought.toString());
+		let changeBondNum = prevBalBonds.sub(balBonds).toString();
+		assert.equal(changeBondNum, dynamicYTbought.add(ZCBsold).toString());
+	}
+
+	async function test_market_sell_unitYT_to_U(amtToSell, minMCR, minCumulativeMCR, maxSteps) {
+		let orderbook = [];
+		let currentID = (await exchange.headZCBSellID()).toString();
+		let ratio = await NGBwrapperInstance.WrappedAmtToUnitAmt_RoundDown(_10To18);
+		while (currentID !== "0") {
+			let order = await exchange.ZCBSells(currentID);
+			order.ID = currentID;
+			orderbook.push(order);
+			currentID = order.nextID.toString();
+		}
+
+		let prevBalBonds = await exchange.BondDeposited(accounts[1]);
+		let prevBalYield = await exchange.YieldDeposited(accounts[1]);
+
+		await exchange.marketSellUnitYTtoU(amtToSell, minMCR, minCumulativeMCR, maxSteps, true, {from: accounts[1]});
+
+		balBonds = await exchange.BondDeposited(accounts[1]);
+		balYield = await exchange.YieldDeposited(accounts[1]);
+
+		let expectedResultantOrderbook = [...orderbook];
+		for (let i = 0; i < expectedResultantOrderbook.length; i++) {
+			expectedResultantOrderbook[i] = {...expectedResultantOrderbook[i]}; //clone each object
+		}
+		let remaining = amtToSell;
+		let ZCBbought = new BN(0);
+
+		while (
+			expectedResultantOrderbook.length > 0 &&
+			expectedResultantOrderbook[0].maturityConversionRate.cmp(minMCR) != -1
+		) {
+			let order = expectedResultantOrderbook[0];
+			let orderYTamount = impliedYTamount(order.amount, ratio, order.maturityConversionRate);
+			let orderUnitYTamount = orderYTamount.mul(ratio).div(_10To18);
+			let lhs = ZCBbought.add(order.amount);
+			let rhs = remaining.sub(orderUnitYTamount);
+			let cmp = lhs.cmp(rhs);
+			if (cmp === 1) {
+				/*
+					_unitAmountYT - unitYTtoSell == ZCBbought + ZCBtoBuy
+					ZCBtoBuy == unitYTtoSell * orderRatio
+					YTtoSell = unitYTtoSell / ratio
+
+					_unitAmountYT - unitYTtoSell == ZCBbought + unitYTtoSell*orderRatio
+					unitYTtoSell*(orderRatio + 1) == _unitAmountYT - ZCBbought
+					unitYTtoSell == (_unitAmountYT - ZCBbought) / (orderRatio + 1)
+				*/
+				let orderRatio = order.amount.mul(_10To18).div(orderUnitYTamount);
+				let unitYTtoSell = remaining.sub(ZCBbought).mul(_10To18).div(orderRatio.add(_10To18));
+				let ZCBtoBuy = unitYTtoSell.mul(orderRatio).div(_10To18);
+				let YTtoSell = unitYTtoSell.mul(_10To18).div(ratio);
+
+				order.amount = order.amount.sub(ZCBtoBuy);
+				ZCBbought = ZCBbought.add(ZCBtoBuy);
+				remaining = remaining.sub(unitYTtoSell);
+			}
+			else {
+				//delete order from list & decrement remaining
+				remaining = remaining.sub(orderUnitYTamount);
+				expectedResultantOrderbook.shift();
+				ZCBbought = ZCBbought.add(order.amount);
+			}
+			if (cmp !== -1) break; //lazy hack
+		}
+
+		let dynamicYTsold = amtToSell.sub(remaining);
+		let YTsold = dynamicYTsold.mul(_10To18).div(ratio);
+		orderbook = [];
+		currentID = (await exchange.headZCBSellID()).toString();
+		while (currentID !== "0") {
+			let order = await exchange.ZCBSells(currentID);
+			order.ID = currentID;
+			orderbook.push(order);
+			currentID = order.nextID.toString();
+		}
+		assert.equal(orderbook.length, expectedResultantOrderbook.length);
+		for (let i = 0; i < orderbook.length; i++) {
+			assert.equal(orderbook[i].amount.toString(), expectedResultantOrderbook[i].amount.toString());
+			assert.equal(orderbook[i].maturityConversionRate.toString(), expectedResultantOrderbook[i].maturityConversionRate.toString());
+			assert.equal(orderbook[i].maker, expectedResultantOrderbook[i].maker);
+			assert.equal(orderbook[i].nextID.toString(), expectedResultantOrderbook[i].nextID.toString());
+		}
+
+		let change = prevBalYield.sub(balYield);
+		let expected = YTsold;
+		let diff = change.sub(expected).abs();
+		let cmp = diff.cmp(new BN(3));
+		assert.equal(cmp, -1, "acceptable range of error is 2 units");
+		let changeBondNum = balBonds.sub(prevBalBonds);
+		expected = dynamicYTsold.add(ZCBbought);
+		diff = parseInt(changeBondNum.sub(expected).toString());
+		assert.isBelow(diff, 1, "actual must be less than or equal to expected");
+		assert.isBelow(Math.abs(diff), 3, "acceptable range of error is 2 units");
+	}
+
+	it('marketBuyYT, no mcr blockers', async () => {
+		let amtToBuy = _10To18.div(new BN(300));
+		let maxMCR = _10To18.mul(new BN(10));
+		let maxCumulativeMCR = maxMCR;
+		let maxSteps = 10;
+		await test_market_buy_YT(amtToBuy, maxMCR, maxCumulativeMCR, maxSteps);
+	});
+
+	it('marketSellZCB, no mcr blockers', async () => {
+		let amtToSell = _10To18.div(new BN(780));
+		let maxMCR = _10To18.mul(new BN(10));
+		let maxCumulativeMCR = maxMCR;
+		let maxSteps = 10;
+		await test_market_sell_ZCB(amtToSell, maxMCR, maxCumulativeMCR, maxSteps);
+	});
+
+	it('marketBuyZCB, no mcr blockers', async () => {
+		let amtToBuy = _10To18.div(new BN(300));
+		let minMCR = _10To18.div(new BN(10));
+		let minCumulativeMCR = minMCR;
+		let maxSteps = 10;
+		await test_market_buy_ZCB(amtToBuy, minMCR, minCumulativeMCR, maxSteps);
+	});
+
+	it('marketSellYT, no mcr blockers', async () => {
+		let amtToSell = _10To18.div(new BN(780));
+		let minMCR = _10To18.div(new BN(10));
+		let minCumulativeMCR = minMCR;
+		let maxSteps = 10;
+		await test_market_sell_YT(amtToSell, minMCR, minCumulativeMCR, maxSteps);
+	});
+
+	it('marketSellZCBtoU, no mcr blockers', async () => {
+		let amtZCB = _10To18.div(new BN(780));
+		let maxMCR = _10To18.mul(new BN(10));
+		let maxCumulativeMCR = maxMCR;
+		let maxSteps = 10;
+		await market_sell_ZCB_to_U(amtZCB, maxMCR, maxCumulativeMCR, maxSteps);
+	});
+
+	it('marketSellUnitYTtoU, no mcr blockers', async () => {
+		let unitAmtToSell = _10To18.div(new BN(780));
+		let minMCR = _10To18.div(new BN(10));
+		let minCumulativeMCR = minMCR;
+		let maxSteps = 10;
+		await test_market_sell_unitYT_to_U(unitAmtToSell, minMCR, minCumulativeMCR, maxSteps);
 	});
 });

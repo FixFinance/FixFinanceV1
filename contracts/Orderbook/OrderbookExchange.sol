@@ -128,14 +128,6 @@ contract OrderbookExchange {
 
 	function manageCollateral_BuyZCB_takeOrder(address _addr, uint _amountZCB, uint _amountWrappedYT, uint _ratio, bool _useInternalBalances) internal {
 		if (_useInternalBalances) {
-			require(_amountZCB < uint(type(int256).max));
-			uint unitAmtYT = _amountWrappedYT.mul(_ratio) / (1 ether);
-			//get YT
-			FCP.transferPositionFrom(msg.sender, address(this), _amountWrappedYT+1, -int(unitAmtYT)); //+1 to prevent off by 1 errors
-			//send ZCB
-			FCP.transferPosition(msg.sender, 0, int(_amountZCB));
-		}
-		else {
 			uint bondValChange = (_amountWrappedYT.mul(_ratio) / (1 ether)).add(_amountZCB);
 			require(bondValChange < uint(type(int256).max));
 
@@ -147,6 +139,14 @@ contract OrderbookExchange {
 			requireValidCollateral(resultantYD, resultantBD, wrappedAmtLockedYT, _ratio);
 			YieldDeposited[_addr] = resultantYD;
 			BondDeposited[_addr] = resultantBD;
+		}
+		else {
+			require(_amountZCB < uint(type(int256).max));
+			uint unitAmtYT = _amountWrappedYT.mul(_ratio) / (1 ether);
+			//get YT
+			FCP.transferPositionFrom(msg.sender, address(this), _amountWrappedYT+1, -int(unitAmtYT)); //+1 to prevent off by 1 errors
+			//send ZCB
+			FCP.transferPosition(msg.sender, 0, int(_amountZCB));
 		}
 	}
 
@@ -183,14 +183,6 @@ contract OrderbookExchange {
 
 	function manageCollateral_BuyYT_takeOrder(address _addr, uint _amountZCB, uint _amountWrappedYT, uint _ratio, bool _useInternalBalances) internal {
 		if (_useInternalBalances) {
-			require(_amountZCB < uint(type(int256).max));
-			uint unitAmtYT = _amountWrappedYT.mul(_ratio) / (1 ether);
-			//get ZCB
-			FCP.transferPositionFrom(msg.sender, address(this), 0, int(_amountZCB));
-			//send YT
-			FCP.transferPosition(msg.sender, _amountWrappedYT, -int(unitAmtYT));
-		}
-		else {
 			uint bondValChange = (_amountWrappedYT.mul(_ratio) / (1 ether)).add(_amountZCB);
 			require(bondValChange < uint(type(int256).max));
 
@@ -202,6 +194,14 @@ contract OrderbookExchange {
 			requireValidCollateral(resultantYD, resultantBD, wrappedAmtLockedYT, _ratio);
 			YieldDeposited[_addr] = resultantYD;
 			BondDeposited[_addr] = resultantBD;
+		}
+		else {
+			require(_amountZCB < uint(type(int256).max));
+			uint unitAmtYT = _amountWrappedYT.mul(_ratio) / (1 ether);
+			//get ZCB
+			FCP.transferPositionFrom(msg.sender, address(this), 0, int(_amountZCB));
+			//send YT
+			FCP.transferPosition(msg.sender, _amountWrappedYT, -int(unitAmtYT));
 		}
 	}
 
@@ -749,12 +749,12 @@ contract OrderbookExchange {
 				YTbought += scaledYTamt;
 
 				manageCollateral_ReceiveZCB(order.maker, _amountZCB);
-				if (order.amount == _amountZCB) {
+				if (order.amount == scaledYTamt) {
 					headYTSellID = order.nextID;
 					delete YTSells[currentID];
 				}
 				else {
-					YTSells[currentID].amount = order.amount - _amountZCB;
+					YTSells[currentID].amount = order.amount - scaledYTamt;
 					headYTSellID = currentID;
 				}
 
@@ -846,6 +846,7 @@ contract OrderbookExchange {
 				YTbought += order.amount;
 				_amountZCB -= orderZCBamt;
 			}
+			currentID = order.nextID;
 		}
 		require(impliedMaturityConversionRate(ZCBsold, YTbought, ratio) <= _maxCumulativeMaturityConversionRate);
 		//collect & distribute to taker
@@ -853,8 +854,8 @@ contract OrderbookExchange {
 		headYTSellID = currentID;
 	}
 
-	function marketSellYTtoU(
-		uint _amountYT,
+	function marketSellUnitYTtoU(
+		uint _unitAmountYT,
 		uint _minMaturityConversionRate,
 		uint _minCumulativeMaturityConversionRate,
 		uint16 _maxIterations,
@@ -872,22 +873,23 @@ contract OrderbookExchange {
 				manageCollateral_BuyZCB_takeOrder(msg.sender, ZCBbought, YTsold, ratio, _useInternalBalances);
 				return (ZCBbought, YTsold);
 			}
-			uint unitAmtYT = _amountYT.mul(ratio) / (1 ether);
 			uint orderYTamt = impliedYTamount(order.amount, ratio, order.maturityConversionRate);
 			uint orderUnitAmtYT = orderYTamt.mul(ratio) / (1 ether);
-			if (orderUnitAmtYT >= unitAmtYT || ZCBbought.add(order.amount) >= unitAmtYT.sub(orderUnitAmtYT)) {
-				uint orderRatio = order.amount.mul(1 ether).div(orderYTamt); //ratio of ZCB to YT for specific order
+			if (orderUnitAmtYT >= _unitAmountYT || ZCBbought.add(order.amount) >= _unitAmountYT.sub(orderUnitAmtYT)) {
+				uint orderRatio = order.amount.mul(1 ether).div(orderUnitAmtYT); //ratio of ZCB to unit YT for specific order
 				/*
-					unitAmtYT - unitYTtoSell == ZCBbought + ZCBtoBuy
-					ZCBtoBuy == YTtoSell * orderRatio
+					_unitAmountYT - unitYTtoSell == ZCBbought + ZCBtoBuy
+					ZCBtoBuy == unitYTtoSell * orderRatio
 					YTtoSell = unitYTtoSell / ratio
 
-					unitAmtYT - YTtoSell*ratio == ZCBbought + YTtoSell*orderRatio
-					YTtoSell*(orderRatio + ratio) == unitAmtYT - ZCBbought
-					YTtoSell == (unitAmtYT - ZCBbought) / (orderRatio + ratio)
+					_unitAmountYT - unitYTtoSell == ZCBbought + unitYTtoSell*orderRatio
+					unitYTtoSell*(orderRatio + 1) == _unitAmountYT - ZCBbought
+					unitYTtoSell == (_unitAmountYT - ZCBbought) / (orderRatio + 1)
 				*/
-				uint YTtoSell = unitAmtYT.sub(ZCBbought).mul(1 ether).div(ratio.add(orderRatio));
-				uint ZCBtoBuy = YTtoSell.mul(orderRatio) / (1 ether);
+				uint copyUnitAmtYT = _unitAmountYT; //prevent stack too deep
+				uint unitYTtoSell = copyUnitAmtYT.sub(ZCBbought).mul(1 ether).div(orderRatio.add(1 ether));
+				uint YTtoSell = unitYTtoSell.mul(1 ether).div(ratio);
+				uint ZCBtoBuy = unitYTtoSell.mul(orderRatio) / (1 ether);
 
 				YTsold += YTtoSell;
 				ZCBbought += ZCBtoBuy;
@@ -917,7 +919,7 @@ contract OrderbookExchange {
 
 				ZCBbought += order.amount;
 				YTsold += orderYTamt;
-				_amountYT -= orderYTamt;
+				_unitAmountYT -= orderUnitAmtYT;
 			}
 			currentID = order.nextID;
 		}

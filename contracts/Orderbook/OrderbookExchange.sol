@@ -205,7 +205,7 @@ contract OrderbookExchange {
 		}
 	}
 
- 	function insertFromHead_SellZCB(uint _amount, uint _maturityConversionRate, uint _newID) internal {
+ 	function insertFromHead_SellZCB(uint _amount, uint _maturityConversionRate, uint _newID, uint _maxSteps) internal {
 		uint currentID = headZCBSellID;
 		if (currentID == 0) {
 			headZCBSellID = _newID;
@@ -220,7 +220,7 @@ contract OrderbookExchange {
 		}
 		LimitSellZCB storage prevOrder; 
 		currentID = currentOrder.nextID;
-		while (currentID > 0) {
+		for (uint i = 0; i < _maxSteps && currentID > 0; i++) {
 			prevOrder = currentOrder;
 			currentOrder = ZCBSells[currentID];
 			if (_maturityConversionRate > currentOrder.maturityConversionRate) {
@@ -234,7 +234,7 @@ contract OrderbookExchange {
 		ZCBSells[_newID] = LimitSellZCB(msg.sender, _amount, _maturityConversionRate, 0);
 	}
 
-	function insertFromHead_SellYT(uint _amount, uint _maturityConversionRate, uint _newID) internal {
+	function insertFromHead_SellYT(uint _amount, uint _maturityConversionRate, uint _newID, uint _maxSteps) internal {
 		uint currentID = headYTSellID;
 		if (currentID == 0) {
 			headYTSellID = _newID;
@@ -249,7 +249,7 @@ contract OrderbookExchange {
 		}
 		LimitSellYT storage prevOrder; 
 		currentID = currentOrder.nextID;
-		while (currentID > 0) {
+		for (uint i = 0; i < _maxSteps && currentID > 0; i++) {
 			prevOrder = currentOrder;
 			currentOrder = YTSells[currentID];
 			if (_maturityConversionRate < currentOrder.maturityConversionRate) {
@@ -263,14 +263,14 @@ contract OrderbookExchange {
 		YTSells[_newID] = LimitSellYT(msg.sender, _amount, _maturityConversionRate, 0);
 	}
 
-	function insertWithHint_SellZCB(uint _amount, uint _maturityConversionRate, uint _hintID, uint _newID) internal {
+	function insertWithHint_SellZCB(uint _amount, uint _maturityConversionRate, uint _hintID, uint _newID, uint _maxSteps) internal {
 		uint currentID = _hintID;
 		LimitSellZCB storage currentOrder = ZCBSells[currentID];
 		LimitSellZCB storage prevOrder;
 		uint startMCR = currentOrder.maturityConversionRate;
 		require(_maturityConversionRate <= startMCR && startMCR > 0);
 		currentID = currentOrder.nextID;
-		while (currentID > 0) {
+		for (uint i = 0; i < _maxSteps && currentID > 0; i++) {
 			prevOrder = currentOrder;
 			currentOrder = ZCBSells[currentID];
 			if (_maturityConversionRate > currentOrder.maturityConversionRate) {
@@ -284,14 +284,14 @@ contract OrderbookExchange {
 		ZCBSells[_newID] = LimitSellZCB(msg.sender, _amount, _maturityConversionRate, 0);
 	}
 
-	function insertWithHint_SellYT(uint _amount, uint _maturityConversionRate, uint _hintID, uint _newID) internal {
+	function insertWithHint_SellYT(uint _amount, uint _maturityConversionRate, uint _hintID, uint _newID, uint _maxSteps) internal {
 		uint currentID = _hintID;
 		LimitSellYT storage currentOrder = YTSells[currentID];
 		LimitSellYT storage prevOrder;
 		uint startMCR = currentOrder.maturityConversionRate;
 		require(_maturityConversionRate >= startMCR && startMCR > 0);
 		currentID = currentOrder.nextID;
-		while (currentID > 0) {
+		for (uint i = 0; i < _maxSteps && currentID > 0; i++) {
 			prevOrder = currentOrder;
 			currentOrder = YTSells[currentID];
 			if (_maturityConversionRate < currentOrder.maturityConversionRate) {
@@ -472,14 +472,15 @@ contract OrderbookExchange {
 	function limitSellZCB(
 		uint _amount,
 		uint _maturityConversionRate,
-		uint _hintID
+		uint _hintID,
+		uint _maxSteps
 	) public ensureMCRAboveCurrentRatio(_maturityConversionRate) {
 		uint newID = totalNumOrders+1;
 		if (_hintID == 0) {
-			insertFromHead_SellZCB(_amount, _maturityConversionRate, newID);
+			insertFromHead_SellZCB(_amount, _maturityConversionRate, newID, _maxSteps);
 		}
 		else {
-			insertWithHint_SellZCB(_amount, _maturityConversionRate, _hintID, newID);
+			insertWithHint_SellZCB(_amount, _maturityConversionRate, _hintID, newID, _maxSteps);
 		}
 		manageCollateral_SellZCB_makeOrder(msg.sender, _amount);
 		totalNumOrders = newID;
@@ -488,14 +489,15 @@ contract OrderbookExchange {
 	function limitSellYT(
 		uint _amount,
 		uint _maturityConversionRate,
-		uint _hintID
+		uint _hintID,
+		uint _maxSteps
 	) public ensureMCRAboveCurrentRatio(_maturityConversionRate) {
 		uint newID = totalNumOrders+1;
 		if (_hintID == 0) {
-			insertFromHead_SellYT(_amount, _maturityConversionRate, newID);
+			insertFromHead_SellYT(_amount, _maturityConversionRate, newID, _maxSteps);
 		}
 		else {
-			insertWithHint_SellYT(_amount, _maturityConversionRate, _hintID, newID);
+			insertWithHint_SellYT(_amount, _maturityConversionRate, _hintID, newID, _maxSteps);
 		}
 		manageCollateral_SellYT_makeOrder(msg.sender, _amount);
 		totalNumOrders = newID;

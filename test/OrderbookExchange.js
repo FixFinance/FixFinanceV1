@@ -102,12 +102,13 @@ contract('OrderbookExchange', async function(accounts) {
 	});
 
 	async function test_place_limit_order(amt, MCR, targetID, hintID, expectedIDs, isZCBLimitSell) {
+		const maxSteps = 100;
 		if (isZCBLimitSell) {
 			let prevYD = YD;
 			let prevBD = BD;
 			let prevLockedYT = lockedYT;
 
-			await exchange.limitSellZCB(amt, MCR, hintID);
+			await exchange.limitSellZCB(amt, MCR, hintID, maxSteps);
 
 			YD = await exchange.YieldDeposited(accounts[0]);
 			BD = await exchange.BondDeposited(accounts[0]);
@@ -137,7 +138,7 @@ contract('OrderbookExchange', async function(accounts) {
 			let prevBD = BD;
 			let prevLockedYT = lockedYT;
 
-			let rec = await exchange.limitSellYT(amt, MCR, hintID);
+			let rec = await exchange.limitSellYT(amt, MCR, hintID, maxSteps);
 
 			YD = await exchange.YieldDeposited(accounts[0]);
 			BD = await exchange.BondDeposited(accounts[0]);

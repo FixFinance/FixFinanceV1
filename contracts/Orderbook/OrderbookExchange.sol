@@ -94,6 +94,8 @@ contract OrderbookExchange {
 
 	function impliedZCBamount(uint _YT, uint _ratio, uint _maturityConversionRate) internal pure returns(uint) {
 		uint yieldToMaturity = _maturityConversionRate.mul(1 ether).div(_ratio);
+		//ensure that for YTsell orders that yieldToMaturity is always positive
+		yieldToMaturity = yieldToMaturity > (1 ether) ? yieldToMaturity : (1 ether) + 1;
 		uint effYT = _YT.mul(_ratio) / (1 ether);
 		return effYT.mul(yieldToMaturity.sub(1 ether)) / (1 ether);
 	}

@@ -47,14 +47,25 @@ contract OrderbookExchange is OrderbookData {
 		uint _hintID,
 		uint _maxSteps
 	) external {
-		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
+		address _delegateAddress = delegateAddress;
+		bytes memory sig = abi.encodeWithSignature(
 			"limitSellZCB(uint256,uint256,uint256,uint256)",
 			_amount,
 			_maturityConversionRate,
 			_hintID,
 			_maxSteps
-		));
-		require(success);
+		);
+
+		uint prevID;
+		assembly {
+			let success := delegatecall(gas(), _delegateAddress, add(sig, 0x20), mload(sig), 0, 0x20)
+
+			if iszero(success) { revert(0,0) }
+
+			prevID := mload(0)
+		}
+
+		emit MakeLimitSellZCB(msg.sender, prevID, _amount, _maturityConversionRate);
 	}
 
 	function limitSellYT(
@@ -63,14 +74,25 @@ contract OrderbookExchange is OrderbookData {
 		uint _hintID,
 		uint _maxSteps
 	) external {
-		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
+		address _delegateAddress = delegateAddress;
+		bytes memory sig = abi.encodeWithSignature(
 			"limitSellYT(uint256,uint256,uint256,uint256)",
 			_amount,
 			_maturityConversionRate,
 			_hintID,
 			_maxSteps
-		));
-		require(success);
+		);
+
+		uint prevID;
+		assembly {
+			let success := delegatecall(gas(), _delegateAddress, add(sig, 0x20), mload(sig), 0, 0x20)
+
+			if iszero(success) { revert(0,0) }
+
+			prevID := mload(0)
+		}
+
+		emit MakeLimitSellYT(msg.sender, prevID, _amount, _maturityConversionRate);
 	}
 
 	function modifyZCBLimitSell(

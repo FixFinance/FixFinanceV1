@@ -163,104 +163,120 @@ contract OrderbookDelegate is OrderbookData {
 		}
 	}
 
- 	function insertFromHead_SellZCB(uint _amount, uint _maturityConversionRate, uint _newID, uint _maxSteps) internal {
+ 	function insertFromHead_SellZCB(uint _amount, uint _maturityConversionRate, uint _newID, uint _maxSteps) internal returns(uint prevID) {
 		uint currentID = headZCBSellID;
 		if (currentID == 0) {
 			headZCBSellID = _newID;
 			ZCBSells[_newID] = LimitSellZCB(msg.sender, _amount, _maturityConversionRate, 0);
-			return;
+			return 0;
 		}
 		LimitSellZCB storage currentOrder = ZCBSells[currentID];
 		if (_maturityConversionRate > currentOrder.maturityConversionRate) {
 			headZCBSellID = _newID;
 			ZCBSells[_newID] = LimitSellZCB(msg.sender, _amount, _maturityConversionRate, currentID);
-			return;
+			return 0;
 		}
 		LimitSellZCB storage prevOrder; 
+		prevID = currentID;
 		currentID = currentOrder.nextID;
-		for (uint i = 0; i < _maxSteps && currentID > 0; i++) {
+		for (; currentID > 0; _maxSteps--) {
+			require(_maxSteps > 0);
 			prevOrder = currentOrder;
 			currentOrder = ZCBSells[currentID];
 			if (_maturityConversionRate > currentOrder.maturityConversionRate) {
 				prevOrder.nextID = _newID;
 				ZCBSells[_newID] = LimitSellZCB(msg.sender, _amount, _maturityConversionRate, currentID);
-				return;
+				return prevID;
 			}
+			prevID = currentID;
 			currentID = currentOrder.nextID;
 		}
 		currentOrder.nextID = _newID;
 		ZCBSells[_newID] = LimitSellZCB(msg.sender, _amount, _maturityConversionRate, 0);
+		return prevID;
 	}
 
-	function insertFromHead_SellYT(uint _amount, uint _maturityConversionRate, uint _newID, uint _maxSteps) internal {
+	function insertFromHead_SellYT(uint _amount, uint _maturityConversionRate, uint _newID, uint _maxSteps) internal returns(uint prevID) {
 		uint currentID = headYTSellID;
 		if (currentID == 0) {
 			headYTSellID = _newID;
 			YTSells[_newID] = LimitSellYT(msg.sender, _amount, _maturityConversionRate, 0);
-			return;
+			return 0;
 		}
 		LimitSellYT storage currentOrder = YTSells[currentID];
 		if (_maturityConversionRate < currentOrder.maturityConversionRate) {
 			headYTSellID = _newID;
 			YTSells[_newID] = LimitSellYT(msg.sender, _amount, _maturityConversionRate, currentID);
-			return;
+			return 0;
 		}
 		LimitSellYT storage prevOrder; 
+		prevID = currentID;
 		currentID = currentOrder.nextID;
-		for (uint i = 0; i < _maxSteps && currentID > 0; i++) {
+		for (; currentID > 0; _maxSteps--) {
+			require(_maxSteps > 0);
 			prevOrder = currentOrder;
 			currentOrder = YTSells[currentID];
 			if (_maturityConversionRate < currentOrder.maturityConversionRate) {
 				prevOrder.nextID = _newID;
 				YTSells[_newID] = LimitSellYT(msg.sender, _amount, _maturityConversionRate, currentID);
-				return;
+				return prevID;
 			}
+			prevID = currentID;
 			currentID = currentOrder.nextID;
 		}
 		currentOrder.nextID = _newID;
 		YTSells[_newID] = LimitSellYT(msg.sender, _amount, _maturityConversionRate, 0);
+		return prevID;
 	}
 
-	function insertWithHint_SellZCB(uint _amount, uint _maturityConversionRate, uint _hintID, uint _newID, uint _maxSteps) internal {
+	function insertWithHint_SellZCB(uint _amount, uint _maturityConversionRate, uint _hintID, uint _newID, uint _maxSteps) internal returns(uint prevID) {
 		uint currentID = _hintID;
 		LimitSellZCB storage currentOrder = ZCBSells[currentID];
 		LimitSellZCB storage prevOrder;
 		uint startMCR = currentOrder.maturityConversionRate;
 		require(_maturityConversionRate <= startMCR && startMCR > 0);
+		prevID = currentID;
 		currentID = currentOrder.nextID;
-		for (uint i = 0; i < _maxSteps && currentID > 0; i++) {
+		for (; currentID > 0; _maxSteps--) {
+			require(_maxSteps > 0);
 			prevOrder = currentOrder;
 			currentOrder = ZCBSells[currentID];
 			if (_maturityConversionRate > currentOrder.maturityConversionRate) {
 				prevOrder.nextID = _newID;
 				ZCBSells[_newID] = LimitSellZCB(msg.sender, _amount, _maturityConversionRate, currentID);
-				return;
+				return prevID;
 			}
+			prevID = currentID;
 			currentID = currentOrder.nextID;
 		}
 		currentOrder.nextID = _newID;
 		ZCBSells[_newID] = LimitSellZCB(msg.sender, _amount, _maturityConversionRate, 0);
+		return prevID;
 	}
 
-	function insertWithHint_SellYT(uint _amount, uint _maturityConversionRate, uint _hintID, uint _newID, uint _maxSteps) internal {
+	function insertWithHint_SellYT(uint _amount, uint _maturityConversionRate, uint _hintID, uint _newID, uint _maxSteps) internal returns(uint prevID) {
 		uint currentID = _hintID;
 		LimitSellYT storage currentOrder = YTSells[currentID];
 		LimitSellYT storage prevOrder;
 		uint startMCR = currentOrder.maturityConversionRate;
 		require(_maturityConversionRate >= startMCR && startMCR > 0);
+		prevID = currentID;
 		currentID = currentOrder.nextID;
-		for (uint i = 0; i < _maxSteps && currentID > 0; i++) {
+		for (; currentID > 0; _maxSteps--) {
+			require(_maxSteps > 0);
 			prevOrder = currentOrder;
 			currentOrder = YTSells[currentID];
 			if (_maturityConversionRate < currentOrder.maturityConversionRate) {
 				prevOrder.nextID = _newID;
 				YTSells[_newID] = LimitSellYT(msg.sender, _amount, _maturityConversionRate, currentID);
-				return;
+				return prevID;
 			}
+			prevID = currentID;
 			currentID = currentOrder.nextID;
 		}
 		currentOrder.nextID = _newID;
 		YTSells[_newID] = LimitSellYT(msg.sender, _amount, _maturityConversionRate, 0);
+		return prevID;
 	}
 
 	function modifyFromHead_SellZCB(int _amount, uint _targetID, uint _maxSteps) internal returns (int change) {
@@ -430,13 +446,13 @@ contract OrderbookDelegate is OrderbookData {
 		uint _maturityConversionRate,
 		uint _hintID,
 		uint _maxSteps
-	) external ensureMCRAboveCurrentRatio(_maturityConversionRate) {
+	) external ensureMCRAboveCurrentRatio(_maturityConversionRate) returns(uint prevID) {
 		uint newID = totalNumOrders+1;
 		if (_hintID == 0) {
-			insertFromHead_SellZCB(_amount, _maturityConversionRate, newID, _maxSteps);
+			prevID = insertFromHead_SellZCB(_amount, _maturityConversionRate, newID, _maxSteps);
 		}
 		else {
-			insertWithHint_SellZCB(_amount, _maturityConversionRate, _hintID, newID, _maxSteps);
+			prevID = insertWithHint_SellZCB(_amount, _maturityConversionRate, _hintID, newID, _maxSteps);
 		}
 		manageCollateral_SellZCB_makeOrder(msg.sender, _amount);
 		totalNumOrders = newID;
@@ -447,13 +463,13 @@ contract OrderbookDelegate is OrderbookData {
 		uint _maturityConversionRate,
 		uint _hintID,
 		uint _maxSteps
-	) external ensureMCRAboveCurrentRatio(_maturityConversionRate) {
+	) external ensureMCRAboveCurrentRatio(_maturityConversionRate) returns(uint prevID) {
 		uint newID = totalNumOrders+1;
 		if (_hintID == 0) {
-			insertFromHead_SellYT(_amount, _maturityConversionRate, newID, _maxSteps);
+			prevID = insertFromHead_SellYT(_amount, _maturityConversionRate, newID, _maxSteps);
 		}
 		else {
-			insertWithHint_SellYT(_amount, _maturityConversionRate, _hintID, newID, _maxSteps);
+			prevID = insertWithHint_SellYT(_amount, _maturityConversionRate, _hintID, newID, _maxSteps);
 		}
 		manageCollateral_SellYT_makeOrder(msg.sender, _amount);
 		totalNumOrders = newID;

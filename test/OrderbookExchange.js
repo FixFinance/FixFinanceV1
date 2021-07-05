@@ -110,7 +110,20 @@ contract('OrderbookExchange', async function(accounts) {
 			let prevBD = BD;
 			let prevLockedYT = lockedYT;
 
-			await exchange.limitSellZCB(amt, MCR, hintID, maxSteps);
+			let rec = await exchange.limitSellZCB(amt, MCR, hintID, maxSteps);
+			let log = rec.receipt.logs[0];
+			let logArgs = log.args;
+			assert.equal(log.event, 'MakeLimitSellZCB');
+
+			let targetIndex = expectedIDs.indexOf(targetID);
+			if (targetIndex === -1) {
+				assert.fail('Target ID not present in expectedIDs array, invalid test');
+			}
+			let prevID = targetIndex === 0 ? "0" : expectedIDs[targetIndex-1];
+			assert.equal(logArgs.maker, accounts[0]);
+			assert.equal(logArgs.prevID.toString(), prevID);
+			assert.equal(logArgs.amount.toString(), amt.toString());
+			assert.equal(logArgs.maturityConversionRate.toString(), MCR.toString());
 
 			YD = await exchange.YieldDeposited(accounts[0]);
 			BD = await exchange.BondDeposited(accounts[0]);
@@ -141,6 +154,19 @@ contract('OrderbookExchange', async function(accounts) {
 			let prevLockedYT = lockedYT;
 
 			let rec = await exchange.limitSellYT(amt, MCR, hintID, maxSteps);
+			let log = rec.receipt.logs[0];
+			let logArgs = log.args;
+			assert.equal(log.event, 'MakeLimitSellYT');
+
+			let targetIndex = expectedIDs.indexOf(targetID);
+			if (targetIndex === -1) {
+				assert.fail('Target ID not present in expectedIDs array, invalid test');
+			}
+			let prevID = targetIndex === 0 ? "0" : expectedIDs[targetIndex-1];
+			assert.equal(logArgs.maker, accounts[0]);
+			assert.equal(logArgs.prevID.toString(), prevID);
+			assert.equal(logArgs.amount.toString(), amt.toString());
+			assert.equal(logArgs.maturityConversionRate.toString(), MCR.toString());
 
 			YD = await exchange.YieldDeposited(accounts[0]);
 			BD = await exchange.BondDeposited(accounts[0]);
@@ -175,7 +201,9 @@ contract('OrderbookExchange', async function(accounts) {
 			let prevHeadID = (await exchange.headZCBSellID()).toString();
 
 			let rec = await exchange.modifyZCBLimitSell(change, ID, hintID, maxSteps);
-			let logArgs = rec.receipt.logs[0].args;
+			let log = rec.receipt.logs[0];
+			let logArgs = log.args;
+			assert.equal(log.event, 'ModifyOrder');
 
 			let order = await exchange.ZCBSells(ID);
 			let headID = (await exchange.headZCBSellID()).toString();
@@ -218,7 +246,9 @@ contract('OrderbookExchange', async function(accounts) {
 			let prevHeadID = (await exchange.headYTSellID()).toString();
 
 			let rec = await exchange.modifyYTLimitSell(change, ID, hintID, maxSteps);
-			let logArgs = rec.receipt.logs[0].args;
+			let log = rec.receipt.logs[0];
+			let logArgs = log.args;
+			assert.equal(log.event, 'ModifyOrder');
 
 			let order = await exchange.YTSells(ID);
 			let headID = (await exchange.headYTSellID()).toString();

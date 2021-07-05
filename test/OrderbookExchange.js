@@ -174,7 +174,8 @@ contract('OrderbookExchange', async function(accounts) {
 			let prevOrder = await exchange.ZCBSells(ID);
 			let prevHeadID = (await exchange.headZCBSellID()).toString();
 
-			await exchange.modifyZCBLimitSell(change, ID, hintID, maxSteps);
+			let rec = await exchange.modifyZCBLimitSell(change, ID, hintID, maxSteps);
+			let logArgs = rec.receipt.logs[0].args;
 
 			let order = await exchange.ZCBSells(ID);
 			let headID = (await exchange.headZCBSellID()).toString();
@@ -182,6 +183,9 @@ contract('OrderbookExchange', async function(accounts) {
 			let resultantChange = order.amount.sub(prevOrder.amount);
 			let expectedDeleted = change.cmp(prevOrder.amount.neg()) <= 0;
 			let expectedChange = expectedDeleted ? prevOrder.amount.neg() : change;
+
+			assert.equal(logArgs.orderID.toString(), ID.toString());
+			assert.equal(logArgs.change.toString(), expectedChange.toString(), "correct change value logged");
 
 			YD = await exchange.YieldDeposited(accounts[0]);
 			BD = await exchange.BondDeposited(accounts[0]);
@@ -213,7 +217,8 @@ contract('OrderbookExchange', async function(accounts) {
 			let prevOrder = await exchange.YTSells(ID);
 			let prevHeadID = (await exchange.headYTSellID()).toString();
 
-			await exchange.modifyYTLimitSell(change, ID, hintID, maxSteps);
+			let rec = await exchange.modifyYTLimitSell(change, ID, hintID, maxSteps);
+			let logArgs = rec.receipt.logs[0].args;
 
 			let order = await exchange.YTSells(ID);
 			let headID = (await exchange.headYTSellID()).toString();
@@ -221,6 +226,9 @@ contract('OrderbookExchange', async function(accounts) {
 			let resultantChange = order.amount.sub(prevOrder.amount);
 			let expectedDeleted = change.cmp(prevOrder.amount.neg()) <= 0;
 			let expectedChange = expectedDeleted ? prevOrder.amount.neg() : change;
+
+			assert.equal(logArgs.orderID.toString(), ID.toString());
+			assert.equal(logArgs.change.toString(), expectedChange.toString(), "correct change value logged");
 
 			YD = await exchange.YieldDeposited(accounts[0]);
 			BD = await exchange.BondDeposited(accounts[0]);
@@ -433,7 +441,10 @@ contract('OrderbookExchange', async function(accounts) {
 		let prevBalBonds = await exchange.BondDeposited(accounts[1]);
 		let prevBalYield = await exchange.YieldDeposited(accounts[1]);
 
-		await exchange.marketBuyYT(amtToBuy, maxMCR, maxCumulativeMCR, maxSteps, true, {from: accounts[1]});
+		let rec = await exchange.marketBuyYT(amtToBuy, maxMCR, maxCumulativeMCR, maxSteps, true, {from: accounts[1]});
+		let log = rec.receipt.logs[0];
+		assert.equal(log.event, 'MarketBuyYT');
+		let logArgs = log.args;
 
 		balBonds = await exchange.BondDeposited(accounts[1]);
 		balYield = await exchange.YieldDeposited(accounts[1]);
@@ -468,6 +479,10 @@ contract('OrderbookExchange', async function(accounts) {
 				ZCBsold = ZCBsold.add(orderZCBamt);
 			}
 		}
+
+		assert.equal(logArgs.newYTSellHeadID.toString(), expectedResultantOrderbook[0].ID.toString());
+		assert.equal(logArgs.headAmount.toString(), expectedResultantOrderbook[0].amount.toString());
+		assert.equal(logArgs.taker, accounts[1]);
 
 		let YTbought = amtToBuy.sub(remaining);
 		orderbook = [];
@@ -506,7 +521,10 @@ contract('OrderbookExchange', async function(accounts) {
 		let prevBalBonds = await exchange.BondDeposited(accounts[1]);
 		let prevBalYield = await exchange.YieldDeposited(accounts[1]);
 
-		await exchange.marketSellZCB(amtToSell, maxMCR, maxCumulativeMCR, maxSteps, true, {from: accounts[1]});
+		let rec = await exchange.marketSellZCB(amtToSell, maxMCR, maxCumulativeMCR, maxSteps, true, {from: accounts[1]});
+		let log = rec.receipt.logs[0];
+		assert.equal(log.event, 'MarketBuyYT');
+		let logArgs = log.args;
 
 		balBonds = await exchange.BondDeposited(accounts[1]);
 		balYield = await exchange.YieldDeposited(accounts[1]);
@@ -541,6 +559,10 @@ contract('OrderbookExchange', async function(accounts) {
 				YTbought = YTbought.add(order.amount);
 			}
 		}
+
+		assert.equal(logArgs.newYTSellHeadID.toString(), expectedResultantOrderbook[0].ID.toString());
+		assert.equal(logArgs.headAmount.toString(), expectedResultantOrderbook[0].amount.toString());
+		assert.equal(logArgs.taker, accounts[1]);
 
 		let ZCBsold = amtToSell.sub(remaining);
 		orderbook = [];
@@ -579,7 +601,10 @@ contract('OrderbookExchange', async function(accounts) {
 		let prevBalBonds = await exchange.BondDeposited(accounts[1]);
 		let prevBalYield = await exchange.YieldDeposited(accounts[1]);
 
-		await exchange.marketBuyZCB(amtToBuy, minMCR, minCumulativeMCR, maxSteps, true, {from: accounts[1]});
+		let rec = await exchange.marketBuyZCB(amtToBuy, minMCR, minCumulativeMCR, maxSteps, true, {from: accounts[1]});
+		let log = rec.receipt.logs[0];
+		assert.equal(log.event, 'MarketBuyZCB');
+		let logArgs = log.args;
 
 		balBonds = await exchange.BondDeposited(accounts[1]);
 		balYield = await exchange.YieldDeposited(accounts[1]);
@@ -614,6 +639,10 @@ contract('OrderbookExchange', async function(accounts) {
 				YTsold = YTsold.add(orderYTamt);
 			}
 		}
+
+		assert.equal(logArgs.newZCBSellHeadID.toString(), expectedResultantOrderbook[0].ID.toString());
+		assert.equal(logArgs.headAmount.toString(), expectedResultantOrderbook[0].amount.toString());
+		assert.equal(logArgs.taker, accounts[1]);
 
 		let ZCBbought = amtToBuy.sub(remaining);
 		orderbook = [];
@@ -656,7 +685,10 @@ contract('OrderbookExchange', async function(accounts) {
 		let prevBalBonds = await exchange.BondDeposited(accounts[1]);
 		let prevBalYield = await exchange.YieldDeposited(accounts[1]);
 
-		await exchange.marketSellYT(amtToSell, minMCR, minCumulativeMCR, maxSteps, true, {from: accounts[1]});
+		let rec = await exchange.marketSellYT(amtToSell, minMCR, minCumulativeMCR, maxSteps, true, {from: accounts[1]});
+		let log = rec.receipt.logs[0];
+		assert.equal(log.event, 'MarketBuyZCB');
+		let logArgs = log.args;
 
 		balBonds = await exchange.BondDeposited(accounts[1]);
 		balYield = await exchange.YieldDeposited(accounts[1]);
@@ -691,6 +723,10 @@ contract('OrderbookExchange', async function(accounts) {
 				ZCBbought = ZCBbought.add(order.amount);
 			}
 		}
+
+		assert.equal(logArgs.newZCBSellHeadID.toString(), expectedResultantOrderbook[0].ID.toString());
+		assert.equal(logArgs.headAmount.toString(), expectedResultantOrderbook[0].amount.toString());
+		assert.equal(logArgs.taker, accounts[1]);
 
 		let YTsold = amtToSell.sub(remaining);
 		orderbook = [];
@@ -733,7 +769,10 @@ contract('OrderbookExchange', async function(accounts) {
 		let prevBalBonds = await exchange.BondDeposited(accounts[1]);
 		let prevBalYield = await exchange.YieldDeposited(accounts[1]);
 
-		await exchange.marketSellZCBtoU(amtToSell, maxMCR, maxCumulativeMCR, maxSteps, true, {from: accounts[1]});
+		let rec = await exchange.marketSellZCBtoU(amtToSell, maxMCR, maxCumulativeMCR, maxSteps, true, {from: accounts[1]});
+		let log = rec.receipt.logs[0];
+		assert.equal(log.event, 'MarketBuyYT');
+		let logArgs = log.args;
 
 		balBonds = await exchange.BondDeposited(accounts[1]);
 		balYield = await exchange.YieldDeposited(accounts[1]);
@@ -782,7 +821,12 @@ contract('OrderbookExchange', async function(accounts) {
 			if (cmp !== -1) break; //lazy hack
 		}
 
+		assert.equal(logArgs.newYTSellHeadID.toString(), expectedResultantOrderbook[0].ID.toString());
+		assert.equal(logArgs.headAmount.toString(), expectedResultantOrderbook[0].amount.toString());
+		assert.equal(logArgs.taker, accounts[1]);
+
 		let ZCBsold = amtToSell.sub(remaining);
+
 		orderbook = [];
 		currentID = (await exchange.headYTSellID()).toString();
 		while (currentID !== "0") {

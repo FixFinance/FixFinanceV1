@@ -5,6 +5,38 @@ import "../interfaces/IWrapper.sol";
 import "../interfaces/IFixCapitalPool.sol";
 
 contract OrderbookData {
+
+	event MakeLimitSellZCB(
+		address indexed maker,
+		uint prevID,
+		uint amount,
+		uint maturityConversionRate
+	);
+
+	event MakeLimitSellYT(
+		address indexed maker,
+		uint prevID,
+		uint amount,
+		uint maturityConversionRate
+	);
+
+	event ModifyOrder(
+		uint orderID,
+		int change
+	);
+
+	event MarketBuyYT(
+		address indexed taker,
+		uint newYTSellHeadID,
+		uint headAmount
+	);
+
+	event MarketBuyZCB(
+		address indexed taker,
+		uint newZCBSellHeadID,
+		uint headAmount
+	);
+
 	struct LimitSellZCB {
 		//same as LimitBuyYT
 		address maker;

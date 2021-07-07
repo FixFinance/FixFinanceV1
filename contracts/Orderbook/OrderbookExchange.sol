@@ -319,6 +319,14 @@ contract OrderbookExchange is OrderbookData {
 	//-----------------rate-oracle---------------------
 
 	/*
+		@Description: force the rate oracle to record a new datapoint
+	*/
+	function forceRateDataUpdate() external {
+		(bool success, ) = delegate1Address.delegatecall(abi.encodeWithSignature("forceRateDataUpdate()"));
+		require(success);
+	}
+
+	/*
 		@Description: returns the implied yield from the rate offered in this amm between now and maturity
 
 		@return uint yieldToMaturity: the multiplier by which the market anticipates the conversionRate to increase by up to maturity
@@ -361,16 +369,33 @@ contract OrderbookExchange is OrderbookData {
 	}
 
 	/*
-		@Description: get all rate datapoints and the timestamps at which they were recorded
+		@Description: get all rate datapoints and information about the state of the rate oracle
 	*/
 	function getOracleData() external view returns (
 		uint[LENGTH_RATE_SERIES] memory _impliedMCRs,
 		uint _lastDatapointCollection,
+		uint _oracleMCR,
 		uint8 _toSet
 	) {
 		_impliedMCRs = impliedMCRs;
 		_lastDatapointCollection = lastDatapointCollection;
+		_oracleMCR = OracleMCR;
 		_toSet = toSet;
+	}
+
+	/*
+		@Description: set the median of all datapoints in the impliedRates array as the
+			oracle rate, may only be called after all datapoints have been updated since
+			last call to this function
+
+		@param uint _MCR: the median of all MCR datapoints
+	*/
+	function setOracleMCR(uint _MCR) external {
+		(bool success, ) = delegate1Address.delegatecall(abi.encodeWithSignature(
+			"setOracleMCR(uint256)",
+			_MCR
+		));
+		require(success);
 	}
 
 }

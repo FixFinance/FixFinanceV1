@@ -15,11 +15,19 @@ const BN = web3.utils.BN;
 const nullAddress = "0x0000000000000000000000000000000000000000";
 const _10 = new BN(10);
 const _10To18 = _10.pow(new BN("18"));
-const LENGTH_RATE_SERIES_BN = new BN(31);
+const LENGTH_RATE_SERIES = 31;
+const LENGTH_RATE_SERIES_BN = new BN(LENGTH_RATE_SERIES);
 const secondsPerYear = 31556926;
 
 const BipsToTreasury = "1000"; //10% in basis point format
 const SBPSretained = 999_000;
+
+const medianBN = arr => {
+  const mid = Math.floor(arr.length / 2),
+    nums = [...arr].sort((a, b) => a.cmp(b));
+  return arr.length % 2 !== 0 ? nums[mid] : (nums[mid - 1] + nums[mid]) / 2;
+};
+
 
 contract('OrderbookExchange', async function(accounts) {
 
@@ -1083,4 +1091,33 @@ contract('OrderbookExchange', async function(accounts) {
 		let func = async () => await test_market_sell_unitYT_to_U(unitAmtToSell, minMCR, minCumulativeMCR, maxSteps);
 		await test_and_check_oracle(func);
 	});
+
+	it('Set Oracle MCR', async () => {
+		let orcData = await exchange.getOracleData();
+		for (let i = LENGTH_RATE_SERIES-1; orcData._impliedMCRs[i].cmp(new BN(0)) === 0; i--) {
+			await helper.advanceTime(61);
+			await exchange.forceRateDataUpdate();
+		}
+		orcData = await exchange.getOracleData();
+		assert.notEqual(orcData._impliedMCRs[LENGTH_RATE_SERIES-1].toString(), "0");
+		let median = medianBN(orcData._impliedMCRs);
+		await exchange.setOracleMCR(median);
+		orcData = await exchange.getOracleData();
+		assert.equal(orcData._oracleMCR.toString(), median.toString());
+	});
+
+	it('Cannot Set wrong MCR', async () => {
+		let orcData = await exchange.getOracleData();
+		let median = medianBN(orcData._impliedMCRs);
+		let notMedian = median.add(new BN(100));
+		let caught = false;
+		try {
+			await exchange.setOracleMCR(notMedian);
+		} catch (err) {
+			caught = true;
+		}
+		if (!caught) {
+			assert.fail('managed to set the wrong median MCR as the MCR');
+		}
+	})
 });

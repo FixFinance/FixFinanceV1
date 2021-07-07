@@ -1052,7 +1052,17 @@ contract OrderbookDelegate1 is OrderbookData {
 	function setOracleMCR(uint _MCR) external {
 		uint8 numLarger;
 		uint8 numEqual;
-		for (uint8 i = 0; i < LENGTH_RATE_SERIES; i++) {
+		{
+			uint lastMCR = impliedMCRs[LENGTH_RATE_SERIES-1];
+			require(lastMCR > 0); //ensure the entire array has been filled with datapoints
+			if (lastMCR > _MCR) {
+				numLarger++;
+			}
+			else if (lastMCR == _MCR) {
+				numEqual++;
+			}
+		}
+		for (uint8 i = 0; i < LENGTH_RATE_SERIES-1; i++) {
 			uint MCRi = impliedMCRs[i];
 			if (MCRi > _MCR) {
 				numLarger++;

@@ -72,12 +72,11 @@ contract OrderbookData {
 	IWrapper public wrapper;
 	uint public maturity;
 
-	//data for rate oracle
+	//--------------data for rate oracle---------------
 	uint8 constant LENGTH_RATE_SERIES = 31;
 	uint constant TIME_BETWEEN_DATAPOINTS = 1 minutes;
 	uint constant SecondsPerYear = 31556926;
 	int128 constant ABDK_1 = 1<<64;
-
 	uint OracleMCR;
 	uint[LENGTH_RATE_SERIES] impliedMCRs;
 	uint40 lastDatapointCollection;

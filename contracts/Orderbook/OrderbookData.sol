@@ -78,9 +78,8 @@ contract OrderbookData {
 	uint constant SecondsPerYear = 31556926;
 	int128 constant ABDK_1 = 1<<64;
 
-	uint8 toSet;
-	bool CanSetOracleMCR;
 	uint OracleMCR;
 	uint[LENGTH_RATE_SERIES] impliedMCRs;
-	uint[LENGTH_RATE_SERIES] timestamps;
+	uint40 lastDatapointCollection;
+	uint8 toSet;
 }

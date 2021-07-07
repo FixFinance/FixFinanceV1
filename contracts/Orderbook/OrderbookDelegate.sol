@@ -446,7 +446,7 @@ contract OrderbookDelegate is OrderbookData {
 		uint _maturityConversionRate,
 		uint _hintID,
 		uint _maxSteps
-	) external ensureMCRAboveCurrentRatio(_maturityConversionRate) returns(uint prevID) {
+	) external ensureMCRAboveCurrentRatio(_maturityConversionRate) setRateModifier returns(uint prevID) {
 		uint newID = totalNumOrders+1;
 		if (_hintID == 0) {
 			prevID = insertFromHead_SellZCB(_amount, _maturityConversionRate, newID, _maxSteps);
@@ -463,7 +463,7 @@ contract OrderbookDelegate is OrderbookData {
 		uint _maturityConversionRate,
 		uint _hintID,
 		uint _maxSteps
-	) external ensureMCRAboveCurrentRatio(_maturityConversionRate) returns(uint prevID) {
+	) external ensureMCRAboveCurrentRatio(_maturityConversionRate) setRateModifier returns(uint prevID) {
 		uint newID = totalNumOrders+1;
 		if (_hintID == 0) {
 			prevID = insertFromHead_SellYT(_amount, _maturityConversionRate, newID, _maxSteps);
@@ -480,7 +480,7 @@ contract OrderbookDelegate is OrderbookData {
 		uint _targetID,
 		uint _hintID,
 		uint _maxSteps
-	) external returns(int change) {
+	) external setRateModifier returns(int change) {
 		require(msg.sender == ZCBSells[_targetID].maker);
 		if (_hintID == 0) {
 			change = modifyFromHead_SellZCB(_amount, _targetID, _maxSteps);
@@ -502,7 +502,7 @@ contract OrderbookDelegate is OrderbookData {
 		uint _targetID,
 		uint _hintID,
 		uint _maxSteps
-	) external returns(int change) {
+	) external setRateModifier returns(int change) {
 		require(msg.sender == YTSells[_targetID].maker);
 		if (_hintID == 0) {
 			change = modifyFromHead_SellYT(_amount, _targetID, _maxSteps);
@@ -525,7 +525,7 @@ contract OrderbookDelegate is OrderbookData {
 		uint _maxCumulativeMaturityConversionRate,
 		uint16 _maxIterations,
 		bool _useInternalBalances
-	) external returns(uint YTbought, uint ZCBsold, uint newHeadID, uint newHeadAmount) {
+	) external setRateModifier returns(uint YTbought, uint ZCBsold, uint newHeadID, uint newHeadAmount) {
 		newHeadID = headYTSellID;
 		LimitSellYT memory order;
 		uint ratio = wrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
@@ -591,7 +591,7 @@ contract OrderbookDelegate is OrderbookData {
 		uint _minCumulativeMaturityConversionRate,
 		uint16 _maxIterations,
 		bool _useInternalBalances
-	) external returns(uint ZCBbought, uint YTsold, uint newHeadID, uint newHeadAmount) {
+	) external setRateModifier returns(uint ZCBbought, uint YTsold, uint newHeadID, uint newHeadAmount) {
 
 		newHeadID = headZCBSellID;
 		LimitSellZCB memory order;
@@ -659,7 +659,7 @@ contract OrderbookDelegate is OrderbookData {
 		uint _minCumulativeMaturityConversionRate,
 		uint16 _maxIterations,
 		bool _useInternalBalances
-	) external returns(uint ZCBbought, uint YTsold, uint newHeadID, uint newHeadAmount) {
+	) external setRateModifier returns(uint ZCBbought, uint YTsold, uint newHeadID, uint newHeadAmount) {
 
 		newHeadID = headZCBSellID;
 		LimitSellZCB memory order;
@@ -726,7 +726,7 @@ contract OrderbookDelegate is OrderbookData {
 		uint _maxCumulativeMaturityConversionRate,
 		uint16 _maxIterations,
 		bool _useInternalBalances
-	) external returns(uint YTbought, uint ZCBsold, uint newHeadID, uint newHeadAmount) {
+	) external setRateModifier returns(uint YTbought, uint ZCBsold, uint newHeadID, uint newHeadAmount) {
 
 		newHeadID = headYTSellID;
 		LimitSellYT memory order;
@@ -793,7 +793,7 @@ contract OrderbookDelegate is OrderbookData {
 		uint _maxCumulativeMaturityConversionRate,
 		uint16 _maxIterations,
 		bool _useInternalBalances
-	) external {
+	) external setRateModifier {
 		/*
 			lokey this function actually returns (uint YTbought, uint ZCBsold, uint newHeadID, uint newHeadAmount)
 			but solidity poorly allocates stack space for return variables so to prevent stack too deep we must
@@ -901,7 +901,7 @@ contract OrderbookDelegate is OrderbookData {
 		uint _minCumulativeMaturityConversionRate,
 		uint16 _maxIterations,
 		bool _useInternalBalances
-	) external {
+	) external setRateModifier {
 		/*
 			lokey this function actually returns (uint ZCBbought, uint YTsold, uint newHeadID, uint newHeadAmount)
 			but solidity poorly allocates stack space for return variables so to prevent stack too deep we must
@@ -1004,4 +1004,67 @@ contract OrderbookDelegate is OrderbookData {
 		}
 	}
 
+	//---------------------------R-a-t-e---O-r-a-c-l-e---------------------------------
+
+	/*
+		@Description: force this contract to store a data point in its rate oracle
+	*/
+	function forceRateDataUpdate() external setRateModifier {}
+
+	/*
+		@Description: write the next rate datapoint to storage
+
+		@param uint8 _index: the index within the impliedRates array for which to set a value
+	*/
+	function internalSetOracleMCR(uint8 _index) internal {
+		uint YThead = headYTSellID;
+		if (YThead == 0) return;
+		uint ZCBhead = headZCBSellID;
+		if (ZCBhead == 0) return;
+
+		uint ytMCR = YTSells[YThead].maturityConversionRate;
+		uint zcbMCR = ZCBSells[ZCBhead].maturityConversionRate;
+		uint ratio = wrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
+		ytMCR = ytMCR < ratio ? ratio : ytMCR;
+		zcbMCR = zcbMCR < ratio ? ratio : zcbMCR;
+		//take average, not as good as geometric mean scaled with ratio as 1.0, though this is more computationally efficient
+		uint impliedMCR = ytMCR.add(zcbMCR) >> 1;
+		impliedMCRs[_index] = impliedMCR;
+		lastDatapointCollection = uint40(block.timestamp);
+		toSet = (_index+1) % LENGTH_RATE_SERIES;
+	}
+
+	/*
+		@Description: if enough time has elapsed automatically update the rate data in the oracle
+	*/
+	modifier setRateModifier() {
+		if (block.timestamp > lastDatapointCollection + TIME_BETWEEN_DATAPOINTS) internalSetOracleMCR(toSet);
+		_;
+	}
+
+	/*
+		@Description: set the median of all datapoints in the impliedRates array as the
+			oracle rate, may only be called after all datapoints have been updated since
+			last call to this function
+
+		@param uint _MCR: the median of all MCR datapoints
+	*/
+	function setOracleMCR(uint _MCR) external {
+		uint8 numLarger;
+		uint8 numEqual;
+		for (uint8 i = 0; i < LENGTH_RATE_SERIES; i++) {
+			uint MCRi = impliedMCRs[i];
+			if (MCRi > _MCR) {
+				numLarger++;
+			}
+			else if (MCRi == _MCR) {
+				numEqual++;
+			}
+		}
+		uint8 numSmaller = LENGTH_RATE_SERIES - numEqual - numLarger;
+		require(numLarger+numEqual >= numSmaller);
+		require(numSmaller+numEqual >= numLarger);
+
+		OracleMCR = _MCR;
+	}
 }

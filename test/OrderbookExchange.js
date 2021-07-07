@@ -15,6 +15,7 @@ const BN = web3.utils.BN;
 const nullAddress = "0x0000000000000000000000000000000000000000";
 const _10 = new BN(10);
 const _10To18 = _10.pow(new BN("18"));
+const LENGTH_RATE_SERIES_BN = new BN(31);
 const secondsPerYear = 31556926;
 
 const BipsToTreasury = "1000"; //10% in basis point format
@@ -103,14 +104,49 @@ contract('OrderbookExchange', async function(accounts) {
 		assert.equal(bondBalance.sub(prevBondBalance).toString(), bondToWithdraw.toString());
 	});
 
+	async function test_and_check_oracle(test_function) {
+		await helper.advanceTime(61);
+		let prevZCBsellHeadID = await exchange.headZCBSellID();
+		let prevYTsellHeadID = await exchange.headYTSellID();
+		let prevMCRzcbHead = (await exchange.ZCBSells(prevZCBsellHeadID)).maturityConversionRate;
+		let prevMCRytHead = (await exchange.YTSells(prevYTsellHeadID)).maturityConversionRate;
+		let willSet = prevMCRzcbHead.toString() !== "0" && prevMCRytHead.toString() !== "0";
+		let newMCRdatapoint = prevMCRzcbHead.add(prevMCRytHead).div(new BN(2));
+		let prevOrcData = await exchange.getOracleData();
+
+		let rec = await test_function();
+
+		let timestamp = (await web3.eth.getBlock(rec.receipt.blockNumber)).timestamp;
+		let orcData = await exchange.getOracleData();
+		if (willSet) {
+			assert.equal(orcData._toSet.toString(), prevOrcData._toSet.add(new BN(1)).mod(LENGTH_RATE_SERIES_BN).toString());
+			assert.equal(orcData._impliedMCRs[prevOrcData._toSet.toNumber()].toString(), newMCRdatapoint.toString());
+			assert.equal(orcData._lastDatapointCollection.toString(), timestamp.toString());
+		}
+		else {
+			assert.equal(orcData._toSet.toString(), prevOrcData._toSet.toString());
+			assert.equal(orcData._impliedMCRs[prevOrcData._toSet.toNumber()].toString(), prevOrcData._impliedMCRs[prevOrcData._toSet.toNumber()].toString());
+			assert.equal(orcData._lastDatapointCollection.toString(), prevOrcData._lastDatapointCollection.toString());
+		}
+	}
+
 	async function test_place_limit_order(amt, MCR, targetID, hintID, expectedIDs, isZCBLimitSell) {
+		await helper.advanceTime(61);
 		const maxSteps = 100;
+		let prevZCBsellHeadID = await exchange.headZCBSellID();
+		let prevYTsellHeadID = await exchange.headYTSellID();
+		let prevMCRzcbHead = (await exchange.ZCBSells(prevZCBsellHeadID)).maturityConversionRate;
+		let prevMCRytHead = (await exchange.YTSells(prevYTsellHeadID)).maturityConversionRate;
+		let willSet = prevMCRzcbHead.toString() !== "0" && prevMCRytHead.toString() !== "0";
+		let newMCRdatapoint = prevMCRzcbHead.add(prevMCRytHead).div(new BN(2));
+		let prevOrcData = await exchange.getOracleData();
+		let rec;
 		if (isZCBLimitSell) {
 			let prevYD = YD;
 			let prevBD = BD;
 			let prevLockedYT = lockedYT;
 
-			let rec = await exchange.limitSellZCB(amt, MCR, hintID, maxSteps);
+			rec = await exchange.limitSellZCB(amt, MCR, hintID, maxSteps);
 			let log = rec.receipt.logs[0];
 			let logArgs = log.args;
 			assert.equal(log.event, 'MakeLimitSellZCB');
@@ -153,7 +189,7 @@ contract('OrderbookExchange', async function(accounts) {
 			let prevBD = BD;
 			let prevLockedYT = lockedYT;
 
-			let rec = await exchange.limitSellYT(amt, MCR, hintID, maxSteps);
+			rec = await exchange.limitSellYT(amt, MCR, hintID, maxSteps);
 			let log = rec.receipt.logs[0];
 			let logArgs = log.args;
 			assert.equal(log.event, 'MakeLimitSellYT');
@@ -191,26 +227,45 @@ contract('OrderbookExchange', async function(accounts) {
 			assert.equal(order.amount.toString(), amt.toString());
 			assert.equal(order.maturityConversionRate.toString(), MCR.toString());
 		}
+		let timestamp = (await web3.eth.getBlock(rec.receipt.blockNumber)).timestamp;
+		let orcData = await exchange.getOracleData();
+		if (willSet) {
+			assert.equal(orcData._toSet.toString(), prevOrcData._toSet.add(new BN(1)).mod(LENGTH_RATE_SERIES_BN).toString());
+			assert.equal(orcData._impliedMCRs[prevOrcData._toSet.toNumber()].toString(), newMCRdatapoint.toString());
+			assert.equal(orcData._lastDatapointCollection.toString(), timestamp.toString());
+		}
+		else {
+			assert.equal(orcData._toSet.toString(), prevOrcData._toSet.toString());
+			assert.equal(orcData._impliedMCRs[prevOrcData._toSet.toNumber()].toString(), prevOrcData._impliedMCRs[prevOrcData._toSet.toNumber()].toString());
+			assert.equal(orcData._lastDatapointCollection.toString(), prevOrcData._lastDatapointCollection.toString());
+		}
 	}
 
 	async function test_modify(change, ID, hintID, maxSteps, isZCBLimitSell) {
+		await helper.advanceTime(61);
+		let prevYD = YD;
+		let prevBD = BD;
+		let prevZCBsellHeadID = await exchange.headZCBSellID();
+		let prevYTsellHeadID = await exchange.headYTSellID();
+		let prevMCRzcbHead = (await exchange.ZCBSells(prevZCBsellHeadID)).maturityConversionRate;
+		let prevMCRytHead = (await exchange.YTSells(prevYTsellHeadID)).maturityConversionRate;
+		let willSet = prevMCRzcbHead.toString() !== "0" && prevMCRytHead.toString() !== "0";
+		let newMCRdatapoint = prevMCRzcbHead.add(prevMCRytHead).div(new BN(2));
+		let prevOrcData = await exchange.getOracleData();
+		let prevOrder = isZCBLimitSell ? await exchange.ZCBSells(ID) : await exchange.YTSells(ID);
+		let prevHeadID = (isZCBLimitSell ? prevZCBsellHeadID : prevYTsellHeadID).toString();
+		let expectedDeleted = change.cmp(prevOrder.amount.neg()) <= 0;
+		let expectedChange = expectedDeleted ? prevOrder.amount.neg() : change;
+		let order, headID, rec;
 		if (isZCBLimitSell) {
-			let prevYD = YD;
-			let prevBD = BD;
-			let prevOrder = await exchange.ZCBSells(ID);
-			let prevHeadID = (await exchange.headZCBSellID()).toString();
-
-			let rec = await exchange.modifyZCBLimitSell(change, ID, hintID, maxSteps);
+			rec = await exchange.modifyZCBLimitSell(change, ID, hintID, maxSteps);
 			let log = rec.receipt.logs[0];
 			let logArgs = log.args;
 			assert.equal(log.event, 'ModifyOrder');
 
-			let order = await exchange.ZCBSells(ID);
-			let headID = (await exchange.headZCBSellID()).toString();
-
+			order = await exchange.ZCBSells(ID);
+			headID = (await exchange.headZCBSellID()).toString();
 			let resultantChange = order.amount.sub(prevOrder.amount);
-			let expectedDeleted = change.cmp(prevOrder.amount.neg()) <= 0;
-			let expectedChange = expectedDeleted ? prevOrder.amount.neg() : change;
 
 			assert.equal(logArgs.orderID.toString(), ID.toString());
 			assert.equal(logArgs.change.toString(), expectedChange.toString(), "correct change value logged");
@@ -221,41 +276,18 @@ contract('OrderbookExchange', async function(accounts) {
 			assert.equal(resultantChange.toString(), expectedChange.toString());
 			assert.equal(YD.toString(), prevYD.toString());
 			assert.equal(prevBD.sub(BD).toString(), resultantChange.toString());
-			if (expectedDeleted) {
-				assert.equal(order.maker, nullAddress);
-				assert.equal(order.maturityConversionRate.toString(), "0");
-				assert.equal(order.nextID.toString(), "0");
-			}
-			else {
-				assert.equal(order.maker, prevOrder.maker);
-				assert.equal(order.maturityConversionRate.toString(), prevOrder.maturityConversionRate.toString());
-				assert.equal(order.nextID.toString(), prevOrder.nextID.toString());
-			}
-			if (expectedDeleted && prevHeadID === ID) {
-				assert.equal(headID, prevOrder.nextID.toString());
-			}
-			else {
-				assert.equal(headID, prevHeadID);
-			}
 		}
 		else {
-			let prevYD = YD;
-			let prevBD = BD;
 			let prevLockedYT = lockedYT;
-			let prevOrder = await exchange.YTSells(ID);
-			let prevHeadID = (await exchange.headYTSellID()).toString();
 
-			let rec = await exchange.modifyYTLimitSell(change, ID, hintID, maxSteps);
+			rec = await exchange.modifyYTLimitSell(change, ID, hintID, maxSteps);
 			let log = rec.receipt.logs[0];
 			let logArgs = log.args;
 			assert.equal(log.event, 'ModifyOrder');
 
-			let order = await exchange.YTSells(ID);
-			let headID = (await exchange.headYTSellID()).toString();
-
+			order = await exchange.YTSells(ID);
+			headID = (await exchange.headYTSellID()).toString();
 			let resultantChange = order.amount.sub(prevOrder.amount);
-			let expectedDeleted = change.cmp(prevOrder.amount.neg()) <= 0;
-			let expectedChange = expectedDeleted ? prevOrder.amount.neg() : change;
 
 			assert.equal(logArgs.orderID.toString(), ID.toString());
 			assert.equal(logArgs.change.toString(), expectedChange.toString(), "correct change value logged");
@@ -268,22 +300,34 @@ contract('OrderbookExchange', async function(accounts) {
 			assert.equal(BD.toString(), prevBD.toString());
 			assert.equal(YD.toString(), prevYD.toString());
 			assert.equal(lockedYT.sub(prevLockedYT).toString(), resultantChange.toString());
-			if (expectedDeleted) {
-				assert.equal(order.maker, nullAddress);
-				assert.equal(order.maturityConversionRate.toString(), "0");
-				assert.equal(order.nextID.toString(), "0");
-			}
-			else {
-				assert.equal(order.maker, prevOrder.maker);
-				assert.equal(order.maturityConversionRate.toString(), prevOrder.maturityConversionRate.toString());
-				assert.equal(order.nextID.toString(), prevOrder.nextID.toString());
-			}
-			if (expectedDeleted && prevHeadID === ID) {
-				assert.equal(headID, prevOrder.nextID.toString());
-			}
-			else {
-				assert.equal(headID, prevHeadID);
-			}
+		}
+		if (expectedDeleted) {
+			assert.equal(order.maker, nullAddress);
+			assert.equal(order.maturityConversionRate.toString(), "0");
+			assert.equal(order.nextID.toString(), "0");
+		}
+		else {
+			assert.equal(order.maker, prevOrder.maker);
+			assert.equal(order.maturityConversionRate.toString(), prevOrder.maturityConversionRate.toString());
+			assert.equal(order.nextID.toString(), prevOrder.nextID.toString());
+		}
+		if (expectedDeleted && prevHeadID === ID) {
+			assert.equal(headID, prevOrder.nextID.toString());
+		}
+		else {
+			assert.equal(headID, prevHeadID);
+		}
+		let orcData = await exchange.getOracleData();
+		let timestamp = (await web3.eth.getBlock(rec.receipt.blockNumber)).timestamp;
+		if (willSet) {
+			assert.equal(orcData._toSet.toString(), prevOrcData._toSet.add(new BN(1)).mod(LENGTH_RATE_SERIES_BN).toString());
+			assert.equal(orcData._impliedMCRs[prevOrcData._toSet.toNumber()].toString(), newMCRdatapoint.toString());
+			assert.equal(orcData._lastDatapointCollection.toString(), timestamp.toString());
+		}
+		else {
+			assert.equal(orcData._toSet.toString(), prevOrcData._toSet.toString());
+			assert.equal(orcData._impliedMCRs[prevOrcData._toSet.toNumber()].toString(), prevOrcData._impliedMCRs[prevOrcData._toSet.toNumber()].toString());
+			assert.equal(orcData._lastDatapointCollection.toString(), prevOrcData._lastDatapointCollection.toString());
 		}
 	}
 
@@ -535,6 +579,7 @@ contract('OrderbookExchange', async function(accounts) {
 		assert.equal(balYield.sub(prevBalYield).toString(), YTbought.toString());
 		let changeBondNum = prevBalBonds.sub(balBonds).toString();
 		assert.equal(changeBondNum, dynamicYTbought.add(ZCBsold).toString());
+		return rec;
 	}
 
 	async function test_market_sell_ZCB(amtToSell, maxMCR, maxCumulativeMCR, maxSteps) {
@@ -615,6 +660,7 @@ contract('OrderbookExchange', async function(accounts) {
 		assert.equal(balYield.sub(prevBalYield).toString(), YTbought.toString());
 		let changeBondNum = prevBalBonds.sub(balBonds).toString();
 		assert.equal(changeBondNum, dynamicYTbought.add(ZCBsold).toString());
+		return rec;
 	}
 
 	async function test_market_buy_ZCB(amtToBuy, minMCR, minCumulativeMCR, maxSteps) {
@@ -699,6 +745,7 @@ contract('OrderbookExchange', async function(accounts) {
 		assert.equal(cmp, -1, "acceptable range of error is 2 units");
 		let changeBondNum = balBonds.sub(prevBalBonds).toString();
 		assert.equal(changeBondNum, dynamicYTsold.add(ZCBbought).toString());
+		return rec;
 	}
 
 	async function test_market_sell_YT(amtToSell, minMCR, minCumulativeMCR, maxSteps) {
@@ -783,6 +830,7 @@ contract('OrderbookExchange', async function(accounts) {
 		assert.equal(cmp, -1, "acceptable range of error is 2 units");
 		let changeBondNum = balBonds.sub(prevBalBonds).toString();
 		assert.equal(changeBondNum, dynamicYTsold.add(ZCBbought).toString());
+		return rec;
 	}
 
 	async function market_sell_ZCB_to_U(amtToSell, maxMCR, maxCumulativeMCR, maxSteps) {
@@ -877,6 +925,7 @@ contract('OrderbookExchange', async function(accounts) {
 		assert.equal(balYield.sub(prevBalYield).toString(), YTbought.toString());
 		let changeBondNum = prevBalBonds.sub(balBonds).toString();
 		assert.equal(changeBondNum, dynamicYTbought.add(ZCBsold).toString());
+		return rec;
 	}
 
 	async function test_market_sell_unitYT_to_U(amtToSell, minMCR, minCumulativeMCR, maxSteps) {
@@ -893,7 +942,10 @@ contract('OrderbookExchange', async function(accounts) {
 		let prevBalBonds = await exchange.BondDeposited(accounts[1]);
 		let prevBalYield = await exchange.YieldDeposited(accounts[1]);
 
-		await exchange.marketSellUnitYTtoU(amtToSell, minMCR, minCumulativeMCR, maxSteps, true, {from: accounts[1]});
+		let rec = await exchange.marketSellUnitYTtoU(amtToSell, minMCR, minCumulativeMCR, maxSteps, true, {from: accounts[1]});
+		let log = rec.receipt.logs[0];
+		assert.equal(log.event, 'MarketBuyZCB');
+		let logArgs = log.args;
 
 		balBonds = await exchange.BondDeposited(accounts[1]);
 		balYield = await exchange.YieldDeposited(accounts[1]);
@@ -943,6 +995,10 @@ contract('OrderbookExchange', async function(accounts) {
 			if (cmp !== -1) break; //lazy hack
 		}
 
+		assert.equal(logArgs.newZCBSellHeadID.toString(), expectedResultantOrderbook[0].ID.toString());
+		assert.equal(logArgs.headAmount.toString(), expectedResultantOrderbook[0].amount.toString());
+		assert.equal(logArgs.taker, accounts[1]);
+
 		let dynamicYTsold = amtToSell.sub(remaining);
 		let YTsold = dynamicYTsold.mul(_10To18).div(ratio);
 		orderbook = [];
@@ -971,6 +1027,7 @@ contract('OrderbookExchange', async function(accounts) {
 		diff = parseInt(changeBondNum.sub(expected).toString());
 		assert.isBelow(diff, 1, "actual must be less than or equal to expected");
 		assert.isBelow(Math.abs(diff), 3, "acceptable range of error is 2 units");
+		return rec;
 	}
 
 	it('marketBuyYT, no mcr blockers', async () => {
@@ -978,7 +1035,8 @@ contract('OrderbookExchange', async function(accounts) {
 		let maxMCR = _10To18.mul(new BN(10));
 		let maxCumulativeMCR = maxMCR;
 		let maxSteps = 10;
-		await test_market_buy_YT(amtToBuy, maxMCR, maxCumulativeMCR, maxSteps);
+		let func = async () => await test_market_buy_YT(amtToBuy, maxMCR, maxCumulativeMCR, maxSteps);
+		await test_and_check_oracle(func);
 	});
 
 	it('marketSellZCB, no mcr blockers', async () => {
@@ -986,7 +1044,8 @@ contract('OrderbookExchange', async function(accounts) {
 		let maxMCR = _10To18.mul(new BN(10));
 		let maxCumulativeMCR = maxMCR;
 		let maxSteps = 10;
-		await test_market_sell_ZCB(amtToSell, maxMCR, maxCumulativeMCR, maxSteps);
+		let func = async () => await test_market_sell_ZCB(amtToSell, maxMCR, maxCumulativeMCR, maxSteps);
+		await test_and_check_oracle(func);
 	});
 
 	it('marketBuyZCB, no mcr blockers', async () => {
@@ -994,7 +1053,8 @@ contract('OrderbookExchange', async function(accounts) {
 		let minMCR = _10To18.div(new BN(10));
 		let minCumulativeMCR = minMCR;
 		let maxSteps = 10;
-		await test_market_buy_ZCB(amtToBuy, minMCR, minCumulativeMCR, maxSteps);
+		let func = async () => await test_market_buy_ZCB(amtToBuy, minMCR, minCumulativeMCR, maxSteps);
+		await test_and_check_oracle(func);
 	});
 
 	it('marketSellYT, no mcr blockers', async () => {
@@ -1002,7 +1062,8 @@ contract('OrderbookExchange', async function(accounts) {
 		let minMCR = _10To18.div(new BN(10));
 		let minCumulativeMCR = minMCR;
 		let maxSteps = 10;
-		await test_market_sell_YT(amtToSell, minMCR, minCumulativeMCR, maxSteps);
+		let func = async () => await test_market_sell_YT(amtToSell, minMCR, minCumulativeMCR, maxSteps);
+		await test_and_check_oracle(func);
 	});
 
 	it('marketSellZCBtoU, no mcr blockers', async () => {
@@ -1010,7 +1071,8 @@ contract('OrderbookExchange', async function(accounts) {
 		let maxMCR = _10To18.mul(new BN(10));
 		let maxCumulativeMCR = maxMCR;
 		let maxSteps = 10;
-		await market_sell_ZCB_to_U(amtZCB, maxMCR, maxCumulativeMCR, maxSteps);
+		let func = async () => await market_sell_ZCB_to_U(amtZCB, maxMCR, maxCumulativeMCR, maxSteps);
+		await test_and_check_oracle(func);
 	});
 
 	it('marketSellUnitYTtoU, no mcr blockers', async () => {
@@ -1018,6 +1080,7 @@ contract('OrderbookExchange', async function(accounts) {
 		let minMCR = _10To18.div(new BN(10));
 		let minCumulativeMCR = minMCR;
 		let maxSteps = 10;
-		await test_market_sell_unitYT_to_U(unitAmtToSell, minMCR, minCumulativeMCR, maxSteps);
+		let func = async () => await test_market_sell_unitYT_to_U(unitAmtToSell, minMCR, minCumulativeMCR, maxSteps);
+		await test_and_check_oracle(func);
 	});
 });

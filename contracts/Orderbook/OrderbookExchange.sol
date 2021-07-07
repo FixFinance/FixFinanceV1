@@ -11,17 +11,17 @@ import "./OrderbookData.sol";
 
 contract OrderbookExchange is OrderbookData {
 
-	address immutable delegateAddress;
+	address immutable delegate1Address;
 
 	using SafeMath for uint256;
 	using SignedSafeMath for int256;
 	using ABDKMath64x64 for int128;
 
-	constructor(address _FCPaddress, address _delegateAddress) public {
+	constructor(address _FCPaddress, address _delegate1Address) public {
 		FCP = IFixCapitalPool(_FCPaddress);
 		wrapper = IFixCapitalPool(_FCPaddress).wrapper();
 		maturity = IFixCapitalPool(_FCPaddress).maturity();
-		delegateAddress = _delegateAddress;
+		delegate1Address = _delegate1Address;
 	}
 
 	function deposit(uint _amountYield, int _amountBond) public {
@@ -31,7 +31,7 @@ contract OrderbookExchange is OrderbookData {
 	}
 
 	function withdraw(uint _amountYield, int _amountBond) public {
-		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
+		(bool success, ) = delegate1Address.delegatecall(abi.encodeWithSignature(
 			"withdraw(uint256,int256)",
 			_amountYield,
 			_amountBond
@@ -47,7 +47,7 @@ contract OrderbookExchange is OrderbookData {
 		uint _hintID,
 		uint _maxSteps
 	) external {
-		address _delegateAddress = delegateAddress;
+		address _delegateAddress = delegate1Address;
 		bytes memory sig = abi.encodeWithSignature(
 			"limitSellZCB(uint256,uint256,uint256,uint256)",
 			_amount,
@@ -74,7 +74,7 @@ contract OrderbookExchange is OrderbookData {
 		uint _hintID,
 		uint _maxSteps
 	) external {
-		address _delegateAddress = delegateAddress;
+		address _delegateAddress = delegate1Address;
 		bytes memory sig = abi.encodeWithSignature(
 			"limitSellYT(uint256,uint256,uint256,uint256)",
 			_amount,
@@ -101,7 +101,7 @@ contract OrderbookExchange is OrderbookData {
 		uint _hintID,
 		uint _maxSteps
 	) external returns(int change) {
-		address _delegateAddress = delegateAddress;
+		address _delegateAddress = delegate1Address;
 		bytes memory sig = abi.encodeWithSignature(
 			"modifyZCBLimitSell(int256,uint256,uint256,uint256)",
 			_amount,
@@ -127,7 +127,7 @@ contract OrderbookExchange is OrderbookData {
 		uint _hintID,
 		uint _maxSteps
 	) external returns(int change) {
-		address _delegateAddress = delegateAddress;
+		address _delegateAddress = delegate1Address;
 		bytes memory sig = abi.encodeWithSignature(
 			"modifyYTLimitSell(int256,uint256,uint256,uint256)",
 			_amount,
@@ -154,7 +154,7 @@ contract OrderbookExchange is OrderbookData {
 		uint16 _maxIterations,
 		bool _useInternalBalances
 	) external returns (uint /*YTbought*/,uint /*ZCBsold*/) {
-		address _delegateAddress = delegateAddress;
+		address _delegateAddress = delegate1Address;
 		bytes memory sig = abi.encodeWithSignature(
 			"marketBuyYT(uint256,uint256,uint256,uint16,bool)",
 			_amountYT,
@@ -183,7 +183,7 @@ contract OrderbookExchange is OrderbookData {
 		uint16 _maxIterations,
 		bool _useInternalBalances
 	) external returns(uint /*ZCBbought*/, uint /*YTsold*/) {
-		address _delegateAddress = delegateAddress;
+		address _delegateAddress = delegate1Address;
 		bytes memory sig = abi.encodeWithSignature(
 			"marketSellYT(uint256,uint256,uint256,uint16,bool)",
 			_amountYT,
@@ -211,7 +211,7 @@ contract OrderbookExchange is OrderbookData {
 		uint16 _maxIterations,
 		bool _useInternalBalances
 	) external returns(uint /*ZCBbought*/, uint /*YTsold*/) {
-		address _delegateAddress = delegateAddress;
+		address _delegateAddress = delegate1Address;
 		bytes memory sig = abi.encodeWithSignature(
 			"marketBuyZCB(uint256,uint256,uint256,uint16,bool)",
 			_amountZCB,
@@ -239,7 +239,7 @@ contract OrderbookExchange is OrderbookData {
 		uint16 _maxIterations,
 		bool _useInternalBalances
 	) external returns(uint /*YTbought*/, uint /*ZCBsold*/) {
-		address _delegateAddress = delegateAddress;
+		address _delegateAddress = delegate1Address;
 		bytes memory sig = abi.encodeWithSignature(
 			"marketSellZCB(uint256,uint256,uint256,uint16,bool)",
 			_amountZCB,
@@ -267,7 +267,7 @@ contract OrderbookExchange is OrderbookData {
 		uint16 _maxIterations,
 		bool _useInternalBalances
 	) external returns(uint /*YTbought*/, uint /*ZCBsold*/) {
-		address _delegateAddress = delegateAddress;
+		address _delegateAddress = delegate1Address;
 		bytes memory sig = abi.encodeWithSignature(
 			"marketSellZCBtoU(uint256,uint256,uint256,uint16,bool)",
 			_amountZCB,
@@ -295,7 +295,7 @@ contract OrderbookExchange is OrderbookData {
 		uint16 _maxIterations,
 		bool _useInternalBalances
 	) external returns(uint /*ZCBbought*/, uint /*YTsold*/) {
-		address _delegateAddress = delegateAddress;
+		address _delegateAddress = delegate1Address;
 		bytes memory sig = abi.encodeWithSignature(
 			"marketSellUnitYTtoU(uint256,uint256,uint256,uint16,bool)",
 			_unitAmountYT,

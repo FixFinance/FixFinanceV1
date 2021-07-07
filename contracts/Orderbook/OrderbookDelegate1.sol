@@ -9,7 +9,7 @@ import "../libraries/ABDKMath64x64.sol";
 import "../libraries/BigMath.sol";
 import "./OrderbookData.sol";
 
-contract OrderbookDelegate is OrderbookData {
+contract OrderbookDelegate1 is OrderbookData {
 
 	using SafeMath for uint256;
 	using SignedSafeMath for int256;

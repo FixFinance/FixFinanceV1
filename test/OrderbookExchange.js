@@ -5,7 +5,7 @@ const fixCapitalPool = artifacts.require("FixCapitalPool");
 const yieldToken = artifacts.require("IYieldToken");
 const zeroCouponBond = artifacts.require("IZeroCouponBond");
 const zcbYtDeployer = artifacts.require("ZCB_YT_Deployer");
-const OrderbookDelegate = artifacts.require("OrderbookDelegate");
+const OrderbookDelegate1 = artifacts.require("OrderbookDelegate1");
 const OrderbookExchange = artifacts.require("OrderbookExchange");
 const InfoOracle = artifacts.require("InfoOracle");
 
@@ -34,8 +34,8 @@ contract('OrderbookExchange', async function(accounts) {
 		fixCapitalPoolInstance = await fixCapitalPool.new(NGBwrapperInstance.address, maturity, zcbYtDeployerInstance.address, infoOracleInstance.address);
 		zcbInstance = await zeroCouponBond.at(await fixCapitalPoolInstance.zeroCouponBondAddress());
 		yieldTokenInstance = await yieldToken.at(await fixCapitalPoolInstance.yieldTokenAddress());
-		orderbookDelegateInstance = await OrderbookDelegate.new();
-		exchange = await OrderbookExchange.new(fixCapitalPoolInstance.address, orderbookDelegateInstance.address);
+		orderbookDelegate1Instance = await OrderbookDelegate1.new();
+		exchange = await OrderbookExchange.new(fixCapitalPoolInstance.address, orderbookDelegate1Instance.address);
 
 		//mint funds to accounts[0]
 		balance = _10To18;

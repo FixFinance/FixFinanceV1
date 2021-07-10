@@ -81,4 +81,7 @@ contract OrderbookData {
 	uint[LENGTH_RATE_SERIES] impliedMCRs;
 	uint40 lastDatapointCollection;
 	uint8 toSet;
+
+	//-----------admin---------------
+	uint minimumOrderSize;
 }

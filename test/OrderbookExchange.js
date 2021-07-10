@@ -44,6 +44,7 @@ contract('OrderbookExchange', async function(accounts) {
 		yieldTokenInstance = await yieldToken.at(await fixCapitalPoolInstance.yieldTokenAddress());
 		orderbookDelegate1Instance = await OrderbookDelegate1.new();
 		exchange = await OrderbookExchange.new(fixCapitalPoolInstance.address, orderbookDelegate1Instance.address);
+		await exchange.setMinimumOrderSize(_10To18.div(new BN(400000)));
 
 		//mint funds to accounts[0]
 		balance = _10To18;
@@ -196,8 +197,9 @@ contract('OrderbookExchange', async function(accounts) {
 			let prevYD = YD;
 			let prevBD = BD;
 			let prevLockedYT = lockedYT;
-
+		try {
 			rec = await exchange.limitSellYT(amt, MCR, hintID, maxSteps);
+		} catch (err) {process.exit();}
 			let log = rec.receipt.logs[0];
 			let logArgs = log.args;
 			assert.equal(log.event, 'MakeLimitSellYT');
@@ -249,12 +251,13 @@ contract('OrderbookExchange', async function(accounts) {
 		}
 	}
 
-	async function test_modify(change, ID, hintID, maxSteps, isZCBLimitSell) {
+	async function test_modify(change, ID, hintID, maxSteps, removeBelowLimit, isZCBLimitSell) {
 		await helper.advanceTime(61);
 		let prevYD = YD;
 		let prevBD = BD;
 		let prevZCBsellHeadID = await exchange.headZCBSellID();
 		let prevYTsellHeadID = await exchange.headYTSellID();
+		let ratio = await NGBwrapperInstance.WrappedAmtToUnitAmt_RoundDown(_10To18);
 		let prevMCRzcbHead = (await exchange.ZCBSells(prevZCBsellHeadID)).maturityConversionRate;
 		let prevMCRytHead = (await exchange.YTSells(prevYTsellHeadID)).maturityConversionRate;
 		let willSet = prevMCRzcbHead.toString() !== "0" && prevMCRytHead.toString() !== "0";
@@ -262,13 +265,33 @@ contract('OrderbookExchange', async function(accounts) {
 		let prevOrcData = await exchange.getOracleData();
 		let prevOrder = isZCBLimitSell ? await exchange.ZCBSells(ID) : await exchange.YTSells(ID);
 		let prevHeadID = (isZCBLimitSell ? prevZCBsellHeadID : prevYTsellHeadID).toString();
-		let expectedDeleted = change.cmp(prevOrder.amount.neg()) <= 0;
+		let expectedDeleted = change.neg().cmp(prevOrder.amount) >= 0;
 		let expectedChange = expectedDeleted ? prevOrder.amount.neg() : change;
+		let minimumOrderSize = await exchange.getMinimumOrderSize();
 		let order, headID, rec;
 		if (isZCBLimitSell) {
-			rec = await exchange.modifyZCBLimitSell(change, ID, hintID, maxSteps);
+			//Z == U * yieldToMaturity
+			let minimumZCB = minimumOrderSize.mul(prevOrder.maturityConversionRate).div(ratio);
+			if (change.cmp(new BN(0)) == -1 && minimumZCB.cmp(prevOrder.amount.add(change)) > -1) {
+				if (expectedDeleted || removeBelowLimit) {
+					expectedChange = prevOrder.amount.neg();
+					expectedDeleted = true;
+				}
+				else if (minimumZCB.cmp(prevOrder.amount) == 1) {
+					expectedChange = 0;
+				}
+				else {
+					expectedChange = prevOrder.amount.sub(minimumZCB).neg();
+				}
+			}
+
+			rec = await exchange.modifyZCBLimitSell(change, ID, hintID, maxSteps, removeBelowLimit);
 			let log = rec.receipt.logs[0];
 			let logArgs = log.args;
+
+			YD = await exchange.YieldDeposited(accounts[0]);
+			BD = await exchange.BondDeposited(accounts[0]);
+
 			assert.equal(log.event, 'ModifyOrder');
 
 			order = await exchange.ZCBSells(ID);
@@ -278,17 +301,29 @@ contract('OrderbookExchange', async function(accounts) {
 			assert.equal(logArgs.orderID.toString(), ID.toString());
 			assert.equal(logArgs.change.toString(), expectedChange.toString(), "correct change value logged");
 
-			YD = await exchange.YieldDeposited(accounts[0]);
-			BD = await exchange.BondDeposited(accounts[0]);
-
 			assert.equal(resultantChange.toString(), expectedChange.toString());
 			assert.equal(YD.toString(), prevYD.toString());
 			assert.equal(prevBD.sub(BD).toString(), resultantChange.toString());
 		}
 		else {
+			//YT == U / ((1 - zcbDilutiontoMatutity) * ratio)
+			let dilutionToMaturity = ratio.mul(_10To18).div(prevOrder.maturityConversionRate);
+			let minimumYT = minimumOrderSize.mul(_10To18).div(_10To18.sub(dilutionToMaturity).mul(ratio).div(_10To18));
+			if (change.cmp(new BN(0)) == -1 && minimumYT.cmp(prevOrder.amount.add(change)) > -1) {
+				if (expectedDeleted || removeBelowLimit) {
+					expectedChange = prevOrder.amount.neg();
+					expectedDeleted = true;
+				}
+				else if (minimumYT.cmp(prevOrder.amount) == 1) {
+					expectedChange = 0;
+				}
+				else {
+					expectedChange = prevOrder.amount.sub(minimumYT).neg();
+				}
+			}
 			let prevLockedYT = lockedYT;
 
-			rec = await exchange.modifyYTLimitSell(change, ID, hintID, maxSteps);
+			rec = await exchange.modifyYTLimitSell(change, ID, hintID, maxSteps, removeBelowLimit);
 			let log = rec.receipt.logs[0];
 			let logArgs = log.args;
 			assert.equal(log.event, 'ModifyOrder');
@@ -337,6 +372,7 @@ contract('OrderbookExchange', async function(accounts) {
 			assert.equal(orcData._impliedMCRs[prevOrcData._toSet.toNumber()].toString(), prevOrcData._impliedMCRs[prevOrcData._toSet.toNumber()].toString());
 			assert.equal(orcData._lastDatapointCollection.toString(), prevOrcData._lastDatapointCollection.toString());
 		}
+		return rec;
 	}
 
 	it('limitSellZCB at head, blank list', async () => {
@@ -397,23 +433,71 @@ contract('OrderbookExchange', async function(accounts) {
 	});
 
 	it('modifyZCBLimitSell at head', async () => {
-		await test_modify(_10To18.div(new BN(1200)).neg(), "2", "0", 10, true);
+		await test_modify(_10To18.div(new BN(1200)), "2", "0", 10, false, true);
 	});
 
 	it('modifyZCBLimitSell in middle, no hint', async () => {
-		await test_modify(_10To18.div(new BN(7500)).neg(), "4", "0", 10, true);
+		await test_modify(_10To18.div(new BN(7500)).neg(), "4", "0", 10, false, true);
 	});
 
 	it('modifyZCBLimitSell in middle, use hint', async () => {
-		await test_modify(_10To18.div(new BN(6500)).neg(), "4", "3", 10, true);
+		await test_modify(_10To18.div(new BN(6500)).neg(), "4", "3", 10, false, true);
 	});
 
 	it('modifyZCBLimitSell at tail, no hint', async () => {
-		await test_modify(_10To18.div(new BN(6500)).neg(), "6", "0", 10, true);
+		await test_modify(_10To18.div(new BN(6500)).neg(), "6", "0", 10, false, true);
 	});
 
 	it('modifyZCBLimitSell at tail, use hint', async () => {
-		await test_modify(_10To18.neg(), "6", "1", 10, true);
+		await test_modify(_10To18.neg(), "6", "1", 10, false, true);
+	});
+
+	it('modifyZCBLimitSell at head, reultant amount under minimum', async () => {
+		let order = await exchange.ZCBSells("2");
+		let minimumOrderSize = await exchange.getMinimumOrderSize();
+		let ratio = await NGBwrapperInstance.WrappedAmtToUnitAmt_RoundDown(_10To18);
+		let minimumZCB = minimumOrderSize.mul(order.maturityConversionRate).div(ratio);
+		let change = order.amount.sub(minimumZCB).add(new BN(100)).neg();
+		await test_modify(change, "2", "0", 10, false, true);
+		//add back
+		await test_modify(change.neg(), "2", "0", 10, false, true);
+		//tets again with removeUnderMinimum:true
+		await test_modify(change, "2", "0", 10, true, true);
+	});
+
+	it('modifyZCBLimitSell in middle use hint, resultant amount under minimum', async () => {
+		let order = await exchange.ZCBSells("1");
+		let minimumOrderSize = await exchange.getMinimumOrderSize();
+		let ratio = await NGBwrapperInstance.WrappedAmtToUnitAmt_RoundDown(_10To18);
+		let minimumZCB = minimumOrderSize.mul(order.maturityConversionRate).div(ratio);
+		let change = order.amount.sub(minimumZCB).add(new BN(100)).neg();
+		await test_modify(change, "1", "4", 10, false, true);
+		//add back
+		await test_modify(change.neg().sub(new BN(100)), "1", "4", 10, false, true);
+		//tets again with removeUnderMinimum:true
+		await test_modify(change, "1", "4", 10, true, true);
+	});
+
+	it('modifyZCBLimitSell in middle no hint, resultant amount under minimum', async () => {
+		let order = await exchange.ZCBSells("4");
+		let minimumOrderSize = await exchange.getMinimumOrderSize();
+		let ratio = await NGBwrapperInstance.WrappedAmtToUnitAmt_RoundDown(_10To18);
+		let minimumZCB = minimumOrderSize.mul(order.maturityConversionRate).div(ratio);
+		let change = order.amount.sub(minimumZCB).add(new BN(100)).neg();
+		await test_modify(change, "4", "0", 10, false, true);
+		//add back
+		await test_modify(change.neg(), "4", "0", 10, false, true);
+		//tets again with removeUnderMinimum:true
+		await test_modify(change, "4", "0", 10, true, true);
+	});
+
+	it('Resupply Liquidity to ZCB Sell side of orderbook', async () => {
+		let amtZCB = _10To18.div(new BN(200));
+		let MCR = _10To18.mul(new BN(7));
+		let expectedIDs = ["3", "7", "5"];
+		await test_place_limit_order(amtZCB, MCR, "7", "0", expectedIDs, true);
+		expectedIDs = ["3", "7", "8", "5"];
+		await test_place_limit_order(amtZCB, MCR, "8", "0", expectedIDs, true);
 	});
 
 	//other side of orderbook
@@ -421,43 +505,43 @@ contract('OrderbookExchange', async function(accounts) {
 	it('limitSellYT at head, blank list', async () => {
 		let amtYT = _10To18.div(new BN(800));
 		let MCR = _10To18.mul(new BN(6));
-		let expectedIDs = ["7"];
-		await test_place_limit_order(amtYT, MCR, "7", "0", expectedIDs, false);
+		let expectedIDs = ["9"];
+		await test_place_limit_order(amtYT, MCR, "9", "0", expectedIDs, false);
 	});
 
 	it('limitSellYT at head, head exists', async () => {
 		let amtYT = _10To18.div(new BN(900));
 		let MCR = _10To18.mul(new BN(3));
-		let expectedIDs = ["8", "7"];
-		await test_place_limit_order(amtYT, MCR, "8", "0", expectedIDs, false);
+		let expectedIDs = ["10", "9"];
+		await test_place_limit_order(amtYT, MCR, "10", "0", expectedIDs, false);
 	});
 
 	it('limitSellYT in middle, no hint', async () => {
 		let amtYT = _10To18.div(new BN(700));
 		let MCR = _10To18.mul(new BN(4));
-		let expectedIDs = ["8", "9", "7"];
-		await test_place_limit_order(amtYT, MCR, "9", "0", expectedIDs, false);
+		let expectedIDs = ["10", "11", "9"];
+		await test_place_limit_order(amtYT, MCR, "11", "0", expectedIDs, false);
 	});
 
 	it('limitSellYT in middle, use hint', async () => {
 		let amtYT = _10To18.div(new BN(450));
 		let MCR = _10To18.mul(new BN(5));
-		let expectedIDs = ["8", "9", "10", "7"];
-		await test_place_limit_order(amtYT, MCR, "10", "9", expectedIDs, false);
+		let expectedIDs = ["10", "11", "12", "9"];
+		await test_place_limit_order(amtYT, MCR, "12", "11", expectedIDs, false);
 	});
 
 	it('limitSellYT at tail, no hint', async () => {
 		let amtYT = _10To18.div(new BN(870));
 		let MCR = _10To18.mul(new BN(7));
-		let expectedIDs = ["8", "9", "10", "7", "11"];
-		await test_place_limit_order(amtYT, MCR, "11", "0", expectedIDs, false);
+		let expectedIDs = ["10", "11", "12", "9", "13"];
+		await test_place_limit_order(amtYT, MCR, "13", "0", expectedIDs, false);
 	});
 
 	it('limitSellYT at tail, use hint', async () => {
 		let amtYT = _10To18.div(new BN(900));
 		let MCR = _10To18.mul(new BN(7));
-		let expectedIDs = ["8", "9", "10", "7", "11", "12"];
-		await test_place_limit_order(amtYT, MCR, "12", "7", expectedIDs, false);
+		let expectedIDs = ["10", "11", "12", "9", "13", "14"];
+		await test_place_limit_order(amtYT, MCR, "14", "9", expectedIDs, false);
 	});
 
 	it('cannot limitSellYT where MCR is under current ratio', async () => {
@@ -476,23 +560,77 @@ contract('OrderbookExchange', async function(accounts) {
 	});
 
 	it('modifyYTLimitSell at head', async () => {
-		await test_modify(_10To18.neg(), "8", "0", 10, false);
+		await test_modify(_10To18.neg(), "10", "0", 10, false, false);
 	});
 
 	it('modifyYTLimitSell in middle, no hint', async () => {
-		await test_modify(_10To18.div(new BN(5000)), "10", "0", 10, false);
+		await test_modify(_10To18.div(new BN(5000)), "12", "0", 10, false, false);
 	});
 
 	it('modifyYTLimitSell in middle, use hint', async () => {
-		await test_modify(_10To18.div(new BN(1000)), "11", "10", 10, false);
+		await test_modify(_10To18.div(new BN(1000)), "13", "12", 10, false, false);
 	});
 
 	it('modifyYTLimitSell at tail, no hint', async () => {
-		await test_modify(_10To18.div(new BN(7000)).neg(), "12", "0", 10, false);
+		await test_modify(_10To18.div(new BN(7000)).neg(), "14", "0", 10, false, false);
 	});
 
 	it('modifyYTLimitSell at tail, use hint', async () => {
-		await test_modify(_10To18.div(new BN(9000)).neg(), "12", "11", 10, false);
+		await test_modify(_10To18.div(new BN(9000)).neg(), "14", "13", 10, false, false);
+	});
+
+	it('modifyYTLimitSell at head, reultant amount under minimum', async () => {
+		let order = await exchange.YTSells("11");
+		let minimumOrderSize = await exchange.getMinimumOrderSize();
+		let ratio = await NGBwrapperInstance.WrappedAmtToUnitAmt_RoundDown(_10To18);
+		//YT == U / ((1 - zcbDilutiontoMatutity) * ratio)
+		let dilutionToMaturity = ratio.mul(_10To18).div(order.maturityConversionRate);
+		let minimumYT = minimumOrderSize.mul(_10To18).div(_10To18.sub(dilutionToMaturity).mul(ratio).div(_10To18));
+		let change = order.amount.sub(minimumYT).add(new BN(100)).neg();
+		await test_modify(change, "11", "0", 10, false, false);
+		//add back
+		await test_modify(change.neg(), "11", "0", 10, false, false);
+		//tets again with removeUnderMinimum:true
+		await test_modify(change, "11", "0", 10, true, false);
+	});
+
+	it('modifyYTLimitSell in middle use hint, reultant amount under minimum', async () => {
+		let order = await exchange.YTSells("9");
+		let minimumOrderSize = await exchange.getMinimumOrderSize();
+		let ratio = await NGBwrapperInstance.WrappedAmtToUnitAmt_RoundDown(_10To18);
+		//YT == U / ((1 - zcbDilutiontoMatutity) * ratio)
+		let dilutionToMaturity = ratio.mul(_10To18).div(order.maturityConversionRate);
+		let minimumYT = minimumOrderSize.mul(_10To18).div(_10To18.sub(dilutionToMaturity).mul(ratio).div(_10To18));
+		let change = order.amount.sub(minimumYT).add(new BN(100)).neg();
+		await test_modify(change, "9", "12", 10, false, false);
+		//add back
+		await test_modify(change.neg(), "9", "12", 10, false, false);
+		//tets again with removeUnderMinimum:true
+		await test_modify(change, "9", "12", 10, true, false);
+	});
+
+	it('modifyYTLimitSell at tail no hint, reultant amount under minimum', async () => {
+		let order = await exchange.YTSells("14");
+		let minimumOrderSize = await exchange.getMinimumOrderSize();
+		let ratio = await NGBwrapperInstance.WrappedAmtToUnitAmt_RoundDown(_10To18);
+		//YT == U / ((1 - zcbDilutiontoMatutity) * ratio)
+		let dilutionToMaturity = ratio.mul(_10To18).div(order.maturityConversionRate);
+		let minimumYT = minimumOrderSize.mul(_10To18).div(_10To18.sub(dilutionToMaturity).mul(ratio).div(_10To18));
+		let change = order.amount.sub(minimumYT).add(new BN(100)).neg();
+		await test_modify(change, "14", "0", 10, false, false);
+		//add back
+		await test_modify(change.neg(), "14", "0", 10, false, false);
+		//tets again with removeUnderMinimum:true
+		await test_modify(change, "14", "0", 10, true, false);
+	});
+
+	it('Resupply Liquidity to YT Sell side of orderbook', async () => {
+		let amtYT = _10To18.div(new BN(450));
+		let MCR = _10To18.mul(new BN(6));
+		let expectedIDs = ["12", "15", "13"];
+		await test_place_limit_order(amtYT, MCR, "15", "12", expectedIDs, false);
+		expectedIDs = ["12", "15", "16", "13"];
+		await test_place_limit_order(amtYT, MCR, "16", "0", expectedIDs, false);
 	});
 
 	function impliedZCBamount(amountYT, ratio, MCR) {

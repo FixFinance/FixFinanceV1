@@ -3,6 +3,7 @@ pragma solidity >=0.6.8 <0.7.0;
 
 import "../interfaces/IWrapper.sol";
 import "../interfaces/IFixCapitalPool.sol";
+import "../helpers/Ownable.sol";
 import "../libraries/SafeMath.sol";
 import "../libraries/SignedSafeMath.sol";
 import "../libraries/ABDKMath64x64.sol";
@@ -99,15 +100,17 @@ contract OrderbookExchange is OrderbookData {
 		int _amount,
 		uint _targetID,
 		uint _hintID,
-		uint _maxSteps
+		uint _maxSteps,
+		bool _removeBelowMin
 	) external returns(int change) {
 		address _delegateAddress = delegate1Address;
 		bytes memory sig = abi.encodeWithSignature(
-			"modifyZCBLimitSell(int256,uint256,uint256,uint256)",
+			"modifyZCBLimitSell(int256,uint256,uint256,uint256,bool)",
 			_amount,
 			_targetID,
 			_hintID,
-			_maxSteps
+			_maxSteps,
+			_removeBelowMin
 		);
 
 		assembly {
@@ -125,15 +128,17 @@ contract OrderbookExchange is OrderbookData {
 		int _amount,
 		uint _targetID,
 		uint _hintID,
-		uint _maxSteps
+		uint _maxSteps,
+		bool _removeBelowMin
 	) external returns(int change) {
 		address _delegateAddress = delegate1Address;
 		bytes memory sig = abi.encodeWithSignature(
-			"modifyYTLimitSell(int256,uint256,uint256,uint256)",
+			"modifyYTLimitSell(int256,uint256,uint256,uint256,bool)",
 			_amount,
 			_targetID,
 			_hintID,
-			_maxSteps
+			_maxSteps,
+			_removeBelowMin
 		);
 
 		assembly {
@@ -398,4 +403,23 @@ contract OrderbookExchange is OrderbookData {
 		require(success);
 	}
 
+	//-----------------admin-------------------------
+
+	/*
+		@Description: set the minimum size of an order on the orderbook
+			size is determined by the amount of U that the collateral for the order
+			would be valued at using the MCR of that order
+	*/
+	function setMinimumOrderSize(uint _minimumOrderSize) external {
+		require(msg.sender == Ownable(address(FCP)).owner());
+		minimumOrderSize = _minimumOrderSize;
+	}
+
+	/*
+		@Description: get the minimum NPV of a limit order
+			where NPV is in U and is determined using the MCR of the limit order
+	*/
+	function getMinimumOrderSize() external view returns(uint) {
+		return minimumOrderSize;
+	}
 }

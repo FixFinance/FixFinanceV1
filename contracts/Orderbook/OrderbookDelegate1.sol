@@ -15,6 +15,8 @@ contract OrderbookDelegate1 is OrderbookData {
 	using SignedSafeMath for int256;
 	using ABDKMath64x64 for int128;
 
+	uint private constant TOTAL_BASIS_POINTS = 10_000;
+
 	function minimumZCBLimitAmount(uint _maturityConversionRate, uint _ratio) internal view returns(uint minimum) {
 		uint yieldToMaturity = _maturityConversionRate.mul(1 ether).div(_ratio);
 		require(yieldToMaturity > 1 ether);
@@ -177,7 +179,13 @@ contract OrderbookDelegate1 is OrderbookData {
 		BondDeposited[_addr] = resultantBD;
 	}
 
-	function manageCollateral_BuyYT_takeOrder(address _addr, uint _amountZCB, uint _amountWrappedYT, uint _ratio, bool _useInternalBalances) internal {
+	function manageCollateral_BuyYT_takeOrder(
+		address _addr,
+		uint _amountZCB,
+		uint _amountWrappedYT,
+		uint _ratio,
+		bool _useInternalBalances
+	) internal {
 		if (_useInternalBalances) {
 			uint bondValChange = (_amountWrappedYT.mul(_ratio) / (1 ether)).add(_amountZCB);
 			require(bondValChange < uint(type(int256).max));
@@ -198,6 +206,22 @@ contract OrderbookDelegate1 is OrderbookData {
 			FCP.transferPositionFrom(msg.sender, address(this), 0, int(_amountZCB));
 			//send YT
 			FCP.transferPosition(msg.sender, _amountWrappedYT, -int(unitAmtYT));
+		}
+	}
+
+	function manageCollateral_payFee(uint _amount, uint _ratio) internal {
+		int BR = BondRevenue;
+		if (_ratio == 0) {
+			//ratio of 0 means fee is in ZCB
+			require(_amount <= uint(type(int256).max));
+			BondRevenue = BR.add(int(_amount));
+		}
+		else {
+			//the conversion below is always safe because / (1 ether) always deflates enough
+			int bondAmount = int(_amount.mul(_ratio) / (1 ether));
+			uint YR = YieldRevenue;
+			YieldRevenue = YR.add(_amount);
+			BondRevenue = BR.sub(bondAmount);
 		}
 	}
 
@@ -637,8 +661,12 @@ contract OrderbookDelegate1 is OrderbookData {
 		for (uint16 i = 0; i < _maxIterations && newHeadID != 0; i++) {
 			order = YTSells[newHeadID];
 			if (order.maturityConversionRate > _maxMaturityConversionRate) {
+				//account for fees
+				uint ZCBfee = ZCBsold.mul(IORC.getOrderbookFeeBips(address(FCP))) / TOTAL_BASIS_POINTS;
+				ZCBsold = ZCBsold.add(ZCBfee);
 				require(impliedMaturityConversionRate(ZCBsold, YTbought, ratio) <= _maxCumulativeMaturityConversionRate);
 				//collect & distribute to taker
+				manageCollateral_payFee(ZCBfee, 0);
 				manageCollateral_BuyYT_takeOrder(msg.sender, ZCBsold, YTbought, ratio, _useInternalBalances);
 				if (i != 0) {
 					headYTSellID = newHeadID;
@@ -667,8 +695,12 @@ contract OrderbookDelegate1 is OrderbookData {
 					headYTSellID = newHeadID;
 				}
 
+				//account for fees
+				uint ZCBfee = ZCBsold.mul(IORC.getOrderbookFeeBips(address(FCP))) / TOTAL_BASIS_POINTS;
+				ZCBsold = ZCBsold.add(ZCBfee);
 				require(impliedMaturityConversionRate(ZCBsold, YTbought, ratio) <= _maxCumulativeMaturityConversionRate);
 				//collect & distribute to taker
+				manageCollateral_payFee(ZCBfee, 0);
 				manageCollateral_BuyYT_takeOrder(msg.sender, ZCBsold, YTbought, ratio, _useInternalBalances);
 				return (YTbought, ZCBsold, newHeadID, newHeadAmount);
 			}
@@ -683,15 +715,19 @@ contract OrderbookDelegate1 is OrderbookData {
 			}
 			newHeadID = order.nextID;
 		}
+		//account for fees
+		uint ZCBfee = ZCBsold.mul(IORC.getOrderbookFeeBips(address(FCP))) / TOTAL_BASIS_POINTS;
+		ZCBsold = ZCBsold.add(ZCBfee);
 		require(impliedMaturityConversionRate(ZCBsold, YTbought, ratio) <= _maxCumulativeMaturityConversionRate);
 		//collect & distribute to taker
+		manageCollateral_payFee(ZCBfee, 0);
 		manageCollateral_BuyYT_takeOrder(msg.sender, ZCBsold, YTbought, ratio, _useInternalBalances);
 		headYTSellID = newHeadID;
 		newHeadAmount = newHeadID == 0 ? 0 : YTSells[newHeadID].amount;
 	}
 
 	function marketSellYT(
-		uint _amountYT,
+		uint _amountYT, //deflate div (1 + fee), after execution inflate YTsold mul (1 + fee)
 		uint _minMaturityConversionRate,
 		uint _minCumulativeMaturityConversionRate,
 		uint16 _maxIterations,
@@ -701,16 +737,22 @@ contract OrderbookDelegate1 is OrderbookData {
 		newHeadID = headZCBSellID;
 		LimitSellZCB memory order;
 		uint ratio = wrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
-		for (uint16 i = 0; i < _maxIterations && newHeadID != 0; i++) {
+		uint i = uint(IORC.getOrderbookFeeBips(address(FCP))) << 16; //store fee multiplier in 17th to 24th bit of i, cast i to uint16 for iteration purpouses
+		_amountYT = _amountYT.mul(TOTAL_BASIS_POINTS).div((i >> 16) + TOTAL_BASIS_POINTS);
+		for ( ; uint16(i) < _maxIterations && newHeadID != 0; i++) {
 			order = ZCBSells[newHeadID];
 			if (order.maturityConversionRate < _minMaturityConversionRate) {
-				require(impliedMaturityConversionRate(ZCBbought, YTsold, ratio) >= _minCumulativeMaturityConversionRate);
-				//collect & distribute to taker
-				manageCollateral_BuyZCB_takeOrder(msg.sender, ZCBbought, YTsold, ratio, _useInternalBalances);
-				if (i != 0) {
+				if (uint16(i) != 0) {
 					headZCBSellID = newHeadID;
 				}
 				newHeadAmount = order.amount;
+
+				uint YTfee = YTsold.mul(i >> 16) / TOTAL_BASIS_POINTS;
+				YTsold = YTsold.add(YTfee);
+				require(impliedMaturityConversionRate(ZCBbought, YTsold, ratio) >= _minCumulativeMaturityConversionRate);
+				//collect & distribute to taker
+				manageCollateral_payFee(YTfee, ratio);
+				manageCollateral_BuyZCB_takeOrder(msg.sender, ZCBbought, YTsold, ratio, _useInternalBalances);
 				return (ZCBbought, YTsold, newHeadID, newHeadAmount);
 			}
 			uint orderYTamt = impliedYTamount(order.amount, ratio, order.maturityConversionRate);
@@ -734,8 +776,12 @@ contract OrderbookDelegate1 is OrderbookData {
 					headZCBSellID = newHeadID;
 				}
 
+				uint YTfee = YTsold.mul(i >> 16) / TOTAL_BASIS_POINTS;
+				YTsold = YTsold.add(YTfee);
+
 				require(impliedMaturityConversionRate(ZCBbought, YTsold, ratio) >= _minCumulativeMaturityConversionRate);
 				//collect & distribute to taker
+				manageCollateral_payFee(YTfee, ratio);
 				manageCollateral_BuyZCB_takeOrder(msg.sender, ZCBbought, YTsold, ratio, _useInternalBalances);
 				return (ZCBbought, YTsold, newHeadID, newHeadAmount);
 			}
@@ -750,8 +796,12 @@ contract OrderbookDelegate1 is OrderbookData {
 			}
 			newHeadID = order.nextID;
 		}
+		uint YTfee = YTsold.mul(i >> 16) / TOTAL_BASIS_POINTS;
+		YTsold = YTsold.add(YTfee);
+
 		require(impliedMaturityConversionRate(ZCBbought, YTsold, ratio) >= _minCumulativeMaturityConversionRate);
 		//collect & distribute to taker
+		manageCollateral_payFee(YTfee, ratio);
 		manageCollateral_BuyZCB_takeOrder(msg.sender, ZCBbought, YTsold, ratio, _useInternalBalances);
 		headZCBSellID = newHeadID;
 		newHeadAmount = newHeadID == 0 ? 0 : ZCBSells[newHeadID].amount;
@@ -772,8 +822,11 @@ contract OrderbookDelegate1 is OrderbookData {
 		for (uint16 i = 0; i < _maxIterations && newHeadID != 0; i++) {
 			order = ZCBSells[newHeadID];
 			if (order.maturityConversionRate < _minMaturityConversionRate) {
+				uint YTfee = YTsold.mul(IORC.getOrderbookFeeBips(address(FCP))) / TOTAL_BASIS_POINTS;
+				YTsold = YTsold.add(YTfee);
 				require(impliedMaturityConversionRate(ZCBbought, YTsold, ratio) >= _minCumulativeMaturityConversionRate);
 				//collect & distribute to taker
+				manageCollateral_payFee(YTfee, ratio);
 				manageCollateral_BuyZCB_takeOrder(msg.sender, ZCBbought, YTsold, ratio, _useInternalBalances);
 				if (i != 0) {
 					headZCBSellID = newHeadID;
@@ -802,8 +855,11 @@ contract OrderbookDelegate1 is OrderbookData {
 					headZCBSellID = newHeadID;
 				}
 
+				uint YTfee = YTsold.mul(IORC.getOrderbookFeeBips(address(FCP))) / TOTAL_BASIS_POINTS;
+				YTsold = YTsold.add(YTfee);
 				require(impliedMaturityConversionRate(ZCBbought, YTsold, ratio) >= _minCumulativeMaturityConversionRate);
 				//collect & distribute to taker
+				manageCollateral_payFee(YTfee, ratio);
 				manageCollateral_BuyZCB_takeOrder(msg.sender, ZCBbought, YTsold, ratio, _useInternalBalances);
 				return (ZCBbought, YTsold, newHeadID, newHeadAmount);
 			}
@@ -818,8 +874,11 @@ contract OrderbookDelegate1 is OrderbookData {
 			}
 			newHeadID = order.nextID;
 		}
+		uint YTfee = YTsold.mul(IORC.getOrderbookFeeBips(address(FCP))) / TOTAL_BASIS_POINTS;
+		YTsold = YTsold.add(YTfee);
 		require(impliedMaturityConversionRate(ZCBbought, YTsold, ratio) >= _minCumulativeMaturityConversionRate);
 		//collect & distribute to taker
+		manageCollateral_payFee(YTfee, ratio);
 		manageCollateral_BuyZCB_takeOrder(msg.sender, ZCBbought, YTsold, ratio, _useInternalBalances);
 		headZCBSellID = newHeadID;
 		newHeadAmount = newHeadID == 0 ? 0 : ZCBSells[newHeadID].amount;
@@ -836,16 +895,21 @@ contract OrderbookDelegate1 is OrderbookData {
 		newHeadID = headYTSellID;
 		LimitSellYT memory order;
 		uint ratio = wrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
-		for (uint16 i = 0; i < _maxIterations && newHeadID != 0; i++) {
+		uint i = uint(IORC.getOrderbookFeeBips(address(FCP))) << 16; //store fee multiplier in 17th to 24th bit of i, cast i to uint16 for iteration purpouses
+		_amountZCB = _amountZCB.mul(TOTAL_BASIS_POINTS).div((i >> 16) + TOTAL_BASIS_POINTS);
+		for ( ; uint16(i) < _maxIterations && newHeadID != 0; i++) {
 			order = YTSells[newHeadID];
 			if (order.maturityConversionRate > _maxMaturityConversionRate) {
-				require(impliedMaturityConversionRate(ZCBsold, YTbought, ratio) <= _maxCumulativeMaturityConversionRate);
-				//collect & distribute to taker
-				manageCollateral_BuyYT_takeOrder(msg.sender, ZCBsold, YTbought, ratio, _useInternalBalances);
-				if (i != 0) {
+				if (uint16(i) != 0) {
 					headYTSellID = newHeadID;
 				}
 				newHeadAmount = order.amount;
+				uint ZCBfee = ZCBsold.mul(i >> 16) / TOTAL_BASIS_POINTS;
+				ZCBsold = ZCBsold.add(ZCBfee);
+				require(impliedMaturityConversionRate(ZCBsold, YTbought, ratio) <= _maxCumulativeMaturityConversionRate);
+				//collect & distribute to taker
+				manageCollateral_payFee(ZCBfee, 0);
+				manageCollateral_BuyYT_takeOrder(msg.sender, ZCBsold, YTbought, ratio, _useInternalBalances);
 				return (YTbought, ZCBsold, newHeadID, newHeadAmount);
 			}
 			uint orderZCBamt = impliedZCBamount(order.amount, ratio, order.maturityConversionRate);
@@ -869,8 +933,11 @@ contract OrderbookDelegate1 is OrderbookData {
 					headYTSellID = newHeadID;
 				}
 
+				uint ZCBfee = ZCBsold.mul(i >> 16) / TOTAL_BASIS_POINTS;
+				ZCBsold = ZCBsold.add(ZCBfee);
 				require(impliedMaturityConversionRate(ZCBsold, YTbought, ratio) <= _maxCumulativeMaturityConversionRate);
 				//collect & distribute to taker
+				manageCollateral_payFee(ZCBfee, 0);
 				manageCollateral_BuyYT_takeOrder(msg.sender, ZCBsold, YTbought, ratio, _useInternalBalances);
 				return (YTbought, ZCBsold, newHeadID, newHeadAmount);
 			}
@@ -885,8 +952,11 @@ contract OrderbookDelegate1 is OrderbookData {
 			}
 			newHeadID = order.nextID;
 		}
+		uint ZCBfee = ZCBsold.mul(i >> 16) / TOTAL_BASIS_POINTS;
+		ZCBsold = ZCBsold.add(ZCBfee);
 		require(impliedMaturityConversionRate(ZCBsold, YTbought, ratio) <= _maxCumulativeMaturityConversionRate);
 		//collect & distribute to taker
+		manageCollateral_payFee(ZCBfee, 0);
 		manageCollateral_BuyYT_takeOrder(msg.sender, ZCBsold, YTbought, ratio, _useInternalBalances);
 		headYTSellID = newHeadID;
 		newHeadAmount = newHeadID == 0 ? 0 : YTSells[newHeadID].amount;

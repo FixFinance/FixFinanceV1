@@ -3,6 +3,7 @@ pragma solidity >=0.6.8 <0.7.0;
 
 import "../interfaces/IWrapper.sol";
 import "../interfaces/IFixCapitalPool.sol";
+import "../interfaces/IInfoOracle.sol";
 
 contract OrderbookData {
 
@@ -71,6 +72,11 @@ contract OrderbookData {
 	IFixCapitalPool public FCP;
 	IWrapper public wrapper;
 	uint public maturity;
+
+	IInfoOracle public IORC;
+	uint public YieldRevenue;
+	int public BondRevenue;
+
 
 	//--------------data for rate oracle---------------
 	uint8 constant LENGTH_RATE_SERIES = 31;

@@ -59,7 +59,7 @@ contract('ZCBamm', async function(accounts){
 		yieldTokenInstance = await yieldToken.at(await fixCapitalPoolInstance.yieldTokenAddress());
 		await ZCBamm.link("BigMath", BigMathInstance.address);
 		await infoOracleInstance.setSlippageConstant(fixCapitalPoolInstance.address, SlippageConstant);
-		await infoOracleInstance.setFeeConstants(fixCapitalPoolInstance.address, ZCBammFeeConstant, YTammFeeConstant);
+		await infoOracleInstance.setAmmFeeConstants(fixCapitalPoolInstance.address, ZCBammFeeConstant, YTammFeeConstant);
 		amm = await ZCBamm.new(fixCapitalPoolInstance.address, infoOracleInstance.address);
 		anchor = (await amm.anchor()).toNumber();
 

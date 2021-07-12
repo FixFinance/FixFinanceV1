@@ -18,8 +18,9 @@ contract OrderbookExchange is OrderbookData {
 	using SignedSafeMath for int256;
 	using ABDKMath64x64 for int128;
 
-	constructor(address _FCPaddress, address _delegate1Address) public {
+	constructor(address _FCPaddress, address _infoOracleAddress, address _delegate1Address) public {
 		FCP = IFixCapitalPool(_FCPaddress);
+		IORC = IInfoOracle(_infoOracleAddress);
 		wrapper = IFixCapitalPool(_FCPaddress).wrapper();
 		maturity = IFixCapitalPool(_FCPaddress).maturity();
 		delegate1Address = _delegate1Address;

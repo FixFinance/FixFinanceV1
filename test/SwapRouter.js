@@ -77,7 +77,7 @@ contract('SwapRouter', async function(accounts) {
 		fixCapitalPoolInstance = await FixCapitalPool.at(rec.receipt.logs[0].args.addr);
 
 		await infoOracleInstance.setSlippageConstant(fixCapitalPoolInstance.address, SlippageConstant);
-		await infoOracleInstance.setFeeConstants(fixCapitalPoolInstance.address, ZCBammFeeConstant, YTammFeeConstant);
+		await infoOracleInstance.setAmmFeeConstants(fixCapitalPoolInstance.address, ZCBammFeeConstant, YTammFeeConstant);
 
 		zcbInstance = await IERC20.at(await fixCapitalPoolInstance.zeroCouponBondAddress());
 		yieldTokenInstance = await YieldToken.at(await fixCapitalPoolInstance.yieldTokenAddress());

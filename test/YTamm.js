@@ -113,7 +113,7 @@ contract('YTamm', async function(accounts){
 		await YTamm.link("BigMath", BigMathInstance.address);
 		await YTammDelegate.link("BigMath", BigMathInstance.address);
 		await infoOracleInstance.setSlippageConstant(fixCapitalPoolInstance.address, SlippageConstant);
-		await infoOracleInstance.setFeeConstants(fixCapitalPoolInstance.address, ZCBammFeeConstant, YTammFeeConstant);
+		await infoOracleInstance.setAmmFeeConstants(fixCapitalPoolInstance.address, ZCBammFeeConstant, YTammFeeConstant);
 		amm0 = await ZCBamm.new(fixCapitalPoolInstance.address, infoOracleInstance.address);
 
 

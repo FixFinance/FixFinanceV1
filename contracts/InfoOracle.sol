@@ -25,6 +25,8 @@ contract InfoOracle is IInfoOracle, Ownable {
 
 	uint16 public override bipsToTreasury;
 
+	uint8 public override MinimumOrderbookFee;
+
 	address public override sendTo;
 
 	mapping(address => uint) public override WrapperToYTSlippageConst;
@@ -38,6 +40,10 @@ contract InfoOracle is IInfoOracle, Ownable {
 	mapping(address => uint) public override ZCBammFeeConstants;
 
 	mapping(address => uint) public override YTammFeeConstants;
+
+	mapping(address => uint8) public override WrapperOrderbookFeeBips;
+
+	mapping(address => uint8) public override FCPOrderbookFeeBips;
 
 	mapping(address => address) public override DelegatedControllers;
 
@@ -99,10 +105,22 @@ contract InfoOracle is IInfoOracle, Ownable {
 		@param uint _ZCBammFeeConstant: the fee constant for ZCBamms, must be >= 1, inflated by (1 ether)
 		@param uint _YTammFeeConstant: the fee constant for YTamms, must be >= 1, inflated by (1 ether)
 	*/
-	function wrapperSetFeeConstants(address _wrapper, uint _ZCBammFeeConstant, uint _YTammFeeConstant) external override  maySetContractParameters(_wrapper) {
+	function wrapperSetAmmFeeConstants(address _wrapper, uint _ZCBammFeeConstant, uint _YTammFeeConstant) external override  maySetContractParameters(_wrapper) {
 		require(_ZCBammFeeConstant >= 1 ether && _YTammFeeConstant >= 1 ether);
 		WrapperToZCBFeeConst[_wrapper] = _ZCBammFeeConstant;
 		WrapperToYTFeeConst[_wrapper] = _YTammFeeConstant;
+	}
+
+	/*
+		@Description: set the default spread in bips that will be taken from orderbook trades on orderbooks for FCPs on a specific wrapper asset
+
+		@param address _wrapper: the address of the wrapper contract for which to set the default orderbook fee
+		@param uint8 _orderbookFeeBips: the amount of basis points that will be charged on every orderbook trade,
+			inflated by 1 bip
+			if _orderbookFeeBips is 0 this means that no general wrapper fee will be taken into account
+	*/
+	function wrapperSetOrderbookFeeConstant(address _wrapper, uint8 _orderbookFeeBips) external override maySetContractParameters(_wrapper) {
+		WrapperOrderbookFeeBips[_wrapper] = _orderbookFeeBips;
 	}
 
 	/*
@@ -125,10 +143,22 @@ contract InfoOracle is IInfoOracle, Ownable {
 		@param uint _ZCBammFeeConstant: the fee constant for the ZCBamm, must be >= 1, inflated by (1 ether)
 		@param uint _YTammFeeConstant: the fee constant for the YTamm, must be >= 1, inflated by (1 ether)
 	*/
-	function setFeeConstants(address _fixCapitalPoolAddress, uint _ZCBammFeeConstant, uint _YTammFeeConstant) external override maySetContractParameters(_fixCapitalPoolAddress) {
+	function setAmmFeeConstants(address _fixCapitalPoolAddress, uint _ZCBammFeeConstant, uint _YTammFeeConstant) external override maySetContractParameters(_fixCapitalPoolAddress) {
 		require(_ZCBammFeeConstant >= 1 ether && _YTammFeeConstant >= 1 ether);
 		ZCBammFeeConstants[_fixCapitalPoolAddress] = _ZCBammFeeConstant;
 		YTammFeeConstants[_fixCapitalPoolAddress] = _YTammFeeConstant;
+	}
+
+	/*
+		@Description: set spread in bips that will be taken from orderbook trades on the orderbook for a specific FCP contract
+
+		@param address _fixCapitalPoolAddress: the address of the FCP for which to set the specific orderbook fee constant
+		@param uint8 _orderbookFeeBips: the amount of basis points that will be charged on every orderbook trade
+			inflated by 1 bip
+			if _orderbookFeeBips is 0 this means that no specific fee will be taken into account
+	*/
+	function setOrderbookFeeConstant(address _fixCapitalPoolAddress, uint8 _orderbookFeeBips) external override maySetContractParameters(_fixCapitalPoolAddress) {
+		FCPOrderbookFeeBips[_fixCapitalPoolAddress] = _orderbookFeeBips;
 	}
 
 	/*
@@ -237,6 +267,29 @@ contract InfoOracle is IInfoOracle, Ownable {
 	}
 
 	/*
+		@Description: given a FCP return its corresponding orderbook fee, in basis points
+			if there is a specific fee for the FCP get that,
+			otherwise get the default fee constant for the wrapper that the FCP is associated with
+			once the specific or default fee has been found if it is less than the minimum orderbook fee
+			increase it to the minimum orderbook fee
+
+		@param address _fixCapitalPoolAddress: corresponds to the FCP contract for which to find the Orderbook fee
+
+		@return uint8 FeeBips: the Orderbook fee in basis points corresponding to the FCP contract
+	*/
+	function getOrderbookFeeBips(address _fixCapitalPoolAddress) external view override returns (uint8 FeeBips) {
+		FeeBips = FCPOrderbookFeeBips[_fixCapitalPoolAddress];
+		if (FeeBips == 0) {
+			FeeBips = WrapperOrderbookFeeBips[address(IFixCapitalPool(_fixCapitalPoolAddress).wrapper())];
+		}
+		if (FeeBips != 0) {
+			FeeBips--;
+		}
+		uint8 _minimumOrderbookFee = MinimumOrderbookFee;
+		FeeBips = FeeBips < _minimumOrderbookFee ? _minimumOrderbookFee : FeeBips;
+	}
+
+	/*
 		@Description: given a fix capital pool return its corresponding YTamm slippage constant
 			if there is a specific constant for the fix capital pool return that,
 			otherwise return the default slippage constant for the wrapper that the fix capital pool is associated with
@@ -254,6 +307,16 @@ contract InfoOracle is IInfoOracle, Ownable {
 	}
 
 	//-----------------------I-n-f-o-O-r-a-c-l-e---a-d-m-i-n-----------------------------
+
+	/*
+		@Description: set the floor on the orderbook fee
+
+		@param uint8 _minimumOrderbookFee: the minimum orderbook fee in bips
+	*/
+	function setMinimumOrderbookFee(uint8 _minimumOrderbookFee) external override onlyOwner {
+		MinimumOrderbookFee = _minimumOrderbookFee;
+	}
+
 
 	/*
 		@Description: admin may set the % of LP fees that go to the treasury

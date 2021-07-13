@@ -1044,10 +1044,16 @@ contract('OrderbookExchange', async function(accounts) {
 		let prevBalBonds = await exchange.BondDeposited(accounts[1]);
 		let prevBalYield = await exchange.YieldDeposited(accounts[1]);
 
+		let prevBondRevenue = await exchange.BondRevenue();
+		let prevYieldRevenue = await exchange.YieldRevenue();
+
 		let rec = await exchange.marketSellZCBtoU(amtToSell, maxMCR, maxCumulativeMCR, maxSteps, true, {from: accounts[1]});
 		let log = rec.receipt.logs[0];
 		assert.equal(log.event, 'MarketBuyYT');
 		let logArgs = log.args;
+
+		let bondRevenue = await exchange.BondRevenue();
+		let yieldRevenue = await exchange.YieldRevenue();
 
 		balBonds = await exchange.BondDeposited(accounts[1]);
 		balYield = await exchange.YieldDeposited(accounts[1]);
@@ -1066,8 +1072,9 @@ contract('OrderbookExchange', async function(accounts) {
 			let order = expectedResultantOrderbook[0];
 			let orderZCBamount = impliedZCBamount(order.amount, ratio, order.maturityConversionRate);
 			let orderUnitYTamt = order.amount.mul(ratio).div(_10To18);
+			let feeAdjOrderZCBamt = orderZCBamount.mul(new BN(10_000 + FeeBips)).div(new BN(10_000));
 			let unitYTbought = YTbought.mul(ratio).div(_10To18);
-			let cmp = orderUnitYTamt.add(unitYTbought).cmp(remaining.sub(order.amount));
+			let cmp = orderUnitYTamt.add(unitYTbought).cmp(remaining.sub(feeAdjOrderZCBamt));
 			if (cmp === 1) {
 				//partially accept offer
 				/*
@@ -1079,7 +1086,7 @@ contract('OrderbookExchange', async function(accounts) {
 					YTtoBuy * (orderRatio + ratio) == _amountZCB - unitAmtYTbought
 					YTtoBuy == (_amountZCB - unitAmtYTbought) / (orderRatio + ratio)
 				*/
-				let orderRatio = orderZCBamount.mul(_10To18).div(order.amount);
+				let orderRatio = feeAdjOrderZCBamt.mul(_10To18).div(order.amount);
 				let YTtoBuy = remaining.sub(unitYTbought).mul(_10To18).div(orderRatio.add(ratio));
 				let ZCBtoSell = YTtoBuy.mul(orderRatio).div(_10To18);
 
@@ -1089,7 +1096,7 @@ contract('OrderbookExchange', async function(accounts) {
 			}
 			else {
 				//delete order from list & decrement remaining
-				remaining = remaining.sub(orderZCBamount);
+				remaining = remaining.sub(feeAdjOrderZCBamt);
 				expectedResultantOrderbook.shift();
 				YTbought = YTbought.add(order.amount);
 			}
@@ -1101,7 +1108,11 @@ contract('OrderbookExchange', async function(accounts) {
 		assert.equal(logArgs.taker, accounts[1]);
 
 		let ZCBsold = amtToSell.sub(remaining);
+		let totalZCBreceived = ZCBsold.mul(new BN(10_000)).div(new BN(10_000 + FeeBips));
+		let fee = ZCBsold.sub(totalZCBreceived).sub(new BN(1));
 
+		assert.equal(bondRevenue.sub(prevBondRevenue).toString(), fee.toString());
+		assert.equal(yieldRevenue.toString(), prevYieldRevenue.toString());
 		orderbook = [];
 		currentID = (await exchange.headYTSellID()).toString();
 		while (currentID !== "0") {
@@ -1139,10 +1150,16 @@ contract('OrderbookExchange', async function(accounts) {
 		let prevBalBonds = await exchange.BondDeposited(accounts[1]);
 		let prevBalYield = await exchange.YieldDeposited(accounts[1]);
 
+		let prevBondRevenue = await exchange.BondRevenue();
+		let prevYieldRevenue = await exchange.YieldRevenue();
+
 		let rec = await exchange.marketSellUnitYTtoU(amtToSell, minMCR, minCumulativeMCR, maxSteps, true, {from: accounts[1]});
 		let log = rec.receipt.logs[0];
 		assert.equal(log.event, 'MarketBuyZCB');
 		let logArgs = log.args;
+
+		let bondRevenue = await exchange.BondRevenue();
+		let yieldRevenue = await exchange.YieldRevenue();
 
 		balBonds = await exchange.BondDeposited(accounts[1]);
 		balYield = await exchange.YieldDeposited(accounts[1]);
@@ -1161,8 +1178,9 @@ contract('OrderbookExchange', async function(accounts) {
 			let order = expectedResultantOrderbook[0];
 			let orderYTamount = impliedYTamount(order.amount, ratio, order.maturityConversionRate);
 			let orderUnitYTamount = orderYTamount.mul(ratio).div(_10To18);
+			let feeAdjOrderUnitYTamt = orderUnitYTamount.mul(new BN(10_000 + FeeBips)).div(new BN(10_000));
 			let lhs = ZCBbought.add(order.amount);
-			let rhs = remaining.sub(orderUnitYTamount);
+			let rhs = remaining.sub(feeAdjOrderUnitYTamt);
 			let cmp = lhs.cmp(rhs);
 			if (cmp === 1) {
 				/*
@@ -1174,7 +1192,7 @@ contract('OrderbookExchange', async function(accounts) {
 					unitYTtoSell*(orderRatio + 1) == _unitAmountYT - ZCBbought
 					unitYTtoSell == (_unitAmountYT - ZCBbought) / (orderRatio + 1)
 				*/
-				let orderRatio = order.amount.mul(_10To18).div(orderUnitYTamount);
+				let orderRatio = order.amount.mul(_10To18).div(feeAdjOrderUnitYTamt);
 				let unitYTtoSell = remaining.sub(ZCBbought).mul(_10To18).div(orderRatio.add(_10To18));
 				let ZCBtoBuy = unitYTtoSell.mul(orderRatio).div(_10To18);
 				let YTtoSell = unitYTtoSell.mul(_10To18).div(ratio);
@@ -1185,7 +1203,7 @@ contract('OrderbookExchange', async function(accounts) {
 			}
 			else {
 				//delete order from list & decrement remaining
-				remaining = remaining.sub(orderUnitYTamount);
+				remaining = remaining.sub(feeAdjOrderUnitYTamt);
 				expectedResultantOrderbook.shift();
 				ZCBbought = ZCBbought.add(order.amount);
 			}
@@ -1198,6 +1216,13 @@ contract('OrderbookExchange', async function(accounts) {
 
 		let dynamicYTsold = amtToSell.sub(remaining);
 		let YTsold = dynamicYTsold.mul(_10To18).div(ratio);
+		let totalYTreceived = YTsold.mul(new BN(10_000)).div(new BN(10_000 + FeeBips));
+		let fee = YTsold.sub(totalYTreceived).sub(new BN(1));
+
+		let bondNum = fee.mul(ratio).div(_10To18);
+		assert.equal(prevBondRevenue.sub(bondRevenue).toString(), bondNum.toString());
+		assert.equal(yieldRevenue.sub(prevYieldRevenue).toString(), fee.toString());
+
 		orderbook = [];
 		currentID = (await exchange.headZCBSellID()).toString();
 		while (currentID !== "0") {

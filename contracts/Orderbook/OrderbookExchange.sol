@@ -13,17 +13,24 @@ import "./OrderbookData.sol";
 contract OrderbookExchange is OrderbookData {
 
 	address immutable delegate1Address;
+	address immutable delegate2Address;
 
 	using SafeMath for uint256;
 	using SignedSafeMath for int256;
 	using ABDKMath64x64 for int128;
 
-	constructor(address _FCPaddress, address _infoOracleAddress, address _delegate1Address) public {
+	constructor(
+		address _FCPaddress,
+		address _infoOracleAddress,
+		address _delegate1Address,
+		address _delegate2Address
+	) public {
 		FCP = IFixCapitalPool(_FCPaddress);
 		IORC = IInfoOracle(_infoOracleAddress);
 		wrapper = IFixCapitalPool(_FCPaddress).wrapper();
 		maturity = IFixCapitalPool(_FCPaddress).maturity();
 		delegate1Address = _delegate1Address;
+		delegate2Address = _delegate2Address;
 	}
 
 	function deposit(uint _amountYield, int _amountBond) public {
@@ -49,7 +56,7 @@ contract OrderbookExchange is OrderbookData {
 		uint _hintID,
 		uint _maxSteps
 	) external {
-		address _delegateAddress = delegate1Address;
+		address _delegateAddress = delegate2Address;
 		bytes memory sig = abi.encodeWithSignature(
 			"limitSellZCB(uint256,uint256,uint256,uint256)",
 			_amount,
@@ -76,7 +83,7 @@ contract OrderbookExchange is OrderbookData {
 		uint _hintID,
 		uint _maxSteps
 	) external {
-		address _delegateAddress = delegate1Address;
+		address _delegateAddress = delegate2Address;
 		bytes memory sig = abi.encodeWithSignature(
 			"limitSellYT(uint256,uint256,uint256,uint256)",
 			_amount,
@@ -104,7 +111,7 @@ contract OrderbookExchange is OrderbookData {
 		uint _maxSteps,
 		bool _removeBelowMin
 	) external returns(int change) {
-		address _delegateAddress = delegate1Address;
+		address _delegateAddress = delegate2Address;
 		bytes memory sig = abi.encodeWithSignature(
 			"modifyZCBLimitSell(int256,uint256,uint256,uint256,bool)",
 			_amount,
@@ -132,7 +139,7 @@ contract OrderbookExchange is OrderbookData {
 		uint _maxSteps,
 		bool _removeBelowMin
 	) external returns(int change) {
-		address _delegateAddress = delegate1Address;
+		address _delegateAddress = delegate2Address;
 		bytes memory sig = abi.encodeWithSignature(
 			"modifyYTLimitSell(int256,uint256,uint256,uint256,bool)",
 			_amount,
@@ -328,7 +335,7 @@ contract OrderbookExchange is OrderbookData {
 		@Description: force the rate oracle to record a new datapoint
 	*/
 	function forceRateDataUpdate() external {
-		(bool success, ) = delegate1Address.delegatecall(abi.encodeWithSignature("forceRateDataUpdate()"));
+		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature("forceRateDataUpdate()"));
 		require(success);
 	}
 
@@ -397,7 +404,7 @@ contract OrderbookExchange is OrderbookData {
 		@param uint _MCR: the median of all MCR datapoints
 	*/
 	function setOracleMCR(uint _MCR) external {
-		(bool success, ) = delegate1Address.delegatecall(abi.encodeWithSignature(
+		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
 			"setOracleMCR(uint256)",
 			_MCR
 		));

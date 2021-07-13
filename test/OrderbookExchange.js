@@ -6,6 +6,7 @@ const yieldToken = artifacts.require("IYieldToken");
 const zeroCouponBond = artifacts.require("IZeroCouponBond");
 const zcbYtDeployer = artifacts.require("ZCB_YT_Deployer");
 const OrderbookDelegate1 = artifacts.require("OrderbookDelegate1");
+const OrderbookDelegate2 = artifacts.require("OrderbookDelegate2");
 const OrderbookExchange = artifacts.require("OrderbookExchange");
 const InfoOracle = artifacts.require("InfoOracle");
 
@@ -43,7 +44,8 @@ contract('OrderbookExchange', async function(accounts) {
 		zcbInstance = await zeroCouponBond.at(await fixCapitalPoolInstance.zeroCouponBondAddress());
 		yieldTokenInstance = await yieldToken.at(await fixCapitalPoolInstance.yieldTokenAddress());
 		orderbookDelegate1Instance = await OrderbookDelegate1.new();
-		exchange = await OrderbookExchange.new(fixCapitalPoolInstance.address, infoOracleInstance.address, orderbookDelegate1Instance.address);
+		orderbookDelegate2Instance = await OrderbookDelegate2.new();
+		exchange = await OrderbookExchange.new(fixCapitalPoolInstance.address, infoOracleInstance.address, orderbookDelegate1Instance.address, orderbookDelegate2Instance.address);
 		await exchange.setMinimumOrderSize(_10To18.div(new BN(400000)));
 		FeeBips = 25;
 		await infoOracleInstance.setMinimumOrderbookFee(FeeBips);

@@ -17,7 +17,7 @@ interface IFixCapitalPool is IFCPFlashLender {
 
 	function wrappedTokenFree(address _owner) external view returns (uint wrappedTknFree);
 	function inPayoutPhase() external view returns (bool);
-	function maturity() external view returns(uint64);
+	function maturity() external view returns(uint40);
 	function maturityConversionRate() external view returns(uint);
 	function underlyingAssetAddress() external view returns(address);
 	function balanceBonds(address _owner) external view returns(int);

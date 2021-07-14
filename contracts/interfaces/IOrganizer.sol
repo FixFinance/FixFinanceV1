@@ -16,7 +16,7 @@ interface IOrganizer {
 
 	function DeploySwapRouter() external;
 	function deployNGBWrapper(address _underlyingAssetAddress) external;
-	function deployFixCapitalPoolInstance(address _wrapperAddress, uint64 _maturity) external;
+	function deployFixCapitalPoolInstance(address _wrapperAddress, uint40 _maturity) external;
 	function deployZCBamm(address _fixCapitalPoolAddress) external;
 	function deployYTamm(address _fixCapitalPoolAddress) external;
 

@@ -21,7 +21,7 @@ contract FixCapitalPool is IFixCapitalPool, Ownable, nonReentrant {
 	bool public override inPayoutPhase;
 
 	//timestamp at which payout phase may be entered
-	uint64 public override maturity;
+	uint40 public override maturity;
 
 	//(1 ether) * amountUnit / wrappedToken
 	uint public override maturityConversionRate;
@@ -74,7 +74,7 @@ contract FixCapitalPool is IFixCapitalPool, Ownable, nonReentrant {
     */
 	constructor(
 		address _wrapper,
-		uint64 _maturity,
+		uint40 _maturity,
 		address _ZCB_YTdeployerAddr,
 		address _infoOracleAddress
 	) public {

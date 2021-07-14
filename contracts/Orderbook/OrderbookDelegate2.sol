@@ -47,14 +47,14 @@ contract OrderbookDelegate2 is OrderbookData {
 	}
 
 	modifier ensureValidZCBSell(uint _amountZCB, uint _maturityConversionRate) {
-		uint ratio = wrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
+		uint ratio = internalWrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
 		uint minimumZCBamount = minimumZCBLimitAmount(_maturityConversionRate, ratio);
 		require(_amountZCB > minimumZCBamount);
 		_;
 	}
 
 	modifier ensureValidYTSell(uint _amountYT, uint _maturityConversionRate) {
-		uint ratio = wrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
+		uint ratio = internalWrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
 		uint minimumYTamount = minimumYTlimitAmount(_maturityConversionRate, ratio);
 		require(_amountYT > minimumYTamount);
 		_;
@@ -71,55 +71,55 @@ contract OrderbookDelegate2 is OrderbookData {
 
 	function manageCollateral_SellZCB_makeOrder(address _addr, uint _amount) internal {
 		require(_amount < uint(type(int256).max));
-		uint YD = YieldDeposited[_addr];
-		int BD = BondDeposited[_addr];
-		uint wrappedAmtLockedYT = lockedYT[_addr];
-		uint ratio = wrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
+		uint YD = internalYieldDeposited[_addr];
+		int BD = internalBondDeposited[_addr];
+		uint wrappedAmtLockedYT = internalLockedYT[_addr];
+		uint ratio = internalWrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
 
 		int resultantBD = BD.sub(int(_amount));
 
 		requireValidCollateral(YD, resultantBD, wrappedAmtLockedYT, ratio);
 
-		BondDeposited[_addr] = resultantBD;
+		internalBondDeposited[_addr] = resultantBD;
 	}
 
 	function manageCollateral_ReceiveZCB(address _addr, uint _amount) internal {
 		require(_amount < uint(type(int256).max));
-		int BD = BondDeposited[_addr];
-		BondDeposited[_addr] = BD.add(int(_amount));
+		int BD = internalBondDeposited[_addr];
+		internalBondDeposited[_addr] = BD.add(int(_amount));
 	}
 
 	function manageCollateral_SellYT_makeOrder(address _addr, uint _amount) internal {
 		require(_amount < uint(type(int256).max));
-		uint YD = YieldDeposited[_addr];
-		int BD = BondDeposited[_addr];
-		uint wrappedAmtLockedYT = lockedYT[_addr];
-		uint ratio = wrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
+		uint YD = internalYieldDeposited[_addr];
+		int BD = internalBondDeposited[_addr];
+		uint wrappedAmtLockedYT = internalLockedYT[_addr];
+		uint ratio = internalWrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
 
 		uint newWrappedAmtLockedYT = wrappedAmtLockedYT.add(_amount);
 
 		requireValidCollateral(YD, BD, newWrappedAmtLockedYT, ratio);
 
-		lockedYT[_addr] = newWrappedAmtLockedYT;
+		internalLockedYT[_addr] = newWrappedAmtLockedYT;
 	}
 
 	function manageCollateral_ReceiveYT_makeOrder(address _addr, uint _amount) internal {
 		require(_amount < uint(type(int256).max));
-		uint _lockedYT = lockedYT[_addr];
-		lockedYT[_addr] = _lockedYT.sub(_amount);
+		uint _internalLockedYT = internalLockedYT[_addr];
+		internalLockedYT[_addr] = _internalLockedYT.sub(_amount);
 	}
 
  	function insertFromHead_SellZCB(uint _amount, uint _maturityConversionRate, uint _newID, uint _maxSteps) internal returns(uint prevID) {
-		uint currentID = headZCBSellID;
+		uint currentID = internalHeadZCBSellID;
 		if (currentID == 0) {
-			headZCBSellID = _newID;
-			ZCBSells[_newID] = LimitSellZCB(msg.sender, _amount, _maturityConversionRate, 0);
+			internalHeadZCBSellID = _newID;
+			internalZCBSells[_newID] = LimitSellZCB(msg.sender, _amount, _maturityConversionRate, 0);
 			return 0;
 		}
-		LimitSellZCB storage currentOrder = ZCBSells[currentID];
+		LimitSellZCB storage currentOrder = internalZCBSells[currentID];
 		if (_maturityConversionRate > currentOrder.maturityConversionRate) {
-			headZCBSellID = _newID;
-			ZCBSells[_newID] = LimitSellZCB(msg.sender, _amount, _maturityConversionRate, currentID);
+			internalHeadZCBSellID = _newID;
+			internalZCBSells[_newID] = LimitSellZCB(msg.sender, _amount, _maturityConversionRate, currentID);
 			return 0;
 		}
 		LimitSellZCB storage prevOrder; 
@@ -128,31 +128,31 @@ contract OrderbookDelegate2 is OrderbookData {
 		for (; currentID > 0; _maxSteps--) {
 			require(_maxSteps > 0);
 			prevOrder = currentOrder;
-			currentOrder = ZCBSells[currentID];
+			currentOrder = internalZCBSells[currentID];
 			if (_maturityConversionRate > currentOrder.maturityConversionRate) {
 				prevOrder.nextID = _newID;
-				ZCBSells[_newID] = LimitSellZCB(msg.sender, _amount, _maturityConversionRate, currentID);
+				internalZCBSells[_newID] = LimitSellZCB(msg.sender, _amount, _maturityConversionRate, currentID);
 				return prevID;
 			}
 			prevID = currentID;
 			currentID = currentOrder.nextID;
 		}
 		currentOrder.nextID = _newID;
-		ZCBSells[_newID] = LimitSellZCB(msg.sender, _amount, _maturityConversionRate, 0);
+		internalZCBSells[_newID] = LimitSellZCB(msg.sender, _amount, _maturityConversionRate, 0);
 		return prevID;
 	}
 
 	function insertFromHead_SellYT(uint _amount, uint _maturityConversionRate, uint _newID, uint _maxSteps) internal returns(uint prevID) {
-		uint currentID = headYTSellID;
+		uint currentID = internalHeadYTSellID;
 		if (currentID == 0) {
-			headYTSellID = _newID;
-			YTSells[_newID] = LimitSellYT(msg.sender, _amount, _maturityConversionRate, 0);
+			internalHeadYTSellID = _newID;
+			internalYTSells[_newID] = LimitSellYT(msg.sender, _amount, _maturityConversionRate, 0);
 			return 0;
 		}
-		LimitSellYT storage currentOrder = YTSells[currentID];
+		LimitSellYT storage currentOrder = internalYTSells[currentID];
 		if (_maturityConversionRate < currentOrder.maturityConversionRate) {
-			headYTSellID = _newID;
-			YTSells[_newID] = LimitSellYT(msg.sender, _amount, _maturityConversionRate, currentID);
+			internalHeadYTSellID = _newID;
+			internalYTSells[_newID] = LimitSellYT(msg.sender, _amount, _maturityConversionRate, currentID);
 			return 0;
 		}
 		LimitSellYT storage prevOrder; 
@@ -161,23 +161,23 @@ contract OrderbookDelegate2 is OrderbookData {
 		for (; currentID > 0; _maxSteps--) {
 			require(_maxSteps > 0);
 			prevOrder = currentOrder;
-			currentOrder = YTSells[currentID];
+			currentOrder = internalYTSells[currentID];
 			if (_maturityConversionRate < currentOrder.maturityConversionRate) {
 				prevOrder.nextID = _newID;
-				YTSells[_newID] = LimitSellYT(msg.sender, _amount, _maturityConversionRate, currentID);
+				internalYTSells[_newID] = LimitSellYT(msg.sender, _amount, _maturityConversionRate, currentID);
 				return prevID;
 			}
 			prevID = currentID;
 			currentID = currentOrder.nextID;
 		}
 		currentOrder.nextID = _newID;
-		YTSells[_newID] = LimitSellYT(msg.sender, _amount, _maturityConversionRate, 0);
+		internalYTSells[_newID] = LimitSellYT(msg.sender, _amount, _maturityConversionRate, 0);
 		return prevID;
 	}
 
 	function insertWithHint_SellZCB(uint _amount, uint _maturityConversionRate, uint _hintID, uint _newID, uint _maxSteps) internal returns(uint prevID) {
 		uint currentID = _hintID;
-		LimitSellZCB storage currentOrder = ZCBSells[currentID];
+		LimitSellZCB storage currentOrder = internalZCBSells[currentID];
 		LimitSellZCB storage prevOrder;
 		uint startMCR = currentOrder.maturityConversionRate;
 		require(_maturityConversionRate <= startMCR && startMCR > 0);
@@ -186,23 +186,23 @@ contract OrderbookDelegate2 is OrderbookData {
 		for (; currentID > 0; _maxSteps--) {
 			require(_maxSteps > 0);
 			prevOrder = currentOrder;
-			currentOrder = ZCBSells[currentID];
+			currentOrder = internalZCBSells[currentID];
 			if (_maturityConversionRate > currentOrder.maturityConversionRate) {
 				prevOrder.nextID = _newID;
-				ZCBSells[_newID] = LimitSellZCB(msg.sender, _amount, _maturityConversionRate, currentID);
+				internalZCBSells[_newID] = LimitSellZCB(msg.sender, _amount, _maturityConversionRate, currentID);
 				return prevID;
 			}
 			prevID = currentID;
 			currentID = currentOrder.nextID;
 		}
 		currentOrder.nextID = _newID;
-		ZCBSells[_newID] = LimitSellZCB(msg.sender, _amount, _maturityConversionRate, 0);
+		internalZCBSells[_newID] = LimitSellZCB(msg.sender, _amount, _maturityConversionRate, 0);
 		return prevID;
 	}
 
 	function insertWithHint_SellYT(uint _amount, uint _maturityConversionRate, uint _hintID, uint _newID, uint _maxSteps) internal returns(uint prevID) {
 		uint currentID = _hintID;
-		LimitSellYT storage currentOrder = YTSells[currentID];
+		LimitSellYT storage currentOrder = internalYTSells[currentID];
 		LimitSellYT storage prevOrder;
 		uint startMCR = currentOrder.maturityConversionRate;
 		require(_maturityConversionRate >= startMCR && startMCR > 0);
@@ -211,37 +211,37 @@ contract OrderbookDelegate2 is OrderbookData {
 		for (; currentID > 0; _maxSteps--) {
 			require(_maxSteps > 0);
 			prevOrder = currentOrder;
-			currentOrder = YTSells[currentID];
+			currentOrder = internalYTSells[currentID];
 			if (_maturityConversionRate < currentOrder.maturityConversionRate) {
 				prevOrder.nextID = _newID;
-				YTSells[_newID] = LimitSellYT(msg.sender, _amount, _maturityConversionRate, currentID);
+				internalYTSells[_newID] = LimitSellYT(msg.sender, _amount, _maturityConversionRate, currentID);
 				return prevID;
 			}
 			prevID = currentID;
 			currentID = currentOrder.nextID;
 		}
 		currentOrder.nextID = _newID;
-		YTSells[_newID] = LimitSellYT(msg.sender, _amount, _maturityConversionRate, 0);
+		internalYTSells[_newID] = LimitSellYT(msg.sender, _amount, _maturityConversionRate, 0);
 		return prevID;
 	}
 
 	function modifyFromHead_SellZCB(int _amount, uint _targetID, uint _maxSteps, uint _minimumAmount, bool _removeBelowMin) internal returns (int change) {
-		uint currentID = headZCBSellID;
+		uint currentID = internalHeadZCBSellID;
 		if (currentID == _targetID) {
 			if (_amount > 0) {
-				uint prevAmt = ZCBSells[currentID].amount;
-				ZCBSells[currentID].amount = prevAmt.add(uint(_amount));
+				uint prevAmt = internalZCBSells[currentID].amount;
+				internalZCBSells[currentID].amount = prevAmt.add(uint(_amount));
 				return _amount;
 			}
 			else {
-				uint prevAmt = ZCBSells[currentID].amount;
+				uint prevAmt = internalZCBSells[currentID].amount;
 				if (
 					prevAmt <= uint(-_amount) ||
 					(_removeBelowMin && (prevAmt - uint(-_amount) <= _minimumAmount))
 				) {
 					//delete order
-					headZCBSellID = ZCBSells[currentID].nextID;
-					delete ZCBSells[currentID];
+					internalHeadZCBSellID = internalZCBSells[currentID].nextID;
+					delete internalZCBSells[currentID];
 					return -int(prevAmt);
 				}
 				else {
@@ -249,10 +249,10 @@ contract OrderbookDelegate2 is OrderbookData {
 						return 0;
 					}
 					else if (prevAmt - uint(-_amount) <= _minimumAmount) {
-						ZCBSells[currentID].amount = _minimumAmount;
+						internalZCBSells[currentID].amount = _minimumAmount;
 						return int(_minimumAmount).sub(int(prevAmt));
 					}
-					ZCBSells[currentID].amount = prevAmt.sub(uint(-_amount));
+					internalZCBSells[currentID].amount = prevAmt.sub(uint(-_amount));
 					return _amount;
 				}
 			}
@@ -262,13 +262,13 @@ contract OrderbookDelegate2 is OrderbookData {
 		for (uint i = 0; currentID != _targetID; i++) {
 			require(i < _maxSteps);
 			prevID = currentID;
-			currentID = ZCBSells[currentID].nextID;
+			currentID = internalZCBSells[currentID].nextID;
 			require(currentID != 0);
 		}
 
-		uint prevAmt = ZCBSells[currentID].amount;
+		uint prevAmt = internalZCBSells[currentID].amount;
 		if (_amount > 0) {
-			ZCBSells[currentID].amount = prevAmt.add(uint(_amount));
+			internalZCBSells[currentID].amount = prevAmt.add(uint(_amount));
 			return _amount;
 		}
 		else {
@@ -277,8 +277,8 @@ contract OrderbookDelegate2 is OrderbookData {
 				(_removeBelowMin && (prevAmt - uint(-_amount) <= _minimumAmount))
 			) {
 				//delete order
-				ZCBSells[prevID].nextID = ZCBSells[currentID].nextID;
-				delete ZCBSells[currentID];
+				internalZCBSells[prevID].nextID = internalZCBSells[currentID].nextID;
+				delete internalZCBSells[currentID];
 				return -int(prevAmt);
 			}
 			else {
@@ -286,32 +286,32 @@ contract OrderbookDelegate2 is OrderbookData {
 					return 0;
 				}
 				else if (prevAmt - uint(-_amount) <= _minimumAmount) {
-					ZCBSells[currentID].amount = _minimumAmount;
+					internalZCBSells[currentID].amount = _minimumAmount;
 					return int(_minimumAmount).sub(int(prevAmt));
 				}
-				ZCBSells[currentID].amount = prevAmt.sub(uint(-_amount));
+				internalZCBSells[currentID].amount = prevAmt.sub(uint(-_amount));
 				return _amount;
 			}
 		}
 	}
 
 	function modifyFromHead_SellYT(int _amount, uint _targetID, uint _maxSteps, uint _minimumAmount, bool _removeBelowMin) internal returns (int change) {
-		uint currentID = headYTSellID;
+		uint currentID = internalHeadYTSellID;
 		if (currentID == _targetID) {
 			if (_amount > 0) {
-				uint prevAmt = YTSells[currentID].amount;
-				YTSells[currentID].amount = prevAmt.add(uint(_amount));
+				uint prevAmt = internalYTSells[currentID].amount;
+				internalYTSells[currentID].amount = prevAmt.add(uint(_amount));
 				return _amount;
 			}
 			else {
-				uint prevAmt = YTSells[currentID].amount;
+				uint prevAmt = internalYTSells[currentID].amount;
 				if (
 					prevAmt <= uint(-_amount) ||
 					(_removeBelowMin && (prevAmt - uint(-_amount) <= _minimumAmount))
 				) {
 					//delete order
-					headYTSellID = YTSells[currentID].nextID;
-					delete YTSells[currentID];
+					internalHeadYTSellID = internalYTSells[currentID].nextID;
+					delete internalYTSells[currentID];
 					return -int(prevAmt);
 				}
 				else {
@@ -319,10 +319,10 @@ contract OrderbookDelegate2 is OrderbookData {
 						return 0;
 					}
 					else if (prevAmt - uint(-_amount) <= _minimumAmount) {
-						YTSells[currentID].amount = _minimumAmount;
+						internalYTSells[currentID].amount = _minimumAmount;
 						return int(_minimumAmount).sub(int(prevAmt));
 					}
-					YTSells[currentID].amount = prevAmt.sub(uint(-_amount));
+					internalYTSells[currentID].amount = prevAmt.sub(uint(-_amount));
 					return _amount;
 				}
 			}
@@ -332,24 +332,24 @@ contract OrderbookDelegate2 is OrderbookData {
 		for (uint i = 0; currentID != _targetID; i++) {
 			require(i < _maxSteps);
 			prevID = currentID;
-			currentID = YTSells[currentID].nextID;
+			currentID = internalYTSells[currentID].nextID;
 			require(currentID != 0);
 		}
 
 		if (_amount > 0) {
-			uint prevAmt = YTSells[currentID].amount;
-			YTSells[currentID].amount = prevAmt.add(uint(_amount));
+			uint prevAmt = internalYTSells[currentID].amount;
+			internalYTSells[currentID].amount = prevAmt.add(uint(_amount));
 			return _amount;
 		}
 		else {
-			uint prevAmt = YTSells[currentID].amount;
+			uint prevAmt = internalYTSells[currentID].amount;
 			if (
 				prevAmt <= uint(-_amount) ||
 				(_removeBelowMin && (prevAmt - uint(-_amount) <= _minimumAmount))
 			) {
 				//delete order
-				YTSells[prevID].nextID = YTSells[currentID].nextID;
-				delete YTSells[currentID];
+				internalYTSells[prevID].nextID = internalYTSells[currentID].nextID;
+				delete internalYTSells[currentID];
 				return -int(prevAmt);
 			}
 			else {
@@ -357,10 +357,10 @@ contract OrderbookDelegate2 is OrderbookData {
 					return 0;
 				}
 				else if (prevAmt - uint(-_amount) <= _minimumAmount) {
-					YTSells[currentID].amount = _minimumAmount;
+					internalYTSells[currentID].amount = _minimumAmount;
 					return int(_minimumAmount).sub(int(prevAmt));
 				}
-				YTSells[currentID].amount = prevAmt.sub(uint(-_amount));
+				internalYTSells[currentID].amount = prevAmt.sub(uint(-_amount));
 				return _amount;
 			}
 		}
@@ -372,24 +372,24 @@ contract OrderbookDelegate2 is OrderbookData {
 		for (uint i = 0; currentID != _targetID; i++) {
 			require(i < _maxSteps);
 			prevID = currentID;
-			currentID = ZCBSells[currentID].nextID;
+			currentID = internalZCBSells[currentID].nextID;
 			require(currentID != 0);
 		}
 
 		if (_amount > 0) {
-			uint prevAmt = ZCBSells[currentID].amount;
-			ZCBSells[currentID].amount = prevAmt.add(uint(_amount));
+			uint prevAmt = internalZCBSells[currentID].amount;
+			internalZCBSells[currentID].amount = prevAmt.add(uint(_amount));
 			return _amount;
 		}
 		else {
-			uint prevAmt = ZCBSells[currentID].amount;
+			uint prevAmt = internalZCBSells[currentID].amount;
 			if (
 				prevAmt <= uint(-_amount) ||
 				(_removeBelowMin && (prevAmt - uint(-_amount) <= _minimumAmount))
 			) {
 				//delete order
-				ZCBSells[prevID].nextID = ZCBSells[currentID].nextID;
-				delete ZCBSells[currentID];
+				internalZCBSells[prevID].nextID = internalZCBSells[currentID].nextID;
+				delete internalZCBSells[currentID];
 				return -int(prevAmt);
 			}
 			else {
@@ -397,10 +397,10 @@ contract OrderbookDelegate2 is OrderbookData {
 					return 0;
 				}
 				else if (prevAmt - uint(-_amount) <= _minimumAmount) {
-					ZCBSells[currentID].amount = _minimumAmount;
+					internalZCBSells[currentID].amount = _minimumAmount;
 					return int(_minimumAmount).sub(int(prevAmt));
 				}
-				ZCBSells[currentID].amount = prevAmt.sub(uint(-_amount));
+				internalZCBSells[currentID].amount = prevAmt.sub(uint(-_amount));
 				return _amount;
 			}
 		}
@@ -412,24 +412,24 @@ contract OrderbookDelegate2 is OrderbookData {
 		for (uint i = 0; currentID != _targetID; i++) {
 			require(i < _maxSteps);
 			prevID = currentID;
-			currentID = YTSells[currentID].nextID;
+			currentID = internalYTSells[currentID].nextID;
 			require(currentID != 0);
 		}
 
 		if (_amount > 0) {
-			uint prevAmt = YTSells[currentID].amount;
-			YTSells[currentID].amount = prevAmt.add(uint(_amount));
+			uint prevAmt = internalYTSells[currentID].amount;
+			internalYTSells[currentID].amount = prevAmt.add(uint(_amount));
 			return _amount;
 		}
 		else {
-			uint prevAmt = YTSells[currentID].amount;
+			uint prevAmt = internalYTSells[currentID].amount;
 			if (
 				prevAmt <= uint(-_amount) ||
 				(_removeBelowMin && (prevAmt - uint(-_amount) <= _minimumAmount))
 			) {
 				//delete order
-				YTSells[prevID].nextID = YTSells[currentID].nextID;
-				delete YTSells[currentID];
+				internalYTSells[prevID].nextID = internalYTSells[currentID].nextID;
+				delete internalYTSells[currentID];
 				return -int(prevAmt);
 			}
 			else {
@@ -437,10 +437,10 @@ contract OrderbookDelegate2 is OrderbookData {
 					return 0;
 				}
 				else if (prevAmt - uint(-_amount) <= _minimumAmount) {
-					YTSells[currentID].amount = _minimumAmount;
+					internalYTSells[currentID].amount = _minimumAmount;
 					return int(_minimumAmount).sub(int(prevAmt));
 				}
-				YTSells[currentID].amount = prevAmt.sub(uint(-_amount));
+				internalYTSells[currentID].amount = prevAmt.sub(uint(-_amount));
 				return _amount;
 			}
 		}
@@ -490,14 +490,14 @@ contract OrderbookDelegate2 is OrderbookData {
 		bool _removeBelowMin
 	) external setRateModifier returns(int change) {
 		require(_amount != 0);
-		require(msg.sender == ZCBSells[_targetID].maker);
-		uint ratio = wrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
-		uint minimumAmount = minimumZCBLimitAmount(ZCBSells[_targetID].maturityConversionRate, ratio);
+		require(msg.sender == internalZCBSells[_targetID].maker);
+		uint ratio = internalWrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
+		uint minimumAmount = minimumZCBLimitAmount(internalZCBSells[_targetID].maturityConversionRate, ratio);
 		if (_hintID == 0) {
 			change = modifyFromHead_SellZCB(_amount, _targetID, _maxSteps, minimumAmount, _removeBelowMin);
 		}
 		else {
-			require(_targetID != headZCBSellID);
+			require(_targetID != internalHeadZCBSellID);
 			change = modifyWithHint_SellZCB(_amount, _targetID, _hintID, _maxSteps, minimumAmount, _removeBelowMin);
 		}
 		if (change > 0) {
@@ -516,14 +516,14 @@ contract OrderbookDelegate2 is OrderbookData {
 		bool _removeBelowMin
 	) external setRateModifier returns(int change) {
 		require(_amount != 0);
-		require(msg.sender == YTSells[_targetID].maker);
-		uint ratio = wrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
-		uint minimumAmount = minimumYTlimitAmount(YTSells[_targetID].maturityConversionRate, ratio);
+		require(msg.sender == internalYTSells[_targetID].maker);
+		uint ratio = internalWrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
+		uint minimumAmount = minimumYTlimitAmount(internalYTSells[_targetID].maturityConversionRate, ratio);
 		if (_hintID == 0) {
 			change = modifyFromHead_SellYT(_amount, _targetID, _maxSteps, minimumAmount, _removeBelowMin);
 		}
 		else {
-			require(_targetID != headYTSellID);
+			require(_targetID != internalHeadYTSellID);
 			change = modifyWithHint_SellYT(_amount, _targetID, _hintID, _maxSteps, minimumAmount, _removeBelowMin);
 		}
 		if (change > 0) {
@@ -547,14 +547,14 @@ contract OrderbookDelegate2 is OrderbookData {
 		@param uint8 _index: the index within the impliedRates array for which to set a value
 	*/
 	function internalSetOracleMCR(uint8 _index) internal {
-		uint YThead = headYTSellID;
+		uint YThead = internalHeadYTSellID;
 		if (YThead == 0) return;
-		uint ZCBhead = headZCBSellID;
+		uint ZCBhead = internalHeadZCBSellID;
 		if (ZCBhead == 0) return;
 
-		uint ytMCR = YTSells[YThead].maturityConversionRate;
-		uint zcbMCR = ZCBSells[ZCBhead].maturityConversionRate;
-		uint ratio = wrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
+		uint ytMCR = internalYTSells[YThead].maturityConversionRate;
+		uint zcbMCR = internalZCBSells[ZCBhead].maturityConversionRate;
+		uint ratio = internalWrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
 		ytMCR = ytMCR < ratio ? ratio : ytMCR;
 		zcbMCR = zcbMCR < ratio ? ratio : zcbMCR;
 		//take average, not as good as geometric mean scaled with ratio as 1.0, though this is more computationally efficient

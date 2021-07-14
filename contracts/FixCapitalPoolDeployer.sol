@@ -8,7 +8,7 @@ contract FixCapitalPoolDeployer {
 		@Description: deploy new FixCapitalPool contract and transfer ownership
 
 		@param address _aw: address of the wrapper for which to deploy a new fix capital pool
-		@param uint64 _maturity: the maturity of the new FixCapitalPool
+		@param uint40 _maturity: the maturity of the new FixCapitalPool
 		@param address _yieldTokenDeployer: address of a YieldTokenDeployer contract
 		@param address _owner: the address to transfer ownership of the new FixCapitalPool to
 		@param address _infoOracleAddress: the address of the FIX infoOracle, this addresss shall
@@ -18,7 +18,7 @@ contract FixCapitalPoolDeployer {
 	*/
 	function deploy(
 		address _aw,
-		uint64 _maturity,
+		uint40 _maturity,
 		address _yieldTokenDeployer,
 		address _owner,
 		address _infoOracleAddress

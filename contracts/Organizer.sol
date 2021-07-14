@@ -95,9 +95,9 @@ contract Organizer is Ownable, IOrganizer {
 		@Description: deploy a new FixCapitalPool instance, whitelist it in fixCapitalPoolToWrapper mapping
 
 		@param address _wrapperAddress: the address of the IWrapper for which to deploy the FixCapitalPool
-		@param uint64 _maturity: the maturity of the new FixCapitalPool to deploy
+		@param uint40 _maturity: the maturity of the new FixCapitalPool to deploy
 	*/
-	function deployFixCapitalPoolInstance(address _wrapperAddress, uint64 _maturity) external override {
+	function deployFixCapitalPoolInstance(address _wrapperAddress, uint40 _maturity) external override {
 		require(_maturity > block.timestamp+(1 weeks), "maturity must be at least 1 weeks away");
 		address fixCapitalPoolAddress = FixCapitalPoolDeployer(FixCapitalPoolDeployerAddress).deploy(
 			_wrapperAddress,

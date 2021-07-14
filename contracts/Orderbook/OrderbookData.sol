@@ -54,28 +54,29 @@ contract OrderbookData {
 		uint nextID;
 	}
 
-	mapping(address => uint) public YieldDeposited;
-	mapping(address => int) public BondDeposited;
+	mapping(address => uint) internal internalYieldDeposited;
+	mapping(address => int) internal internalBondDeposited;
 
 	//amount of YT that is being used as collateral for a limit order
-	mapping(address => uint) public lockedYT;
+	mapping(address => uint) internal internalLockedYT;
 
-	mapping(uint => LimitSellYT) public YTSells;
-	mapping(uint => LimitSellZCB) public ZCBSells;
+	mapping(uint => LimitSellYT) internal internalYTSells;
+	mapping(uint => LimitSellZCB) internal internalZCBSells;
 
-	uint public headYTSellID;
-	uint public headZCBSellID;
+	uint internal internalHeadYTSellID;
+	uint internal internalHeadZCBSellID;
 
 	//value of totalNumOrders at the time an order is created is its key in the order mapping
 	uint totalNumOrders;
 
-	IFixCapitalPool public FCP;
-	IWrapper public wrapper;
-	uint public maturity;
+	IFixCapitalPool public internalFCP;
+	IWrapper public internalWrapper;
+	IInfoOracle public internalIORC;
 
-	IInfoOracle public IORC;
-	uint public YieldRevenue;
-	int public BondRevenue;
+	uint40 public internalMaturity;
+
+	uint public internalYieldRevenue;
+	int public internalBondRevenue;
 
 
 	//--------------data for rate oracle---------------

@@ -3,6 +3,7 @@ pragma solidity >=0.6.8 <0.7.0;
 
 import "../interfaces/IWrapper.sol";
 import "../interfaces/IFixCapitalPool.sol";
+import "../interfaces/IOrderbookExchange.sol";
 import "../helpers/Ownable.sol";
 import "../libraries/SafeMath.sol";
 import "../libraries/SignedSafeMath.sol";
@@ -10,7 +11,7 @@ import "../libraries/ABDKMath64x64.sol";
 import "../libraries/BigMath.sol";
 import "./OrderbookData.sol";
 
-contract OrderbookExchange is OrderbookData {
+contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 
 	address immutable delegate1Address;
 	address immutable delegate2Address;
@@ -20,26 +21,26 @@ contract OrderbookExchange is OrderbookData {
 	using ABDKMath64x64 for int128;
 
 	constructor(
-		address _FCPaddress,
+		address _internalFCPaddress,
 		address _infoOracleAddress,
 		address _delegate1Address,
 		address _delegate2Address
 	) public {
-		FCP = IFixCapitalPool(_FCPaddress);
-		IORC = IInfoOracle(_infoOracleAddress);
-		wrapper = IFixCapitalPool(_FCPaddress).wrapper();
-		maturity = IFixCapitalPool(_FCPaddress).maturity();
+		internalFCP = IFixCapitalPool(_internalFCPaddress);
+		internalIORC = IInfoOracle(_infoOracleAddress);
+		internalWrapper = IFixCapitalPool(_internalFCPaddress).wrapper();
+		internalMaturity = IFixCapitalPool(_internalFCPaddress).maturity();
 		delegate1Address = _delegate1Address;
 		delegate2Address = _delegate2Address;
 	}
 
-	function deposit(uint _amountYield, int _amountBond) public {
-		FCP.transferPositionFrom(msg.sender, address(this), _amountYield, _amountBond);
-		YieldDeposited[msg.sender] += _amountYield;
-		BondDeposited[msg.sender] += _amountBond;
+	function deposit(uint _amountYield, int _amountBond) external override {
+		internalFCP.transferPositionFrom(msg.sender, address(this), _amountYield, _amountBond);
+		internalYieldDeposited[msg.sender] += _amountYield;
+		internalBondDeposited[msg.sender] += _amountBond;
 	}
 
-	function withdraw(uint _amountYield, int _amountBond) public {
+	function withdraw(uint _amountYield, int _amountBond) external override {
 		(bool success, ) = delegate1Address.delegatecall(abi.encodeWithSignature(
 			"withdraw(uint256,int256)",
 			_amountYield,
@@ -55,7 +56,7 @@ contract OrderbookExchange is OrderbookData {
 		uint _maturityConversionRate,
 		uint _hintID,
 		uint _maxSteps
-	) external {
+	) external override {
 		address _delegateAddress = delegate2Address;
 		bytes memory sig = abi.encodeWithSignature(
 			"limitSellZCB(uint256,uint256,uint256,uint256)",
@@ -82,7 +83,7 @@ contract OrderbookExchange is OrderbookData {
 		uint _maturityConversionRate,
 		uint _hintID,
 		uint _maxSteps
-	) external {
+	) external override {
 		address _delegateAddress = delegate2Address;
 		bytes memory sig = abi.encodeWithSignature(
 			"limitSellYT(uint256,uint256,uint256,uint256)",
@@ -110,7 +111,7 @@ contract OrderbookExchange is OrderbookData {
 		uint _hintID,
 		uint _maxSteps,
 		bool _removeBelowMin
-	) external returns(int change) {
+	) external override returns(int change) {
 		address _delegateAddress = delegate2Address;
 		bytes memory sig = abi.encodeWithSignature(
 			"modifyZCBLimitSell(int256,uint256,uint256,uint256,bool)",
@@ -138,7 +139,7 @@ contract OrderbookExchange is OrderbookData {
 		uint _hintID,
 		uint _maxSteps,
 		bool _removeBelowMin
-	) external returns(int change) {
+	) external override returns(int change) {
 		address _delegateAddress = delegate2Address;
 		bytes memory sig = abi.encodeWithSignature(
 			"modifyYTLimitSell(int256,uint256,uint256,uint256,bool)",
@@ -166,7 +167,7 @@ contract OrderbookExchange is OrderbookData {
 		uint _maxCumulativeMaturityConversionRate,
 		uint16 _maxIterations,
 		bool _useInternalBalances
-	) external returns (uint /*YTbought*/,uint /*ZCBsold*/) {
+	) external override returns(uint /*YTbought*/,uint /*ZCBsold*/) {
 		address _delegateAddress = delegate1Address;
 		bytes memory sig = abi.encodeWithSignature(
 			"marketBuyYT(uint256,uint256,uint256,uint16,bool)",
@@ -195,7 +196,7 @@ contract OrderbookExchange is OrderbookData {
 		uint _minCumulativeMaturityConversionRate,
 		uint16 _maxIterations,
 		bool _useInternalBalances
-	) external returns(uint /*ZCBbought*/, uint /*YTsold*/) {
+	) external override returns(uint /*ZCBbought*/, uint /*YTsold*/) {
 		address _delegateAddress = delegate1Address;
 		bytes memory sig = abi.encodeWithSignature(
 			"marketSellYT(uint256,uint256,uint256,uint16,bool)",
@@ -223,7 +224,7 @@ contract OrderbookExchange is OrderbookData {
 		uint _minCumulativeMaturityConversionRate,
 		uint16 _maxIterations,
 		bool _useInternalBalances
-	) external returns(uint /*ZCBbought*/, uint /*YTsold*/) {
+	) external override returns(uint /*ZCBbought*/, uint /*YTsold*/) {
 		address _delegateAddress = delegate1Address;
 		bytes memory sig = abi.encodeWithSignature(
 			"marketBuyZCB(uint256,uint256,uint256,uint16,bool)",
@@ -251,7 +252,7 @@ contract OrderbookExchange is OrderbookData {
 		uint _maxCumulativeMaturityConversionRate,
 		uint16 _maxIterations,
 		bool _useInternalBalances
-	) external returns(uint /*YTbought*/, uint /*ZCBsold*/) {
+	) external override returns(uint /*YTbought*/, uint /*ZCBsold*/) {
 		address _delegateAddress = delegate1Address;
 		bytes memory sig = abi.encodeWithSignature(
 			"marketSellZCB(uint256,uint256,uint256,uint16,bool)",
@@ -279,7 +280,7 @@ contract OrderbookExchange is OrderbookData {
 		uint _maxCumulativeMaturityConversionRate,
 		uint16 _maxIterations,
 		bool _useInternalBalances
-	) external returns(uint /*YTbought*/, uint /*ZCBsold*/) {
+	) external override returns(uint /*YTbought*/, uint /*ZCBsold*/) {
 		address _delegateAddress = delegate1Address;
 		bytes memory sig = abi.encodeWithSignature(
 			"marketSellZCBtoU(uint256,uint256,uint256,uint16,bool)",
@@ -307,7 +308,7 @@ contract OrderbookExchange is OrderbookData {
 		uint _minCumulativeMaturityConversionRate,
 		uint16 _maxIterations,
 		bool _useInternalBalances
-	) external returns(uint /*ZCBbought*/, uint /*YTsold*/) {
+	) external override returns(uint /*ZCBbought*/, uint /*YTsold*/) {
 		address _delegateAddress = delegate1Address;
 		bytes memory sig = abi.encodeWithSignature(
 			"marketSellUnitYTtoU(uint256,uint256,uint256,uint16,bool)",
@@ -334,8 +335,23 @@ contract OrderbookExchange is OrderbookData {
 	/*
 		@Description: force the rate oracle to record a new datapoint
 	*/
-	function forceRateDataUpdate() external {
+	function forceRateDataUpdate() external override {
 		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature("forceRateDataUpdate()"));
+		require(success);
+	}
+
+	/*
+		@Description: set the median of all datapoints in the impliedRates array as the
+			oracle rate, may only be called after all datapoints have been updated since
+			last call to this function
+
+		@param uint _MCR: the median of all MCR datapoints
+	*/
+	function setOracleMCR(uint _MCR) external override {
+		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
+			"setOracleMCR(uint256)",
+			_MCR
+		));
 		require(success);
 	}
 
@@ -344,8 +360,8 @@ contract OrderbookExchange is OrderbookData {
 
 		@return uint yieldToMaturity: the multiplier by which the market anticipates the conversionRate to increase by up to maturity
 	*/
-	function impliedYieldToMaturity() external view returns (uint yieldToMaturity) {
-		uint ratio = wrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
+	function impliedYieldToMaturity() external view override returns (uint yieldToMaturity) {
+		uint ratio = internalWrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
 		uint _oracleMCR = OracleMCR;
 		return ratio < _oracleMCR ? _oracleMCR.mul(1 ether).div(ratio) : (1 ether);
 	}
@@ -355,9 +371,9 @@ contract OrderbookExchange is OrderbookData {
 
 		@return int128 APY: the implied APY of this amm in ABDK64.64 format
 	*/
-	function getAPYFromOracle() external view returns (int128 APY) {
+	function getAPYFromOracle() external view override returns (int128 APY) {
 		uint _oracleMCR = OracleMCR;
-		uint ratio = wrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
+		uint ratio = internalWrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
 		if (ratio >= _oracleMCR) {
 			return ABDK_1;
 		}
@@ -367,7 +383,7 @@ contract OrderbookExchange is OrderbookData {
 			APY == exp2 ( log 2 ( (MCR/ratio)**(1/yearsRemaining) ))
 			APY == exp2 ( (1/yearsRemaining) * log 2 (MCR/ratio))
 		*/
-		int128 yearsRemaining = int128((maturity.sub(wrapper.lastUpdate()) << 64) / SecondsPerYear);
+		int128 yearsRemaining = int128((uint(internalMaturity).sub(internalWrapper.lastUpdate()) << 64) / SecondsPerYear);
 		uint base = _oracleMCR.mul(1 << 64).div(ratio);
 		require(base <= uint(type(int128).max));
 		int128 exp = ABDK_1.div(yearsRemaining);
@@ -377,14 +393,14 @@ contract OrderbookExchange is OrderbookData {
 	/*
 		@Description: get the implied MCR from the rate oracle
 	*/
-	function getImpliedMCRFromOracle() external view returns(uint impliedMCR) {
+	function getImpliedMCRFromOracle() external view override returns(uint impliedMCR) {
 		impliedMCR = OracleMCR;
 	}
 
 	/*
 		@Description: get all rate datapoints and information about the state of the rate oracle
 	*/
-	function getOracleData() external view returns (
+	function getOracleData() external view override returns (
 		uint[LENGTH_RATE_SERIES] memory _impliedMCRs,
 		uint _lastDatapointCollection,
 		uint _oracleMCR,
@@ -396,21 +412,6 @@ contract OrderbookExchange is OrderbookData {
 		_toSet = toSet;
 	}
 
-	/*
-		@Description: set the median of all datapoints in the impliedRates array as the
-			oracle rate, may only be called after all datapoints have been updated since
-			last call to this function
-
-		@param uint _MCR: the median of all MCR datapoints
-	*/
-	function setOracleMCR(uint _MCR) external {
-		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
-			"setOracleMCR(uint256)",
-			_MCR
-		));
-		require(success);
-	}
-
 	//-----------------admin-------------------------
 
 	/*
@@ -419,7 +420,7 @@ contract OrderbookExchange is OrderbookData {
 			would be valued at using the MCR of that order
 	*/
 	function setMinimumOrderSize(uint _minimumOrderSize) external {
-		require(msg.sender == Ownable(address(FCP)).owner());
+		require(msg.sender == Ownable(address(internalFCP)).owner());
 		minimumOrderSize = _minimumOrderSize;
 	}
 
@@ -430,4 +431,77 @@ contract OrderbookExchange is OrderbookData {
 	function getMinimumOrderSize() external view returns(uint) {
 		return minimumOrderSize;
 	}
+
+	//-----------------VIEWS-----------------
+
+	function YieldDeposited(address _depositor) external view override returns(uint) {
+		return internalYieldDeposited[_depositor];
+	}
+
+	function BondDeposited(address _depositor) external view override returns(int) {
+		return internalBondDeposited[_depositor];
+	}
+
+	function lockedYT(address _depositor) external view override returns(uint) {
+		return internalLockedYT[_depositor];
+	}
+
+	function YTSells(uint _ID) external view override returns(
+		address maker,
+		uint amount,
+		uint maturityConversionRate,
+		uint nextID
+	) {
+		LimitSellYT memory order = internalYTSells[_ID];
+		maker = order.maker;
+		amount = order.amount;
+		maturityConversionRate = order.maturityConversionRate;
+		nextID = order.nextID;
+	}
+
+	function ZCBSells(uint _ID) external view override returns(
+		address maker,
+		uint amount,
+		uint maturityConversionRate,
+		uint nextID
+	) {
+		LimitSellZCB memory order = internalZCBSells[_ID];
+		maker = order.maker;
+		amount = order.amount;
+		maturityConversionRate = order.maturityConversionRate;
+		nextID = order.nextID;
+	}
+
+	function headYTSellID() external view override returns(uint ID) {
+		ID = internalHeadYTSellID;
+	}
+
+	function headZCBSellID() external view override returns(uint ID) {
+		ID = internalHeadZCBSellID;
+	}
+
+	function FCP() external view override returns(IFixCapitalPool) {
+		return internalFCP;
+	}
+
+	function IORC() external view override returns(IInfoOracle) {
+		return internalIORC;
+	}
+
+	function wrapper() external view override returns(IWrapper) {
+		return internalWrapper;
+	}
+
+	function maturity() external view override returns(uint40) {
+		return internalMaturity;
+	}
+
+	function YieldRevenue() external view override returns(uint) {
+		return internalYieldRevenue;
+	}
+
+	function BondRevenue() external view override returns(int) {
+		return internalBondRevenue;
+	}
+
 }

@@ -6,10 +6,10 @@ import "./NGBwrapper.sol";
 contract NGBwrapperDeployer {
 
 	constructor(address _infoOracleAddress) public {
-		infoOracleAddress = _infoOracleAddress;
+		internalInfoOracleAddress = _infoOracleAddress;
 	}
 
-	address infoOracleAddress;
+	address internalInfoOracleAddress;
 	/*
 		100 sbps (super basis points) is 1 bip (basis point)
 		1.0 == 100% == 10_000 bips == 1_000_000 sbps
@@ -21,7 +21,7 @@ contract NGBwrapperDeployer {
 	uint32 private constant DEFAULT_SBPS_RETAINED = 999_000;
 
 	function deploy(address _underlyingAssetAddress, address _owner) external returns(address ret) {
-		ret = address(new NGBwrapper(_underlyingAssetAddress, infoOracleAddress, DEFAULT_SBPS_RETAINED));
+		ret = address(new NGBwrapper(_underlyingAssetAddress, internalInfoOracleAddress, DEFAULT_SBPS_RETAINED));
 		Ownable(ret).transferOwnership(_owner);
 	}
 

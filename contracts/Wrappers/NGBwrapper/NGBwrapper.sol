@@ -8,6 +8,7 @@ import "../../libraries/ABDKMath64x64.sol";
 import "../../libraries/BigMath.sol";
 import "../../helpers/nonReentrant.sol";
 import "../../helpers/Ownable.sol";
+import "./NGBwrapperData.sol";
 
 /*
 	Native Growing Balance Wrapper
@@ -16,50 +17,9 @@ import "../../helpers/Ownable.sol";
 
 	The balances of the underlying asset automatically grow as yield is generated
 */
-contract NGBwrapper is INGBWrapper, nonReentrant, Ownable {
+contract NGBwrapper is INGBWrapper, NGBwrapperData {
 	using SafeMath for uint;
 	using ABDKMath64x64 for int128;
-
-    bytes32 constant CALLBACK_SUCCESS = keccak256("ERC3156FlashBorrower.onFlashLoan");
-    uint256 public override flashLoanFee = 1000; // denominated in super bips
-
-	//SBPS == super bips == 1/100th of a bip
-	//100 * 10_000 == 1_000_000
-	uint32 private constant totalSBPS = 1_000_000;
-
-	//totalSBPS - annualTreasuryFee(in sbps)
-	uint32 private SBPSRetained = 999_000;
-
-	//minimum amount of interest on each harvest that should be retained for holders
-	//of this token.
-	//800_000 sbps == 8_000 bips == 80%
-	//ex. if 1000 units of interest are generated between harvests then 800 units
-	//is the minimum amount that must be retained for tokens holders thus the
-	//maximum amount that may go to the treasury is 200 units
-	uint32 private constant minHarvestRetention = 800_000;
-
-	uint private constant ABDK_1 = 1 << 64;
-
-	int128 private constant MAX = 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
-
-	address public override underlyingAssetAddress;
-
-	bool public constant override underlyingIsStatic = false;
-
-	//amount of unit amount equivalent to (1 ether) of wrapped amount at lastHarvest
-	uint public override prevRatio;
-
-	uint8 public immutable override decimals;
-
-	address public immutable override infoOracleAddress;
-
-	//most recent timestamp at which harvestToTreasury() was called
-	uint public override lastHarvest;
-
-	uint8 private constant NUM_REWARD_ASSETS = 7;
-	address[NUM_REWARD_ASSETS] public rewardsAddr;
-	uint[NUM_REWARD_ASSETS] public totalDividendsPaidPerWasset;
-	mapping(address => uint[NUM_REWARD_ASSETS]) prevTotalRewardsPerWasset;
 
 	modifier claimRewards(address _addr) {
 		for (uint8 i = 0; i < NUM_REWARD_ASSETS; i++) {
@@ -68,7 +28,7 @@ contract NGBwrapper is INGBWrapper, nonReentrant, Ownable {
 				_;
 				return;
 			}
-			uint _totalSupply = totalSupply;
+			uint _totalSupply = internalTotalSupply;
 			uint CBRA = IERC20(_rewardsAddr).balanceOf(_rewardsAddr); //contract balance rewards asset
 			uint TDPW = totalDividendsPaidPerWasset[i]; //total dividends paid per wasset since contract inception
 			uint CBRAPWA = CBRA.mul(1 ether).div(_totalSupply); //contract balance rewards asset per wasset
@@ -77,7 +37,7 @@ contract NGBwrapper is INGBWrapper, nonReentrant, Ownable {
 			uint prevTRPW = prevTotalRewardsPerWasset[_addr][i];
 			if (prevTRPW < TRPW) {
 				uint RPW = TRPW - prevTRPW; //rewards per wasset
-				uint dividend = RPW.mul(balanceOf[_addr]) / (1 ether); //dividend to be paid to _addr
+				uint dividend = RPW.mul(internalBalanceOf[_addr]) / (1 ether); //dividend to be paid to _addr
 				uint additionalDPW = dividend.mul(1 ether).div(_totalSupply).add(1); //add 1 to avoid rounding errors
 				IERC20(_rewardsAddr).transfer(_addr, dividend);
 				totalDividendsPaidPerWasset[i] = TDPW.add(additionalDPW);
@@ -94,7 +54,7 @@ contract NGBwrapper is INGBWrapper, nonReentrant, Ownable {
 				_;
 				return;
 			}
-			uint _totalSupply = totalSupply;
+			uint _totalSupply = internalTotalSupply;
 			uint CBRA = IERC20(_rewardsAddr).balanceOf(_rewardsAddr); //contract balance rewards asset
 			uint TDPW = totalDividendsPaidPerWasset[i]; //total dividends paid per wasset since contract inception
 			uint CBRAPWA = CBRA.mul(1 ether).div(_totalSupply); //contract balance rewards asset per wasset
@@ -104,7 +64,7 @@ contract NGBwrapper is INGBWrapper, nonReentrant, Ownable {
 			uint nextTDPW = TDPW;
 			if (prevTRPW < TRPW) {
 				uint RPW = TRPW - prevTRPW; //rewards per wasset
-				uint dividend = RPW.mul(balanceOf[_addr0]);
+				uint dividend = RPW.mul(internalBalanceOf[_addr0]);
 				dividend = dividend / (1 ether); //dividend to be paid to _addr
 				uint additionalDPW = dividend.mul(1 ether).div(_totalSupply).add(1); //add 1 to avoid rounding errors
 				IERC20(_rewardsAddr).transfer(_addr0, dividend);
@@ -115,7 +75,7 @@ contract NGBwrapper is INGBWrapper, nonReentrant, Ownable {
 			prevTRPW = prevTotalRewardsPerWasset[_addr1][i];
 			if (prevTRPW < TRPW) {
 				uint RPW = TRPW - prevTRPW; //rewards per wasset
-				uint dividend = RPW.mul(balanceOf[_addr1]);
+				uint dividend = RPW.mul(internalBalanceOf[_addr1]);
 				dividend = dividend / (1 ether); //dividend to be paid to _addr
 				uint additionalDPW = dividend.mul(1 ether).div(_totalSupply).add(1); //add 1 to avoid rounding errors
 				IERC20(_rewardsAddr).transfer(_addr1, dividend);
@@ -134,16 +94,16 @@ contract NGBwrapper is INGBWrapper, nonReentrant, Ownable {
 	*/
 	constructor (address _underlyingAssetAddress, address _infoOralceAddress, uint32 _SBPSRetained) public {
 		require(_SBPSRetained > 0 && _SBPSRetained <= totalSBPS);
-		underlyingAssetAddress = _underlyingAssetAddress;
-		decimals = IERC20(_underlyingAssetAddress).decimals();
-		name = string(abi.encodePacked('wrapped ',IERC20(_underlyingAssetAddress).name()));
-		symbol = string(abi.encodePacked('w', IERC20(_underlyingAssetAddress).symbol()));
-		infoOracleAddress = _infoOralceAddress;
+		internalUnderlyingAssetAddress = _underlyingAssetAddress;
+		internalDecimals = IERC20(_underlyingAssetAddress).decimals();
+		internalName = string(abi.encodePacked('wrapped ',IERC20(_underlyingAssetAddress).name()));
+		internalSymbol = string(abi.encodePacked('w', IERC20(_underlyingAssetAddress).symbol()));
+		internalInfoOracleAddress = _infoOralceAddress;
 		SBPSRetained = _SBPSRetained;
 	}
 
 	/*
-		@Description: make first deposit into contract, totalSupply must == 0
+		@Description: make first deposit into contract, internalTotalSupply must == 0
 		
 		@param address _to: the address that shall receive the newly minted wrapped tokens
 		@param uint _amountUnit: the amount of underlying asset units to deposit
@@ -151,14 +111,14 @@ contract NGBwrapper is INGBWrapper, nonReentrant, Ownable {
 		@return uint _amountWrappedToken: the amount of wrapped tokens that were minted
 	*/
 	function firstDeposit(address _to, uint _amountUnit) internal returns (uint _amountWrappedToken) {
-		IERC20 _aToken = IERC20(underlyingAssetAddress);
+		IERC20 _aToken = IERC20(internalUnderlyingAssetAddress);
 		bool success = _aToken.transferFrom(msg.sender, address(this), _amountUnit);
 		require(success);
-		balanceOf[_to] = _amountUnit;
-		totalSupply = _amountUnit;
+		internalBalanceOf[_to] = _amountUnit;
+		internalTotalSupply = _amountUnit;
 		_amountWrappedToken = _amountUnit;
-		lastHarvest = block.timestamp;
-		prevRatio = 1 ether;
+		internalLastHarvest = block.timestamp;
+		internalPrevRatio = 1 ether;
 	}
 
 	/*
@@ -170,18 +130,18 @@ contract NGBwrapper is INGBWrapper, nonReentrant, Ownable {
 		@return uint _amountWrappedToken: the amount of wrapped tokens that were minted
 	*/
 	function deposit(address _to, uint _amountUnit) internal returns (uint _amountWrappedToken) {
-		uint _totalSupply = totalSupply;
+		uint _totalSupply = internalTotalSupply;
 		if (_totalSupply == 0) {
 			return firstDeposit(_to, _amountUnit);
 		}
 		harvestToTreasury();
-		IERC20 _aToken = IERC20(underlyingAssetAddress);
+		IERC20 _aToken = IERC20(internalUnderlyingAssetAddress);
 		uint contractBalance = _aToken.balanceOf(address(this));
 		bool success = _aToken.transferFrom(msg.sender, address(this), _amountUnit);
 		require(success);
-		_amountWrappedToken = totalSupply*_amountUnit/contractBalance;
-		balanceOf[_to] += _amountWrappedToken;
-		totalSupply += _amountWrappedToken;
+		_amountWrappedToken = internalTotalSupply*_amountUnit/contractBalance;
+		internalBalanceOf[_to] += _amountWrappedToken;
+		internalTotalSupply += _amountWrappedToken;
 	}
 
 	/*
@@ -220,9 +180,9 @@ contract NGBwrapper is INGBWrapper, nonReentrant, Ownable {
 		@Description: get the ratio of underlyingAsset / wrappedAsset
 	*/
 	function getRatio() internal view returns (uint) {
-		uint _totalSupply = totalSupply;	
-		uint _prevRatio = prevRatio;
-		uint contractBalance = IERC20(underlyingAssetAddress).balanceOf(address(this));
+		uint _totalSupply = internalTotalSupply;	
+		uint _prevRatio = internalPrevRatio;
+		uint contractBalance = IERC20(internalUnderlyingAssetAddress).balanceOf(address(this));
 		uint nonFeeAdjustedRatio = uint(1 ether).mul(contractBalance).div(_totalSupply);
 		//handle odd case, most likely only caused by rounding error (off by 1)
 		if (nonFeeAdjustedRatio <= _prevRatio) {
@@ -258,19 +218,19 @@ contract NGBwrapper is INGBWrapper, nonReentrant, Ownable {
 			generated since the last harvest
 	*/
 	function harvestToTreasury() internal {
-		uint _lastHarvest = lastHarvest;
+		uint _lastHarvest = internalLastHarvest;
 		if (block.timestamp == _lastHarvest) {
 			return;
 		}
-		uint contractBalance = IERC20(underlyingAssetAddress).balanceOf(address(this));
-		uint prevTotalSupply = totalSupply;
-		uint _prevRatio = prevRatio;
+		uint contractBalance = IERC20(internalUnderlyingAssetAddress).balanceOf(address(this));
+		uint prevTotalSupply = internalTotalSupply;
+		uint _prevRatio = internalPrevRatio;
 		//time in years
 		/*
 			nextBalance = contractBalance * ((totalBips-bipsToTreasury)/totalBips)**t
-			prevTotalSupply*contractBalance/totalSupply = contractBalance * ((totalBips-bipsToTreasury)/totalBips)**t
-			prevTotalSupply/totalSupply = ((totalBips-bipsToTreasury)/totalBips)**t
-			totalSupply = prevTotalSupply*((totalBips-bipsToTreasury)/totalBips)**(-t)
+			prevTotalSupply*contractBalance/internalTotalSupply = contractBalance * ((totalBips-bipsToTreasury)/totalBips)**t
+			prevTotalSupply/internalTotalSupply = ((totalBips-bipsToTreasury)/totalBips)**t
+			internalTotalSupply = prevTotalSupply*((totalBips-bipsToTreasury)/totalBips)**(-t)
 		*/
 		uint effectiveRatio = uint(1 ether).mul(contractBalance);
 		uint nonFeeAdjustedRatio = effectiveRatio.div(prevTotalSupply);
@@ -281,25 +241,25 @@ contract NGBwrapper is INGBWrapper, nonReentrant, Ownable {
 		uint minNewRatio = (nonFeeAdjustedRatio - _prevRatio).mul(minHarvestRetention).div(totalSBPS).add(_prevRatio);
 		int128 time = int128(((block.timestamp - _lastHarvest) << 64)/ BigMath.SecondsPerYear);
 		uint term = uint(BigMath.Pow(int128((uint(SBPSRetained) << 64) / totalSBPS), time.neg()));
-		uint newTotalSupply = prevTotalSupply.mul(term) / ABDK_1;
+		uint newTotalSupply = prevTotalSupply.mul(term) >> 64;
 		effectiveRatio = effectiveRatio.div(newTotalSupply);
 		if (effectiveRatio < minNewRatio) {
 			/*
-				ratio == contractBalance/totalSupply
-				totalSupply == contractBalance/ratio
+				ratio == contractBalance/internalTotalSupply
+				internalTotalSupply == contractBalance/ratio
 			*/
 			newTotalSupply = contractBalance.mul(1 ether).div(minNewRatio);
-			prevRatio = minNewRatio;
+			internalPrevRatio = minNewRatio;
 		}
 		else {
-			prevRatio = effectiveRatio;
+			internalPrevRatio = effectiveRatio;
 		}
-		lastHarvest = block.timestamp;
+		internalLastHarvest = block.timestamp;
 		uint dividend = newTotalSupply.sub(prevTotalSupply);
-		address sendTo = IInfoOracle(infoOracleAddress).sendTo();
-		balanceOf[sendTo] += dividend >> 1;
-		balanceOf[owner] += dividend - (dividend >> 1);
-		totalSupply = newTotalSupply;
+		address sendTo = IInfoOracle(internalInfoOracleAddress).sendTo();
+		internalBalanceOf[sendTo] += dividend >> 1;
+		internalBalanceOf[owner] += dividend - (dividend >> 1);
+		internalTotalSupply = newTotalSupply;
 	}
 
 	/*
@@ -319,14 +279,14 @@ contract NGBwrapper is INGBWrapper, nonReentrant, Ownable {
 	*/
 	function withdrawUnitAmount(address _to, uint _amountUnit) public override returns (uint _amountWrappedToken) {
 		harvestToTreasury();
-		IERC20 _aToken = IERC20(underlyingAssetAddress);
+		IERC20 _aToken = IERC20(internalUnderlyingAssetAddress);
 		uint contractBalance = _aToken.balanceOf(address(this));
-		//_amountWrappedToken == ceil(totalSupply*_amountUnit/contractBalance)
-		_amountWrappedToken = totalSupply*_amountUnit;
+		//_amountWrappedToken == ceil(internalTotalSupply*_amountUnit/contractBalance)
+		_amountWrappedToken = internalTotalSupply*_amountUnit;
 		_amountWrappedToken = (_amountWrappedToken%contractBalance == 0 ? 0 : 1) + (_amountWrappedToken/contractBalance);
-		require(balanceOf[msg.sender] >= _amountWrappedToken);
-		balanceOf[msg.sender] -= _amountWrappedToken;
-		totalSupply -= _amountWrappedToken;
+		require(internalBalanceOf[msg.sender] >= _amountWrappedToken);
+		internalBalanceOf[msg.sender] -= _amountWrappedToken;
+		internalTotalSupply -= _amountWrappedToken;
 		_aToken.transfer(_to, _amountUnit);
 	}
 
@@ -339,13 +299,13 @@ contract NGBwrapper is INGBWrapper, nonReentrant, Ownable {
 		@return uint _amountUnit: the amount of underlying asset received
 	*/
 	function withdrawWrappedAmount(address _to, uint _amountWrappedToken) public override returns (uint _amountUnit) {
-		require(balanceOf[msg.sender] >= _amountWrappedToken);
+		require(internalBalanceOf[msg.sender] >= _amountWrappedToken);
 		harvestToTreasury();
-		IERC20 _aToken = IERC20(underlyingAssetAddress);
+		IERC20 _aToken = IERC20(internalUnderlyingAssetAddress);
 		uint contractBalance = _aToken.balanceOf(address(this));
-		_amountUnit = contractBalance*_amountWrappedToken/totalSupply;
-		balanceOf[msg.sender] -= _amountWrappedToken;
-		totalSupply -= _amountWrappedToken;
+		_amountUnit = contractBalance*_amountWrappedToken/internalTotalSupply;
+		internalBalanceOf[msg.sender] -= _amountWrappedToken;
+		internalTotalSupply -= _amountWrappedToken;
 		_aToken.transfer(_to, _amountUnit);
 	}
 
@@ -418,20 +378,13 @@ contract NGBwrapper is INGBWrapper, nonReentrant, Ownable {
 
 
 	//---------------------------------------------------i-m-p-l-e-m-e-n-t-s---E-R-C-2-0---------------------------
-	uint public override totalSupply;
-
-	mapping(address => uint) public override balanceOf;
-    mapping(address => mapping(address => uint256)) public override allowance;
-
-    string public override name;
-    string public override symbol;
 
 
     function transfer(address _to, uint256 _value) public doubleClaimReward(_to, msg.sender) override returns (bool success) {
-        require(_value <= balanceOf[msg.sender]);
+        require(_value <= internalBalanceOf[msg.sender]);
 
-        balanceOf[msg.sender] -= _value;
-        balanceOf[_to] += _value;
+        internalBalanceOf[msg.sender] -= _value;
+        internalBalanceOf[_to] += _value;
 
         emit Transfer(msg.sender, _to, _value);
 
@@ -439,7 +392,7 @@ contract NGBwrapper is INGBWrapper, nonReentrant, Ownable {
     }
 
     function approve(address _spender, uint256 _value) public override returns (bool success) {
-        allowance[msg.sender][_spender] = _value;
+        internalAllowance[msg.sender][_spender] = _value;
 
         emit Approval(msg.sender, _spender, _value);
 
@@ -447,13 +400,13 @@ contract NGBwrapper is INGBWrapper, nonReentrant, Ownable {
     }
 
     function transferFrom(address _from, address _to, uint256 _value) public doubleClaimReward(_to, _from) override returns (bool success) {
-        require(_value <= allowance[_from][msg.sender]);
-    	require(_value <= balanceOf[_from]);
+        require(_value <= internalAllowance[_from][msg.sender]);
+    	require(_value <= internalBalanceOf[_from]);
 
-    	balanceOf[_from] -= _value;
-    	balanceOf[_to] += _value;
+    	internalBalanceOf[_from] -= _value;
+    	internalBalanceOf[_to] += _value;
 
-        allowance[_from][msg.sender] -= _value;
+        internalAllowance[_from][msg.sender] -= _value;
 
         emit Transfer(_from, _to, _value);
 
@@ -467,8 +420,8 @@ contract NGBwrapper is INGBWrapper, nonReentrant, Ownable {
         address token
     ) external view override returns (uint256) {
     	require(token == address(this));
-    	uint _flashLoanFee = flashLoanFee;
-    	return (uint256(-1) - totalSupply).div(_flashLoanFee == 0 ? 1 : _flashLoanFee);
+    	uint _flashLoanFee = internalFlashLoanFee;
+    	return (uint256(-1) - internalTotalSupply).div(_flashLoanFee == 0 ? 1 : _flashLoanFee);
     }
 
     function flashFee(
@@ -476,7 +429,7 @@ contract NGBwrapper is INGBWrapper, nonReentrant, Ownable {
         uint256 amount
     ) external view override returns (uint256) {
     	require(token == address(this));
-    	return amount.mul(flashLoanFee) / totalSBPS;
+    	return amount.mul(internalFlashLoanFee) / totalSBPS;
     }
 
     function flashLoan(
@@ -486,26 +439,73 @@ contract NGBwrapper is INGBWrapper, nonReentrant, Ownable {
         bytes calldata data
     ) external override noReentry returns (bool) {
     	require(token == address(this));
-    	require(amount + totalSupply <= uint256(-1));
-    	uint _flashLoanFee = flashLoanFee;
-    	require(amount <= (uint256(-1) - totalSupply) / (_flashLoanFee == 0 ? 1 : _flashLoanFee));
-    	uint fee = amount.mul(flashLoanFee) / totalSBPS;
-    	balanceOf[msg.sender] += amount;
-        uint256 _allowance = allowance[address(receiver)][address(this)];
+    	require(amount + internalTotalSupply <= uint256(-1));
+    	uint _flashLoanFee = internalFlashLoanFee;
+    	require(amount <= (uint256(-1) - internalTotalSupply) / (_flashLoanFee == 0 ? 1 : _flashLoanFee));
+    	uint fee = amount.mul(_flashLoanFee) / totalSBPS;
+    	internalBalanceOf[msg.sender] += amount;
+        uint256 _allowance = internalAllowance[address(receiver)][address(this)];
         require(
             _allowance >= (amount + fee),
             "FlashMinter: Repay not approved"
         );
-        allowance[address(receiver)][address(this)] = _allowance - (amount + fee);
+        internalAllowance[address(receiver)][address(this)] = _allowance - (amount + fee);
     	bytes32 out = receiver.onFlashLoan(msg.sender, token, amount, fee, data);
     	require(CALLBACK_SUCCESS == out);
-        uint balance = balanceOf[address(receiver)];
+        uint balance = internalBalanceOf[address(receiver)];
         require(balance >= (amount + fee));
-        balanceOf[address(receiver)] = balance - (amount + fee);
-        totalSupply = totalSupply.sub(fee);
+        internalBalanceOf[address(receiver)] = balance - (amount + fee);
+        internalTotalSupply = internalTotalSupply.sub(fee);
         return true;
     }
 
+    //------------------------v-i-e-w-s---------------------------
+
+	bool public constant override underlyingIsStatic = false;
+
+	function flashLoanFee() external view override returns(uint256) {
+		return internalFlashLoanFee;
+	}
+
+	function prevRatio() external view override returns(uint) {
+		return internalPrevRatio;
+	}
+
+	function lastHarvest() external view override returns(uint) {
+		return internalLastHarvest;
+	}
+
+	function underlyingAssetAddress() external view override returns(address) {
+		return internalUnderlyingAssetAddress;
+	}
+
+	function infoOracleAddress() external view override returns(address) {
+		return internalInfoOracleAddress;
+	}
+
+    function totalSupply() external view override returns (uint supply) {
+    	return internalTotalSupply;
+    }
+
+    function balanceOf(address _owner) external view override returns (uint balance) {
+    	return internalBalanceOf[_owner];
+    }
+
+    function allowance(address _owner, address _spender) external view override returns (uint remaining) {
+    	return internalAllowance[_owner][_spender];
+    }
+
+    function decimals() external view override returns(uint8 digits) {
+    	return internalDecimals;
+    }
+
+    function name() external view override returns (string memory _name) {
+    	return internalName;
+    }
+
+    function symbol() external view override returns (string memory _symbol) {
+    	return internalSymbol;
+    }
 
     //------------------------------------a-d-m-i-n----------------------------
 
@@ -528,7 +528,7 @@ contract NGBwrapper is INGBWrapper, nonReentrant, Ownable {
 		@param uint _flashLoanFee: the new fee percentage denominated in superbips which is to be applied to flashloans
     */
     function setFlashLoanFee(uint _flashLoanFee) external onlyOwner {
-    	flashLoanFee = _flashLoanFee;
+    	internalFlashLoanFee = _flashLoanFee;
     }
 
     /*
@@ -573,7 +573,7 @@ contract NGBwrapper is INGBWrapper, nonReentrant, Ownable {
 		}
 		if (success) {
 			IERC20(prevRewardAsset).transfer(msg.sender, bal >> 1);
-			address sendTo = IInfoOracle(infoOracleAddress).sendTo();
+			address sendTo = IInfoOracle(internalInfoOracleAddress).sendTo();
 			IERC20(prevRewardAsset).transfer(sendTo, bal >> 1);
 		}
     	//collect and distribute current balance

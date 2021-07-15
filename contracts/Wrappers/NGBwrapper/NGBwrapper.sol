@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.6.8 <0.7.0;
-import "../interfaces/IERC20.sol";
-import "../interfaces/INGBWrapper.sol";
-import "../interfaces/IInfoOracle.sol";
-import "../libraries/SafeMath.sol";
-import "../libraries/ABDKMath64x64.sol";
-import "../libraries/BigMath.sol";
-import "../helpers/nonReentrant.sol";
-import "../helpers/Ownable.sol";
+import "../../interfaces/IERC20.sol";
+import "../../interfaces/INGBWrapper.sol";
+import "../../interfaces/IInfoOracle.sol";
+import "../../libraries/SafeMath.sol";
+import "../../libraries/ABDKMath64x64.sol";
+import "../../libraries/BigMath.sol";
+import "../../helpers/nonReentrant.sol";
+import "../../helpers/Ownable.sol";
 
 /*
 	Native Growing Balance Wrapper

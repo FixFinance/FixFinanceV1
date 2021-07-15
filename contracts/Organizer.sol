@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.6.8 <0.7.0;
 import "./interfaces/IOrganizer.sol";
-import "./Wrappers/NGBwrapper.sol";
-import "./Wrappers/NGBwrapperDeployer.sol";
+import "./Wrappers/NGBwrapper/NGBwrapperDeployer.sol";
 import "./FixCapitalPool.sol";
 import "./amm/ZCBamm/ZCBammDeployer.sol";
 import "./amm/YTamm/YTammDeployer.sol";

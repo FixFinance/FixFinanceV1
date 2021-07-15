@@ -4,6 +4,7 @@ const NGBwrapper = artifacts.require('NGBwrapper');
 const FixCapitalPool = artifacts.require('FixCapitalPool');
 const YieldToken = artifacts.require('YieldToken');
 const zcbYtDeployer = artifacts.require('ZCB_YT_Deployer');
+const NGBwrapperDeployer = artifacts.require('NGBwrapperDeployer');
 const organizer = artifacts.require('Organizer');
 const IERC20 = artifacts.require("IERC20");
 const BigMath = artifacts.require("BigMath");
@@ -45,7 +46,9 @@ contract('Organizer', function(accounts) {
 		swapRouterDelegateInstance = await SwapRouterDelegate.new();
 		swapRouterDeployerInstance = await SwapRouterDeployer.new(swapRouterDelegateInstance.address);
 		infoOracleInstance = await InfoOracle.new("0", nullAddress);
+		NGBwrapperDeployerInstance = await NGBwrapperDeployer.new(infoOracleInstance.address);
 		organizerInstance = await organizer.new(
+			NGBwrapperDeployerInstance.address,
 			zcbYtDeployerInstance.address,
 			fixCapitalPoolDeployerInstance.address,
 			ZCBammDeployerInstance.address,

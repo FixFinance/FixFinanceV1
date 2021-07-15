@@ -530,14 +530,9 @@ contract NGBwrapper is INGBWrapper, nonReentrant, Ownable {
     function setFlashLoanFee(uint _flashLoanFee) external onlyOwner {
     	flashLoanFee = _flashLoanFee;
     }
-/*
-	uint8 private constant NUM_REWARD_ASSETS = 7;
-	address[NUM_REWARD_ASSETS] public rewardsAddr;
-	uint[NUM_REWARD_ASSETS] public totalDividendsPaidPerWasset;
-	mapping(address => uint[NUM_REWARD_ASSETS]) prevTotalRewardsPerWasset;
-*/
+
     /*
-		@Description: add an asset for which wrapped asset holders rewards
+		@Description: add an asset for which wrapped asset holders will earn LM rewards
 
 		@param address _rewardsAsset: the new asset for which to start distribution of LM rewards
 		@param uint8 _index: the index within the rewardsAddr array where the new rewards asset will be

@@ -2,6 +2,7 @@
 pragma solidity >=0.6.8 <0.7.0;
 import "./interfaces/IOrganizer.sol";
 import "./Wrappers/NGBwrapper.sol";
+import "./Wrappers/NGBwrapperDeployer.sol";
 import "./FixCapitalPool.sol";
 import "./amm/ZCBamm/ZCBammDeployer.sol";
 import "./amm/YTamm/YTammDeployer.sol";
@@ -12,16 +13,6 @@ import "./helpers/Ownable.sol";
 import "./InfoOracle.sol";
 
 contract Organizer is Ownable, IOrganizer {
-
-	/*
-		100 sbps (super basis points) is 1 bip (basis point)
-		1.0 == 100% == 10_000 bips == 1_000_000 sbps
-
-		DEFAULT_SBPS_RETAINED represents the default value (in super basis points) of
-		1.0 - annualWrapperFee
-		if SBPSRetained == 999_000 == 1_000_000 - 1000, the annual wrapper fee is 1000sbps or 0.1%
-	*/
-	uint32 private constant DEFAULT_SBPS_RETAINED = 999_000;
 
 	event WrapperDeployment(
 		address wrapperAddress,
@@ -42,6 +33,7 @@ contract Organizer is Ownable, IOrganizer {
 	//IWrapper => isVerified
 	mapping(address => bool) public override wrapperIsVerified;
 
+	address public override NGBwrapperDeployerAddress;
 	address public override ZCB_YT_DeployerAddress;
 	address public override FixCapitalPoolDeployerAddress;
 	address public override ZCBammDeployerAddress;
@@ -55,6 +47,7 @@ contract Organizer is Ownable, IOrganizer {
 		init
 	*/
 	constructor (
+		address _NGBwrapperDeployerAddress,
 		address _ZCB_YT_DeployerAddress,
 		address _fixCapitalPoolDeployerAddress,
 		address _ZCBammDeployerAddress,
@@ -62,6 +55,7 @@ contract Organizer is Ownable, IOrganizer {
 		address _SwapRouterDeployerAddress,
 		address _InfoOracleAddress
 	) public {
+		NGBwrapperDeployerAddress = _NGBwrapperDeployerAddress;
 		ZCB_YT_DeployerAddress = _ZCB_YT_DeployerAddress;	
 		FixCapitalPoolDeployerAddress = _fixCapitalPoolDeployerAddress;
 		ZCBammDeployerAddress = _ZCBammDeployerAddress;
@@ -85,10 +79,9 @@ contract Organizer is Ownable, IOrganizer {
 		@param address _underlyingAssetAddress: the NGB asset for which to deploy an NGBwrapper
 	*/
 	function deployNGBWrapper(address _underlyingAssetAddress) external override {
-		NGBwrapper temp = new NGBwrapper(_underlyingAssetAddress, InfoOracleAddress, DEFAULT_SBPS_RETAINED);
-		temp.transferOwnership(msg.sender);
-		wrapperIsVerified[address(temp)] = true;
-		emit WrapperDeployment(address(temp), _underlyingAssetAddress, 0);
+		address temp = NGBwrapperDeployer(NGBwrapperDeployerAddress).deploy(_underlyingAssetAddress, msg.sender);
+		wrapperIsVerified[temp] = true;
+		emit WrapperDeployment(temp, _underlyingAssetAddress, 0);
 	}
 
 	/*

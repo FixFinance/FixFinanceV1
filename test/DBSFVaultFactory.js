@@ -4,6 +4,7 @@ const NGBwrapper = artifacts.require('NGBwrapper');
 const fixCapitalPool = artifacts.require('FixCapitalPool');
 const IYieldToken = artifacts.require("IYieldToken");
 const zcbYtDeployer = artifacts.require('ZCB_YT_Deployer');
+const NGBwrapperDeployer = artifacts.require('NGBwrapperDeployer');
 const organizer = artifacts.require('Organizer');
 const DBSFVaultFactoryDelegate1 = artifacts.require("DBSFVaultFactoryDelegate1");
 const DBSFVaultFactoryDelegate2 = artifacts.require("DBSFVaultFactoryDelegate2");
@@ -78,7 +79,9 @@ contract('DBSFVaultFactory', async function(accounts) {
 		YTammDeployerInstance = await YTammDeployer.new(YTammDelegateInstance.address);
 		fixCapitalPoolDeployerInstance = await FixCapitalPoolDeployer.new();
 		infoOracleInstance = await InfoOracle.new("0", nullAddress);
+		NGBwrapperDeployerInstance = await NGBwrapperDeployer.new(infoOracleInstance.address);
 		organizerInstance = await organizer.new(
+			NGBwrapperDeployerInstance.address,
 			zcbYtDeployerInstance.address,
 			fixCapitalPoolDeployerInstance.address,
 			ZCBammDeployerInstance.address,

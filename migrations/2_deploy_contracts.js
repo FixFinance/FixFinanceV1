@@ -2,6 +2,7 @@ const NGBwrapper = artifacts.require('NGBwrapper');
 const capitalHandler = artifacts.require('FixCapitalPool');
 const dummyAToken = artifacts.require('dummyAToken');
 const organizer = artifacts.require('Organizer');
+const NGBwrapperDeployer = artifacts.require('NGBwrapperDeployer');
 const zcbYtDeployer = artifacts.require('ZCB_YT_Deployer');
 const NSFVaultFactoryDelegate1 = artifacts.require("NSFVaultFactoryDelegate1");
 const NSFVaultFactoryDelegate2 = artifacts.require("NSFVaultFactoryDelegate2");
@@ -65,6 +66,7 @@ module.exports = async function(deployer) {
 	swapRouterDelegateInstance = await deployer.deploy(SwapRouterDelegate);
 	swapRouterDeployerInstance = await deployer.deploy(SwapRouterDeployer, swapRouterDelegateInstance.address);
 	infoOracle = await deployer.deploy(InfoOracle, "0", nullAddress);
+	NGBwrapperDeployerInstance = await deployer.deploy(NGBwrapperDeployer, infoOracle.address);
 	EiInstance = await deployer.deploy(Ei);
 	await deployer.link(Ei, BigMath);
 	bigMathInstance = await deployer.deploy(BigMath);
@@ -74,6 +76,7 @@ module.exports = async function(deployer) {
 	YTammDeployerInstance = await deployer.deploy(YTammDeployer, YTammDelegateInstance.address);
 	organizerInstance = await deployer.deploy(
 		organizer,
+		NGBwrapperDeployerInstance.address,
 		zcbYtDeployerInstance.address,
 		capitalHandlerDeployerInstance.address,
 		ZCBammDeployerInstance.address,

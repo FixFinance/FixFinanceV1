@@ -56,7 +56,7 @@ contract NGBwrapper is INGBWrapper, nonReentrant, Ownable {
 	//most recent timestamp at which harvestToTreasury() was called
 	uint public override lastHarvest;
 
-	uint8 private constant NUM_REWARD_ASSETS = 5;
+	uint8 private constant NUM_REWARD_ASSETS = 7;
 	address[NUM_REWARD_ASSETS] public rewardsAddr;
 	uint[NUM_REWARD_ASSETS] public totalDividendsPaidPerWasset;
 	mapping(address => uint[NUM_REWARD_ASSETS]) prevTotalRewardsPerWasset;
@@ -530,5 +530,58 @@ contract NGBwrapper is INGBWrapper, nonReentrant, Ownable {
     function setFlashLoanFee(uint _flashLoanFee) external onlyOwner {
     	flashLoanFee = _flashLoanFee;
     }
+/*
+	uint8 private constant NUM_REWARD_ASSETS = 7;
+	address[NUM_REWARD_ASSETS] public rewardsAddr;
+	uint[NUM_REWARD_ASSETS] public totalDividendsPaidPerWasset;
+	mapping(address => uint[NUM_REWARD_ASSETS]) prevTotalRewardsPerWasset;
+*/
+    /*
+		@Description: add an asset for which wrapped asset holders rewards
 
+		@param address _rewardsAsset: the new asset for which to start distribution of LM rewards
+		@param uint8 _index: the index within the rewardsAddr array where the new rewards asset will be
+    */
+    function addRewardAsset(address _rewardsAsset, uint8 _index) external onlyOwner {
+    	require(_index < NUM_REWARD_ASSETS);
+    	require(rewardsAddr[_index] == address(0));
+    	for (uint8 i = 0; i < _index; i++) {
+			address addr = rewardsAddr[_index-1];
+			require(addr != _rewardsAsset && addr != address(0));
+    	}
+    	//collect and distribute current balance
+    	rewardsAddr[_index] = _rewardsAsset;
+    }
+
+    /*
+		@Description: remove old rewards asset that is non functional contract / invalid address
+
+		@param address _newRewardAsset: the new asset to replace the previous rewards asset at index _index
+			_newRewardAsset may equal address(0) only if the value at the next index is address(0)
+		@param uint8 _index: the index for which to change the rewards asset address
+    */
+    function overwriteRewardAsset(address _newRewardAsset, uint8 _index) external onlyOwner {
+    	require(_newRewardAsset != address(0));
+    	require(_index < NUM_REWARD_ASSETS);
+    	address prevRewardAsset = rewardsAddr[_index];
+    	require(prevRewardAsset != address(0));
+    	require(totalDividendsPaidPerWasset[_index] == 0);
+    	bool success;
+		bytes memory sig = abi.encodeWithSignature("balanceOf(address)", address(this));
+		uint bal;
+		assembly {
+			success := delegatecall(gas(), prevRewardAsset, add(sig, 0x20), mload(sig), 0, 0x20)
+
+			if success {
+				bal := mload(0)
+			}
+		}
+		if (success) {
+			IERC20(prevRewardAsset).transfer(msg.sender, bal >> 1);
+			address sendTo = IInfoOracle(infoOracleAddress).sendTo();
+			IERC20(prevRewardAsset).transfer(sendTo, bal >> 1);
+		}
+    	//collect and distribute current balance
+    	rewardsAddr[_index] = _newRewardAsset;
+    }
 }

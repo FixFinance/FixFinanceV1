@@ -42,114 +42,54 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 		SBPSRetained = _SBPSRetained;
 	}
 
-	modifier claimRewards(address _addr) {
-		for (uint8 i = 0; i < NUM_REWARD_ASSETS; i++) {
-			address _rewardsAddr = rewardsAddr[i];
-			if (_rewardsAddr == address(0)) {
-				_;
-				return;
-			}
-			uint _totalSupply = internalTotalSupply;
-			uint CBRA = IERC20(_rewardsAddr).balanceOf(_rewardsAddr); //contract balance rewards asset
-			uint TDPW = totalDividendsPaidPerWasset[i]; //total dividends paid per wasset since contract inception
-			uint CBRAPWA = CBRA.mul(1 ether).div(_totalSupply); //contract balance rewards asset per wasset
-			uint TRPW = CBRAPWA.add(TDPW); //total rewards per wasset since contract inception
-			//total rewards per wasset from contract inception to most recent rewards collection for _addr
-			uint prevTRPW = prevTotalRewardsPerWasset[_addr][i];
-			if (prevTRPW < TRPW) {
-				uint RPW = TRPW - prevTRPW; //rewards per wasset
-				uint dividend = RPW.mul(internalBalanceOf[_addr]) / (1 ether); //dividend to be paid to _addr
-				uint additionalDPW = dividend.mul(1 ether).div(_totalSupply).add(1); //add 1 to avoid rounding errors
-				IERC20(_rewardsAddr).transfer(_addr, dividend);
-				totalDividendsPaidPerWasset[i] = TDPW.add(additionalDPW);
-				prevTotalRewardsPerWasset[_addr][i] = TRPW;
-			}
-		}
-		_;
-	}
-
 	modifier doubleClaimReward(address _addr0, address _addr1) {
-		for (uint8 i = 0; i < NUM_REWARD_ASSETS; i++) {
-			address _rewardsAddr = rewardsAddr[i];
+		uint len = internalRewardsAssets.length;
+		if (len == 0) {
+			_;
+			return;
+		}
+		uint balanceAddr0 = internalBalanceOf[_addr0];
+		uint balanceAddr1 = internalBalanceOf[_addr1];
+		address addrA = _addr0; //prevent stack too deep
+		address addrB = _addr1; //prevent stack too deep
+		for (uint8 i = 0; i < len; i++) {
+			address _rewardsAddr = internalRewardsAssets[i];
 			if (_rewardsAddr == address(0)) {
-				_;
-				return;
+				continue;
 			}
 			uint _totalSupply = internalTotalSupply;
 			uint CBRA = IERC20(_rewardsAddr).balanceOf(_rewardsAddr); //contract balance rewards asset
-			uint TDPW = totalDividendsPaidPerWasset[i]; //total dividends paid per wasset since contract inception
+			uint TDPW = internalTotalDividendsPaidPerWasset[i]; //total dividends paid per wasset since contract inception
 			uint CBRAPWA = CBRA.mul(1 ether).div(_totalSupply); //contract balance rewards asset per wasset
 			uint TRPW = CBRAPWA.add(TDPW); //total rewards per wasset since contract inception
 			//total rewards per wasset from contract inception to most recent rewards collection for _addr
-			uint prevTRPW = prevTotalRewardsPerWasset[_addr0][i];
+			uint prevTRPW = internalPrevTotalRewardsPerWasset[i][addrA];
 			uint nextTDPW = TDPW;
 			if (prevTRPW < TRPW) {
 				uint RPW = TRPW - prevTRPW; //rewards per wasset
-				uint dividend = RPW.mul(internalBalanceOf[_addr0]);
+				uint dividend = RPW.mul(balanceAddr0);
 				dividend = dividend / (1 ether); //dividend to be paid to _addr
 				uint additionalDPW = dividend.mul(1 ether).div(_totalSupply).add(1); //add 1 to avoid rounding errors
-				IERC20(_rewardsAddr).transfer(_addr0, dividend);
+				IERC20(_rewardsAddr).transfer(addrA, dividend);
 				nextTDPW = TDPW.add(additionalDPW);
-				address addr = _addr0; //prevent stack too deep
-				prevTotalRewardsPerWasset[addr][i] = TRPW;
+				address addr = addrA; //prevent stack too deep
+				internalPrevTotalRewardsPerWasset[i][addr] = TRPW;
 			}
-			prevTRPW = prevTotalRewardsPerWasset[_addr1][i];
+			prevTRPW = internalPrevTotalRewardsPerWasset[i][addrB];
 			if (prevTRPW < TRPW) {
 				uint RPW = TRPW - prevTRPW; //rewards per wasset
-				uint dividend = RPW.mul(internalBalanceOf[_addr1]);
+				uint dividend = RPW.mul(balanceAddr1);
 				dividend = dividend / (1 ether); //dividend to be paid to _addr
 				uint additionalDPW = dividend.mul(1 ether).div(_totalSupply).add(1); //add 1 to avoid rounding errors
-				IERC20(_rewardsAddr).transfer(_addr1, dividend);
+				IERC20(_rewardsAddr).transfer(addrB, dividend);
 				nextTDPW = TDPW.add(additionalDPW);
-				prevTotalRewardsPerWasset[_addr1][i] = TRPW;
+				internalPrevTotalRewardsPerWasset[i][addrB] = TRPW;
 			}
 			if (nextTDPW > TDPW) {
-				totalDividendsPaidPerWasset[i] = nextTDPW;
+				internalTotalDividendsPaidPerWasset[i] = nextTDPW;
 			}
 		}
 		_;
-	}
-
-	/*
-		@Description: make first deposit into contract, internalTotalSupply must == 0
-		
-		@param address _to: the address that shall receive the newly minted wrapped tokens
-		@param uint _amountUnit: the amount of underlying asset units to deposit
-
-		@return uint _amountWrappedToken: the amount of wrapped tokens that were minted
-	*/
-	function firstDeposit(address _to, uint _amountUnit) internal returns (uint _amountWrappedToken) {
-		IERC20 _aToken = IERC20(internalUnderlyingAssetAddress);
-		bool success = _aToken.transferFrom(msg.sender, address(this), _amountUnit);
-		require(success);
-		internalBalanceOf[_to] = _amountUnit;
-		internalTotalSupply = _amountUnit;
-		_amountWrappedToken = _amountUnit;
-		internalLastHarvest = block.timestamp;
-		internalPrevRatio = 1 ether;
-	}
-
-	/*
-		@Description: send in underlying asset, receive wrapped asset
-
-		@param address _to: the address that shall receive the newly minted wrapped tokens
-		@param uint _amountUnit: the amount of underlying asset units to deposit
-
-		@return uint _amountWrappedToken: the amount of wrapped tokens that were minted
-	*/
-	function deposit(address _to, uint _amountUnit) internal returns (uint _amountWrappedToken) {
-		uint _totalSupply = internalTotalSupply;
-		if (_totalSupply == 0) {
-			return firstDeposit(_to, _amountUnit);
-		}
-		harvestToTreasury();
-		IERC20 _aToken = IERC20(internalUnderlyingAssetAddress);
-		uint contractBalance = _aToken.balanceOf(address(this));
-		bool success = _aToken.transferFrom(msg.sender, address(this), _amountUnit);
-		require(success);
-		_amountWrappedToken = internalTotalSupply*_amountUnit/contractBalance;
-		internalBalanceOf[_to] += _amountWrappedToken;
-		internalTotalSupply += _amountWrappedToken;
 	}
 
 	/*
@@ -158,8 +98,17 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 		@param address _to: the address that shall receive the newly minted wrapped tokens
 		@param uint _amount: the amount of underlying asset units to deposit
 	*/
-	function depositUnitAmount(address _to, uint _amount) external claimRewards(_to) override returns (uint _amountWrapped) {
-		return deposit(_to, _amount);
+	function depositUnitAmount(address _to, uint _amount) external override returns (uint _amountWrapped) {
+		address _delegateAddress = delegate1Address;
+		bytes memory sig = abi.encodeWithSignature("depositUnitAmount(address,uint256)", _to, _amount);
+
+		assembly {
+			let success := delegatecall(gas(), _delegateAddress, add(sig, 0x20), mload(sig), 0, 0x20)
+
+			if iszero(success) { revert(0,0) }
+
+			_amountWrapped := mload(0)
+		}
 	}
 
 	/*
@@ -168,9 +117,22 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 		@param address _to: the address that shall receive the newly minted wrapped tokens
 		@param uint _amount: the amount of wrapped asset units to mint
 	*/
-	function depositWrappedAmount(address _to, uint _amount) external claimRewards(_to) override returns (uint _amountUnit) {
-		_amountUnit = WrappedAmtToUnitAmt_RoundUp(_amount);
-		deposit(_to, _amountUnit);
+	function depositWrappedAmount(address _to, uint _amount) external override returns (uint _amountUnit) {
+		address _delegateAddress = delegate1Address;
+		bytes memory sig = abi.encodeWithSignature("depositWrappedAmount(address,uint256)", _to, _amount);
+
+		assembly {
+			let success := delegatecall(gas(), _delegateAddress, add(sig, 0x20), mload(sig), 0, 0x20)
+
+			if iszero(success) { revert(0,0) }
+
+			_amountUnit := mload(0)
+		}
+	}
+
+	function forceRewardsCollection() external override {
+		(bool success, ) = delegate1Address.delegatecall(abi.encodeWithSignature("forceRewardsCollection()"));
+		require(success);
 	}
 
 	/*
@@ -245,17 +207,17 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 
 		@return uint _amountWrappedToken: the amount of units of wrapped asset that were burned
 	*/
-	function withdrawUnitAmount(address _to, uint _amountUnit) public override returns (uint _amountWrappedToken) {
-		harvestToTreasury();
-		IERC20 _aToken = IERC20(internalUnderlyingAssetAddress);
-		uint contractBalance = _aToken.balanceOf(address(this));
-		//_amountWrappedToken == ceil(internalTotalSupply*_amountUnit/contractBalance)
-		_amountWrappedToken = internalTotalSupply*_amountUnit;
-		_amountWrappedToken = (_amountWrappedToken%contractBalance == 0 ? 0 : 1) + (_amountWrappedToken/contractBalance);
-		require(internalBalanceOf[msg.sender] >= _amountWrappedToken);
-		internalBalanceOf[msg.sender] -= _amountWrappedToken;
-		internalTotalSupply -= _amountWrappedToken;
-		_aToken.transfer(_to, _amountUnit);
+	function withdrawUnitAmount(address _to, uint _amountUnit) external override returns (uint _amountWrappedToken) {
+		address _delegateAddress = delegate1Address;
+		bytes memory sig = abi.encodeWithSignature("withdrawUnitAmount(address,uint256)", _to, _amountUnit);
+
+		assembly {
+			let success := delegatecall(gas(), _delegateAddress, add(sig, 0x20), mload(sig), 0, 0x20)
+
+			if iszero(success) { revert(0,0) }
+
+			_amountWrappedToken := mload(0)
+		}
 	}
 
 	/*
@@ -266,15 +228,17 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 
 		@return uint _amountUnit: the amount of underlying asset received
 	*/
-	function withdrawWrappedAmount(address _to, uint _amountWrappedToken) public override returns (uint _amountUnit) {
-		require(internalBalanceOf[msg.sender] >= _amountWrappedToken);
-		harvestToTreasury();
-		IERC20 _aToken = IERC20(internalUnderlyingAssetAddress);
-		uint contractBalance = _aToken.balanceOf(address(this));
-		_amountUnit = contractBalance*_amountWrappedToken/internalTotalSupply;
-		internalBalanceOf[msg.sender] -= _amountWrappedToken;
-		internalTotalSupply -= _amountWrappedToken;
-		_aToken.transfer(_to, _amountUnit);
+	function withdrawWrappedAmount(address _to, uint _amountWrappedToken) external override returns (uint _amountUnit) {
+		address _delegateAddress = delegate1Address;
+		bytes memory sig = abi.encodeWithSignature("withdrawWrappedAmount(address,uint256)", _to, _amountWrappedToken);
+
+		assembly {
+			let success := delegatecall(gas(), _delegateAddress, add(sig, 0x20), mload(sig), 0, 0x20)
+
+			if iszero(success) { revert(0,0) }
+
+			_amountUnit := mload(0)
+		}
 	}
 
 
@@ -475,6 +439,22 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
     	return internalSymbol;
     }
 
+	function rewardsAssets(uint _index) external override view returns(address) {
+		return internalRewardsAssets[_index];
+	}
+
+	function immutableRewardsAssets(uint _index) external override view returns(address) {
+		return internalImmutableRewardsAssets[_index];
+	}
+
+	function totalDividendsPaidPerWasset(uint _index) external override view returns(uint) {
+		return internalTotalDividendsPaidPerWasset[_index];
+	}
+
+	function prevTotalRewardsPerWasset(uint _index, address _wassetHolder) external override view returns(uint) {
+		return internalPrevTotalRewardsPerWasset[_index][_wassetHolder];
+	}
+
     //------------------------------------a-d-m-i-n----------------------------
 
     /*
@@ -505,46 +485,44 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 		@param address _rewardsAsset: the new asset for which to start distribution of LM rewards
 		@param uint8 _index: the index within the rewardsAddr array where the new rewards asset will be
     */
-    function addRewardAsset(address _rewardsAsset, uint8 _index) external onlyOwner {
-    	require(_index < NUM_REWARD_ASSETS);
-    	require(rewardsAddr[_index] == address(0));
-    	for (uint8 i = 0; i < _index; i++) {
-			address addr = rewardsAddr[_index-1];
-			require(addr != _rewardsAsset && addr != address(0));
+    function addRewardAsset(address _rewardsAsset) external onlyOwner {
+    	uint len = internalRewardsAssets.length;
+    	for (uint8 i = 0; i < len; i++) {
+			require(internalImmutableRewardsAssets[i] != _rewardsAsset);
     	}
-    	//collect and distribute current balance
-    	rewardsAddr[_index] = _rewardsAsset;
+    	internalRewardsAssets.push(_rewardsAsset);
+    	internalImmutableRewardsAssets.push(_rewardsAsset);
+    	internalTotalDividendsPaidPerWasset.push(0);
+    	internalPrevTotalRewardsPerWasset.push();
+    	uint currentBal = IERC20(_rewardsAsset).balanceOf(address(this));
+    	address sendTo = IInfoOracle(internalInfoOracleAddress).sendTo();
+    	uint toOwner = currentBal >> 1;
+    	IERC20(_rewardsAsset).transfer(msg.sender, toOwner);
+    	IERC20(_rewardsAsset).transfer(sendTo, currentBal - toOwner);
     }
 
     /*
-		@Description: remove old rewards asset that is non functional contract / invalid address
+		@Description: deactivate a rewards asset
+			any amount of this asset recived by this contract will sit dormant until activated
 
-		@param address _newRewardAsset: the new asset to replace the previous rewards asset at index _index
-			_newRewardAsset may equal address(0) only if the value at the next index is address(0)
-		@param uint8 _index: the index for which to change the rewards asset address
+		@param uint _index: the index within the rewards asset array of the asset to deactivate
     */
-    function overwriteRewardAsset(address _newRewardAsset, uint8 _index) external onlyOwner {
-    	require(_newRewardAsset != address(0));
-    	require(_index < NUM_REWARD_ASSETS);
-    	address prevRewardAsset = rewardsAddr[_index];
-    	require(prevRewardAsset != address(0));
-    	require(totalDividendsPaidPerWasset[_index] == 0);
-    	bool success;
-		bytes memory sig = abi.encodeWithSignature("balanceOf(address)", address(this));
-		uint bal;
-		assembly {
-			success := delegatecall(gas(), prevRewardAsset, add(sig, 0x20), mload(sig), 0, 0x20)
+    function deactivateRewardAsset(uint _index) external onlyOwner {
+    	uint len = internalRewardsAssets.length;
+    	require(_index < len);
+    	internalRewardsAssets[_index] = address(0);
+    }
 
-			if success {
-				bal := mload(0)
-			}
-		}
-		if (success) {
-			IERC20(prevRewardAsset).transfer(msg.sender, bal >> 1);
-			address sendTo = IInfoOracle(internalInfoOracleAddress).sendTo();
-			IERC20(prevRewardAsset).transfer(sendTo, bal >> 1);
-		}
-    	//collect and distribute current balance
-    	rewardsAddr[_index] = _newRewardAsset;
+    /*
+		@Description: reactivate a rewards asset,
+			any amount of this asset henceforth received by this contract shall be distributed propotionally among
+			wrapped asset holders
+
+		@param uint _index: the index within the immutable rewards asset array of the asset to reactivate
+    */
+    function reactivateRewardAsset(uint _index) external onlyOwner {
+    	uint len = internalRewardsAssets.length;
+    	require(_index < len);
+    	internalRewardsAssets[_index] = internalImmutableRewardsAssets[_index];
     }
 }

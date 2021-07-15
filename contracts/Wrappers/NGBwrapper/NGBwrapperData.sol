@@ -34,9 +34,8 @@ contract NGBwrapperData is nonReentrant, Ownable {
     string internalSymbol;
 
     //-------G-e-n-e-r-a-l-i-z-e-d---L-i-q-u-i-d-i-t-y---M-i-n-i-n-g---R-e-w-a-r-d-s---C-a-p-t-u-r-e---M-e-c-h-a-n-i-s-m--------
-	uint8 internal constant NUM_REWARD_ASSETS = 7;
-	address[NUM_REWARD_ASSETS] rewardsAddr;
-	uint[NUM_REWARD_ASSETS] totalDividendsPaidPerWasset;
-	mapping(address => uint[NUM_REWARD_ASSETS]) prevTotalRewardsPerWasset;
-
+	address[] internalRewardsAssets;
+	address[] internalImmutableRewardsAssets;
+	uint[] internalTotalDividendsPaidPerWasset;
+	mapping(address => uint)[] internalPrevTotalRewardsPerWasset;
 }

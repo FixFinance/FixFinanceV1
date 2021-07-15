@@ -23,6 +23,11 @@ interface IWrapper is IERC20, IERC3156FlashLender {
 	function getStatus() external view returns (uint updateTimestamp, uint ratio);
 
 	function flashLoanFee() external view returns(uint256);
+
+	//---Distribution-of-Rewards-in-Seperate-Assets-----
+	function forceRewardsCollection() external;
+	function rewardsAssets(uint _index) external view returns(address);
+	function immutableRewardsAssets(uint _index) external view returns(address);
+	function totalDividendsPaidPerWasset(uint _index) external view returns(uint);
+	function prevTotalRewardsPerWasset(uint _index, address _wassetHolder) external view returns(uint);
 }
-
-

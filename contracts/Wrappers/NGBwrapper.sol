@@ -8,7 +8,6 @@ import "../libraries/ABDKMath64x64.sol";
 import "../libraries/BigMath.sol";
 import "../helpers/nonReentrant.sol";
 import "../helpers/Ownable.sol";
-import "../ERC20.sol";
 
 /*
 	Native Growing Balance Wrapper
@@ -56,6 +55,79 @@ contract NGBwrapper is INGBWrapper, nonReentrant, Ownable {
 
 	//most recent timestamp at which harvestToTreasury() was called
 	uint public override lastHarvest;
+
+	uint8 private constant NUM_REWARD_ASSETS = 5;
+	address[NUM_REWARD_ASSETS] public rewardsAddr;
+	uint[NUM_REWARD_ASSETS] public totalDividendsPaidPerWasset;
+	mapping(address => uint[NUM_REWARD_ASSETS]) prevTotalRewardsPerWasset;
+
+	modifier claimRewards(address _addr) {
+		for (uint8 i = 0; i < NUM_REWARD_ASSETS; i++) {
+			address _rewardsAddr = rewardsAddr[i];
+			if (_rewardsAddr == address(0)) {
+				_;
+				return;
+			}
+			uint _totalSupply = totalSupply;
+			uint CBRA = IERC20(_rewardsAddr).balanceOf(_rewardsAddr); //contract balance rewards asset
+			uint TDPW = totalDividendsPaidPerWasset[i]; //total dividends paid per wasset since contract inception
+			uint CBRAPWA = CBRA.mul(1 ether).div(_totalSupply); //contract balance rewards asset per wasset
+			uint TRPW = CBRAPWA.add(TDPW); //total rewards per wasset since contract inception
+			//total rewards per wasset from contract inception to most recent rewards collection for _addr
+			uint prevTRPW = prevTotalRewardsPerWasset[_addr][i];
+			if (prevTRPW < TRPW) {
+				uint RPW = TRPW - prevTRPW; //rewards per wasset
+				uint dividend = RPW.mul(balanceOf[_addr]) / (1 ether); //dividend to be paid to _addr
+				uint additionalDPW = dividend.mul(1 ether).div(_totalSupply).add(1); //add 1 to avoid rounding errors
+				IERC20(_rewardsAddr).transfer(_addr, dividend);
+				totalDividendsPaidPerWasset[i] = TDPW.add(additionalDPW);
+				prevTotalRewardsPerWasset[_addr][i] = TRPW;
+			}
+		}
+		_;
+	}
+
+	modifier doubleClaimReward(address _addr0, address _addr1) {
+		for (uint8 i = 0; i < NUM_REWARD_ASSETS; i++) {
+			address _rewardsAddr = rewardsAddr[i];
+			if (_rewardsAddr == address(0)) {
+				_;
+				return;
+			}
+			uint _totalSupply = totalSupply;
+			uint CBRA = IERC20(_rewardsAddr).balanceOf(_rewardsAddr); //contract balance rewards asset
+			uint TDPW = totalDividendsPaidPerWasset[i]; //total dividends paid per wasset since contract inception
+			uint CBRAPWA = CBRA.mul(1 ether).div(_totalSupply); //contract balance rewards asset per wasset
+			uint TRPW = CBRAPWA.add(TDPW); //total rewards per wasset since contract inception
+			//total rewards per wasset from contract inception to most recent rewards collection for _addr
+			uint prevTRPW = prevTotalRewardsPerWasset[_addr0][i];
+			uint nextTDPW = TDPW;
+			if (prevTRPW < TRPW) {
+				uint RPW = TRPW - prevTRPW; //rewards per wasset
+				uint dividend = RPW.mul(balanceOf[_addr0]);
+				dividend = dividend / (1 ether); //dividend to be paid to _addr
+				uint additionalDPW = dividend.mul(1 ether).div(_totalSupply).add(1); //add 1 to avoid rounding errors
+				IERC20(_rewardsAddr).transfer(_addr0, dividend);
+				nextTDPW = TDPW.add(additionalDPW);
+				address addr = _addr0; //prevent stack too deep
+				prevTotalRewardsPerWasset[addr][i] = TRPW;
+			}
+			prevTRPW = prevTotalRewardsPerWasset[_addr1][i];
+			if (prevTRPW < TRPW) {
+				uint RPW = TRPW - prevTRPW; //rewards per wasset
+				uint dividend = RPW.mul(balanceOf[_addr1]);
+				dividend = dividend / (1 ether); //dividend to be paid to _addr
+				uint additionalDPW = dividend.mul(1 ether).div(_totalSupply).add(1); //add 1 to avoid rounding errors
+				IERC20(_rewardsAddr).transfer(_addr1, dividend);
+				nextTDPW = TDPW.add(additionalDPW);
+				prevTotalRewardsPerWasset[_addr1][i] = TRPW;
+			}
+			if (nextTDPW > TDPW) {
+				totalDividendsPaidPerWasset[i] = nextTDPW;
+			}
+		}
+		_;
+	}
 
 	/*
 		init
@@ -118,7 +190,7 @@ contract NGBwrapper is INGBWrapper, nonReentrant, Ownable {
 		@param address _to: the address that shall receive the newly minted wrapped tokens
 		@param uint _amount: the amount of underlying asset units to deposit
 	*/
-	function depositUnitAmount(address _to, uint _amount) external override returns (uint _amountWrapped) {
+	function depositUnitAmount(address _to, uint _amount) external claimRewards(_to) override returns (uint _amountWrapped) {
 		return deposit(_to, _amount);
 	}
 
@@ -128,7 +200,7 @@ contract NGBwrapper is INGBWrapper, nonReentrant, Ownable {
 		@param address _to: the address that shall receive the newly minted wrapped tokens
 		@param uint _amount: the amount of wrapped asset units to mint
 	*/
-	function depositWrappedAmount(address _to, uint _amount) external override returns (uint _amountUnit) {
+	function depositWrappedAmount(address _to, uint _amount) external claimRewards(_to) override returns (uint _amountUnit) {
 		_amountUnit = WrappedAmtToUnitAmt_RoundUp(_amount);
 		deposit(_to, _amountUnit);
 	}
@@ -355,7 +427,7 @@ contract NGBwrapper is INGBWrapper, nonReentrant, Ownable {
     string public override symbol;
 
 
-    function transfer(address _to, uint256 _value) public override returns (bool success) {
+    function transfer(address _to, uint256 _value) public doubleClaimReward(_to, msg.sender) override returns (bool success) {
         require(_value <= balanceOf[msg.sender]);
 
         balanceOf[msg.sender] -= _value;
@@ -374,7 +446,7 @@ contract NGBwrapper is INGBWrapper, nonReentrant, Ownable {
         return true;
     }
 
-    function transferFrom(address _from, address _to, uint256 _value) public override returns (bool success) {
+    function transferFrom(address _from, address _to, uint256 _value) public doubleClaimReward(_to, _from) override returns (bool success) {
         require(_value <= allowance[_from][msg.sender]);
     	require(_value <= balanceOf[_from]);
 

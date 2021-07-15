@@ -21,6 +21,27 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 	using SafeMath for uint;
 	using ABDKMath64x64 for int128;
 
+	address delegate1Address;
+
+	/*
+		init
+	*/
+	constructor (
+		address _underlyingAssetAddress,
+		address _infoOralceAddress,
+		address _delegate1Address,
+		uint32 _SBPSRetained
+	) public {
+		require(_SBPSRetained > 0 && _SBPSRetained <= totalSBPS);
+		internalUnderlyingAssetAddress = _underlyingAssetAddress;
+		internalDecimals = IERC20(_underlyingAssetAddress).decimals();
+		internalName = string(abi.encodePacked('wrapped ',IERC20(_underlyingAssetAddress).name()));
+		internalSymbol = string(abi.encodePacked('w', IERC20(_underlyingAssetAddress).symbol()));
+		internalInfoOracleAddress = _infoOralceAddress;
+		delegate1Address = _delegate1Address;
+		SBPSRetained = _SBPSRetained;
+	}
+
 	modifier claimRewards(address _addr) {
 		for (uint8 i = 0; i < NUM_REWARD_ASSETS; i++) {
 			address _rewardsAddr = rewardsAddr[i];
@@ -87,19 +108,6 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 			}
 		}
 		_;
-	}
-
-	/*
-		init
-	*/
-	constructor (address _underlyingAssetAddress, address _infoOralceAddress, uint32 _SBPSRetained) public {
-		require(_SBPSRetained > 0 && _SBPSRetained <= totalSBPS);
-		internalUnderlyingAssetAddress = _underlyingAssetAddress;
-		internalDecimals = IERC20(_underlyingAssetAddress).decimals();
-		internalName = string(abi.encodePacked('wrapped ',IERC20(_underlyingAssetAddress).name()));
-		internalSymbol = string(abi.encodePacked('w', IERC20(_underlyingAssetAddress).symbol()));
-		internalInfoOracleAddress = _infoOralceAddress;
-		SBPSRetained = _SBPSRetained;
 	}
 
 	/*
@@ -218,48 +226,8 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 			generated since the last harvest
 	*/
 	function harvestToTreasury() internal {
-		uint _lastHarvest = internalLastHarvest;
-		if (block.timestamp == _lastHarvest) {
-			return;
-		}
-		uint contractBalance = IERC20(internalUnderlyingAssetAddress).balanceOf(address(this));
-		uint prevTotalSupply = internalTotalSupply;
-		uint _prevRatio = internalPrevRatio;
-		//time in years
-		/*
-			nextBalance = contractBalance * ((totalBips-bipsToTreasury)/totalBips)**t
-			prevTotalSupply*contractBalance/internalTotalSupply = contractBalance * ((totalBips-bipsToTreasury)/totalBips)**t
-			prevTotalSupply/internalTotalSupply = ((totalBips-bipsToTreasury)/totalBips)**t
-			internalTotalSupply = prevTotalSupply*((totalBips-bipsToTreasury)/totalBips)**(-t)
-		*/
-		uint effectiveRatio = uint(1 ether).mul(contractBalance);
-		uint nonFeeAdjustedRatio = effectiveRatio.div(prevTotalSupply);
-		if (nonFeeAdjustedRatio <= _prevRatio) {
-			//only continue if yield has been generated
-			return;
-		}
-		uint minNewRatio = (nonFeeAdjustedRatio - _prevRatio).mul(minHarvestRetention).div(totalSBPS).add(_prevRatio);
-		int128 time = int128(((block.timestamp - _lastHarvest) << 64)/ BigMath.SecondsPerYear);
-		uint term = uint(BigMath.Pow(int128((uint(SBPSRetained) << 64) / totalSBPS), time.neg()));
-		uint newTotalSupply = prevTotalSupply.mul(term) >> 64;
-		effectiveRatio = effectiveRatio.div(newTotalSupply);
-		if (effectiveRatio < minNewRatio) {
-			/*
-				ratio == contractBalance/internalTotalSupply
-				internalTotalSupply == contractBalance/ratio
-			*/
-			newTotalSupply = contractBalance.mul(1 ether).div(minNewRatio);
-			internalPrevRatio = minNewRatio;
-		}
-		else {
-			internalPrevRatio = effectiveRatio;
-		}
-		internalLastHarvest = block.timestamp;
-		uint dividend = newTotalSupply.sub(prevTotalSupply);
-		address sendTo = IInfoOracle(internalInfoOracleAddress).sendTo();
-		internalBalanceOf[sendTo] += dividend >> 1;
-		internalBalanceOf[owner] += dividend - (dividend >> 1);
-		internalTotalSupply = newTotalSupply;
+		(bool success, ) = delegate1Address.delegatecall(abi.encodeWithSignature("harvestToTreasury()"));
+		require(success);
 	}
 
 	/*

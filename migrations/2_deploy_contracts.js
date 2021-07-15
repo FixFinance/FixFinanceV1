@@ -2,6 +2,7 @@ const NGBwrapper = artifacts.require('NGBwrapper');
 const capitalHandler = artifacts.require('FixCapitalPool');
 const dummyAToken = artifacts.require('dummyAToken');
 const organizer = artifacts.require('Organizer');
+const NGBwrapperDelegate1 = artifacts.require('NGBwrapperDelegate1');
 const NGBwrapperDeployer = artifacts.require('NGBwrapperDeployer');
 const zcbYtDeployer = artifacts.require('ZCB_YT_Deployer');
 const NSFVaultFactoryDelegate1 = artifacts.require("NSFVaultFactoryDelegate1");
@@ -33,22 +34,6 @@ const BN = web3.utils.BN;
 const _10to18 = (new BN(10)).pow(new BN(18));
 
 module.exports = async function(deployer) {
-	/*
-	factory = await UniswapV2Factory.at(UniswapV2FactoryAddress);
-
-	organizerInstance = await deployer.deploy(organizer);
-
-	await organizerInstance.deployATokenWrapper(kovanAEthAddress);
-	await organizerInstance.deployFixCapitalPoolInstance(kovanAEthAddress, start2021);
-	await organizerInstance.deployFixCapitalPoolInstance(kovanAEthAddress, start2022);
-	await organizerInstance.deployFixCapitalPoolInstance(kovanAEthAddress, start2026);
-
-	capitalHandlers = await organizerInstance.allFixCapitalPoolInstances();
-
-	for (let i = 0; i < capitalHandlers.length; i++) {
-		await factory.createPair(kovanAEthAddress, capitalHandlers[i]);
-	}
-	*/
 	accounts = await web3.eth.getAccounts();
 	dummyATokenInstance = await deployer.deploy(dummyAToken, "aETH");
 	dummyATokenInstance = await deployer.deploy(dummyAToken, "aUSDC");
@@ -66,7 +51,8 @@ module.exports = async function(deployer) {
 	swapRouterDelegateInstance = await deployer.deploy(SwapRouterDelegate);
 	swapRouterDeployerInstance = await deployer.deploy(SwapRouterDeployer, swapRouterDelegateInstance.address);
 	infoOracle = await deployer.deploy(InfoOracle, "0", nullAddress);
-	NGBwrapperDeployerInstance = await deployer.deploy(NGBwrapperDeployer, infoOracle.address);
+	ngbwDelegate1Instance = await deployer.deploy(NGBwrapperDelegate1);
+	NGBwrapperDeployerInstance = await deployer.deploy(NGBwrapperDeployer, infoOracle.address, ngbwDelegate1Instance.address);
 	EiInstance = await deployer.deploy(Ei);
 	await deployer.link(Ei, BigMath);
 	bigMathInstance = await deployer.deploy(BigMath);

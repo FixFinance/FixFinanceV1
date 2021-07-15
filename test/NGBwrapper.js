@@ -1,4 +1,5 @@
 const dummyAToken = artifacts.require('dummyAToken');
+const NGBwrapperDelegate1 = artifacts.require('NGBwrapperDelegate1');
 const NGBwrapper = artifacts.require('NGBwrapper');
 const InfoOracle = artifacts.require('InfoOracle');
 const BN = web3.utils.BN;
@@ -32,7 +33,8 @@ contract('NGBwrapper', async function(accounts){
 		dummyATokenInstance = await dummyAToken.new("DMY");
 		sendTo = accounts[4];
 		infoOracleInstance = await InfoOracle.new(0, sendTo);
-		NGBwrapperInstance = await NGBwrapper.new(dummyATokenInstance.address, infoOracleInstance.address, SBPSretained);
+		ngbwDelegate1Instance = await NGBwrapperDelegate1.new();
+		NGBwrapperInstance = await NGBwrapper.new(dummyATokenInstance.address, infoOracleInstance.address, ngbwDelegate1Instance.address, SBPSretained);
 		inflation = await dummyATokenInstance.inflation();
 		treasuryAddress = sendTo;
 		await NGBwrapperInstance.transferOwnership(treasuryAddress);

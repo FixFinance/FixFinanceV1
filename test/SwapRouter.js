@@ -4,6 +4,7 @@ const NGBwrapper = artifacts.require('NGBwrapper');
 const FixCapitalPool = artifacts.require('FixCapitalPool');
 const YieldToken = artifacts.require('YieldToken');
 const zcbYtDeployer = artifacts.require('ZCB_YT_Deployer');
+const NGBwrapperDelegate1 = artifacts.require('NGBwrapperDelegate1');
 const NGBwrapperDeployer = artifacts.require('NGBwrapperDeployer');
 const organizer = artifacts.require('Organizer');
 const IERC20 = artifacts.require("IERC20");
@@ -56,7 +57,8 @@ contract('SwapRouter', async function(accounts) {
 			BipsToTreasury,
 			nullAddress
 		);
-		NGBwrapperDeployerInstance = await NGBwrapperDeployer.new(infoOracleInstance.address);
+		ngbwDelegate1Instance = await NGBwrapperDelegate1.new();
+		NGBwrapperDeployerInstance = await NGBwrapperDeployer.new(infoOracleInstance.address, ngbwDelegate1Instance.address);
 		organizerInstance = await organizer.new(
 			NGBwrapperDeployerInstance.address,
 			zcbYtDeployerInstance.address,

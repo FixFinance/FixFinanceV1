@@ -6,11 +6,11 @@ import "../interfaces/IYieldToken.sol";
 import "../interfaces/IZeroCouponBond.sol";
 import "../interfaces/IERC20.sol";
 import "../interfaces/IInfoOracle.sol";
-import "../ZCB_YT_Deployer.sol";
 import "../libraries/SafeMath.sol";
 import "../libraries/SignedSafeMath.sol";
 import "../helpers/Ownable.sol";
 import "../helpers/nonReentrant.sol";
+import "./ZCB_YT/ZCB_YT_Deployer.sol";
 
 contract FixCapitalPool is IFixCapitalPool, Ownable, nonReentrant {
 	using SafeMath for uint;

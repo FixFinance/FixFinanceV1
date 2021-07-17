@@ -4,8 +4,10 @@ pragma solidity >=0.6.8 <0.7.0;
 import "../../interfaces/IFixCapitalPool.sol";
 import "../../interfaces/IWrapper.sol";
 import "../../interfaces/IZeroCouponBond.sol";
+import "../../libraries/SafeMath.sol";
 
 contract ZeroCouponBond is IZeroCouponBond {
+    using SafeMath for uint;
 
 	IFixCapitalPool immutable fcp;
 	IWrapper immutable wrapper;
@@ -64,7 +66,14 @@ contract ZeroCouponBond is IZeroCouponBond {
     }
 
     function totalSupply() public view override returns (uint _supply) {
-    	_supply = wrapper.WrappedAmtToUnitAmt_RoundDown(wrapper.balanceOf(address(fcp)));
+        _supply = wrapper.balanceOf(address(fcp));
+        IFixCapitalPool _fcp = fcp;
+        if (_fcp.inPayoutPhase()) {
+            _supply = _supply.mul(_fcp.maturityConversionRate()) / (1 ether);
+        }
+        else {
+            _supply = wrapper.WrappedAmtToUnitAmt_RoundDown(_supply);
+        }
     }
 
     /*

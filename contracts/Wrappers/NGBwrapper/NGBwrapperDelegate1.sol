@@ -36,14 +36,17 @@ contract NGBwrapperDelegate1 is NGBwrapperData {
 				newTRPW = internalTotalRewardsPerWasset[i].add(newRewardsPerWasset);
 			}
 			uint prevTRPW = internalPrevTotalRewardsPerWasset[i][_addr];
+			bool getContractBalanceAgain = false;
 			if (prevTRPW < newTRPW) {
 				uint dividend = (newTRPW - prevTRPW).mul(balanceAddr) / (1 ether);
-				IERC20(_rewardsAddr).transfer(_addr, dividend);
+				getContractBalanceAgain = dividend > 0;
 				internalPrevTotalRewardsPerWasset[i][_addr] = newTRPW;
+				bool success = IERC20(_rewardsAddr).transfer(_addr, dividend);
+				require(success);
 			}
 			//fetch balanceOf again rather than taking CBRA and subtracting dividend because of small rounding errors that may occur
 			//however if no transfers were executed it is fine to use the previously fetched CBRA value
-			internalPrevContractBalance[i] = prevTRPW < newTRPW ? IERC20(_rewardsAddr).balanceOf(address(this)) : CBRA;
+			internalPrevContractBalance[i] = getContractBalanceAgain ? IERC20(_rewardsAddr).balanceOf(address(this)) : CBRA;
 			internalTotalRewardsPerWasset[i] = newTRPW;
 		}
 		_;

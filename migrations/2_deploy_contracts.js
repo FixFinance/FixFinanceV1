@@ -73,5 +73,6 @@ module.exports = async function(deployer) {
 	await organizerInstance.DeploySwapRouter();
 	let rec = await organizerInstance.deployNGBWrapper(dummyATokenInstance.address);
 	wAsset = await NGBwrapper.at(rec.receipt.logs[0].args.wrapperAddress);
-	await organizerInstance.deployFixCapitalPoolInstance(wAsset.address, start2026);
+	let timestamp = (await web3.eth.getBlock('latest')).timestamp + 10*24*60*60;
+	await organizerInstance.deployFixCapitalPoolInstance(wAsset.address, timestamp);
 };

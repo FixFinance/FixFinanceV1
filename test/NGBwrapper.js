@@ -31,12 +31,13 @@ function AmountError(actual, expected) {
 contract('NGBwrapper', async function(accounts){
 	it('before each', async () => {
 		dummyATokenInstance = await dummyAToken.new("DMY");
-		sendTo = accounts[4];
-		infoOracleInstance = await InfoOracle.new(0, sendTo);
+		rewardsAsset = await dummyAToken.new("RWD");
+		owner = accounts[4];
+		infoOracleInstance = await InfoOracle.new(0, owner);
 		ngbwDelegate1Instance = await NGBwrapperDelegate1.new();
 		NGBwrapperInstance = await NGBwrapper.new(dummyATokenInstance.address, infoOracleInstance.address, ngbwDelegate1Instance.address, SBPSretained);
 		inflation = await dummyATokenInstance.inflation();
-		treasuryAddress = sendTo;
+		treasuryAddress = owner;
 		await NGBwrapperInstance.transferOwnership(treasuryAddress);
 		assert.equal(await NGBwrapperInstance.underlyingAssetAddress(), dummyATokenInstance.address, 'correct address for aToken');
 		assert.equal((await NGBwrapperInstance.totalSupply()).toString(), "0", "correct total supply");
@@ -116,5 +117,143 @@ contract('NGBwrapper', async function(accounts){
 		aTknBalAct2 = await dummyATokenInstance.balanceOf(accounts[2]);
 		//inflation is 6*10**18 thus we can expect the range abs of the error in the balance of account[2] to be less than 6
 		assert.equal(aTknBalAct2.sub(toWithdraw).abs().cmp(new BN(6)) == -1, true, "balance is within acceptable range of error")
+	});
+
+	it('Starts with no reward assets', async () => {
+		assert.equal((await NGBwrapperInstance.numRewardsAssets()).toString(), "0");
+	});
+
+	it('Add reward asset', async () => {
+		await NGBwrapperInstance.addRewardAsset(rewardsAsset.address, {from: owner});
+		assert.equal((await NGBwrapperInstance.numRewardsAssets()).toString(), "1");
+		assert.equal(await NGBwrapperInstance.rewardsAssets(0), rewardsAsset.address);
+		assert.equal(await NGBwrapperInstance.immutableRewardsAssets(0), rewardsAsset.address);
+		assert.equal((await NGBwrapperInstance.prevContractBalance(0)).toString(), "0");
+		assert.equal((await NGBwrapperInstance.totalRewardsPerWasset(0)).toString(), "0");
+	});
+
+	it('Cannot add same reward asset again', async () => {
+		let caught = false;
+		try {
+			await NGBwrapperInstance.addRewardAsset(rewardsAsset.address, {from: owner});
+		} catch (err) {
+			caught = true;
+		}
+		if (!caught) {
+			assert.fail('Managed to add same reward asset twice');
+		}
+	});
+
+	it('correct reward asset dividends, on transfer', async () => {
+		let bal0 = await NGBwrapperInstance.balanceOf(accounts[0]);
+		let bal1 = await NGBwrapperInstance.balanceOf(accounts[1]);
+		let bal2 = await NGBwrapperInstance.balanceOf(accounts[2]);
+		let ts = await NGBwrapperInstance.totalSupply();
+		await rewardsAsset.mintTo(accounts[0], "0"); //overwrite balance to 0
+
+		let mintAmt = _10To18.div(new BN(757).add(new BN(23478)));
+		totalMintAmt = mintAmt;
+		await rewardsAsset.mintTo(NGBwrapperInstance.address, mintAmt);
+
+		let transferAmt = bal0.div(new BN(3));
+		await NGBwrapperInstance.transfer(accounts[2], bal0.sub(transferAmt), {from: accounts[0]})
+
+
+		let rBal0 = await rewardsAsset.balanceOf(accounts[0]);
+		let rBal2 = await rewardsAsset.balanceOf(accounts[2]);
+
+		let expectedRBal0 = mintAmt.mul(bal0).div(ts);
+		let expectedRBal2 = mintAmt.mul(bal2).div(ts);
+
+		assert.equal(rBal0.toString(), expectedRBal0.toString());
+		assert.equal(rBal2.toString(), expectedRBal2.toString());
+
+		let expectedContractBalance = mintAmt.sub(rBal0).sub(rBal2);
+		let expectedTRPW = mintAmt.mul(_10To18).div(totalSupply);
+		let prevTRPW0 = await NGBwrapperInstance.prevTotalRewardsPerWasset(0, accounts[0]);
+		let prevTRPW2 = await NGBwrapperInstance.prevTotalRewardsPerWasset(0, accounts[2]);
+		let TRPW = await NGBwrapperInstance.totalRewardsPerWasset(0);
+		let prevContractBalance = await NGBwrapperInstance.prevContractBalance(0);
+
+		assert.equal(prevContractBalance.toString(), expectedContractBalance.toString());
+		assert.equal(TRPW.toString(), expectedTRPW.toString());
+		assert.equal(prevTRPW0.toString(), expectedTRPW.toString());
+		assert.equal(prevTRPW2.toString(), expectedTRPW.toString());
+
+		tally = rBal0.add(rBal2);
+	});
+
+	it('correct reward asset dividends, on withdraws', async () => {
+		let bal0 = await NGBwrapperInstance.balanceOf(accounts[0]);
+		let bal1 = await NGBwrapperInstance.balanceOf(accounts[1]);
+		let bal2 = await NGBwrapperInstance.balanceOf(accounts[2]);
+		let bal4 = await NGBwrapperInstance.balanceOf(accounts[4]);
+		let prevRBal0 = await rewardsAsset.balanceOf(accounts[0]);
+		let prevRBal1 = await rewardsAsset.balanceOf(accounts[1]);
+		let prevRBal2 = await rewardsAsset.balanceOf(accounts[2]);
+		let prevRBal4 = await rewardsAsset.balanceOf(accounts[4]);
+		let ts = await NGBwrapperInstance.totalSupply();
+		let mintAmt = _10To18.div(new BN(872).add(new BN(4392)));
+		let prevTRPW = await NGBwrapperInstance.totalRewardsPerWasset(0);
+
+		let newCBal = mintAmt.add(await rewardsAsset.balanceOf(NGBwrapperInstance.address));
+		let additionalRPW = mintAmt.mul(_10To18).div(ts);
+		let expectedTRPW = prevTRPW.add(additionalRPW);
+
+		await rewardsAsset.mintTo(NGBwrapperInstance.address, newCBal);
+
+		let rpw = expectedTRPW.sub(await NGBwrapperInstance.prevTotalRewardsPerWasset(0, accounts[0]));
+		await NGBwrapperInstance.withdrawWrappedAmount(accounts[0], bal0, {from: accounts[0]});
+		let TRPW = await NGBwrapperInstance.totalRewardsPerWasset(0);
+		let userPrevTRPW = await NGBwrapperInstance.prevTotalRewardsPerWasset(0, accounts[0]);
+		let rBal0 = await rewardsAsset.balanceOf(accounts[0]);
+		let expectedDividend0 = rpw.mul(bal0).div(_10To18);
+		let prevContractBalance = newCBal;
+		let contractBalance = await NGBwrapperInstance.prevContractBalance(0);
+		assert.equal(contractBalance.toString(), prevContractBalance.sub(expectedDividend0).toString());
+		assert.equal(TRPW.toString(), expectedTRPW.toString());
+		assert.equal(userPrevTRPW.toString(), expectedTRPW.toString());
+		assert.equal(rBal0.sub(prevRBal0).toString(), expectedDividend0.toString());
+
+		rpw = expectedTRPW.sub(await NGBwrapperInstance.prevTotalRewardsPerWasset(0, accounts[1]));
+		await NGBwrapperInstance.withdrawWrappedAmount(accounts[1], bal1, {from: accounts[1]});
+		TRPW = await NGBwrapperInstance.totalRewardsPerWasset(0);
+		userPrevTRPW = await NGBwrapperInstance.prevTotalRewardsPerWasset(0, accounts[1]);
+		let rBal1 = await rewardsAsset.balanceOf(accounts[1]);
+		let expectedDividend1 = rpw.mul(bal1).div(_10To18);
+		prevContractBalance = contractBalance;
+		contractBalance = await NGBwrapperInstance.prevContractBalance(0);
+		assert.equal(contractBalance.toString(), prevContractBalance.sub(expectedDividend1).toString());
+		assert.equal(TRPW.toString(), expectedTRPW.toString());
+		assert.equal(userPrevTRPW.toString(), expectedTRPW.toString());
+		assert.equal(rBal1.sub(prevRBal1).toString(), expectedDividend1.toString());
+
+		rpw = expectedTRPW.sub(await NGBwrapperInstance.prevTotalRewardsPerWasset(0, accounts[2]));
+		await NGBwrapperInstance.withdrawWrappedAmount(accounts[2], bal2, {from: accounts[2]});
+		TRPW = await NGBwrapperInstance.totalRewardsPerWasset(0);
+		userPrevTRPW = await NGBwrapperInstance.prevTotalRewardsPerWasset(0, accounts[2]);
+		let rBal2 = await rewardsAsset.balanceOf(accounts[2]);
+		let expectedDividend2 = rpw.mul(bal2).div(_10To18);
+		prevContractBalance = contractBalance;
+		contractBalance = await NGBwrapperInstance.prevContractBalance(0);
+		assert.equal(contractBalance.toString(), prevContractBalance.sub(expectedDividend2).toString());
+		assert.equal(TRPW.toString(), expectedTRPW.toString());
+		assert.equal(userPrevTRPW.toString(), expectedTRPW.toString());
+		assert.equal(rBal2.sub(prevRBal2).toString(), expectedDividend2.toString());
+
+		rpw = expectedTRPW.sub(await NGBwrapperInstance.prevTotalRewardsPerWasset(0, accounts[4]));
+		await NGBwrapperInstance.withdrawWrappedAmount(accounts[4], bal4, {from: accounts[4]});
+		TRPW = await NGBwrapperInstance.totalRewardsPerWasset(0);
+		userPrevTRPW = await NGBwrapperInstance.prevTotalRewardsPerWasset(0, accounts[4]);
+		let rBal4 = await rewardsAsset.balanceOf(accounts[4]);
+		let expectedDividend4 = rpw.mul(bal4).div(_10To18);
+		prevContractBalance = contractBalance;
+		contractBalance = await NGBwrapperInstance.prevContractBalance(0);
+		assert.equal(contractBalance.toString(), prevContractBalance.sub(expectedDividend4).toString());
+		assert.equal(TRPW.toString(), expectedTRPW.toString());
+		assert.equal(userPrevTRPW.toString(), expectedTRPW.toString());
+		assert.equal(rBal4.sub(prevRBal4).toString(), expectedDividend4.toString());
+
+		assert.isBelow(contractBalance.toNumber(), 7);
 	});
 });

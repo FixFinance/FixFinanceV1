@@ -26,8 +26,10 @@ interface IWrapper is IERC20, IERC3156FlashLender {
 
 	//---Distribution-of-Rewards-in-Seperate-Assets-----
 	function forceRewardsCollection() external;
+	function numRewardsAssets() external view returns(uint);
 	function rewardsAssets(uint _index) external view returns(address);
 	function immutableRewardsAssets(uint _index) external view returns(address);
-	function totalDividendsPaidPerWasset(uint _index) external view returns(uint);
+	function prevContractBalance(uint _index) external view returns(uint);
+	function totalRewardsPerWasset(uint _index) external view returns(uint);
 	function prevTotalRewardsPerWasset(uint _index, address _wassetHolder) external view returns(uint);
 }

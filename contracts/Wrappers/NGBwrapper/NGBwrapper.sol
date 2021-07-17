@@ -50,44 +50,41 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 		}
 		uint balanceAddr0 = internalBalanceOf[_addr0];
 		uint balanceAddr1 = internalBalanceOf[_addr1];
-		address addrA = _addr0; //prevent stack too deep
-		address addrB = _addr1; //prevent stack too deep
+		uint _totalSupply = internalTotalSupply;
 		for (uint8 i = 0; i < len; i++) {
 			address _rewardsAddr = internalRewardsAssets[i];
 			if (_rewardsAddr == address(0)) {
 				continue;
 			}
-			uint _totalSupply = internalTotalSupply;
-			uint CBRA = IERC20(_rewardsAddr).balanceOf(_rewardsAddr); //contract balance rewards asset
-			uint TDPW = internalTotalDividendsPaidPerWasset[i]; //total dividends paid per wasset since contract inception
-			uint CBRAPWA = CBRA.mul(1 ether).div(_totalSupply); //contract balance rewards asset per wasset
-			uint TRPW = CBRAPWA.add(TDPW); //total rewards per wasset since contract inception
-			//total rewards per wasset from contract inception to most recent rewards collection for _addr
-			uint prevTRPW = internalPrevTotalRewardsPerWasset[i][addrA];
-			uint nextTDPW = TDPW;
-			if (prevTRPW < TRPW) {
-				uint RPW = TRPW - prevTRPW; //rewards per wasset
-				uint dividend = RPW.mul(balanceAddr0);
-				dividend = dividend / (1 ether); //dividend to be paid to _addr
-				uint additionalDPW = dividend.mul(1 ether).div(_totalSupply).add(1); //add 1 to avoid rounding errors
-				IERC20(_rewardsAddr).transfer(addrA, dividend);
-				nextTDPW = TDPW.add(additionalDPW);
-				address addr = addrA; //prevent stack too deep
-				internalPrevTotalRewardsPerWasset[i][addr] = TRPW;
+			uint newTRPW;
+			uint CBRA = IERC20(_rewardsAddr).balanceOf(address(this)); //contract balance rewards asset
+			{
+				uint prevCBRA = internalPrevContractBalance[i];
+				if (prevCBRA > CBRA) { //odd case, should never happen
+					continue;
+				}
+				uint newRewardsPerWasset = (CBRA - prevCBRA).mul(1 ether).div(_totalSupply);
+				newTRPW = internalTotalRewardsPerWasset[i].add(newRewardsPerWasset);
 			}
-			prevTRPW = internalPrevTotalRewardsPerWasset[i][addrB];
-			if (prevTRPW < TRPW) {
-				uint RPW = TRPW - prevTRPW; //rewards per wasset
-				uint dividend = RPW.mul(balanceAddr1);
-				dividend = dividend / (1 ether); //dividend to be paid to _addr
-				uint additionalDPW = dividend.mul(1 ether).div(_totalSupply).add(1); //add 1 to avoid rounding errors
-				IERC20(_rewardsAddr).transfer(addrB, dividend);
-				nextTDPW = TDPW.add(additionalDPW);
-				internalPrevTotalRewardsPerWasset[i][addrB] = TRPW;
+			uint prevTRPW = internalPrevTotalRewardsPerWasset[i][_addr0];
+			bool getContractBalanceAgain = false;
+			if (prevTRPW < newTRPW) {
+				getContractBalanceAgain = true;
+				uint dividend = (newTRPW - prevTRPW).mul(balanceAddr0) / (1 ether);
+				IERC20(_rewardsAddr).transfer(_addr0, dividend);
+				internalPrevTotalRewardsPerWasset[i][_addr0] = newTRPW;
 			}
-			if (nextTDPW > TDPW) {
-				internalTotalDividendsPaidPerWasset[i] = nextTDPW;
+			prevTRPW = internalPrevTotalRewardsPerWasset[i][_addr1];
+			if (prevTRPW < newTRPW) {
+				getContractBalanceAgain = true;
+				uint dividend = (newTRPW - prevTRPW).mul(balanceAddr1) / (1 ether);
+				IERC20(_rewardsAddr).transfer(_addr1, dividend);
+				internalPrevTotalRewardsPerWasset[i][_addr1] = newTRPW;
 			}
+			//fetch balanceOf again rather than taking CBRA and subtracting dividend because of small rounding errors that may occur
+			//however if no transfers were executed it is fine to use the previously fetched CBRA value
+			internalPrevContractBalance[i] = getContractBalanceAgain ? IERC20(_rewardsAddr).balanceOf(address(this)) : CBRA;
+			internalTotalRewardsPerWasset[i] = newTRPW;
 		}
 		_;
 	}
@@ -447,12 +444,20 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 		return internalImmutableRewardsAssets[_index];
 	}
 
-	function totalDividendsPaidPerWasset(uint _index) external override view returns(uint) {
-		return internalTotalDividendsPaidPerWasset[_index];
+	function prevContractBalance(uint _index) external view override returns(uint) {
+		return internalPrevContractBalance[_index];
+	}
+
+	function totalRewardsPerWasset(uint _index) external view override returns(uint) {
+		return internalTotalRewardsPerWasset[_index];
 	}
 
 	function prevTotalRewardsPerWasset(uint _index, address _wassetHolder) external override view returns(uint) {
 		return internalPrevTotalRewardsPerWasset[_index][_wassetHolder];
+	}
+
+	function numRewardsAssets() external override view returns(uint) {
+		return internalRewardsAssets.length;
 	}
 
     //------------------------------------a-d-m-i-n----------------------------
@@ -492,7 +497,8 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
     	}
     	internalRewardsAssets.push(_rewardsAsset);
     	internalImmutableRewardsAssets.push(_rewardsAsset);
-    	internalTotalDividendsPaidPerWasset.push(0);
+    	internalPrevContractBalance.push(0);
+    	internalTotalRewardsPerWasset.push(0);
     	internalPrevTotalRewardsPerWasset.push();
     	uint currentBal = IERC20(_rewardsAsset).balanceOf(address(this));
     	address sendTo = IInfoOracle(internalInfoOracleAddress).sendTo();
@@ -524,5 +530,23 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
     	uint len = internalRewardsAssets.length;
     	require(_index < len);
     	internalRewardsAssets[_index] = internalImmutableRewardsAssets[_index];
+    }
+
+    /*
+		@Description: harvest the entirety of a reward asset to the owner & to fix finance, split 50/50
+			this reward asset must not be listed within the immutableRewardsAssets array
+
+		@param address _assetAddr: the address of the reward asset to harvest
+    */
+    function harvestNonListedRewardAsset(address _assetAddr) external onlyOwner {
+    	uint len = internalRewardsAssets.length;
+    	for (uint8 i = 0; i < len; i++) {
+			require(internalImmutableRewardsAssets[i] != _assetAddr);
+    	}
+    	uint currentBal = IERC20(_assetAddr).balanceOf(address(this));
+    	address sendTo = IInfoOracle(internalInfoOracleAddress).sendTo();
+    	uint toOwner = currentBal >> 1;
+    	IERC20(_assetAddr).transfer(msg.sender, toOwner);
+    	IERC20(_assetAddr).transfer(sendTo, currentBal - toOwner);
     }
 }

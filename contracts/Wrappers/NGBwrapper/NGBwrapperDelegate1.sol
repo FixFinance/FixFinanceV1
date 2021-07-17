@@ -14,28 +14,37 @@ contract NGBwrapperDelegate1 is NGBwrapperData {
 
 	modifier claimRewards(address _addr) {
 		uint len = internalRewardsAssets.length;
-		uint balanceAddr = len > 0 ? internalBalanceOf[_addr] : 0; //prevent sload if not needed
+		if (len == 0) {
+			_;
+			return;
+		}
+		uint balanceAddr = internalBalanceOf[_addr];
+		uint _totalSupply = internalTotalSupply;
 		for (uint8 i = 0; i < len; i++) {
 			address _rewardsAddr = internalRewardsAssets[i];
 			if (_rewardsAddr == address(0)) {
 				continue;
 			}
-			uint _totalSupply = internalTotalSupply;
-			uint CBRA = IERC20(_rewardsAddr).balanceOf(_rewardsAddr); //contract balance rewards asset
-			uint TDPW = internalTotalDividendsPaidPerWasset[i]; //total dividends paid per wasset since contract inception
-			uint CBRAPWA = CBRA.mul(1 ether).div(_totalSupply); //contract balance rewards asset per wasset
-			uint TRPW = CBRAPWA.add(TDPW); //total rewards per wasset since contract inception
-			//total rewards per wasset from contract inception to most recent rewards collection for _addr
-			uint prevTRPW = internalPrevTotalRewardsPerWasset[i][_addr];
-			if (prevTRPW < TRPW) {
-				uint RPW = TRPW - prevTRPW; //rewards per wasset
-				uint dividend = RPW.mul(balanceAddr) / (1 ether); //dividend to be paid to _addr
-				uint additionalDPW = dividend.mul(1 ether).div(_totalSupply).add(1); //add 1 to avoid rounding errors
-				IERC20(_rewardsAddr).transfer(_addr, dividend);
-				internalTotalDividendsPaidPerWasset[i] = TDPW.add(additionalDPW);
-				address addr = _addr; //prevent stack too deep
-				internalPrevTotalRewardsPerWasset[i][addr] = TRPW;
+			uint newTRPW;
+			uint CBRA = IERC20(_rewardsAddr).balanceOf(address(this)); //contract balance rewards asset
+			{
+				uint prevCBRA = internalPrevContractBalance[i];
+				if (prevCBRA > CBRA) { //odd case, should never happen
+					continue;
+				}
+				uint newRewardsPerWasset = (CBRA - prevCBRA).mul(1 ether).div(_totalSupply);
+				newTRPW = internalTotalRewardsPerWasset[i].add(newRewardsPerWasset);
 			}
+			uint prevTRPW = internalPrevTotalRewardsPerWasset[i][_addr];
+			if (prevTRPW < newTRPW) {
+				uint dividend = (newTRPW - prevTRPW).mul(balanceAddr) / (1 ether);
+				IERC20(_rewardsAddr).transfer(_addr, dividend);
+				internalPrevTotalRewardsPerWasset[i][_addr] = newTRPW;
+			}
+			//fetch balanceOf again rather than taking CBRA and subtracting dividend because of small rounding errors that may occur
+			//however if no transfers were executed it is fine to use the previously fetched CBRA value
+			internalPrevContractBalance[i] = prevTRPW < newTRPW ? IERC20(_rewardsAddr).balanceOf(address(this)) : CBRA;
+			internalTotalRewardsPerWasset[i] = newTRPW;
 		}
 		_;
 	}

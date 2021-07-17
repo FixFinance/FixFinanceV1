@@ -2,10 +2,9 @@
 pragma solidity >=0.6.8 <0.7.0;
 import "./interfaces/IOrganizer.sol";
 import "./Wrappers/NGBwrapper/NGBwrapperDeployer.sol";
-import "./FixCapitalPool.sol";
 import "./amm/ZCBamm/ZCBammDeployer.sol";
 import "./amm/YTamm/YTammDeployer.sol";
-import "./FixCapitalPoolDeployer.sol";
+import "./FixCapitalPool/FixCapitalPoolDeployer.sol";
 import "./SwapRouter/SwapRouterDeployer.sol";
 import "./SwapRouter/SwapRouter.sol";
 import "./helpers/Ownable.sol";

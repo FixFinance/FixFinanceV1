@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.6.8 <0.7.0;
-import "./interfaces/IFixCapitalPool.sol";
-import "./interfaces/IWrapper.sol";
-import "./interfaces/IYieldToken.sol";
-import "./interfaces/IERC20.sol";
-import "./libraries/SafeMath.sol";
+import "../../interfaces/IFixCapitalPool.sol";
+import "../../interfaces/IWrapper.sol";
+import "../../interfaces/IYieldToken.sol";
+import "../../interfaces/IERC20.sol";
+import "../../libraries/SafeMath.sol";
 
 contract YieldToken is IYieldToken {
 

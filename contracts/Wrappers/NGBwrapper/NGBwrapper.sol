@@ -261,12 +261,10 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 
 
     function transfer(address _to, uint256 _value) external override returns (bool success) {
-    	(success, ) = delegate1Address.delegatecall(abi.encodeWithSignature("transfer(address,uint256)", _to, _value));
+    	(success, ) = delegate2Address.delegatecall(abi.encodeWithSignature("transfer(address,uint256)", _to, _value));
     	require(success);
 
         emit Transfer(msg.sender, _to, _value);
-
-        return true;
     }
 
     function approve(address _spender, uint256 _value) external override returns (bool success) {
@@ -278,12 +276,10 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
     }
 
     function transferFrom(address _from, address _to, uint256 _value) external override returns (bool success) {
-    	(success, ) = delegate1Address.delegatecall(abi.encodeWithSignature("transferFrom(address,address,uint256)", _from, _to, _value));
+    	(success, ) = delegate2Address.delegatecall(abi.encodeWithSignature("transferFrom(address,address,uint256)", _from, _to, _value));
     	require(success);
 
         emit Transfer(_from, _to, _value);
-
-        return true;
     }
 
     //-----------------------E-I-P-3-1-6-5---f-l-a-s-h-l-o-a-n---f-u-n-c-t-i-o-n-a-l-i-t-y-----------------

@@ -48,6 +48,7 @@ contract NGBwrapperData is nonReentrant, Ownable {
 		uint248 prevTotalRewardsPerClaim;
 		bool hasClaimedAllYTrewards;
 	}
+	uint[] internalTotalUnspentDistributionAccountRewards;
 	mapping(address => uint)[] internalDistributionAccountRewards;
 	mapping(address => bool) internalIsDistributionAccount;
 	//Distribution Account => Sub Account => FCP => SubAccountPosition

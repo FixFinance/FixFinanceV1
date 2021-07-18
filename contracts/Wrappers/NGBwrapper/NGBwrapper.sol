@@ -437,6 +437,10 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 		return internalIsDistributionAccount[_addr];
 	}
 
+	function totalUnspentDistributionAccountRewards(uint _index) external view override returns(uint) {
+		return internalTotalUnspentDistributionAccountRewards[_index];
+	}
+
 	function distributionAccountRewards(uint _index, address _distributionAccount) external view override returns(uint) {
 		return internalDistributionAccountRewards[_index][_distributionAccount];
 	}
@@ -498,6 +502,8 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
     	internalPrevContractBalance.push(0);
     	internalTotalRewardsPerWasset.push(0);
     	internalPrevTotalRewardsPerWasset.push();
+    	internalTotalUnspentDistributionAccountRewards.push(0);
+    	internalDistributionAccountRewards.push();
     	uint currentBal = IERC20(_rewardsAsset).balanceOf(address(this));
     	address sendTo = IInfoOracle(internalInfoOracleAddress).sendTo();
     	uint toOwner = currentBal >> 1;

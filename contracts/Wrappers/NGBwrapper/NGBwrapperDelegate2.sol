@@ -36,7 +36,8 @@ contract NGBwrapperDelegate2 is NGBwrapperData {
 				continue;
 			}
 			uint newTRPW;
-			uint CBRA = IERC20(_rewardsAddr).balanceOf(address(this)); //contract balance rewards asset
+			uint totalUnspentDARewards = internalTotalUnspentDistributionAccountRewards[uint8(i)];
+			uint CBRA = IERC20(_rewardsAddr).balanceOf(address(this)).sub(totalUnspentDARewards); //contract balance rewards asset
 			{
 				uint prevCBRA = internalPrevContractBalance[uint8(i)];
 				if (prevCBRA > CBRA) { //odd case, should never happen
@@ -50,13 +51,19 @@ contract NGBwrapperDelegate2 is NGBwrapperData {
 			if (prevTRPW < newTRPW) {
 				uint dividend = (newTRPW - prevTRPW).mul(balanceAddr0) / (1 ether);
 				getContractBalanceAgain = dividend > 0;
-				internalPrevTotalRewardsPerWasset[uint8(i)][_addr0] = newTRPW;
+				address addr = _addr0; // prevent stack too deep
+				internalPrevTotalRewardsPerWasset[uint8(i)][addr] = newTRPW;
 				if (i >> 15 > 0) {
-					address addr = _addr0; // prevent stack too deep
 					internalDistributionAccountRewards[i][addr] = internalDistributionAccountRewards[i][addr].add(dividend);
+					/*
+						it is very rare that a distribution account will transfer to another distribution account,
+						thus we don't need to worry about the possibility of an unnesecarry extra sstore when writing totalUnspentDARewards to storage
+					*/
+					totalUnspentDARewards = totalUnspentDARewards.add(dividend);
+					internalTotalUnspentDistributionAccountRewards[i] = totalUnspentDARewards;
 				}
 				else {
-					bool success = IERC20(_rewardsAddr).transfer(_addr0, dividend);
+					bool success = IERC20(_rewardsAddr).transfer(addr, dividend);
 					require(success);
 				}
 			}
@@ -64,18 +71,26 @@ contract NGBwrapperDelegate2 is NGBwrapperData {
 			if (prevTRPW < newTRPW) {
 				uint dividend = (newTRPW - prevTRPW).mul(balanceAddr1) / (1 ether);
 				getContractBalanceAgain = getContractBalanceAgain || dividend > 0;
-				internalPrevTotalRewardsPerWasset[i][_addr1] = newTRPW;
+				address addr = _addr1; // prevent stack too deep
+				internalPrevTotalRewardsPerWasset[i][addr] = newTRPW;
 				if (1 & (i >> 14) > 0) {
-					internalDistributionAccountRewards[i][_addr1] = internalDistributionAccountRewards[i][_addr1].add(dividend);
+					internalDistributionAccountRewards[i][addr] = internalDistributionAccountRewards[i][addr].add(dividend);
+					/*
+						it is very rare that a distribution account will transfer to another distribution account,
+						thus we don't need to worry about the possibility of an unnesecarry extra sstore when writing totalUnspentDARewards to storage
+					*/
+					totalUnspentDARewards = totalUnspentDARewards.add(dividend);
+					internalTotalUnspentDistributionAccountRewards[i] = totalUnspentDARewards;
 				}
 				else {
-					bool success = IERC20(_rewardsAddr).transfer(_addr1, dividend);
+					bool success = IERC20(_rewardsAddr).transfer(addr, dividend);
 					require(success);
 				}
 			}
 			//fetch balanceOf again rather than taking CBRA and subtracting dividend because of small rounding errors that may occur
 			//however if no transfers were executed it is fine to use the previously fetched CBRA value
-			internalPrevContractBalance[uint8(i)] = getContractBalanceAgain ? IERC20(_rewardsAddr).balanceOf(address(this)) : CBRA;
+			internalPrevContractBalance[uint8(i)] = (getContractBalanceAgain ? IERC20(_rewardsAddr).balanceOf(address(this)) : CBRA)
+				.sub(totalUnspentDARewards);
 			internalTotalRewardsPerWasset[uint8(i)] = newTRPW;
 		}
 		_;

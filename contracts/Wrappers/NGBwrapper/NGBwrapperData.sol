@@ -39,4 +39,18 @@ contract NGBwrapperData is nonReentrant, Ownable {
 	uint[] internalPrevContractBalance;
 	uint[] internalTotalRewardsPerWasset;
 	mapping(address => uint)[] internalPrevTotalRewardsPerWasset;
+
+	//------s-u-b-a-c-c-o-u-n-t---r-e-w-a-r-d-s---m-e-c-h-a-n-i-s-m---------
+
+	struct SubAccountPosition {
+		uint yield;
+		int bond;
+		uint248 prevTotalRewardsPerClaim;
+		bool hasClaimedAllYTrewards;
+	}
+	mapping(address => uint)[] internalDistributionAccountRewards;
+	mapping(address => bool) internalIsDistributionAccount;
+	//Distribution Account => Sub Account => FCP => SubAccountPosition
+	mapping(address => mapping(address => mapping(address => SubAccountPosition))) internalSubAccountPositions;
+
 }

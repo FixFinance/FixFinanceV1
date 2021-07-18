@@ -42,55 +42,6 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 		SBPSRetained = _SBPSRetained;
 	}
 
-	modifier doubleClaimReward(address _addr0, address _addr1) {
-		uint len = internalRewardsAssets.length;
-		if (len == 0) {
-			_;
-			return;
-		}
-		uint balanceAddr0 = internalBalanceOf[_addr0];
-		uint balanceAddr1 = internalBalanceOf[_addr1];
-		uint _totalSupply = internalTotalSupply;
-		for (uint8 i = 0; i < len; i++) {
-			address _rewardsAddr = internalRewardsAssets[i];
-			if (_rewardsAddr == address(0)) {
-				continue;
-			}
-			uint newTRPW;
-			uint CBRA = IERC20(_rewardsAddr).balanceOf(address(this)); //contract balance rewards asset
-			{
-				uint prevCBRA = internalPrevContractBalance[i];
-				if (prevCBRA > CBRA) { //odd case, should never happen
-					continue;
-				}
-				uint newRewardsPerWasset = (CBRA - prevCBRA).mul(1 ether).div(_totalSupply);
-				newTRPW = internalTotalRewardsPerWasset[i].add(newRewardsPerWasset);
-			}
-			uint prevTRPW = internalPrevTotalRewardsPerWasset[i][_addr0];
-			bool getContractBalanceAgain = false;
-			if (prevTRPW < newTRPW) {
-				uint dividend = (newTRPW - prevTRPW).mul(balanceAddr0) / (1 ether);
-				getContractBalanceAgain = dividend > 0;
-				internalPrevTotalRewardsPerWasset[i][_addr0] = newTRPW;
-				bool success = IERC20(_rewardsAddr).transfer(_addr0, dividend);
-				require(success);
-			}
-			prevTRPW = internalPrevTotalRewardsPerWasset[i][_addr1];
-			if (prevTRPW < newTRPW) {
-				uint dividend = (newTRPW - prevTRPW).mul(balanceAddr1) / (1 ether);
-				getContractBalanceAgain = getContractBalanceAgain || dividend > 0;
-				internalPrevTotalRewardsPerWasset[i][_addr1] = newTRPW;
-				bool success = IERC20(_rewardsAddr).transfer(_addr1, dividend);
-				require(success);
-			}
-			//fetch balanceOf again rather than taking CBRA and subtracting dividend because of small rounding errors that may occur
-			//however if no transfers were executed it is fine to use the previously fetched CBRA value
-			internalPrevContractBalance[i] = getContractBalanceAgain ? IERC20(_rewardsAddr).balanceOf(address(this)) : CBRA;
-			internalTotalRewardsPerWasset[i] = newTRPW;
-		}
-		_;
-	}
-
 	/*
 		@Description: send in a specific amount of underlying asset, receive wrapped asset
 
@@ -127,11 +78,6 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 
 			_amountUnit := mload(0)
 		}
-	}
-
-	function forceRewardsCollection() external override {
-		(bool success, ) = delegate1Address.delegatecall(abi.encodeWithSignature("forceRewardsCollection()"));
-		require(success);
 	}
 
 	/*
@@ -311,18 +257,16 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 	//---------------------------------------------------i-m-p-l-e-m-e-n-t-s---E-R-C-2-0---------------------------
 
 
-    function transfer(address _to, uint256 _value) public doubleClaimReward(_to, msg.sender) override returns (bool success) {
-        require(_value <= internalBalanceOf[msg.sender]);
-
-        internalBalanceOf[msg.sender] -= _value;
-        internalBalanceOf[_to] += _value;
+    function transfer(address _to, uint256 _value) external override returns (bool success) {
+    	(success, ) = delegate1Address.delegatecall(abi.encodeWithSignature("transfer(address,uint256)", _to, _value));
+    	require(success);
 
         emit Transfer(msg.sender, _to, _value);
 
         return true;
     }
 
-    function approve(address _spender, uint256 _value) public override returns (bool success) {
+    function approve(address _spender, uint256 _value) external override returns (bool success) {
         internalAllowance[msg.sender][_spender] = _value;
 
         emit Approval(msg.sender, _spender, _value);
@@ -330,14 +274,9 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
         return true;
     }
 
-    function transferFrom(address _from, address _to, uint256 _value) public doubleClaimReward(_to, _from) override returns (bool success) {
-        require(_value <= internalAllowance[_from][msg.sender]);
-    	require(_value <= internalBalanceOf[_from]);
-
-    	internalBalanceOf[_from] -= _value;
-    	internalBalanceOf[_to] += _value;
-
-        internalAllowance[_from][msg.sender] -= _value;
+    function transferFrom(address _from, address _to, uint256 _value) external override returns (bool success) {
+    	(success, ) = delegate1Address.delegatecall(abi.encodeWithSignature("transferFrom(address,address,uint256)", _from, _to, _value));
+    	require(success);
 
         emit Transfer(_from, _to, _value);
 
@@ -390,6 +329,39 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
         return true;
     }
 
+    //-----------r-e-w-a-r-d---a-s-s-e-t---d-i-s-t-r-i-b-u-t-i-o-n---m-e-c-h-a-n-i-s-m---------
+
+	/*
+		@Description: force the NGBwrapper to collect reward assets for msg.sender
+	*/
+	function forceRewardsCollection() external override {
+		(bool success, ) = delegate1Address.delegatecall(abi.encodeWithSignature("forceRewardsCollection()"));
+		require(success);
+	}
+
+	/*
+		@Description: register as a distribution account,
+			should only be done by contracts wishing to distribute rewards correctly among depositors
+	*/
+	function registerAsDistributionAccount() external override {
+		internalIsDistributionAccount[msg.sender] = true;
+	}
+
+	/*
+		@Description: remove registration as distribution account,
+			receive back all funds that had not been distributed
+	*/
+	function delistDistributionAccount() external override {
+		uint len = internalRewardsAssets.length;
+		for (uint8 i = 0; i < len; i++) {
+			address _rewardsAsset = internalImmutableRewardsAssets[i];
+			uint dividend = internalDistributionAccountRewards[i][msg.sender];
+			internalDistributionAccountRewards[i][msg.sender] = 0;
+			IERC20(_rewardsAsset).transfer(_rewardsAsset, dividend);
+		}
+		internalIsDistributionAccount[msg.sender] = false;
+	}
+
     //------------------------v-i-e-w-s---------------------------
 
 	bool public constant override underlyingIsStatic = false;
@@ -438,11 +410,11 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
     	return internalSymbol;
     }
 
-	function rewardsAssets(uint _index) external override view returns(address) {
+	function rewardsAssets(uint _index) external view override returns(address) {
 		return internalRewardsAssets[_index];
 	}
 
-	function immutableRewardsAssets(uint _index) external override view returns(address) {
+	function immutableRewardsAssets(uint _index) external view override returns(address) {
 		return internalImmutableRewardsAssets[_index];
 	}
 
@@ -454,12 +426,37 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 		return internalTotalRewardsPerWasset[_index];
 	}
 
-	function prevTotalRewardsPerWasset(uint _index, address _wassetHolder) external override view returns(uint) {
+	function prevTotalRewardsPerWasset(uint _index, address _wassetHolder) external view override returns(uint) {
 		return internalPrevTotalRewardsPerWasset[_index][_wassetHolder];
 	}
 
-	function numRewardsAssets() external override view returns(uint) {
+	function numRewardsAssets() external view override returns(uint) {
 		return internalRewardsAssets.length;
+	}
+
+	function isDistributionAccount(address _addr) external view override returns(bool) {
+		return internalIsDistributionAccount[_addr];
+	}
+
+	function distributionAccountRewards(uint _index, address _distributionAccount) external view override returns(uint) {
+		return internalDistributionAccountRewards[_index][_distributionAccount];
+	}
+
+	function subAccountPositions(
+		address _distributionAccount,
+		address _subAccount, 
+		address _FCPaddr
+	) external view override returns(
+		uint yield,
+		int bond,
+		uint248 prevTotalRewardsPerClaim,
+		bool hasClaimedAllYTrewards
+	) {
+		SubAccountPosition memory position = internalSubAccountPositions[_distributionAccount][_subAccount][_FCPaddr];
+		yield = position.yield;
+		bond = position.bond;
+		prevTotalRewardsPerClaim = position.prevTotalRewardsPerClaim;
+		hasClaimedAllYTrewards = position.hasClaimedAllYTrewards;
 	}
 
     //------------------------------------a-d-m-i-n----------------------------

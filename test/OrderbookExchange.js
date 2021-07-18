@@ -1,5 +1,6 @@
 const aToken = artifacts.require("dummyAToken");
 const NGBwrapperDelegate1 = artifacts.require('NGBwrapperDelegate1');
+const NGBwrapperDelegate2 = artifacts.require('NGBwrapperDelegate2');
 const NGBwrapper = artifacts.require("NGBwrapper");
 const BigMath = artifacts.require("BigMath");
 const fixCapitalPool = artifacts.require("FixCapitalPool");
@@ -37,7 +38,8 @@ contract('OrderbookExchange', async function(accounts) {
 		aTokenInstance = await aToken.new("aCOIN");
 		infoOracleInstance = await InfoOracle.new(BipsToTreasury, nullAddress);
 		ngbwDelegate1Instance = await NGBwrapperDelegate1.new();
-		NGBwrapperInstance = await NGBwrapper.new(aTokenInstance.address, infoOracleInstance.address, ngbwDelegate1Instance.address, SBPSretained);
+		ngbwDelegate2Instance = await NGBwrapperDelegate2.new();
+		NGBwrapperInstance = await NGBwrapper.new(aTokenInstance.address, infoOracleInstance.address, ngbwDelegate1Instance.address, ngbwDelegate2Instance.address, SBPSretained);
 		zcbYtDeployerInstance = await zcbYtDeployer.new();
 		let timestamp = (await web3.eth.getBlock('latest')).timestamp;
 		//maturity is 110 days out

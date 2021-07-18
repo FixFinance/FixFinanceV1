@@ -1,5 +1,6 @@
 const dummyAToken = artifacts.require('dummyAToken');
 const NGBwrapperDelegate1 = artifacts.require('NGBwrapperDelegate1');
+const NGBwrapperDelegate2 = artifacts.require('NGBwrapperDelegate2');
 const NGBwrapper = artifacts.require('NGBwrapper');
 const InfoOracle = artifacts.require('InfoOracle');
 const BN = web3.utils.BN;
@@ -35,7 +36,8 @@ contract('NGBwrapper', async function(accounts){
 		owner = accounts[4];
 		infoOracleInstance = await InfoOracle.new(0, owner);
 		ngbwDelegate1Instance = await NGBwrapperDelegate1.new();
-		NGBwrapperInstance = await NGBwrapper.new(dummyATokenInstance.address, infoOracleInstance.address, ngbwDelegate1Instance.address, SBPSretained);
+		ngbwDelegate2Instance = await NGBwrapperDelegate2.new();
+		NGBwrapperInstance = await NGBwrapper.new(dummyATokenInstance.address, infoOracleInstance.address, ngbwDelegate1Instance.address, ngbwDelegate2Instance.address, SBPSretained);
 		inflation = await dummyATokenInstance.inflation();
 		treasuryAddress = owner;
 		await NGBwrapperInstance.transferOwnership(treasuryAddress);

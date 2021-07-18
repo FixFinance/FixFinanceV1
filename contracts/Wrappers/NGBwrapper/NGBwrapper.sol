@@ -22,6 +22,7 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 	using ABDKMath64x64 for int128;
 
 	address delegate1Address;
+	address delegate2Address;
 
 	/*
 		init
@@ -30,6 +31,7 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 		address _underlyingAssetAddress,
 		address _infoOralceAddress,
 		address _delegate1Address,
+		address _delegate2Address,
 		uint32 _SBPSRetained
 	) public {
 		require(_SBPSRetained > 0 && _SBPSRetained <= totalSBPS);
@@ -39,6 +41,7 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 		internalSymbol = string(abi.encodePacked('w', IERC20(_underlyingAssetAddress).symbol()));
 		internalInfoOracleAddress = _infoOralceAddress;
 		delegate1Address = _delegate1Address;
+		delegate2Address = _delegate2Address;
 		SBPSRetained = _SBPSRetained;
 	}
 

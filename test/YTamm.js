@@ -1,5 +1,6 @@
 const aToken = artifacts.require("dummyAToken");
 const NGBwrapperDelegate1 = artifacts.require('NGBwrapperDelegate1');
+const NGBwrapperDelegate2 = artifacts.require('NGBwrapperDelegate2');
 const NGBwrapper = artifacts.require("NGBwrapper");
 const BigMath = artifacts.require("BigMath");
 const Ei = artifacts.require("Ei");
@@ -100,7 +101,8 @@ contract('YTamm', async function(accounts){
 			nullAddress
 		);
 		ngbwDelegate1Instance = await NGBwrapperDelegate1.new();
-		NGBwrapperInstance = await NGBwrapper.new(aTokenInstance.address, infoOracleInstance.address, ngbwDelegate1Instance.address, SBPSretained);
+		ngbwDelegate2Instance = await NGBwrapperDelegate2.new();
+		NGBwrapperInstance = await NGBwrapper.new(aTokenInstance.address, infoOracleInstance.address, ngbwDelegate1Instance.address, ngbwDelegate2Instance.address, SBPSretained);
 		EiInstance = await Ei.new();
 		await BigMath.link("Ei", EiInstance.address);
 		BigMathInstance = await BigMath.new();

@@ -31,6 +31,9 @@ interface IFixCapitalPool is IFCPFlashLender {
 	function currentConversionRate() external view returns(uint);
 	function totalBalanceZCB(address _owner) external view returns (uint);
 
+	//----------------rewards-system--------
+	function TotalRewardsPerWassetAtMaturity(uint _index) external view returns(uint);
+
 	//---------------Vault-Factory------------------------------
 	function mintZCBTo(address _owner, uint _amount) external;
 	function burnZCBFrom(address _owner, uint _amount) external;

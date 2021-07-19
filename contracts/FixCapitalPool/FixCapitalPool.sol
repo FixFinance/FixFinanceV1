@@ -69,6 +69,8 @@ contract FixCapitalPool is IFixCapitalPool, Ownable, nonReentrant {
 
     address public override infoOracleAddress;
 
+    uint[] public override TotalRewardsPerWassetAtMaturity;
+
     /*
 		init
     */
@@ -202,6 +204,11 @@ contract FixCapitalPool is IFixCapitalPool, Ownable, nonReentrant {
 		require(!inPayoutPhase && block.timestamp >= maturity);
 		inPayoutPhase = true;
 		maturityConversionRate = wrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
+		uint len = wrapper.numRewardsAssets();
+		len = len > type(uint8).max ? type(uint8).max : len;
+		for (uint8 i = 0; i < len; i++) {
+			TotalRewardsPerWassetAtMaturity.push(wrapper.totalRewardsPerWasset(i));
+		}
 	}
 
 	/*

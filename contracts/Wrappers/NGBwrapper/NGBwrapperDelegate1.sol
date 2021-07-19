@@ -6,62 +6,11 @@ import "../../interfaces/IInfoOracle.sol";
 import "../../libraries/SafeMath.sol";
 import "../../libraries/ABDKMath64x64.sol";
 import "../../libraries/BigMath.sol";
-import "./NGBwrapperData.sol";
+import "./NGBwrapperDelegateParent.sol";
 
-contract NGBwrapperDelegate1 is NGBwrapperData {
-	using SafeMath for uint;
+contract NGBwrapperDelegate1 is NGBwrapperDelegateParent {
+	using SafeMath for uint256;
 	using ABDKMath64x64 for int128;
-
-	modifier claimRewards(address _addr) {
-		uint len = internalRewardsAssets.length;
-		if (len == 0) {
-			_;
-			return;
-		}
-		len = len > type(uint8).max ? type(uint8).max : len;
-		uint balanceAddr = internalBalanceOf[_addr];
-		uint _totalSupply = internalTotalSupply;
-		uint16 i = internalIsDistributionAccount[_addr] ? 1 << 15 : 0;
-		for ( ; uint8(i) < len; i++) {
-			address _rewardsAddr = internalRewardsAssets[uint8(i)];
-			if (_rewardsAddr == address(0)) {
-				continue;
-			}
-			uint newTRPW;
-			uint totalUnspentDARewards = internalTotalUnspentDistributionAccountRewards[uint8(i)];
-			uint CBRA = IERC20(_rewardsAddr).balanceOf(address(this)).sub(totalUnspentDARewards); //contract balance rewards asset
-			{
-				uint prevCBRA = internalPrevContractBalance[uint8(i)];
-				if (prevCBRA > CBRA) { //odd case, should never happen
-					continue;
-				}
-				uint newRewardsPerWasset = (CBRA - prevCBRA).mul(1 ether).div(_totalSupply);
-				newTRPW = internalTotalRewardsPerWasset[uint8(i)].add(newRewardsPerWasset);
-			}
-			uint prevTRPW = internalPrevTotalRewardsPerWasset[uint8(i)][_addr];
-			bool getContractBalanceAgain = false;
-			if (prevTRPW < newTRPW) {
-				uint dividend = (newTRPW - prevTRPW).mul(balanceAddr) / (1 ether);
-				getContractBalanceAgain = dividend > 0;
-				internalPrevTotalRewardsPerWasset[i][_addr] = newTRPW;
-				if (i >> 15 > 0) {
-					internalDistributionAccountRewards[i][_addr] = internalDistributionAccountRewards[i][_addr].add(dividend);
-					totalUnspentDARewards = totalUnspentDARewards.add(dividend);
-					internalTotalUnspentDistributionAccountRewards[i] = totalUnspentDARewards;
-				}
-				else {
-					bool success = IERC20(_rewardsAddr).transfer(_addr, dividend);
-					require(success);
-				}
-			}
-			//fetch balanceOf again rather than taking CBRA and subtracting dividend because of small rounding errors that may occur
-			//however if no transfers were executed it is fine to use the previously fetched CBRA value
-			internalPrevContractBalance[uint8(i)] = (getContractBalanceAgain ? IERC20(_rewardsAddr).balanceOf(address(this)) : CBRA)
-				.sub(totalUnspentDARewards); //contract balance rewards asset
-			internalTotalRewardsPerWasset[uint8(i)] = newTRPW;
-		}
-		_;
-	}
 
 	/*
 		@Description: collect fee, send 50% to owner and 50% to treasury address

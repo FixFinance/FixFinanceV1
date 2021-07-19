@@ -18,7 +18,7 @@ import "./NGBwrapperData.sol";
 	The balances of the underlying asset automatically grow as yield is generated
 */
 contract NGBwrapper is INGBWrapper, NGBwrapperData {
-	using SafeMath for uint;
+	using SafeMath for uint256;
 	using ABDKMath64x64 for int128;
 
 	address delegate1Address;

@@ -82,6 +82,7 @@ contract FixCapitalPool is IFixCapitalPool, Ownable, nonReentrant {
 	) public {
 		IWrapper temp = IWrapper(_wrapper);
 		wrapper = temp;
+		temp.registerAsDistributionAccount();
 		IERC20 temp2 = IERC20(temp.underlyingAssetAddress());
 		underlyingAssetAddress = address(temp2);
 		maturity = _maturity;
@@ -135,7 +136,9 @@ contract FixCapitalPool is IFixCapitalPool, Ownable, nonReentrant {
 		@param uint _amountWrappedTkn: the amount of wrapped asset to deposit
 	*/
 	function depositWrappedToken(address _to, uint _amountWrappedTkn) external override beforePayoutPhase {
-		wrapper.transferFrom(msg.sender, address(this), _amountWrappedTkn);
+		IWrapper wrp = wrapper;
+		wrp.forceClaimSubAccountRewards(address(this), _to, address(this));
+		wrp.transferFrom(msg.sender, address(this), _amountWrappedTkn);
 		balanceYield[_to] += _amountWrappedTkn;
 	}
 
@@ -149,11 +152,13 @@ contract FixCapitalPool is IFixCapitalPool, Ownable, nonReentrant {
 	*/
 	function withdraw(address _to, uint _amountWrappedTkn, bool _unwrap) external override beforePayoutPhase {
 		require(wrappedTokenFree(msg.sender) >= _amountWrappedTkn);
+		IWrapper wrp = wrapper;
+		wrp.forceClaimSubAccountRewards(address(this), msg.sender, address(this));
 		balanceYield[msg.sender] -= _amountWrappedTkn;
 		if (_unwrap)
-			wrapper.withdrawWrappedAmount(_to, _amountWrappedTkn);
+			wrp.withdrawWrappedAmount(_to, _amountWrappedTkn);
 		else
-			wrapper.transfer(_to, _amountWrappedTkn);
+			wrp.transfer(_to, _amountWrappedTkn);
 	}
 
 	/*
@@ -167,11 +172,13 @@ contract FixCapitalPool is IFixCapitalPool, Ownable, nonReentrant {
 	*/
 	function withdrawAll(address _to, bool _unwrap) external override beforePayoutPhase {
 		uint freeToMove = wrappedTokenFree(msg.sender);
+		IWrapper wrp = wrapper;
+		wrp.forceClaimSubAccountRewards(address(this), msg.sender, address(this));
 		balanceYield[msg.sender] -= freeToMove;
 		if (_unwrap)
-			wrapper.withdrawWrappedAmount(_to, freeToMove);
+			wrp.withdrawWrappedAmount(_to, freeToMove);
 		else
-			wrapper.transfer(_to, freeToMove);
+			wrp.transfer(_to, freeToMove);
 	}
 
 	/*
@@ -184,15 +191,17 @@ contract FixCapitalPool is IFixCapitalPool, Ownable, nonReentrant {
 	*/
 	function claimBondPayout(address _to, bool _unwrap) external override {
 		require(inPayoutPhase);
+		IWrapper wrp = wrapper;
+		wrp.forceClaimSubAccountRewards(address(this), msg.sender, address(this));
 		uint freeToMove = wrappedTokenFree(msg.sender);
 		int bondBal = balanceBonds[msg.sender];
 		if (bondBal > 0) {
 			freeToMove += uint(bondBal).mul(1 ether)/maturityConversionRate;
 		}
 		if (_unwrap)
-			wrapper.withdrawWrappedAmount(_to, freeToMove);
+			wrp.withdrawWrappedAmount(_to, freeToMove);
 		else
-			wrapper.transfer(_to, freeToMove);
+			wrp.transfer(_to, freeToMove);
 		delete balanceYield[msg.sender];
 		delete balanceBonds[msg.sender];
 	}
@@ -243,6 +252,9 @@ contract FixCapitalPool is IFixCapitalPool, Ownable, nonReentrant {
     */
 	function mintZCBTo(address _owner, uint _amount) external override {
 		require(whitelistedVaultFactories[msg.sender]);
+		if (inPayoutPhase) {
+			wrapper.forceClaimSubAccountRewards(address(this), _owner, address(this));
+		}
 		balanceBonds[_owner] += int(_amount);
 	}
 
@@ -256,6 +268,9 @@ contract FixCapitalPool is IFixCapitalPool, Ownable, nonReentrant {
 	function burnZCBFrom(address _owner, uint _amount) external override {
 		require(whitelistedVaultFactories[msg.sender]);
 		require(minimumUnitAmountAtMaturity(_owner) >= _amount);
+		if (inPayoutPhase) {
+			wrapper.forceClaimSubAccountRewards(address(this), _owner, address(this));
+		}
 		balanceBonds[_owner] -= int(_amount);
 	}
 
@@ -268,6 +283,7 @@ contract FixCapitalPool is IFixCapitalPool, Ownable, nonReentrant {
 	*/
 	function transferPosition(address _to, uint _yield, int _bond) external override {
 		//ensure position has positive minimum value at maturity
+		wrapper.forceDoubleClaimSubAccountRewards(msg.sender, _to);
 		uint ratio = inPayoutPhase ? maturityConversionRate : wrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
 		require(_bond >= 0 || _yield.mul(ratio)/(1 ether) >= uint(-_bond));
 		uint yieldSender = balanceYield[msg.sender].sub(_yield);
@@ -288,6 +304,8 @@ contract FixCapitalPool is IFixCapitalPool, Ownable, nonReentrant {
 		@param int _bond: the amount change in the balanceBonds mapping
 	*/
 	function transferPositionFrom(address _from, address _to, uint _yield, int _bond) external override {
+		IWrapper wrp = wrapper;
+		wrp.forceDoubleClaimSubAccountRewards( _from, _to);
 		//ensure position has positive minimum value at maturity
 		uint yieldFrom = balanceYield[_from].sub(_yield);
 		if (_yield > 0) {
@@ -298,7 +316,7 @@ contract FixCapitalPool is IFixCapitalPool, Ownable, nonReentrant {
 		}
 
 		if (_bond != 0) {
-			uint ratio = inPayoutPhase ? maturityConversionRate : wrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
+			uint ratio = inPayoutPhase ? maturityConversionRate : wrp.WrappedAmtToUnitAmt_RoundDown(1 ether);
 			uint unitAmtYield = _yield.mul(ratio)/(1 ether);
 			require(_bond >= 0 || unitAmtYield >= uint(-_bond));
 			int bondFrom = balanceBonds[_from].sub(_bond);
@@ -331,6 +349,9 @@ contract FixCapitalPool is IFixCapitalPool, Ownable, nonReentrant {
 		@param address _to: the address to send 
 	*/
 	function transferZCB(address _from, address _to, uint _amount) external override {
+		if (inPayoutPhase) {
+			wrapper.forceDoubleClaimSubAccountRewards( _from, _to);
+		}
 		if (msg.sender != _from && msg.sender != zeroCouponBondAddress) {
 			IZeroCouponBond(zeroCouponBondAddress).decrementAllowance(_from, msg.sender, _amount);
 		}
@@ -355,11 +376,13 @@ contract FixCapitalPool is IFixCapitalPool, Ownable, nonReentrant {
 			*denominated in wrapped asset*
 	*/
 	function transferYT(address _from, address _to, uint _amount) external override {
+		IWrapper wrp = wrapper;
+		wrp.forceDoubleClaimSubAccountRewards( _from, _to);
 		if (msg.sender != _from && msg.sender != yieldTokenAddress) {
 			IYieldToken(yieldTokenAddress).decrementAllowance(_from, msg.sender, _amount);
 		}
 		require(balanceYield[_from] >= _amount);
-		uint _amountBondChange = inPayoutPhase ? _amount.mul(maturityConversionRate)/(1 ether) : wrapper.WrappedAmtToUnitAmt_RoundDown(_amount);
+		uint _amountBondChange = inPayoutPhase ? _amount.mul(maturityConversionRate)/(1 ether) : wrp.WrappedAmtToUnitAmt_RoundDown(_amount);
 		balanceYield[_from] -= _amount;
 		balanceYield[_to] += _amount;
 		balanceBonds[_from] += int(_amountBondChange);
@@ -452,7 +475,13 @@ contract FixCapitalPool is IFixCapitalPool, Ownable, nonReentrant {
     ) external override beforePayoutPhase noReentry returns (bool) {
 		require(_amountYield <= MAX_YIELD_FLASHLOAN);
 		require(_amountBond <= MAX_BOND_FLASHLOAN);
-		uint ratio = wrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
+		uint ratio;
+		{
+			//prevent stack too deep with new scope
+			IWrapper wrp = wrapper;
+			wrp.forceClaimSubAccountRewards(address(this), msg.sender, address(this));
+			ratio = wrp.WrappedAmtToUnitAmt_RoundDown(1 ether);
+		}
 		uint effectiveZCB = _amountYield.mul(ratio) / (1 ether);
 		if (_amountBond >= 0) {
 			effectiveZCB = effectiveZCB.add(uint(_amountBond));

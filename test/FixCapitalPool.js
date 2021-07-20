@@ -20,7 +20,8 @@ contract('FixCapitalPool', async function(accounts){
 		sendTo = accounts[3];
 		infoOracleInstance = await InfoOracle.new(0, sendTo);
 		dummyATokenInstance = await dummyAToken.new("aCOIN");
-		rewardsAsset = await dummyAToken.new("RWD");
+		rewardsAsset0 = await dummyAToken.new("RWD0");
+		rewardsAsset1 = await dummyAToken.new("RWD1");
 		ngbwDelegate1Instance = await NGBwrapperDelegate1.new();
 		ngbwDelegate2Instance = await NGBwrapperDelegate2.new();
 		NGBwrapperInstance = await NGBwrapper.new(dummyATokenInstance.address, infoOracleInstance.address, ngbwDelegate1Instance.address, ngbwDelegate2Instance.address, SBPSretained);
@@ -30,6 +31,8 @@ contract('FixCapitalPool', async function(accounts){
 		inflation = await dummyATokenInstance.inflation();
 		yieldTokenInstance = await IERC20.at(await fixCapitalPoolInstance.yieldTokenAddress());
 		zcbInstance = await IERC20.at(await fixCapitalPoolInstance.zeroCouponBondAddress());
+		await NGBwrapperInstance.addRewardAsset(rewardsAsset0.address);
+		await rewardsAsset0.mintTo(NGBwrapperInstance.address, _10To18);
 		//wrap aTokens
 		amount = '100000';
 		await dummyATokenInstance.approve(NGBwrapperInstance.address, amount);
@@ -125,10 +128,10 @@ contract('FixCapitalPool', async function(accounts){
 
 	it('enters payout phase', async () => {
 		assert.equal(await fixCapitalPoolInstance.inPayoutPhase(), false, "payout phase has not been entered yet");
-		await NGBwrapperInstance.addRewardAsset(rewardsAsset.address);
-		await rewardsAsset.mintTo(NGBwrapperInstance.address, _10To18);
+		await NGBwrapperInstance.addRewardAsset(rewardsAsset1.address);
+		await rewardsAsset1.mintTo(NGBwrapperInstance.address, _10To18);
 		await NGBwrapperInstance.forceRewardsCollection({from: accounts[5]}); //from account with no balance
-		let expectedTRPWatMaturity = (await NGBwrapperInstance.totalRewardsPerWasset(0)).toString();
+		let expectedTRPWatMaturity = (await NGBwrapperInstance.totalRewardsPerWasset(1)).toString();
 		assert.notEqual(expectedTRPWatMaturity, "0", "TRPW must be non 0");
 
 		caught = false;
@@ -147,7 +150,7 @@ contract('FixCapitalPool', async function(accounts){
 			assert.equal(caught, true, "cannot enter payout phase after it has already been entered");
 		});
 
-		let TRPWatMaturity = (await fixCapitalPoolInstance.TotalRewardsPerWassetAtMaturity(0)).toString();
+		let TRPWatMaturity = (await fixCapitalPoolInstance.TotalRewardsPerWassetAtMaturity(1)).toString();
 		assert.equal(TRPWatMaturity, expectedTRPWatMaturity, "correct TRPW at maturity for reward asset");
 		maturityConversionRate = await fixCapitalPoolInstance.maturityConversionRate();
 	});
@@ -172,6 +175,12 @@ contract('FixCapitalPool', async function(accounts){
 		assert.equal((await fixCapitalPoolInstance.balanceBonds(accounts[1])).toString(), '0', "balance bond set to 0");
 		assert.equal((await fixCapitalPoolInstance.balanceYield(accounts[1])).toString(), '0', "balance yield set to 0");
 		assert.equal((await dummyATokenInstance.balanceOf(accounts[2])).toString(), expectedPayout.toString(), "correct payout of long bond tokens");
+	});
+
+	it('contract can repay all obligations', async () => {
+		for (let i = 0; i < accounts.length; i++) {
+			await fixCapitalPoolInstance.claimBondPayout(nullAddress, i%2==0, {from: accounts[i]});
+		}
 	});
 
 });

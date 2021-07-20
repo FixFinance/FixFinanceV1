@@ -17,8 +17,12 @@ contract NGBwrapperDelegateParent is NGBwrapperData {
 			return;
 		}
 		len = len > type(uint8).max ? type(uint8).max : len;
-		uint balanceAddr = internalBalanceOf[_addr];
 		uint _totalSupply = internalTotalSupply;
+		if (_totalSupply == 0) {
+			_;
+			return;
+		}
+		uint balanceAddr = internalBalanceOf[_addr];
 		uint16 i = internalIsDistributionAccount[_addr] ? 1 << 15 : 0;
 		for ( ; uint8(i) < len; i++) {
 			address _rewardsAddr = internalRewardsAssets[uint8(i)];
@@ -41,11 +45,11 @@ contract NGBwrapperDelegateParent is NGBwrapperData {
 			if (prevTRPW < newTRPW) {
 				uint dividend = (newTRPW - prevTRPW).mul(balanceAddr) / (1 ether);
 				getContractBalanceAgain = dividend > 0;
-				internalPrevTotalRewardsPerWasset[i][_addr] = newTRPW;
+				internalPrevTotalRewardsPerWasset[uint8(i)][_addr] = newTRPW;
 				if (i >> 15 > 0) {
-					internalDistributionAccountRewards[i][_addr] = internalDistributionAccountRewards[i][_addr].add(dividend);
+					internalDistributionAccountRewards[uint8(i)][_addr] = internalDistributionAccountRewards[uint8(i)][_addr].add(dividend);
 					totalUnspentDARewards = totalUnspentDARewards.add(dividend);
-					internalTotalUnspentDistributionAccountRewards[i] = totalUnspentDARewards;
+					internalTotalUnspentDistributionAccountRewards[uint8(i)] = totalUnspentDARewards;
 				}
 				else {
 					bool success = IERC20(_rewardsAddr).transfer(_addr, dividend);
@@ -54,8 +58,7 @@ contract NGBwrapperDelegateParent is NGBwrapperData {
 			}
 			//fetch balanceOf again rather than taking CBRA and subtracting dividend because of small rounding errors that may occur
 			//however if no transfers were executed it is fine to use the previously fetched CBRA value
-			internalPrevContractBalance[uint8(i)] = (getContractBalanceAgain ? IERC20(_rewardsAddr).balanceOf(address(this)) : CBRA)
-				.sub(totalUnspentDARewards); //contract balance rewards asset
+			internalPrevContractBalance[uint8(i)] = (getContractBalanceAgain ? IERC20(_rewardsAddr).balanceOf(address(this)).sub(totalUnspentDARewards) : CBRA);
 			internalTotalRewardsPerWasset[uint8(i)] = newTRPW;
 		}
 		_;
@@ -68,9 +71,13 @@ contract NGBwrapperDelegateParent is NGBwrapperData {
 			return;
 		}
 		len = len > type(uint8).max ? type(uint8).max : len;
+		uint _totalSupply = internalTotalSupply;
+		if (_totalSupply == 0) {
+			_;
+			return;
+		}
 		uint balanceAddr0 = internalBalanceOf[_addr0];
 		uint balanceAddr1 = internalBalanceOf[_addr1];
-		uint _totalSupply = internalTotalSupply;
 		/*
 			to save stack space multiple vars will be stored within i
 			most significant bit = addr0 is distribution account
@@ -103,13 +110,13 @@ contract NGBwrapperDelegateParent is NGBwrapperData {
 				address addr = _addr0; // prevent stack too deep
 				internalPrevTotalRewardsPerWasset[uint8(i)][addr] = newTRPW;
 				if (i >> 15 > 0) {
-					internalDistributionAccountRewards[i][addr] = internalDistributionAccountRewards[i][addr].add(dividend);
+					internalDistributionAccountRewards[uint8(i)][addr] = internalDistributionAccountRewards[uint8(i)][addr].add(dividend);
 					/*
 						it is very rare that a distribution account will transfer to another distribution account,
 						thus we don't need to worry about the possibility of an unnesecarry extra sstore when writing totalUnspentDARewards to storage
 					*/
 					totalUnspentDARewards = totalUnspentDARewards.add(dividend);
-					internalTotalUnspentDistributionAccountRewards[i] = totalUnspentDARewards;
+					internalTotalUnspentDistributionAccountRewards[uint8(i)] = totalUnspentDARewards;
 				}
 				else {
 					bool success = IERC20(_rewardsAddr).transfer(addr, dividend);
@@ -121,15 +128,15 @@ contract NGBwrapperDelegateParent is NGBwrapperData {
 				uint dividend = (newTRPW - prevTRPW).mul(balanceAddr1) / (1 ether);
 				getContractBalanceAgain = getContractBalanceAgain || dividend > 0;
 				address addr = _addr1; // prevent stack too deep
-				internalPrevTotalRewardsPerWasset[i][addr] = newTRPW;
+				internalPrevTotalRewardsPerWasset[uint8(i)][addr] = newTRPW;
 				if (1 & (i >> 14) > 0) {
-					internalDistributionAccountRewards[i][addr] = internalDistributionAccountRewards[i][addr].add(dividend);
+					internalDistributionAccountRewards[uint8(i)][addr] = internalDistributionAccountRewards[uint8(i)][addr].add(dividend);
 					/*
 						it is very rare that a distribution account will transfer to another distribution account,
 						thus we don't need to worry about the possibility of an unnesecarry extra sstore when writing totalUnspentDARewards to storage
 					*/
 					totalUnspentDARewards = totalUnspentDARewards.add(dividend);
-					internalTotalUnspentDistributionAccountRewards[i] = totalUnspentDARewards;
+					internalTotalUnspentDistributionAccountRewards[uint8(i)] = totalUnspentDARewards;
 				}
 				else {
 					bool success = IERC20(_rewardsAddr).transfer(addr, dividend);
@@ -138,8 +145,7 @@ contract NGBwrapperDelegateParent is NGBwrapperData {
 			}
 			//fetch balanceOf again rather than taking CBRA and subtracting dividend because of small rounding errors that may occur
 			//however if no transfers were executed it is fine to use the previously fetched CBRA value
-			internalPrevContractBalance[uint8(i)] = (getContractBalanceAgain ? IERC20(_rewardsAddr).balanceOf(address(this)) : CBRA)
-				.sub(totalUnspentDARewards);
+			internalPrevContractBalance[uint8(i)] = (getContractBalanceAgain ? IERC20(_rewardsAddr).balanceOf(address(this)).sub(totalUnspentDARewards) : CBRA);
 			internalTotalRewardsPerWasset[uint8(i)] = newTRPW;
 		}
 		_;

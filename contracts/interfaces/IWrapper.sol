@@ -37,7 +37,7 @@ interface IWrapper is IERC20, IERC3156FlashLender {
 	function delistDistributionAccount() external;
 	function editSubAccountPosition(address _subAccount, address _FCPaddr, int changeYield, int changeBond) external;
 	function forceClaimSubAccountRewards(address _distributionAccount, address _subAccount, address _FCPaddr) external;
-	function forceDoubleClaimSubAccountRewards(address _subAccount0, address _subAccount1, address _FCPaddr) external;
+	function forceDoubleClaimSubAccountRewards(address _subAccount0, address _subAccount1) external;
 	function isDistributionAccount(address _addr) external view returns(bool);
 	function totalUnspentDistributionAccountRewards(uint _index) external view returns(uint);
 	function distributionAccountRewards(uint _index, address _distributionAccount) external view returns(uint);

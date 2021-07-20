@@ -410,22 +410,19 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 
 	/*
 		@Description: force rewards for two sub accounts to be distributed
-			msg.sender is the distributionAccount
+			msg.sender is both the distributionAccount and the FCP
 
 		@param address _subAccount0: the address that is the first sub account owner
 		@param address _subAccount1: the address that is the second sub account owner
-		@param address _FCPaddr: the address of the FCP contract for which the sub account amounts are denominated
 	*/
 	function forceDoubleClaimSubAccountRewards(
 		address _subAccount0,
-		address _subAccount1,
-		address _FCPaddr
+		address _subAccount1
 	) external override {
 		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
-			"forceDoubleClaimSubAccountRewards(address,address,address)",
+			"forceDoubleClaimSubAccountRewards(address,address)",
 			_subAccount0,
-			_subAccount1,
-			_FCPaddr
+			_subAccount1
 		));
 		require(success);
     }

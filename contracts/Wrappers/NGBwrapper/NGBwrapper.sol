@@ -361,22 +361,39 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 		internalIsDistributionAccount[msg.sender] = false;
 	}
 
+	/*
+		@Description: change the amount of bond and yield in a subaccount
+
+		@param address _subAccount: the sub account owner address, receives rewards
+		@param address _FCPaddr: the address of the FCP for which sub account balances are held
+		@param int _changeYield: change in the yield amount in the sub account,
+			final amount - initial amount
+		@param int _changeBond: the change in the bond amount for the sub account,
+			final amount - initial amount
+	*/
 	function editSubAccountPosition(
 		address _subAccount,
 		address _FCPaddr,
-		int changeYield,
-		int changeBond
+		int _changeYield,
+		int _changeBond
 	) external override {
 		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
 			"editSubAccountPosition(address,address,int256,int256)",
 			_subAccount,
 			_FCPaddr,
-			changeYield,
-			changeBond
+			_changeYield,
+			_changeBond
 		));
 		require(success);
 	}
 
+	/*
+		@Description: force rewards for a sub account to be distributed
+
+		@param address _distributionAccount: the address of the distribution account for the sub account
+		@param address _subAccount: the address that is the owner of the sub account and shall receive the rewards
+		@param address _FCPaddr: the address of the FCP contract for which the sub account amounts are denominated
+	*/
 	function forceClaimSubAccountRewards(
 		address _distributionAccount,
 		address _subAccount,
@@ -391,6 +408,27 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 		require(success);
 	}
 
+	/*
+		@Description: force rewards for two sub accounts to be distributed
+			msg.sender is the distributionAccount
+
+		@param address _subAccount0: the address that is the first sub account owner
+		@param address _subAccount1: the address that is the second sub account owner
+		@param address _FCPaddr: the address of the FCP contract for which the sub account amounts are denominated
+	*/
+	function forceDoubleClaimSubAccountRewards(
+		address _subAccount0,
+		address _subAccount1,
+		address _FCPaddr
+	) external override {
+		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
+			"forceDoubleClaimSubAccountRewards(address,address,address)",
+			_subAccount0,
+			_subAccount1,
+			_FCPaddr
+		));
+		require(success);
+    }
     //------------------------v-i-e-w-s---------------------------
 
 	bool public constant override underlyingIsStatic = false;

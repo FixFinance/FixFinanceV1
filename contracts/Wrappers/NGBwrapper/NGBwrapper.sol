@@ -361,6 +361,36 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 		internalIsDistributionAccount[msg.sender] = false;
 	}
 
+	function editSubAccountPosition(
+		address _subAccount,
+		address _FCPaddr,
+		int changeYield,
+		int changeBond
+	) external override {
+		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
+			"editSubAccountPosition(address,address,int256,int256)",
+			_subAccount,
+			_FCPaddr,
+			changeYield,
+			changeBond
+		));
+		require(success);
+	}
+
+	function forceClaimSubAccountRewards(
+		address _distributionAccount,
+		address _subAccount,
+		address _FCPaddr
+	) external override {
+		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
+			"forceClaimSubAccountRewards(address,address,address)",
+			_distributionAccount,
+			_subAccount,
+			_FCPaddr
+		));
+		require(success);
+	}
+
     //------------------------v-i-e-w-s---------------------------
 
 	bool public constant override underlyingIsStatic = false;
@@ -451,15 +481,11 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 		address _FCPaddr
 	) external view override returns(
 		uint yield,
-		int bond,
-		uint248 prevTotalRewardsPerClaim,
-		bool hasClaimedAllYTrewards
+		int bond
 	) {
 		SubAccountPosition memory position = internalSubAccountPositions[_distributionAccount][_subAccount][_FCPaddr];
 		yield = position.yield;
 		bond = position.bond;
-		prevTotalRewardsPerClaim = position.prevTotalRewardsPerClaim;
-		hasClaimedAllYTrewards = position.hasClaimedAllYTrewards;
 	}
 
     //------------------------------------a-d-m-i-n----------------------------
@@ -504,6 +530,7 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
     	internalPrevTotalRewardsPerWasset.push();
     	internalTotalUnspentDistributionAccountRewards.push(0);
     	internalDistributionAccountRewards.push();
+    	internalSAPTRPW.push();
     	uint currentBal = IERC20(_rewardsAsset).balanceOf(address(this));
     	address sendTo = IInfoOracle(internalInfoOracleAddress).sendTo();
     	uint toOwner = currentBal >> 1;

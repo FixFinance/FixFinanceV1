@@ -45,13 +45,16 @@ contract NGBwrapperData is nonReentrant, Ownable {
 	struct SubAccountPosition {
 		uint yield;
 		int bond;
-		uint248 prevTotalRewardsPerClaim;
-		bool hasClaimedAllYTrewards;
 	}
 	uint[] internalTotalUnspentDistributionAccountRewards;
 	mapping(address => uint)[] internalDistributionAccountRewards;
 	mapping(address => bool) internalIsDistributionAccount;
-	//Distribution Account => Sub Account => FCP => SubAccountPosition
-	mapping(address => mapping(address => mapping(address => SubAccountPosition))) internalSubAccountPositions;
 
+	//FCP direct subaccounts don't belong here
+	//Distribution Account => Sub Account => FCP => total bond & yield amts
+	mapping(address => mapping(address => mapping(address => SubAccountPosition))) internalSubAccountPositions;
+	mapping(address => mapping(address => mapping(address => bool))) internalHasClaimedAllYTrewards;
+	//SubAccount Prev Total Rewards Per Wasset
+	//Distribution Account => Sub Account => FCP => PTRPW
+	mapping(address => mapping(address => mapping(address => uint)))[] internalSAPTRPW;
 }

@@ -10,7 +10,11 @@ contract NGBwrapperDelegateParent is NGBwrapperData {
 	using SafeMath for uint256;
 	using ABDKMath64x64 for int128;
 
-	modifier claimRewards(address _addr) {
+	modifier claimRewards(bool _claim, address _addr) {
+		if (!_claim) {
+			_;
+			return;
+		}
 		uint len = internalRewardsAssets.length;
 		if (len == 0) {
 			_;

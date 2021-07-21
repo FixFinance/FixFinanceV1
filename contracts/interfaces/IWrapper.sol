@@ -10,8 +10,8 @@ interface IWrapper is IERC20, IERC3156FlashLender {
 
 	function depositUnitAmount(address _to, uint _amount) external returns (uint _amountWrapped);
 	function depositWrappedAmount(address _to, uint _amount) external returns (uint _unitAmount);
-	function withdrawUnitAmount(address _to, uint _amount) external returns (uint _amountWrapped);
-	function withdrawWrappedAmount(address _to, uint _amount) external returns (uint _unitAmount);
+	function withdrawUnitAmount(address _to, uint _amount, bool _claimRewards) external returns (uint _amountWrapped);
+	function withdrawWrappedAmount(address _to, uint _amount, bool _claimRewards) external returns (uint _unitAmount);
 
 	function forceHarvest() external;
 

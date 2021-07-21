@@ -113,7 +113,7 @@ contract NGBwrapperDelegate1 is NGBwrapperDelegateParent {
 		@param address _to: the address that shall receive the newly minted wrapped tokens
 		@param uint _amount: the amount of underlying asset units to deposit
 	*/
-	function depositUnitAmount(address _to, uint _amount) external claimRewards(_to) returns (uint _amountWrapped) {
+	function depositUnitAmount(address _to, uint _amount) external claimRewards(true, _to) returns (uint _amountWrapped) {
 		return deposit(_to, _amount);
 	}
 
@@ -123,7 +123,7 @@ contract NGBwrapperDelegate1 is NGBwrapperDelegateParent {
 		@param address _to: the address that shall receive the newly minted wrapped tokens
 		@param uint _amount: the amount of wrapped asset units to mint
 	*/
-	function depositWrappedAmount(address _to, uint _amount) external claimRewards(_to) returns (uint _amountUnit) {
+	function depositWrappedAmount(address _to, uint _amount) external claimRewards(true, _to) returns (uint _amountUnit) {
 		_amountUnit = WrappedAmtToUnitAmt_RoundUp(_amount);
 		deposit(_to, _amountUnit);
 	}
@@ -136,7 +136,7 @@ contract NGBwrapperDelegate1 is NGBwrapperDelegateParent {
 
 		@return uint _amountWrappedToken: the amount of units of wrapped asset that were burned
 	*/
-	function withdrawUnitAmount(address _to, uint _amountUnit) external claimRewards(_to) returns (uint _amountWrappedToken) {
+	function withdrawUnitAmount(address _to, uint _amountUnit, bool _claimRewards) external claimRewards(_claimRewards, msg.sender) returns (uint _amountWrappedToken) {
 		harvestToTreasury();
 		IERC20 _aToken = IERC20(internalUnderlyingAssetAddress);
 		uint contractBalance = _aToken.balanceOf(address(this));
@@ -157,7 +157,7 @@ contract NGBwrapperDelegate1 is NGBwrapperDelegateParent {
 
 		@return uint _amountUnit: the amount of underlying asset received
 	*/
-	function withdrawWrappedAmount(address _to, uint _amountWrappedToken) external claimRewards(_to) returns (uint _amountUnit) {
+	function withdrawWrappedAmount(address _to, uint _amountWrappedToken, bool _claimRewards) external claimRewards(_claimRewards, msg.sender) returns (uint _amountUnit) {
 		require(internalBalanceOf[msg.sender] >= _amountWrappedToken);
 		harvestToTreasury();
 		IERC20 _aToken = IERC20(internalUnderlyingAssetAddress);
@@ -168,7 +168,7 @@ contract NGBwrapperDelegate1 is NGBwrapperDelegateParent {
 		_aToken.transfer(_to, _amountUnit);
 	}
 
-	function forceRewardsCollection() external claimRewards(msg.sender) {}
+	function forceRewardsCollection() external claimRewards(true, msg.sender) {}
 
 	/*
 		@Description: get the ratio of underlyingAsset / wrappedAsset

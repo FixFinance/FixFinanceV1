@@ -21,7 +21,7 @@ contract NGBwrapperDelegate2 is NGBwrapperDelegateParent {
         address _FCPaddr,
         int changeYield,
         int changeBond
-    ) external claimRewards(msg.sender) {
+    ) external claimRewards(true, msg.sender) {
         require(msg.sender != _FCPaddr); //must not be an FCP direct subaccount
         //msg.sender is the distributionAccount
         SubAccountPosition memory mPos = claimSubAccountRewardsRetPos(msg.sender, _subAcct, _FCPaddr);
@@ -43,7 +43,7 @@ contract NGBwrapperDelegate2 is NGBwrapperDelegateParent {
         address _distributionAccount,
         address _subAccount,
         address _FCPaddr
-    ) external claimRewards(_distributionAccount) {
+    ) external claimRewards(true, _distributionAccount) {
         require(msg.sender == _distributionAccount || msg.sender == _subAccount);
         claimSubAccountRewardsRetPos(_distributionAccount, _subAccount, _FCPaddr);
     }
@@ -51,7 +51,7 @@ contract NGBwrapperDelegate2 is NGBwrapperDelegateParent {
     function forceDoubleClaimSubAccountRewards(
         address _subAccount0,
         address _subAccount1
-    ) external claimRewards(msg.sender) {
+    ) external claimRewards(true, msg.sender) {
         //msg.sender is distributionAccount & FCP
         claimSubAccountRewardsRetPos(msg.sender, _subAccount0, msg.sender);
         claimSubAccountRewardsRetPos(msg.sender, _subAccount1, msg.sender);

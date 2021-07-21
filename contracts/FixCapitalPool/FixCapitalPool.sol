@@ -156,7 +156,7 @@ contract FixCapitalPool is IFixCapitalPool, Ownable, nonReentrant {
 		wrp.forceClaimSubAccountRewards(address(this), msg.sender, address(this));
 		balanceYield[msg.sender] -= _amountWrappedTkn;
 		if (_unwrap)
-			wrp.withdrawWrappedAmount(_to, _amountWrappedTkn);
+			wrp.withdrawWrappedAmount(_to, _amountWrappedTkn, false);
 		else
 			wrp.transfer(_to, _amountWrappedTkn);
 	}
@@ -176,7 +176,7 @@ contract FixCapitalPool is IFixCapitalPool, Ownable, nonReentrant {
 		wrp.forceClaimSubAccountRewards(address(this), msg.sender, address(this));
 		balanceYield[msg.sender] -= freeToMove;
 		if (_unwrap)
-			wrp.withdrawWrappedAmount(_to, freeToMove);
+			wrp.withdrawWrappedAmount(_to, freeToMove, false);
 		else
 			wrp.transfer(_to, freeToMove);
 	}
@@ -199,7 +199,7 @@ contract FixCapitalPool is IFixCapitalPool, Ownable, nonReentrant {
 			freeToMove += uint(bondBal).mul(1 ether)/maturityConversionRate;
 		}
 		if (_unwrap)
-			wrp.withdrawWrappedAmount(_to, freeToMove);
+			wrp.withdrawWrappedAmount(_to, freeToMove, false);
 		else
 			wrp.transfer(_to, freeToMove);
 		delete balanceYield[msg.sender];

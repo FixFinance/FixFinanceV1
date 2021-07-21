@@ -155,9 +155,9 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 
 		@return uint _amountWrappedToken: the amount of units of wrapped asset that were burned
 	*/
-	function withdrawUnitAmount(address _to, uint _amountUnit) external override returns (uint _amountWrappedToken) {
+	function withdrawUnitAmount(address _to, uint _amountUnit, bool _claimRewards) external override returns (uint _amountWrappedToken) {
 		address _delegateAddress = delegate1Address;
-		bytes memory sig = abi.encodeWithSignature("withdrawUnitAmount(address,uint256)", _to, _amountUnit);
+		bytes memory sig = abi.encodeWithSignature("withdrawUnitAmount(address,uint256,bool)", _to, _amountUnit, _claimRewards);
 
 		assembly {
 			let success := delegatecall(gas(), _delegateAddress, add(sig, 0x20), mload(sig), 0, 0x20)
@@ -176,9 +176,9 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 
 		@return uint _amountUnit: the amount of underlying asset received
 	*/
-	function withdrawWrappedAmount(address _to, uint _amountWrappedToken) external override returns (uint _amountUnit) {
+	function withdrawWrappedAmount(address _to, uint _amountWrappedToken, bool _claimRewards) external override returns (uint _amountUnit) {
 		address _delegateAddress = delegate1Address;
-		bytes memory sig = abi.encodeWithSignature("withdrawWrappedAmount(address,uint256)", _to, _amountWrappedToken);
+		bytes memory sig = abi.encodeWithSignature("withdrawWrappedAmount(address,uint256,bool)", _to, _amountWrappedToken, _claimRewards);
 
 		assembly {
 			let success := delegatecall(gas(), _delegateAddress, add(sig, 0x20), mload(sig), 0, 0x20)

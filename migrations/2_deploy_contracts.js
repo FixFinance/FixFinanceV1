@@ -4,6 +4,7 @@ const dummyAToken = artifacts.require('dummyAToken');
 const organizer = artifacts.require('Organizer');
 const NGBwrapperDelegate1 = artifacts.require('NGBwrapperDelegate1');
 const NGBwrapperDelegate2 = artifacts.require('NGBwrapperDelegate2');
+const NGBwrapperDelegate3 = artifacts.require('NGBwrapperDelegate3');
 const NGBwrapperDeployer = artifacts.require('NGBwrapperDeployer');
 const zcbYtDeployer = artifacts.require('ZCB_YT_Deployer');
 const NSFVaultFactoryDelegate1 = artifacts.require("NSFVaultFactoryDelegate1");
@@ -54,11 +55,13 @@ module.exports = async function(deployer) {
 	infoOracle = await deployer.deploy(InfoOracle, "0", nullAddress);
 	ngbwDelegate1Instance = await deployer.deploy(NGBwrapperDelegate1);
 	ngbwDelegate2Instance = await deployer.deploy(NGBwrapperDelegate2);
+	ngbwDelegate3Instance = await deployer.deploy(NGBwrapperDelegate3);
 	NGBwrapperDeployerInstance = await deployer.deploy(
 		NGBwrapperDeployer,
 		infoOracle.address,
 		ngbwDelegate1Instance.address,
-		ngbwDelegate2Instance.address
+		ngbwDelegate2Instance.address,
+		ngbwDelegate3Instance.address
 	);
 	EiInstance = await deployer.deploy(Ei);
 	await deployer.link(Ei, BigMath);

@@ -6,6 +6,7 @@ const IYieldToken = artifacts.require("IYieldToken");
 const zcbYtDeployer = artifacts.require('ZCB_YT_Deployer');
 const NGBwrapperDelegate1 = artifacts.require('NGBwrapperDelegate1');
 const NGBwrapperDelegate2 = artifacts.require('NGBwrapperDelegate2');
+const NGBwrapperDelegate3 = artifacts.require('NGBwrapperDelegate3');
 const NGBwrapperDeployer = artifacts.require('NGBwrapperDeployer');
 const organizer = artifacts.require('Organizer');
 const DBSFVaultFactoryDelegate1 = artifacts.require("DBSFVaultFactoryDelegate1");
@@ -83,7 +84,13 @@ contract('DBSFVaultFactory', async function(accounts) {
 		infoOracleInstance = await InfoOracle.new("0", nullAddress);
 		ngbwDelegate1Instance = await NGBwrapperDelegate1.new();
 		ngbwDelegate2Instance = await NGBwrapperDelegate2.new();
-		NGBwrapperDeployerInstance = await NGBwrapperDeployer.new(infoOracleInstance.address, ngbwDelegate1Instance.address, ngbwDelegate2Instance.address);
+		ngbwDelegate3Instance = await NGBwrapperDelegate3.new();
+		NGBwrapperDeployerInstance = await NGBwrapperDeployer.new(
+			infoOracleInstance.address,
+			ngbwDelegate1Instance.address,
+			ngbwDelegate2Instance.address,
+			ngbwDelegate3Instance.address
+		);
 		organizerInstance = await organizer.new(
 			NGBwrapperDeployerInstance.address,
 			zcbYtDeployerInstance.address,

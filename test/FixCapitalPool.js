@@ -1,6 +1,7 @@
 const dummyAToken = artifacts.require('dummyAToken');
 const NGBwrapperDelegate1 = artifacts.require('NGBwrapperDelegate1');
 const NGBwrapperDelegate2 = artifacts.require('NGBwrapperDelegate2');
+const NGBwrapperDelegate3 = artifacts.require('NGBwrapperDelegate3');
 const NGBwrapper = artifacts.require('NGBwrapper');
 const fixCapitalPool = artifacts.require('FixCapitalPool');
 const zcbYtDeployer = artifacts.require('ZCB_YT_Deployer');
@@ -24,7 +25,15 @@ contract('FixCapitalPool', async function(accounts){
 		rewardsAsset1 = await dummyAToken.new("RWD1");
 		ngbwDelegate1Instance = await NGBwrapperDelegate1.new();
 		ngbwDelegate2Instance = await NGBwrapperDelegate2.new();
-		NGBwrapperInstance = await NGBwrapper.new(dummyATokenInstance.address, infoOracleInstance.address, ngbwDelegate1Instance.address, ngbwDelegate2Instance.address, SBPSretained);
+		ngbwDelegate3Instance = await NGBwrapperDelegate3.new();
+		NGBwrapperInstance = await NGBwrapper.new(
+			dummyATokenInstance.address,
+			infoOracleInstance.address,
+			ngbwDelegate1Instance.address,
+			ngbwDelegate2Instance.address,
+			ngbwDelegate3Instance.address,
+			SBPSretained
+		);
 		zcbYtDeployerInstance = await zcbYtDeployer.new();
 		timeNow = (await web3.eth.getBlock('latest')).timestamp;
 		fixCapitalPoolInstance = await fixCapitalPool.new(NGBwrapperInstance.address, timeNow+86400, zcbYtDeployerInstance.address, infoOracleInstance.address);

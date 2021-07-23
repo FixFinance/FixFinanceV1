@@ -23,6 +23,7 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 
 	address delegate1Address;
 	address delegate2Address;
+	address delegate3Address;
 
 	/*
 		init
@@ -32,6 +33,7 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 		address _infoOralceAddress,
 		address _delegate1Address,
 		address _delegate2Address,
+		address _delegate3Address,
 		uint32 _SBPSRetained
 	) public {
 		require(_SBPSRetained > 0 && _SBPSRetained <= totalSBPS);
@@ -42,6 +44,7 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 		internalInfoOracleAddress = _infoOralceAddress;
 		delegate1Address = _delegate1Address;
 		delegate2Address = _delegate2Address;
+		delegate3Address = _delegate3Address;
 		SBPSRetained = _SBPSRetained;
 	}
 
@@ -261,7 +264,7 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 
 
     function transfer(address _to, uint256 _value) external override returns (bool success) {
-    	(success, ) = delegate2Address.delegatecall(abi.encodeWithSignature("transfer(address,uint256)", _to, _value));
+    	(success, ) = delegate3Address.delegatecall(abi.encodeWithSignature("transfer(address,uint256)", _to, _value));
     	require(success);
 
         emit Transfer(msg.sender, _to, _value);
@@ -276,7 +279,7 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
     }
 
     function transferFrom(address _from, address _to, uint256 _value) external override returns (bool success) {
-    	(success, ) = delegate2Address.delegatecall(abi.encodeWithSignature("transferFrom(address,address,uint256)", _from, _to, _value));
+    	(success, ) = delegate3Address.delegatecall(abi.encodeWithSignature("transferFrom(address,address,uint256)", _from, _to, _value));
     	require(success);
 
         emit Transfer(_from, _to, _value);
@@ -427,6 +430,17 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 		require(success);
     }
 
+    /*
+		@Description: force rewards for an FCP direct sub account to be claimed
+			only callable by FCP contracts
+
+		@param bool _inPayoutPhase: true if the FCP is in the payout phase
+		@param bool _claimRewards: true if the FCP should claim its rewards
+		@param address _subAcct: the owner of the FCP Direct sub account for which to claim rewards
+		@param uint _yield: the yield amount in the ZCB & YT position of _subAcct
+		@param uint _wrappedClaim: the effective amount of the wrapper asset used to calculate the
+			distribution of rewards to _subAcct
+    */
 	function FCPDirectClaimSubAccountRewards(
 		bool _inPayoutPhase,
 		bool _claimRewards,

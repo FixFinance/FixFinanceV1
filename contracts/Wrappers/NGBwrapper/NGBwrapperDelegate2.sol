@@ -93,7 +93,9 @@ contract NGBwrapperDelegate2 is NGBwrapperDelegateParent {
                 (inPayoutPhase && !internalHasClaimedAllYTrewards[_distributionAcct][_subAcct][_FCPaddr] ? 1 << 14 : 0) |
                 (internalIsDistributionAccount[_subAcct] ? 1 << 13 : 0);
             if (inPayoutPhase) {
-                mPos.bond = IFixCapitalPool(_FCPaddr).balanceBonds(_subAcct);
+                if (_distributionAcct == _FCPaddr) {
+                    mPos.bond = IFixCapitalPool(_FCPaddr).balanceBonds(_subAcct);
+                }
                 uint maturityConversionRate = IFixCapitalPool(_FCPaddr).maturityConversionRate();
                 require(maturityConversionRate > 0); //prevent div by 0
                 uint wrappedZCBConvValue;
@@ -173,27 +175,6 @@ contract NGBwrapperDelegate2 is NGBwrapperDelegateParent {
         if (i & (1 << 14) > 0) {
             internalHasClaimedAllYTrewards[_distributionAcct][_subAcct][_FCPaddr] = true;
         }
-    }
-
-
-
-	//-----------------ERC20-transfer-functionality------------
-
-    function transfer(address _to, uint256 _value) external doubleClaimRewards(_to, msg.sender) {
-        require(_value <= internalBalanceOf[msg.sender]);
-
-        internalBalanceOf[msg.sender] -= _value;
-        internalBalanceOf[_to] += _value;
-    }
-
-    function transferFrom(address _from, address _to, uint256 _value) external doubleClaimRewards(_to, _from) {
-        require(_value <= internalAllowance[_from][msg.sender]);
-    	require(_value <= internalBalanceOf[_from]);
-
-    	internalBalanceOf[_from] -= _value;
-    	internalBalanceOf[_to] += _value;
-
-        internalAllowance[_from][msg.sender] -= _value;
     }
 
 }

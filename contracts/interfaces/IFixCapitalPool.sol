@@ -39,7 +39,7 @@ interface IFixCapitalPool is IFCPFlashLender {
 	function burnZCBFrom(address _owner, uint _amount) external;
 
 	//----------------admin----------------------------
-	function isFinalized() external view returns(bool);
 	function setVaultFactoryAddress(address _vaultFactoryAddress) external;
 	function finalize() external;
+	function isFinalized() external view returns(bool);
 }

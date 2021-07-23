@@ -97,21 +97,9 @@ contract FixCapitalPool is IFixCapitalPool, Ownable, nonReentrant {
 		_;
 	}
 
-	/*
-		@Description: find the amount of wrapped token that the user may withdraw from the fix capital pool
-	*/
-	function wrappedTokenFree(address _owner) public view override returns (uint wrappedTknFree) {
-		wrappedTknFree = balanceYield[_owner];
-		int bondBal = balanceBonds[_owner];
-		if (bondBal < 0){
-			if (inPayoutPhase){
-				uint toSub = uint(-bondBal).mul(1 ether);
-				toSub = toSub/maturityConversionRate + (toSub%maturityConversionRate  == 0 ? 0 : 1);
-				wrappedTknFree = wrappedTknFree.sub(toSub);
-			}
-			else
-				wrappedTknFree = wrappedTknFree.sub(wrapper.UnitAmtToWrappedAmt_RoundUp(uint(-bondBal)));
-		}
+	modifier isInPayoutPhase() {
+		require(inPayoutPhase);
+		_;
 	}
 
 	/*
@@ -137,9 +125,10 @@ contract FixCapitalPool is IFixCapitalPool, Ownable, nonReentrant {
 	*/
 	function depositWrappedToken(address _to, uint _amountWrappedTkn) external override beforePayoutPhase {
 		IWrapper wrp = wrapper;
-		wrp.forceClaimSubAccountRewards(address(this), _to, address(this));
+		uint yield = balanceYield[_to];
 		wrp.transferFrom(msg.sender, address(this), _amountWrappedTkn);
-		balanceYield[_to] += _amountWrappedTkn;
+		wrp.FCPDirectClaimSubAccountRewards(false, false, _to, yield, yield);
+		balanceYield[_to] = yield.add(_amountWrappedTkn);
 	}
 
 	/*
@@ -151,14 +140,19 @@ contract FixCapitalPool is IFixCapitalPool, Ownable, nonReentrant {
 			otherwise underlyingAsset will be sent
 	*/
 	function withdraw(address _to, uint _amountWrappedTkn, bool _unwrap) external override beforePayoutPhase {
-		require(wrappedTokenFree(msg.sender) >= _amountWrappedTkn);
 		IWrapper wrp = wrapper;
-		wrp.forceClaimSubAccountRewards(address(this), msg.sender, address(this));
-		balanceYield[msg.sender] -= _amountWrappedTkn;
+		uint yield = balanceYield[msg.sender];
+		int bond = balanceBonds[msg.sender];
+		//conversionRate doesn't matter if bond >= 0, save gas if we can by not fetching the conv rate
+		uint conversionRate = bond < 0 ? wrp.WrappedAmtToUnitAmt_RoundDown(1 ether) : 0;
+		require(maxWrappedWithdrawAmt(yield, bond, conversionRate) >= _amountWrappedTkn);
 		if (_unwrap)
-			wrp.withdrawWrappedAmount(_to, _amountWrappedTkn, false);
+			wrp.withdrawWrappedAmount(_to, _amountWrappedTkn, true);
 		else
 			wrp.transfer(_to, _amountWrappedTkn);
+
+		wrp.FCPDirectClaimSubAccountRewards(false, false, msg.sender, yield, yield);
+		balanceYield[msg.sender] = yield.sub(_amountWrappedTkn);
 	}
 
 	/*
@@ -171,14 +165,19 @@ contract FixCapitalPool is IFixCapitalPool, Ownable, nonReentrant {
 			otherwise underlyingAsset will be sent
 	*/
 	function withdrawAll(address _to, bool _unwrap) external override beforePayoutPhase {
-		uint freeToMove = wrappedTokenFree(msg.sender);
 		IWrapper wrp = wrapper;
-		wrp.forceClaimSubAccountRewards(address(this), msg.sender, address(this));
-		balanceYield[msg.sender] -= freeToMove;
+		uint yield = balanceYield[msg.sender];
+		int bond = balanceBonds[msg.sender];
+		//conversionRate doesn't matter if bond >= 0, save gas if we can by not fetching the conv rate
+		uint conversionRate = bond < 0 ? wrp.WrappedAmtToUnitAmt_RoundDown(1 ether) : 0;
+		uint freeToMove = maxWrappedWithdrawAmt(yield, bond, conversionRate);
 		if (_unwrap)
-			wrp.withdrawWrappedAmount(_to, freeToMove, false);
+			wrp.withdrawWrappedAmount(_to, freeToMove, true);
 		else
 			wrp.transfer(_to, freeToMove);
+
+		wrp.FCPDirectClaimSubAccountRewards(false, false, msg.sender, yield, yield);
+		balanceYield[msg.sender] = yield.sub(freeToMove);
 	}
 
 	/*
@@ -189,19 +188,16 @@ contract FixCapitalPool is IFixCapitalPool, Ownable, nonReentrant {
 		@param bool _unwrap: if true - wrapped asset will be sent to _to address
 			otherwise underlyingAsset will be sent
 	*/
-	function claimBondPayout(address _to, bool _unwrap) external override {
-		require(inPayoutPhase);
+	function claimBondPayout(address _to, bool _unwrap) external override isInPayoutPhase {
 		IWrapper wrp = wrapper;
-		wrp.forceClaimSubAccountRewards(address(this), msg.sender, address(this));
-		uint freeToMove = wrappedTokenFree(msg.sender);
-		int bondBal = balanceBonds[msg.sender];
-		if (bondBal > 0) {
-			freeToMove += uint(bondBal).mul(1 ether)/maturityConversionRate;
-		}
+		uint yield = balanceYield[msg.sender];
+		int bond = balanceBonds[msg.sender];
+		uint payout = payoutAmount(yield, bond, maturityConversionRate);
+		wrp.FCPDirectClaimSubAccountRewards(true, true, msg.sender, yield, payout);
 		if (_unwrap)
-			wrp.withdrawWrappedAmount(_to, freeToMove, false);
+			wrp.withdrawWrappedAmount(_to, payout, false);
 		else
-			wrp.transfer(_to, freeToMove);
+			wrp.transfer(_to, payout);
 		delete balanceYield[msg.sender];
 		delete balanceBonds[msg.sender];
 	}
@@ -221,24 +217,72 @@ contract FixCapitalPool is IFixCapitalPool, Ownable, nonReentrant {
 	}
 
 	/*
-		@Description: find the amount of Unwrapped Units an address will be able to claim at maturity
-			if no yield is generated in the wrapper from now up to maturity
+		@Description: returns the maximum wrapped amount of the wrapper asset that may be withdrawn by an account
 
-		@param address _owner: the address whose minimum balance at maturity is in question
+		@param address _owner: the account for which to find the maximum wrapped amount that may be withdrawn
+
+		@return uint wrappedTknFree: the maximum wrapped amount of the wrapper asset that may be withdawn
+	*/
+	function wrappedTokenFree(address _owner) external view override returns(uint wrappedTknFree) {
+		uint conversionRate = inPayoutPhase ? maturityConversionRate : wrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
+		return maxWrappedWithdrawAmt(balanceYield[_owner], balanceBonds[_owner], conversionRate);
+	}
+
+	/*
+		@Description: find the amount of Unwrapped Units an address will be able to claim at maturity
+			if no yield is generated in the wrapper from now up to maturity,
+			if in payout phase the value returned will be the unit amount that could be claimed at maturity
+
+		@param uint _yield: the yield amount associated with the ZCB & YT position
+		@param int _bond: the bond amount associated with the ZCB & YT position
+		@param uint _conversionRate: if before payout phase pass the value of the current conversion rate
+			if in payout phase pass the value of the contract 'maturityConversionRate' variable
 
 		@return uint balance: the minimum possible value (denominated in Unit/Unwrapped amount) of _owner's
 			position at maturity
 	*/
-	function minimumUnitAmountAtMaturity(address _owner) internal view returns (uint balance) {
-		if (inPayoutPhase)
-			balance = balanceYield[_owner]*maturityConversionRate/(1 ether);
-		else
-			balance = wrapper.WrappedAmtToUnitAmt_RoundDown(balanceYield[_owner]);
-		int bondBal = balanceBonds[_owner];
-		if (bondBal > 0)
-			balance = balance.add(uint(bondBal));
-		else
-			balance = balance.sub(uint(-bondBal));
+	function minimumUnitAmountAtMaturity(uint _yield, int _bond, uint _conversionRate) internal pure returns (uint balance) {
+		require(_conversionRate > 0);
+		balance = _yield.mul(_conversionRate) / (1 ether);
+		balance = _bond > 0 ? balance.add(uint(_bond)) : balance.sub(uint(_bond.abs()));
+	}
+
+	/*
+		@Description: find the amount of the IWrapper asset to payout based on the balance of yield and bond
+			assumes that the FCP contract is in the payout phase
+
+		@param uint _yield: the yield amount associated with the ZCB & YT position
+		@param int _bond: the bond amount associated with the ZCB & YT position
+		@param uint _maturityConversionRate: pass the value of the contract variable 'maturityConversionRate'
+
+		@return uint: the amount of wrapped asset that should be paid out
+	*/
+	function payoutAmount(uint _yield, int _bond, uint _maturityConversionRate) internal pure returns(uint) {
+		require(_maturityConversionRate > 0);
+		uint ZCB = _yield.mul(_maturityConversionRate) / (1 ether);
+		ZCB = _bond > 0 ? ZCB.add(uint(_bond)) : ZCB.sub(uint(_bond.abs()));
+		return ZCB.mul(1 ether) / _maturityConversionRate;
+	}
+
+	/*
+		@Description: find the amount of wrapped token that the user may withdraw from the fix capital pool
+
+		@param uint _yield: the yield amount associated with the ZCB & YT position
+		@param int _bond: the bond amount associated with the ZCB & YT position
+		@param uint _conversionRate: if before payout phase pass the value of the current conversion rate
+			if in payout phase pass the value of the contract 'maturityConversionRate' variable
+
+		@return uint: the maximum wrapped amount of the wrapper asset that may be withdrawn
+			for the owner of the ZCB & YT position
+	*/
+	function maxWrappedWithdrawAmt(uint _yield, int _bond, uint _conversionRate) internal pure returns(uint) {
+		if (_bond < 0){
+			uint unitAmtFree = (_yield.mul(_conversionRate) / (1 ether)).sub(uint(_bond.abs()));
+			return unitAmtFree.mul(1 ether) / (_conversionRate);
+		}
+		else {
+			return _yield;
+		}
 	}
 
     //--------------------M-a-r-g-i-n---F-u-n-c-t-i-o-n-a-l-i-t-y--------------------------------
@@ -253,7 +297,10 @@ contract FixCapitalPool is IFixCapitalPool, Ownable, nonReentrant {
 	function mintZCBTo(address _owner, uint _amount) external override {
 		require(whitelistedVaultFactories[msg.sender]);
 		if (inPayoutPhase) {
-			wrapper.forceClaimSubAccountRewards(address(this), _owner, address(this));
+			uint yield = balanceYield[_owner];
+			int bond = balanceBonds[_owner];
+			uint payout = payoutAmount(yield, bond, maturityConversionRate);
+			wrapper.FCPDirectClaimSubAccountRewards(true, true, _owner, yield, payout);
 		}
 		balanceBonds[_owner] += int(_amount);
 	}
@@ -267,9 +314,15 @@ contract FixCapitalPool is IFixCapitalPool, Ownable, nonReentrant {
 	*/
 	function burnZCBFrom(address _owner, uint _amount) external override {
 		require(whitelistedVaultFactories[msg.sender]);
-		require(minimumUnitAmountAtMaturity(_owner) >= _amount);
-		if (inPayoutPhase) {
-			wrapper.forceClaimSubAccountRewards(address(this), _owner, address(this));
+		IWrapper wrp = wrapper;
+		bool _inPayoutPhase = inPayoutPhase;
+		uint yield = balanceYield[_owner];
+		int bond = balanceBonds[_owner];
+		uint conversionRate = _inPayoutPhase ? maturityConversionRate : wrp.WrappedAmtToUnitAmt_RoundDown(1 ether);
+		require(minimumUnitAmountAtMaturity(yield, bond, conversionRate) >= _amount);
+		if (_inPayoutPhase) {
+			uint payout = payoutAmount(yield, bond, maturityConversionRate);
+			wrapper.FCPDirectClaimSubAccountRewards(true, true, _owner, yield, payout);
 		}
 		balanceBonds[_owner] -= int(_amount);
 	}
@@ -339,7 +392,8 @@ contract FixCapitalPool is IFixCapitalPool, Ownable, nonReentrant {
 		@return uint: the balance of ZCB of _owner
 	*/
 	function totalBalanceZCB(address _owner) external view override returns (uint) {
-		return minimumUnitAmountAtMaturity(_owner);
+		uint conversionRate = inPayoutPhase ? maturityConversionRate : wrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
+		return minimumUnitAmountAtMaturity(balanceYield[_owner], balanceBonds[_owner], conversionRate);
 	}
 
 	/*
@@ -349,20 +403,28 @@ contract FixCapitalPool is IFixCapitalPool, Ownable, nonReentrant {
 		@param address _to: the address to send 
 	*/
 	function transferZCB(address _from, address _to, uint _amount) external override {
+		uint conversionRate;
 		if (inPayoutPhase) {
 			wrapper.forceDoubleClaimSubAccountRewards( _from, _to);
+			conversionRate = maturityConversionRate;
 		}
+		else {
+			conversionRate = wrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
+		}
+
 		if (msg.sender != _from && msg.sender != zeroCouponBondAddress) {
 			IZeroCouponBond(zeroCouponBondAddress).decrementAllowance(_from, msg.sender, _amount);
 		}
 		int intAmount = int(_amount);
 		require(intAmount >= 0);
-		balanceBonds[_to] = balanceBonds[_to].add(intAmount);
-		balanceBonds[_from] = balanceBonds[_from].sub(intAmount);
+		int newFromBond = balanceBonds[_from].sub(intAmount);
 
 		//ensure that _from address's position may be cashed out to a positive amount of wrappedToken
 		//if it cannot the following call will revert this tx
-		minimumUnitAmountAtMaturity(_from);
+		minimumUnitAmountAtMaturity(balanceYield[_from], newFromBond, conversionRate);
+
+		balanceBonds[_to] = balanceBonds[_to].add(intAmount);
+		balanceBonds[_from] = newFromBond;
 	}
 
 	//---------------------------Y-i-e-l-d---T-o-k-e-n-----------------------
@@ -381,16 +443,20 @@ contract FixCapitalPool is IFixCapitalPool, Ownable, nonReentrant {
 		if (msg.sender != _from && msg.sender != yieldTokenAddress) {
 			IYieldToken(yieldTokenAddress).decrementAllowance(_from, msg.sender, _amount);
 		}
-		require(balanceYield[_from] >= _amount);
-		uint _amountBondChange = inPayoutPhase ? _amount.mul(maturityConversionRate)/(1 ether) : wrp.WrappedAmtToUnitAmt_RoundDown(_amount);
-		balanceYield[_from] -= _amount;
-		balanceYield[_to] += _amount;
-		balanceBonds[_from] += int(_amountBondChange);
-		balanceBonds[_to] -= int(_amountBondChange);
+		uint conversionRate = inPayoutPhase ? maturityConversionRate : wrp.WrappedAmtToUnitAmt_RoundDown(1 ether);
+		uint _amountBondChange = _amount.mul(conversionRate) / (1 ether); //can be casted to int without worry bc '/ (1 ether)' ensures it fits
+		uint newYieldFrom = balanceYield[_from].sub(_amount);
+		int newBondFrom = balanceBonds[_from].add(int(_amountBondChange));
 
 		//ensure that _from address's position may be cashed out to a positive amount of wrappedToken
 		//if it cannot the following call will revert this tx
-		minimumUnitAmountAtMaturity(_from);
+		minimumUnitAmountAtMaturity(newYieldFrom, newBondFrom, conversionRate);
+
+		balanceYield[_from] = newYieldFrom;
+		balanceBonds[_from] = newBondFrom;
+		balanceYield[_to] = balanceYield[_to].add(_amount);
+		balanceBonds[_to] = balanceBonds[_to].sub(int(_amountBondChange));
+
 	}
 
 	//---------------------------------a-d-m-i-n------------------------------
@@ -476,11 +542,23 @@ contract FixCapitalPool is IFixCapitalPool, Ownable, nonReentrant {
 		require(_amountYield <= MAX_YIELD_FLASHLOAN);
 		require(_amountBond <= MAX_BOND_FLASHLOAN);
 		uint ratio;
+		uint _flashLoanFee = flashLoanFee;
+		uint yieldFee;
+		int bondFee;
 		{
-			//prevent stack too deep with new scope
+			uint prevYield = balanceYield[msg.sender];
 			IWrapper wrp = wrapper;
-			wrp.forceClaimSubAccountRewards(address(this), msg.sender, address(this));
+			wrp.FCPDirectClaimSubAccountRewards(false, true, msg.sender, prevYield, prevYield);
 			ratio = wrp.WrappedAmtToUnitAmt_RoundDown(1 ether);
+
+			if (_amountYield > 0) {
+				yieldFee = _amountYield.mul(_flashLoanFee) / totalSBPS;
+				balanceYield[msg.sender] = prevYield.add(_amountYield);
+			}
+			if (_amountBond != 0) {
+				bondFee = _amountBond.mul(int(_flashLoanFee)) / int(totalSBPS);
+				balanceBonds[msg.sender] = balanceBonds[msg.sender].add(_amountBond);
+			}
 		}
 		uint effectiveZCB = _amountYield.mul(ratio) / (1 ether);
 		if (_amountBond >= 0) {
@@ -488,17 +566,6 @@ contract FixCapitalPool is IFixCapitalPool, Ownable, nonReentrant {
 		}
 		else {
 			effectiveZCB = effectiveZCB.sub(uint(-_amountBond));
-		}
-		uint _flashLoanFee = flashLoanFee;
-		uint yieldFee;
-		int bondFee;
-		if (_amountYield > 0) {
-			yieldFee = _amountYield.mul(_flashLoanFee) / totalSBPS;
-			balanceYield[msg.sender] = balanceYield[msg.sender].add(_amountYield);
-		}
-		if (_amountBond != 0) {
-			bondFee = _amountBond.mul(int(_flashLoanFee)) / int(totalSBPS);
-			balanceBonds[msg.sender] = balanceBonds[msg.sender].add(_amountBond);
 		}
 
 		//decrement allowances

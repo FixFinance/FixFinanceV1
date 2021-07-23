@@ -426,6 +426,25 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 		));
 		require(success);
     }
+
+	function FCPDirectClaimSubAccountRewards(
+		bool _inPayoutPhase,
+		bool _claimRewards,
+		address _subAcct,
+		uint _yield,
+		uint _wrappedClaim
+	) external override {
+		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
+			"FCPDirectClaimSubAccountRewards(bool,bool,address,uint256,uint256)",
+			_inPayoutPhase,
+			_claimRewards,
+			_subAcct,
+			_yield,
+			_wrappedClaim
+		));
+		require(success);
+	}
+
     //------------------------v-i-e-w-s---------------------------
 
 	bool public constant override underlyingIsStatic = false;

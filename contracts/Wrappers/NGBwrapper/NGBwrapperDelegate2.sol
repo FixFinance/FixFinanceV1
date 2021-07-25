@@ -215,12 +215,6 @@ contract NGBwrapperDelegate2 is NGBwrapperDelegateParent {
         address[2] memory _subAccts,
         uint[2] memory _yieldArr,
         uint[2] memory _balanceAddrs,
-//        address _subAcct0,
-//        address _subAcct1,
-//        uint _yield0,
-//        uint _yield1,
-//        uint _balanceAddr0,
-//        uint _balanceAddr1,
         uint16 i
     ) internal {
         for (; uint8(i) < _len; i++) {

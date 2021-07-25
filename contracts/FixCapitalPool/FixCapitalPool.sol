@@ -344,15 +344,15 @@ contract FixCapitalPool is IFixCapitalPool, Ownable, nonReentrant {
 		int bondSender = balanceBonds[msg.sender];
 		int bondRec = balanceBonds[_to];
 
-		uint[2] memory prevYields;
-		prevYields[0] = balanceYield[msg.sender];
-		prevYields[1] = balanceYield[_to];
+		uint[2] memory prevYields = [balanceYield[msg.sender], balanceYield[_to]];
 		uint[2] memory wrappedClaims;
 
-		{
-			uint _maturityConversionRate = _inPayoutPhase ? maturityConversionRate : 0; //prevent use of sload when not needed
-			wrappedClaims[0] = _inPayoutPhase ? payoutAmount(prevYields[0], bondSender, _maturityConversionRate) : prevYields[0];
-			wrappedClaims[1] = _inPayoutPhase ? payoutAmount(prevYields[1], bondRec, _maturityConversionRate) : prevYields[1];
+		if (_inPayoutPhase) {
+			uint mcr = maturityConversionRate;
+			wrappedClaims = [payoutAmount(prevYields[0], bondSender, mcr), payoutAmount(prevYields[1], bondRec, mcr)];
+		}
+		else {
+			wrappedClaims = prevYields;
 		}
 		address[2] memory subAccts = [msg.sender, _to];
 		wrp.FCPDirectDoubleClaimSubAccountRewards(_inPayoutPhase, true, subAccts, prevYields, wrappedClaims);

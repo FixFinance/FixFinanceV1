@@ -135,6 +135,39 @@ contract('FixCapitalPool', async function(accounts){
 		await yieldTokenInstance.transfer(accounts[0], maxTransfer.toString(), {from: accounts[1]});
 	});
 
+	it('FCP direct double claim, prior to payout phase from, transferPosition()', async () => {
+		await NGBwrapperInstance.forceClaimSubAccountRewards(fixCapitalPoolInstance.address, accounts[0], fixCapitalPoolInstance.address);
+		await NGBwrapperInstance.forceClaimSubAccountRewards(fixCapitalPoolInstance.address, accounts[1], fixCapitalPoolInstance.address, {from: accounts[1]});
+		let prevRewardsBal0 = await rewardsAsset0.balanceOf(accounts[0]);
+		let prevRewardsBal1 = await rewardsAsset0.balanceOf(accounts[1]);
+		let prevYield0 = await fixCapitalPoolInstance.balanceYield(accounts[0]);
+		let prevYield1 = await fixCapitalPoolInstance.balanceYield(accounts[1]);
+		let tsWrapper = await NGBwrapperInstance.totalSupply();
+
+		let rewardsAmt = _10To18.div(new BN('3487'));
+		let newCBal = rewardsAmt.add(await rewardsAsset0.balanceOf(NGBwrapperInstance.address));
+		await rewardsAsset0.mintTo(NGBwrapperInstance.address, newCBal);
+
+		let expectedRewardsChange0 = rewardsAmt.mul(prevYield0).div(tsWrapper);
+		let expectedRewardsChange1 = rewardsAmt.mul(prevYield1).div(tsWrapper);
+
+		let amtYield = 1;
+		let amtBond = 2;
+		let rec = await fixCapitalPoolInstance.transferPosition(accounts[1], amtYield, amtBond);
+
+		let newRewardsBal0 = await rewardsAsset0.balanceOf(accounts[0]);
+		let newRewardsBal1 = await rewardsAsset0.balanceOf(accounts[1]);
+		let changeRewards0 = newRewardsBal0.sub(prevRewardsBal0);
+		let changeRewards1 = newRewardsBal1.sub(prevRewardsBal1);
+
+		let err = expectedRewardsChange0.sub(changeRewards0);
+		assert.equal(err.cmp(new BN(-1)), 1, "actual rewards is not greater than the expected");
+		assert.equal(err.cmp(new BN(2)), -1, "error is within one unit");
+		err = expectedRewardsChange1.sub(changeRewards1);
+		assert.equal(err.cmp(new BN(-1)), 1, "actual rewards is not greater than the expected");
+		assert.equal(err.cmp(new BN(2)), -1, "error is within one unit");
+	});
+
 	it('enters payout phase', async () => {
 		assert.equal(await fixCapitalPoolInstance.inPayoutPhase(), false, "payout phase has not been entered yet");
 		await NGBwrapperInstance.addRewardAsset(rewardsAsset1.address);
@@ -166,24 +199,31 @@ contract('FixCapitalPool', async function(accounts){
 
 	it('does not reward bond sellers with yield after payout', async () => {
 		minATknAtMaturity = await zcbInstance.balanceOf(accounts[0]);
-		postMaturityInflation = inflation.mul(new BN(2));
-		await dummyATokenInstance.setInflation(postMaturityInflation.toString());
+		postMaturityInflation = _10To18.mul(new BN(2));
+		inflation = inflation.mul(postMaturityInflation).div(_10To18);
+		await dummyATokenInstance.setInflation(inflation.toString());
 		assert.equal((await zcbInstance.balanceOf(accounts[0])).toString(), minATknAtMaturity,
 			"yield holders not rewarded by yield generated on lent out funds after maturity");
 	});
 
-	it('bond holders capture yield generated after maturity', async () => {
-		bondBalAct1 = await fixCapitalPoolInstance.balanceBonds(accounts[1]);
+	it('ZCB holders capture yield generated after maturity', async () => {
+		let yieldBalAct1 = await fixCapitalPoolInstance.balanceYield(accounts[1]);
+		let bondBalAct1 = await fixCapitalPoolInstance.balanceBonds(accounts[1]);
+		let prevATknBal2 = await dummyATokenInstance.balanceOf(accounts[2]);
 		/*
 			On call to withdraw harvestToTreasury() is called, because neglidgeble time has
 			passed no funds will go to the treasury. thus we do not need to adjust post
 			maturity inflation in our calculations below
 		*/
-		expectedPayout = bondBalAct1.mul(postMaturityInflation).div(adjustedInflation);
+		let expectedWrappedOut = yieldBalAct1.add(bondBalAct1.mul(_10To18).div(maturityConversionRate));
+		let expectedUnderlyingOut = expectedWrappedOut.mul(inflation).div(_10To18);
+		let expectedPayout = expectedUnderlyingOut;
 		await fixCapitalPoolInstance.claimBondPayout(accounts[2], true, {from: accounts[1]});
+
+		let aTknBal2 = await dummyATokenInstance.balanceOf(accounts[2]);
 		assert.equal((await fixCapitalPoolInstance.balanceBonds(accounts[1])).toString(), '0', "balance bond set to 0");
 		assert.equal((await fixCapitalPoolInstance.balanceYield(accounts[1])).toString(), '0', "balance yield set to 0");
-		assert.equal((await dummyATokenInstance.balanceOf(accounts[2])).toString(), expectedPayout.toString(), "correct payout of long bond tokens");
+		assert.equal(aTknBal2.sub(prevATknBal2).toString(), expectedPayout.toString(), "correct payout of long bond tokens");
 	});
 
 	it('contract can repay all obligations', async () => {

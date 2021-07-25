@@ -336,16 +336,31 @@ contract FixCapitalPool is IFixCapitalPool, Ownable, nonReentrant {
 	*/
 	function transferPosition(address _to, uint _yield, int _bond) external override {
 		//ensure position has positive minimum value at maturity
-		wrapper.forceDoubleClaimSubAccountRewards(msg.sender, _to);
-		uint ratio = inPayoutPhase ? maturityConversionRate : wrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
+		IWrapper wrp = wrapper; //gas savings
+		bool _inPayoutPhase = inPayoutPhase; //gas savings
+		uint ratio = _inPayoutPhase ? maturityConversionRate : wrp.WrappedAmtToUnitAmt_RoundDown(1 ether);
 		require(_bond >= 0 || _yield.mul(ratio)/(1 ether) >= uint(-_bond));
-		uint yieldSender = balanceYield[msg.sender].sub(_yield);
-		int bondSender = balanceBonds[msg.sender].sub(_bond);
-		require(bondSender >= 0 || yieldSender.mul(ratio)/(1 ether) >= uint(-bondSender));
-		balanceYield[msg.sender] = yieldSender;
-		balanceBonds[msg.sender] = bondSender;
-		balanceYield[_to] += _yield;
-		balanceBonds[_to] += _bond;
+
+		int bondSender = balanceBonds[msg.sender];
+		int bondRec = balanceBonds[_to];
+
+		uint[2] memory prevYields;
+		prevYields[0] = balanceYield[msg.sender];
+		prevYields[1] = balanceYield[_to];
+		uint[2] memory wrappedClaims;
+
+		{
+			uint _maturityConversionRate = _inPayoutPhase ? maturityConversionRate : 0; //prevent use of sload when not needed
+			wrappedClaims[0] = _inPayoutPhase ? payoutAmount(prevYields[0], bondSender, _maturityConversionRate) : prevYields[0];
+			wrappedClaims[1] = _inPayoutPhase ? payoutAmount(prevYields[1], bondRec, _maturityConversionRate) : prevYields[1];
+		}
+		address[2] memory subAccts = [msg.sender, _to];
+		wrp.FCPDirectDoubleClaimSubAccountRewards(_inPayoutPhase, true, subAccts, prevYields, wrappedClaims);
+		require(bondSender >= _bond || prevYields[0].sub(_yield).mul(ratio)/(1 ether) >= uint(bondSender.sub(_bond).abs()));
+		balanceYield[msg.sender] = prevYields[0] - _yield;
+		balanceBonds[msg.sender] = bondSender - _bond;
+		balanceYield[_to] = prevYields[1].add(_yield);
+		balanceBonds[_to] = bondRec.add(_bond);
 	}
 
 	/*
@@ -358,27 +373,33 @@ contract FixCapitalPool is IFixCapitalPool, Ownable, nonReentrant {
 	*/
 	function transferPositionFrom(address _from, address _to, uint _yield, int _bond) external override {
 		IWrapper wrp = wrapper;
-		wrp.forceDoubleClaimSubAccountRewards( _from, _to);
-		//ensure position has positive minimum value at maturity
-		uint yieldFrom = balanceYield[_from].sub(_yield);
+		bool _inPayoutPhase = inPayoutPhase;//gas savings
+		uint[2] memory prevYields = [balanceYield[_from], balanceYield[_to]];
+		int[2] memory prevBonds = [balanceBonds[_from], balanceBonds[_to]];
+		uint ratio = _inPayoutPhase ? maturityConversionRate : wrp.WrappedAmtToUnitAmt_RoundDown(1 ether);
+		uint[2] memory wrappedClaims = _inPayoutPhase ? 
+			[payoutAmount(prevYields[0], prevBonds[0], ratio), payoutAmount(prevYields[1], prevBonds[1], ratio)]
+			: prevYields;
+		address[2] memory subAccts = [_from, _to];
+		wrp.FCPDirectDoubleClaimSubAccountRewards(_inPayoutPhase, true, subAccts, prevYields, wrappedClaims);
+
+		require(prevBonds[0] >= _bond || prevYields[0].sub(_yield).mul(ratio)/(1 ether) >= uint(prevBonds[0].sub(_bond).abs()));
+
 		if (_yield > 0) {
 			//decrement approval of YT
 			IYieldToken(yieldTokenAddress).decrementAllowance(_from, msg.sender, _yield);
-			balanceYield[_from] = yieldFrom;
-			balanceYield[_to] += _yield;
+			balanceYield[_from] = prevYields[0].sub(_yield);
+			balanceYield[_to] = prevYields[1].add(_yield);
 		}
 
+		uint unitAmtYield = _yield.mul(ratio)/(1 ether);
+		require(_bond >= 0 || unitAmtYield >= uint(-_bond));
+		//decrement approval of ZCB
+		uint unitAmtZCB = _bond > 0 ? unitAmtYield.add(uint(_bond)) : unitAmtYield.sub(uint(_bond.abs()));
+		IZeroCouponBond(zeroCouponBondAddress).decrementAllowance(_from, msg.sender, unitAmtZCB);
 		if (_bond != 0) {
-			uint ratio = inPayoutPhase ? maturityConversionRate : wrp.WrappedAmtToUnitAmt_RoundDown(1 ether);
-			uint unitAmtYield = _yield.mul(ratio)/(1 ether);
-			require(_bond >= 0 || unitAmtYield >= uint(-_bond));
-			int bondFrom = balanceBonds[_from].sub(_bond);
-			require(bondFrom >= 0 || yieldFrom.mul(ratio)/(1 ether) >= uint(-bondFrom));
-			//decrement approval of ZCB
-			uint unitAmtZCB = _bond > 0 ? unitAmtYield.add(uint(_bond)) : unitAmtYield.sub(uint(-_bond));
-			IZeroCouponBond(zeroCouponBondAddress).decrementAllowance(_from, msg.sender, unitAmtZCB);
-			balanceBonds[_from] = bondFrom;
-			balanceBonds[_to] += _bond;
+			balanceBonds[_from] = prevBonds[0].sub(_bond);
+			balanceBonds[_to] = prevBonds[1].add(_bond);
 		}
 	}
 
@@ -404,9 +425,13 @@ contract FixCapitalPool is IFixCapitalPool, Ownable, nonReentrant {
 	*/
 	function transferZCB(address _from, address _to, uint _amount) external override {
 		uint conversionRate;
+		int[2] memory prevBonds = [balanceBonds[_from], balanceBonds[_to]];
 		if (inPayoutPhase) {
-			wrapper.forceDoubleClaimSubAccountRewards( _from, _to);
 			conversionRate = maturityConversionRate;
+			address[2] memory subAccts = [_from, _to];
+			uint[2] memory prevYields = [balanceYield[_from], balanceYield[_from]];
+			uint[2] memory wrappedClaims = [payoutAmount(prevYields[0], prevBonds[0], conversionRate), payoutAmount(prevYields[1], prevBonds[1], conversionRate)];
+			wrapper.FCPDirectDoubleClaimSubAccountRewards(true, true, subAccts, prevYields, wrappedClaims);
 		}
 		else {
 			conversionRate = wrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
@@ -439,23 +464,29 @@ contract FixCapitalPool is IFixCapitalPool, Ownable, nonReentrant {
 	*/
 	function transferYT(address _from, address _to, uint _amount) external override {
 		IWrapper wrp = wrapper;
-		wrp.forceDoubleClaimSubAccountRewards( _from, _to);
+		bool _inPayoutPhase = inPayoutPhase; //gas savings
 		if (msg.sender != _from && msg.sender != yieldTokenAddress) {
 			IYieldToken(yieldTokenAddress).decrementAllowance(_from, msg.sender, _amount);
 		}
-		uint conversionRate = inPayoutPhase ? maturityConversionRate : wrp.WrappedAmtToUnitAmt_RoundDown(1 ether);
-		uint _amountBondChange = _amount.mul(conversionRate) / (1 ether); //can be casted to int without worry bc '/ (1 ether)' ensures it fits
-		uint newYieldFrom = balanceYield[_from].sub(_amount);
-		int newBondFrom = balanceBonds[_from].add(int(_amountBondChange));
+		uint conversionRate = _inPayoutPhase ? maturityConversionRate : wrp.WrappedAmtToUnitAmt_RoundDown(1 ether);
+		int[2] memory prevBonds = [balanceBonds[_from], balanceBonds[_to]];
+		address[2] memory subAccts = [_from, _to];
+		uint[2] memory prevYields = [balanceYield[_from], balanceYield[_to]];
+		uint[2] memory wrappedClaims = _inPayoutPhase ? 
+			[payoutAmount(prevYields[0], prevBonds[0], conversionRate), payoutAmount(prevYields[1], prevBonds[1], conversionRate)]
+			: prevYields;
+		wrp.FCPDirectDoubleClaimSubAccountRewards(_inPayoutPhase, true, subAccts, prevYields, wrappedClaims);
+
+		int amountBondChange = int(_amount.mul(conversionRate) / (1 ether)); //can be casted to int without worry bc '/ (1 ether)' ensures it fits
 
 		//ensure that _from address's position may be cashed out to a positive amount of wrappedToken
 		//if it cannot the following call will revert this tx
-		minimumUnitAmountAtMaturity(newYieldFrom, newBondFrom, conversionRate);
+		minimumUnitAmountAtMaturity(prevYields[0].sub(_amount), prevBonds[0].add(amountBondChange), conversionRate);
 
-		balanceYield[_from] = newYieldFrom;
-		balanceBonds[_from] = newBondFrom;
-		balanceYield[_to] = balanceYield[_to].add(_amount);
-		balanceBonds[_to] = balanceBonds[_to].sub(int(_amountBondChange));
+		balanceYield[_from] = prevYields[0].sub(_amount);
+		balanceBonds[_from] = prevBonds[0].add(amountBondChange);
+		balanceYield[_to] = prevYields[1].add(_amount);
+		balanceBonds[_to] = prevBonds[1].sub(amountBondChange);
 
 	}
 

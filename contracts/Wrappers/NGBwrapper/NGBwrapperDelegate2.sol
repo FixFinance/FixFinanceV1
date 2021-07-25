@@ -65,6 +65,29 @@ contract NGBwrapperDelegate2 is NGBwrapperDelegateParent {
         }
     }
 
+    function FCPDirectDoubleClaimSubAccountRewards(
+        bool _inPayoutPhase,
+        bool _claimRewards,
+        address[2] calldata _subAccts,
+        uint[2] calldata _yieldArr,
+        uint[2] calldata _wrappedClaims
+    ) external claimRewards(_claimRewards, msg.sender) {
+        uint len = internalRewardsAssets.length;
+        if (len > 0) {
+            len = len > type(uint8).max ? type(uint8).max : len;
+            bool copyInPayoutPhase = _inPayoutPhase;
+            uint16 flags = (copyInPayoutPhase ? 1 << 15 : 0);
+            {
+                flags = flags | (copyInPayoutPhase && !internalHasClaimedAllYTrewards[msg.sender][_subAccts[0]][msg.sender] ? 1 << 14 : 0);
+                flags = flags | (internalIsDistributionAccount[_subAccts[0]] ? 1 << 13 : 0);
+
+                flags = flags | (copyInPayoutPhase && !internalHasClaimedAllYTrewards[msg.sender][_subAccts[1]][msg.sender] ? 1 << 12 : 0);
+                flags = flags | (internalIsDistributionAccount[_subAccts[1]] ? 1 << 11 : 0);
+            }
+            doubleSubaccountDistributeRewards(uint8(len), msg.sender, _subAccts, _yieldArr, _wrappedClaims, flags);
+        }
+    }
+
     function forceDoubleClaimSubAccountRewards(
         address _subAccount0,
         address _subAccount1
@@ -79,15 +102,15 @@ contract NGBwrapperDelegate2 is NGBwrapperDelegateParent {
         address _subAcct,
         address _FCPaddr
     ) internal returns(SubAccountPosition memory mPos) {
-        if(_distributionAcct != _FCPaddr) {
-            mPos = internalSubAccountPositions[_distributionAcct][_subAcct][_FCPaddr];
-        }
-        else {
-            mPos.yield = IFixCapitalPool(_FCPaddr).balanceYield(_subAcct);
-        }
         uint len = internalRewardsAssets.length;
         if (len > 0) {
             len = len > type(uint8).max ? type(uint8).max : len;
+            if(_distributionAcct != _FCPaddr) {
+                mPos = internalSubAccountPositions[_distributionAcct][_subAcct][_FCPaddr];
+            }
+            else {
+                mPos.yield = IFixCapitalPool(_FCPaddr).balanceYield(_subAcct);
+            }
             bool inPayoutPhase = IFixCapitalPool(_FCPaddr).inPayoutPhase();
             uint16 flags = (inPayoutPhase ? 1 << 15 : 0) |
                 (inPayoutPhase && !internalHasClaimedAllYTrewards[_distributionAcct][_subAcct][_FCPaddr] ? 1 << 14 : 0) |
@@ -174,6 +197,110 @@ contract NGBwrapperDelegate2 is NGBwrapperDelegateParent {
         }
         if (i & (1 << 14) > 0) {
             internalHasClaimedAllYTrewards[_distributionAcct][_subAcct][_FCPaddr] = true;
+        }
+    }
+
+    /*
+        i format:
+            i & (1 << 15) > 0 == inPayoutPhase
+            i & (1 << 14) > 0 == subAcct0 get YT & ZCB rewards
+            i & (1 << 13) > 0 == subAcct0 is distribution account
+            i & (1 << 12) > 0 == subAcct1 get YT & ZCB rewards
+            i & (1 << 11) > 0 == subAcct1 is distribution account
+            uint8(i) == current index in rewards assets array
+    */
+    function doubleSubaccountDistributeRewards(
+        uint8 _len,
+        address _FCPaddr,
+        address[2] memory _subAccts,
+        uint[2] memory _yieldArr,
+        uint[2] memory _balanceAddrs,
+//        address _subAcct0,
+//        address _subAcct1,
+//        uint _yield0,
+//        uint _yield1,
+//        uint _balanceAddr0,
+//        uint _balanceAddr1,
+        uint16 i
+    ) internal {
+        for (; uint8(i) < _len; i++) {
+            address _rewardsAddr = internalRewardsAssets[uint8(i)];
+            if (_rewardsAddr == address(0)) {
+                continue;
+            }
+            uint newTRPC = internalTotalRewardsPerWasset[uint8(i)];
+            uint TRPY = i & ((1 << 14) | (1 << 12)) > 0 ? IFixCapitalPool(_FCPaddr).TotalRewardsPerWassetAtMaturity(uint8(i)) : 0;
+            uint dividend;
+            uint prevTotalRewardsPerClaim = internalSAPTRPW[uint8(i)][_FCPaddr][_subAccts[0]][_FCPaddr];
+            if (i & (1 << 14) > 0) {
+                //collect all YT associated rewards
+                if (prevTotalRewardsPerClaim < TRPY) {
+                    dividend = (TRPY - prevTotalRewardsPerClaim).mul(_yieldArr[0]) / (1 ether);
+                }
+                prevTotalRewardsPerClaim = TRPY;
+            }
+
+            if (prevTotalRewardsPerClaim < newTRPC) {
+                dividend = dividend.add((newTRPC - prevTotalRewardsPerClaim).mul(_balanceAddrs[0]) / (1 ether));
+                internalSAPTRPW[uint8(i)][_FCPaddr][_subAccts[0]][_FCPaddr] = newTRPC;
+            }
+            else if (i & (1 << 14) > 0) {
+                internalSAPTRPW[uint8(i)][_FCPaddr][_subAccts[0]][_FCPaddr] = prevTotalRewardsPerClaim;
+            }
+
+            if (dividend > 1) {
+                dividend--; //sub 1 from dividend to prevent rounding errors resulting in dist acct insolvency by small amounts
+                internalDistributionAccountRewards[uint8(i)][_FCPaddr] = internalDistributionAccountRewards[uint8(i)][_FCPaddr].sub(dividend);
+                if (i & (1 << 13) > 0) {
+                    internalDistributionAccountRewards[uint8(i)][_subAccts[0]] = internalDistributionAccountRewards[uint8(i)][_subAccts[0]].add(dividend);
+                }
+                else {
+                    uint totalUnspentDARewards = internalTotalUnspentDistributionAccountRewards[uint8(i)].sub(dividend);
+                    internalTotalUnspentDistributionAccountRewards[uint8(i)] = totalUnspentDARewards;
+                    bool success = IERC20(_rewardsAddr).transfer(_subAccts[0], dividend);
+                    require(success);
+                    internalPrevContractBalance[uint8(i)] = IERC20(_rewardsAddr).balanceOf(address(this)).sub(totalUnspentDARewards);
+                }
+            }
+
+            dividend = 0;
+            prevTotalRewardsPerClaim = internalSAPTRPW[uint8(i)][_FCPaddr][_subAccts[1]][_FCPaddr];
+            if (i & (1 << 12) > 0) {
+                //collect all YT associated rewards
+                if (prevTotalRewardsPerClaim < TRPY) {
+                    dividend = (TRPY - prevTotalRewardsPerClaim).mul(_yieldArr[1]) / (1 ether);
+                }
+                prevTotalRewardsPerClaim = TRPY;
+            }
+
+            if (prevTotalRewardsPerClaim < newTRPC) {
+                dividend = dividend.add((newTRPC - prevTotalRewardsPerClaim).mul(_balanceAddrs[1]) / (1 ether));
+                internalSAPTRPW[uint8(i)][_FCPaddr][_subAccts[1]][_FCPaddr] = newTRPC;
+            }
+            else if (i & (1 << 12) > 0) {
+                internalSAPTRPW[uint8(i)][_FCPaddr][_subAccts[1]][_FCPaddr] = prevTotalRewardsPerClaim;
+            }
+
+            if (dividend > 1) {
+                dividend--; //sub 1 from dividend to prevent rounding errors resulting in dist acct insolvency by small amounts
+                internalDistributionAccountRewards[uint8(i)][_FCPaddr] = internalDistributionAccountRewards[uint8(i)][_FCPaddr].sub(dividend);
+                if (i & (1 << 11) > 0) {
+                    internalDistributionAccountRewards[uint8(i)][_subAccts[1]] = internalDistributionAccountRewards[uint8(i)][_subAccts[1]].add(dividend);
+                }
+                else {
+                    uint totalUnspentDARewards = internalTotalUnspentDistributionAccountRewards[uint8(i)].sub(dividend);
+                    internalTotalUnspentDistributionAccountRewards[uint8(i)] = totalUnspentDARewards;
+                    bool success = IERC20(_rewardsAddr).transfer(_subAccts[1], dividend);
+                    require(success);
+                    internalPrevContractBalance[uint8(i)] = IERC20(_rewardsAddr).balanceOf(address(this)).sub(totalUnspentDARewards);
+                }
+            }
+        }
+        if (i & (1 << 14) > 0) {
+            internalHasClaimedAllYTrewards[_FCPaddr][_subAccts[0]][_FCPaddr] = true;
+        }
+        if (i & (1 << 12) > 0) {
+            internalHasClaimedAllYTrewards[_FCPaddr][_subAccts[1]][_FCPaddr] = true;
         }
     }
 

@@ -459,6 +459,36 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 		require(success);
 	}
 
+
+    /*
+		@Description: force rewards for an FCP direct sub account to be claimed
+			only callable by FCP contracts
+
+		@param bool _inPayoutPhase: true if the FCP is in the payout phase
+		@param bool _claimRewards: true if the FCP should claim its rewards
+		@param address[2] _subAccts: the owners of the FCP direct sub accounts for which to claim rewards
+		@param uint[2] _yieldArr: [yield balance of subAcct0, yield balance of subAcct1]
+		@param uint[2] _wrappedClaims: the effective amount of the wrapper asset used to calculate the
+			distribution for the sub accounts
+    */
+    function FCPDirectDoubleClaimSubAccountRewards(
+        bool _inPayoutPhase,
+        bool _claimRewards,
+        address[2] calldata _subAccts,
+        uint[2] calldata _yieldArr,
+        uint[2] calldata _wrappedClaims
+    ) external override {
+    	(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
+    		"FCPDirectDoubleClaimSubAccountRewards(bool,bool,address[2],uint256[2],uint256[2])",
+    		_inPayoutPhase,
+    		_claimRewards,
+    		_subAccts,
+    		_yieldArr,
+    		_wrappedClaims
+    	));
+    	require(success);
+    }
+
     //------------------------v-i-e-w-s---------------------------
 
 	bool public constant override underlyingIsStatic = false;

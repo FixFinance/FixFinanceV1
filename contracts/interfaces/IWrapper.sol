@@ -46,19 +46,11 @@ interface IWrapper is IERC20, IERC3156FlashLender {
         uint[2] calldata _yieldArr,
         uint[2] calldata _wrappedClaims
     ) external;
-/*    function FCPDirectDoubleClaimSubAccountRewards(
-        bool _inPayoutPhase,
-        bool _claimRewards,
-        address _subAcct0,
-        address _subAcct1,
-        uint _yield0,
-        uint _yield1,
-        uint _wrappedClaim0,
-        uint _wrappedClaim1
-    ) external; */
 	function isDistributionAccount(address _addr) external view returns(bool);
 	function totalUnspentDistributionAccountRewards(uint _index) external view returns(uint);
 	function distributionAccountRewards(uint _index, address _distributionAccount) external view returns(uint);
+	function hasClaimedAllYTRewards(address _distributionAccount, address _subAccount, address _FCPaddr) external view returns(bool);
+	function subAccountPrevTotalReturnsPerWasset(uint _index, address _distributionAccount, address _subAccount, address _FCPaddr) external view returns(uint);
 	function subAccountPositions(address _distributionAccount, address _subAccount, address _FCPaddr) external view returns(
 		uint yield,
 		int bond

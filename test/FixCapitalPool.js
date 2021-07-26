@@ -168,8 +168,107 @@ contract('FixCapitalPool', async function(accounts){
 		assert.equal(err.cmp(new BN(2)), -1, "error is within one unit");
 	});
 
+	it('FCP direct double claim, prior to payout phase from, transferPositionFrom()', async () => {
+		await NGBwrapperInstance.forceClaimSubAccountRewards(fixCapitalPoolInstance.address, accounts[0], fixCapitalPoolInstance.address);
+		await NGBwrapperInstance.forceClaimSubAccountRewards(fixCapitalPoolInstance.address, accounts[1], fixCapitalPoolInstance.address, {from: accounts[1]});
+		let prevRewardsBal0 = await rewardsAsset0.balanceOf(accounts[0]);
+		let prevRewardsBal1 = await rewardsAsset0.balanceOf(accounts[1]);
+		let prevYield0 = await fixCapitalPoolInstance.balanceYield(accounts[0]);
+		let prevYield1 = await fixCapitalPoolInstance.balanceYield(accounts[1]);
+		let tsWrapper = await NGBwrapperInstance.totalSupply();
+
+		let rewardsAmt = _10To18.div(new BN('23874'));
+		let newCBal = rewardsAmt.add(await rewardsAsset0.balanceOf(NGBwrapperInstance.address));
+		await rewardsAsset0.mintTo(NGBwrapperInstance.address, newCBal);
+
+		let expectedRewardsChange0 = rewardsAmt.mul(prevYield0).div(tsWrapper);
+		let expectedRewardsChange1 = rewardsAmt.mul(prevYield1).div(tsWrapper);
+
+		let amtYield = 0;
+		let amtBond = 2;
+		await zcbInstance.approve(accounts[1], amtBond);
+		let rec = await fixCapitalPoolInstance.transferPositionFrom(accounts[0], accounts[1], amtYield, amtBond, {from: accounts[1]});
+
+		let newRewardsBal0 = await rewardsAsset0.balanceOf(accounts[0]);
+		let newRewardsBal1 = await rewardsAsset0.balanceOf(accounts[1]);
+		let changeRewards0 = newRewardsBal0.sub(prevRewardsBal0);
+		let changeRewards1 = newRewardsBal1.sub(prevRewardsBal1);
+
+		let err = expectedRewardsChange0.sub(changeRewards0);
+		assert.equal(err.cmp(new BN(-1)), 1, "actual rewards is not greater than the expected");
+		assert.equal(err.cmp(new BN(2)), -1, "error is within one unit");
+		err = expectedRewardsChange1.sub(changeRewards1);
+		assert.equal(err.cmp(new BN(-1)), 1, "actual rewards is not greater than the expected");
+		assert.equal(err.cmp(new BN(2)), -1, "error is within one unit");
+	});
+
+	it('FCP direct double claim, prior to payout phase from, transferZCB()', async () => {
+		//before payout phase transferZCB should not claim sub account rewards
+		await NGBwrapperInstance.forceClaimSubAccountRewards(fixCapitalPoolInstance.address, accounts[0], fixCapitalPoolInstance.address);
+		await NGBwrapperInstance.forceClaimSubAccountRewards(fixCapitalPoolInstance.address, accounts[1], fixCapitalPoolInstance.address, {from: accounts[1]});
+		let prevRewardsBal0 = await rewardsAsset0.balanceOf(accounts[0]);
+		let prevRewardsBal1 = await rewardsAsset0.balanceOf(accounts[1]);
+
+		let rewardsAmt = _10To18.div(new BN('12342'));
+		let newCBal = rewardsAmt.add(await rewardsAsset0.balanceOf(NGBwrapperInstance.address));
+		await rewardsAsset0.mintTo(NGBwrapperInstance.address, newCBal);
+
+		let amtZCB = 2;
+		await zcbInstance.approve(accounts[1], amtZCB);
+		let rec = await fixCapitalPoolInstance.transferZCB(accounts[0], accounts[1], amtZCB, {from: accounts[1]});
+
+		let newRewardsBal0 = await rewardsAsset0.balanceOf(accounts[0]);
+		let newRewardsBal1 = await rewardsAsset0.balanceOf(accounts[1]);
+		let changeRewards0 = newRewardsBal0.sub(prevRewardsBal0);
+		let changeRewards1 = newRewardsBal1.sub(prevRewardsBal1);
+
+		assert.equal(changeRewards0.toString(), "0", "transferZCB ought not claim sub account rewards before payout phase");
+		assert.equal(changeRewards1.toString(), "0", "transferZCB ought not claim sub account rewards before payout phase");
+	});
+
+	it('FCP direct double claim, prior to payout phase from, transferYT()', async () => {
+		await NGBwrapperInstance.forceClaimSubAccountRewards(fixCapitalPoolInstance.address, accounts[0], fixCapitalPoolInstance.address);
+		await NGBwrapperInstance.forceClaimSubAccountRewards(fixCapitalPoolInstance.address, accounts[1], fixCapitalPoolInstance.address, {from: accounts[1]});
+		let prevRewardsBal0 = await rewardsAsset0.balanceOf(accounts[0]);
+		let prevRewardsBal1 = await rewardsAsset0.balanceOf(accounts[1]);
+		let prevYield0 = await fixCapitalPoolInstance.balanceYield(accounts[0]);
+		let prevYield1 = await fixCapitalPoolInstance.balanceYield(accounts[1]);
+		let tsWrapper = await NGBwrapperInstance.totalSupply();
+
+		let rewardsAmt = _10To18.div(new BN('93274'));
+		let newCBal = rewardsAmt.add(await rewardsAsset0.balanceOf(NGBwrapperInstance.address));
+		await rewardsAsset0.mintTo(NGBwrapperInstance.address, newCBal);
+
+		let expectedRewardsChange0 = rewardsAmt.mul(prevYield0).div(tsWrapper);
+		let expectedRewardsChange1 = rewardsAmt.mul(prevYield1).div(tsWrapper);
+
+		let amtYT = 2;
+		let rec = await fixCapitalPoolInstance.transferYT(accounts[0], accounts[1], amtYT);
+
+		let newRewardsBal0 = await rewardsAsset0.balanceOf(accounts[0]);
+		let newRewardsBal1 = await rewardsAsset0.balanceOf(accounts[1]);
+		let changeRewards0 = newRewardsBal0.sub(prevRewardsBal0);
+		let changeRewards1 = newRewardsBal1.sub(prevRewardsBal1);
+
+		let err = expectedRewardsChange0.sub(changeRewards0);
+		assert.equal(err.cmp(new BN(-1)), 1, "actual rewards is not greater than the expected");
+		assert.equal(err.cmp(new BN(2)), -1, "error is within one unit");
+		err = expectedRewardsChange1.sub(changeRewards1);
+		assert.equal(err.cmp(new BN(-1)), 1, "actual rewards is not greater than the expected");
+		assert.equal(err.cmp(new BN(2)), -1, "error is within one unit");
+		assert.equal(await NGBwrapperInstance.hasClaimedAllYTRewards(fixCapitalPoolInstance.address, accounts[0], fixCapitalPoolInstance.address), false);
+		assert.equal(await NGBwrapperInstance.hasClaimedAllYTRewards(fixCapitalPoolInstance.address, accounts[1], fixCapitalPoolInstance.address), false);
+	});
+
 	it('enters payout phase', async () => {
 		assert.equal(await fixCapitalPoolInstance.inPayoutPhase(), false, "payout phase has not been entered yet");
+
+		await NGBwrapperInstance.forceClaimSubAccountRewards(fixCapitalPoolInstance.address, accounts[0], fixCapitalPoolInstance.address);
+		await NGBwrapperInstance.forceClaimSubAccountRewards(fixCapitalPoolInstance.address, accounts[1], fixCapitalPoolInstance.address, {from: accounts[1]});
+		priorRewardsAmt = _10To18.div(new BN('28735'));
+		let newCBal = priorRewardsAmt.add(await rewardsAsset0.balanceOf(NGBwrapperInstance.address));
+		await rewardsAsset0.mintTo(NGBwrapperInstance.address, newCBal);
+
 		await NGBwrapperInstance.addRewardAsset(rewardsAsset1.address);
 		await rewardsAsset1.mintTo(NGBwrapperInstance.address, _10To18);
 		await NGBwrapperInstance.forceRewardsCollection({from: accounts[5]}); //from account with no balance
@@ -195,6 +294,157 @@ contract('FixCapitalPool', async function(accounts){
 		let TRPWatMaturity = (await fixCapitalPoolInstance.TotalRewardsPerWassetAtMaturity(1)).toString();
 		assert.equal(TRPWatMaturity, expectedTRPWatMaturity, "correct TRPW at maturity for reward asset");
 		maturityConversionRate = await fixCapitalPoolInstance.maturityConversionRate();
+	});
+
+	it('FCP direct double claim, in payout phase from, transferPositionFrom()', async () => {
+		let prevRewardsBal0 = await rewardsAsset0.balanceOf(accounts[0]);
+		let prevRewardsBal1 = await rewardsAsset0.balanceOf(accounts[1]);
+		let prevYield0 = await fixCapitalPoolInstance.balanceYield(accounts[0]);
+		let prevYield1 = await fixCapitalPoolInstance.balanceYield(accounts[1]);
+		let prevBond0 = await fixCapitalPoolInstance.balanceBonds(accounts[0]);
+		let prevBond1 = await fixCapitalPoolInstance.balanceBonds(accounts[1]);
+		let wrappedClaim0 = prevBond0.mul(_10To18).div(maturityConversionRate).add(prevYield0);
+		let wrappedClaim1 = prevBond1.mul(_10To18).div(maturityConversionRate).add(prevYield1);
+		let tsWrapper = await NGBwrapperInstance.totalSupply();
+
+		let rewardsAmt = _10To18.div(new BN('23874'));
+		let newCBal = rewardsAmt.add(await rewardsAsset0.balanceOf(NGBwrapperInstance.address));
+		await rewardsAsset0.mintTo(NGBwrapperInstance.address, newCBal);
+
+		let expectedNewRewards0 = rewardsAmt.mul(wrappedClaim0).div(tsWrapper);
+		let expectedNewRewards1 = rewardsAmt.mul(wrappedClaim1).div(tsWrapper);
+		let expectedPriorRewards0 = priorRewardsAmt.mul(prevYield0).div(tsWrapper);
+		let expectedPriorRewards1 = priorRewardsAmt.mul(prevYield1).div(tsWrapper);
+		let expectedRewardsChange0 = expectedNewRewards0.add(expectedPriorRewards0);
+		let expectedRewardsChange1 = expectedNewRewards1.add(expectedPriorRewards1);
+
+		let amtYield = 0;
+		let amtBond = 2;
+		await zcbInstance.approve(accounts[1], amtBond);
+		let rec = await fixCapitalPoolInstance.transferPositionFrom(accounts[0], accounts[1], amtYield, amtBond, {from: accounts[1]});
+
+		let newRewardsBal0 = await rewardsAsset0.balanceOf(accounts[0]);
+		let newRewardsBal1 = await rewardsAsset0.balanceOf(accounts[1]);
+		let changeRewards0 = newRewardsBal0.sub(prevRewardsBal0);
+		let changeRewards1 = newRewardsBal1.sub(prevRewardsBal1);
+
+		let err = expectedRewardsChange0.sub(changeRewards0);
+		assert.equal(err.cmp(new BN(-1)), 1, "actual rewards is not greater than the expected");
+		assert.equal(err.cmp(new BN(3)), -1, "error is within two units");
+		err = expectedRewardsChange1.sub(changeRewards1);
+		assert.equal(err.cmp(new BN(-1)), 1, "actual rewards is not greater than the expected");
+		assert.equal(err.cmp(new BN(3)), -1, "error is within two units");
+		assert.equal(await NGBwrapperInstance.hasClaimedAllYTRewards(fixCapitalPoolInstance.address, accounts[0], fixCapitalPoolInstance.address), true);
+		assert.equal(await NGBwrapperInstance.hasClaimedAllYTRewards(fixCapitalPoolInstance.address, accounts[1], fixCapitalPoolInstance.address), true);
+	});
+
+	it('FCP direct double claim, in payout phase from, transferPosition()', async () => {
+		await NGBwrapperInstance.forceClaimSubAccountRewards(fixCapitalPoolInstance.address, accounts[0], fixCapitalPoolInstance.address);
+		await NGBwrapperInstance.forceClaimSubAccountRewards(fixCapitalPoolInstance.address, accounts[1], fixCapitalPoolInstance.address, {from: accounts[1]});
+		let prevRewardsBal0 = await rewardsAsset0.balanceOf(accounts[0]);
+		let prevRewardsBal1 = await rewardsAsset0.balanceOf(accounts[1]);
+		let prevYield0 = await fixCapitalPoolInstance.balanceYield(accounts[0]);
+		let prevYield1 = await fixCapitalPoolInstance.balanceYield(accounts[1]);
+		let prevBond0 = await fixCapitalPoolInstance.balanceBonds(accounts[0]);
+		let prevBond1 = await fixCapitalPoolInstance.balanceBonds(accounts[1]);
+		let wrappedClaim0 = prevBond0.mul(_10To18).div(maturityConversionRate).add(prevYield0);
+		let wrappedClaim1 = prevBond1.mul(_10To18).div(maturityConversionRate).add(prevYield1);
+		let tsWrapper = await NGBwrapperInstance.totalSupply();
+
+		let rewardsAmt = _10To18.div(new BN('98723'));
+		let newCBal = rewardsAmt.add(await rewardsAsset0.balanceOf(NGBwrapperInstance.address));
+		await rewardsAsset0.mintTo(NGBwrapperInstance.address, newCBal);
+
+		let expectedRewardsChange0 = rewardsAmt.mul(wrappedClaim0).div(tsWrapper);
+		let expectedRewardsChange1 = rewardsAmt.mul(wrappedClaim1).div(tsWrapper);
+
+		let amtYield = 1;
+		let amtBond = 2;
+		let rec = await fixCapitalPoolInstance.transferPosition(accounts[1], amtYield, amtBond);
+
+		let newRewardsBal0 = await rewardsAsset0.balanceOf(accounts[0]);
+		let newRewardsBal1 = await rewardsAsset0.balanceOf(accounts[1]);
+		let changeRewards0 = newRewardsBal0.sub(prevRewardsBal0);
+		let changeRewards1 = newRewardsBal1.sub(prevRewardsBal1);
+
+		let err = expectedRewardsChange0.sub(changeRewards0);
+		assert.equal(err.cmp(new BN(-1)), 1, "actual rewards is not greater than the expected");
+		assert.equal(err.cmp(new BN(2)), -1, "error is within one unit");
+		err = expectedRewardsChange1.sub(changeRewards1);
+		assert.equal(err.cmp(new BN(-1)), 1, "actual rewards is not greater than the expected");
+		assert.equal(err.cmp(new BN(2)), -1, "error is within one unit");
+	});
+
+	it('FCP direct double claim, in payout phase from, transferZCB()', async () => {
+		await NGBwrapperInstance.forceClaimSubAccountRewards(fixCapitalPoolInstance.address, accounts[0], fixCapitalPoolInstance.address);
+		await NGBwrapperInstance.forceClaimSubAccountRewards(fixCapitalPoolInstance.address, accounts[1], fixCapitalPoolInstance.address, {from: accounts[1]});
+		let prevRewardsBal0 = await rewardsAsset0.balanceOf(accounts[0]);
+		let prevRewardsBal1 = await rewardsAsset0.balanceOf(accounts[1]);
+		let prevYield0 = await fixCapitalPoolInstance.balanceYield(accounts[0]);
+		let prevYield1 = await fixCapitalPoolInstance.balanceYield(accounts[1]);
+		let prevBond0 = await fixCapitalPoolInstance.balanceBonds(accounts[0]);
+		let prevBond1 = await fixCapitalPoolInstance.balanceBonds(accounts[1]);
+		let wrappedClaim0 = prevBond0.mul(_10To18).div(maturityConversionRate).add(prevYield0);
+		let wrappedClaim1 = prevBond1.mul(_10To18).div(maturityConversionRate).add(prevYield1);
+		let tsWrapper = await NGBwrapperInstance.totalSupply();
+
+		let rewardsAmt = _10To18.div(new BN('34533'));
+		let newCBal = rewardsAmt.add(await rewardsAsset0.balanceOf(NGBwrapperInstance.address));
+		await rewardsAsset0.mintTo(NGBwrapperInstance.address, newCBal);
+
+		let expectedRewardsChange0 = rewardsAmt.mul(wrappedClaim0).div(tsWrapper);
+		let expectedRewardsChange1 = rewardsAmt.mul(wrappedClaim1).div(tsWrapper);
+
+		let amtZCB = 200;
+		let rec = await fixCapitalPoolInstance.transferZCB(accounts[0], accounts[1], amtZCB);
+
+		let newRewardsBal0 = await rewardsAsset0.balanceOf(accounts[0]);
+		let newRewardsBal1 = await rewardsAsset0.balanceOf(accounts[1]);
+		let changeRewards0 = newRewardsBal0.sub(prevRewardsBal0);
+		let changeRewards1 = newRewardsBal1.sub(prevRewardsBal1);
+
+		let err = expectedRewardsChange0.sub(changeRewards0);
+		assert.equal(err.cmp(new BN(-1)), 1, "actual rewards is not greater than the expected");
+		assert.equal(err.cmp(new BN(2)), -1, "error is within one unit");
+		err = expectedRewardsChange1.sub(changeRewards1);
+		assert.equal(err.cmp(new BN(-1)), 1, "actual rewards is not greater than the expected");
+		assert.equal(err.cmp(new BN(2)), -1, "error is within one unit");
+	});
+
+	it('FCP direct double claim, in payout phase from, transferYT()', async () => {
+		await NGBwrapperInstance.forceClaimSubAccountRewards(fixCapitalPoolInstance.address, accounts[0], fixCapitalPoolInstance.address);
+		await NGBwrapperInstance.forceClaimSubAccountRewards(fixCapitalPoolInstance.address, accounts[1], fixCapitalPoolInstance.address, {from: accounts[1]});
+		let prevRewardsBal0 = await rewardsAsset0.balanceOf(accounts[0]);
+		let prevRewardsBal1 = await rewardsAsset0.balanceOf(accounts[1]);
+		let prevYield0 = await fixCapitalPoolInstance.balanceYield(accounts[0]);
+		let prevYield1 = await fixCapitalPoolInstance.balanceYield(accounts[1]);
+		let prevBond0 = await fixCapitalPoolInstance.balanceBonds(accounts[0]);
+		let prevBond1 = await fixCapitalPoolInstance.balanceBonds(accounts[1]);
+		let wrappedClaim0 = prevBond0.mul(_10To18).div(maturityConversionRate).add(prevYield0);
+		let wrappedClaim1 = prevBond1.mul(_10To18).div(maturityConversionRate).add(prevYield1);
+		let tsWrapper = await NGBwrapperInstance.totalSupply();
+
+		let rewardsAmt = _10To18.div(new BN('43287'));
+		let newCBal = rewardsAmt.add(await rewardsAsset0.balanceOf(NGBwrapperInstance.address));
+		await rewardsAsset0.mintTo(NGBwrapperInstance.address, newCBal);
+
+		let expectedRewardsChange0 = rewardsAmt.mul(wrappedClaim0).div(tsWrapper);
+		let expectedRewardsChange1 = rewardsAmt.mul(wrappedClaim1).div(tsWrapper);
+
+		let amtYT = 2;
+		let rec = await fixCapitalPoolInstance.transferYT(accounts[0], accounts[1], amtYT);
+
+		let newRewardsBal0 = await rewardsAsset0.balanceOf(accounts[0]);
+		let newRewardsBal1 = await rewardsAsset0.balanceOf(accounts[1]);
+		let changeRewards0 = newRewardsBal0.sub(prevRewardsBal0);
+		let changeRewards1 = newRewardsBal1.sub(prevRewardsBal1);
+
+		let err = expectedRewardsChange0.sub(changeRewards0);
+		assert.equal(err.cmp(new BN(-1)), 1, "actual rewards is not greater than the expected");
+		assert.equal(err.cmp(new BN(2)), -1, "error is within one unit");
+		err = expectedRewardsChange1.sub(changeRewards1);
+		assert.equal(err.cmp(new BN(-1)), 1, "actual rewards is not greater than the expected");
+		assert.equal(err.cmp(new BN(2)), -1, "error is within one unit");
 	});
 
 	it('does not reward bond sellers with yield after payout', async () => {

@@ -424,12 +424,13 @@ contract FixCapitalPool is IFixCapitalPool, Ownable, nonReentrant {
 		@param address _to: the address to send 
 	*/
 	function transferZCB(address _from, address _to, uint _amount) external override {
+		require(_amount <= uint(type(int256).max));
 		uint conversionRate;
 		int[2] memory prevBonds = [balanceBonds[_from], balanceBonds[_to]];
 		if (inPayoutPhase) {
 			conversionRate = maturityConversionRate;
 			address[2] memory subAccts = [_from, _to];
-			uint[2] memory prevYields = [balanceYield[_from], balanceYield[_from]];
+			uint[2] memory prevYields = [balanceYield[_from], balanceYield[_to]];
 			uint[2] memory wrappedClaims = [payoutAmount(prevYields[0], prevBonds[0], conversionRate), payoutAmount(prevYields[1], prevBonds[1], conversionRate)];
 			wrapper.FCPDirectDoubleClaimSubAccountRewards(true, true, subAccts, prevYields, wrappedClaims);
 		}

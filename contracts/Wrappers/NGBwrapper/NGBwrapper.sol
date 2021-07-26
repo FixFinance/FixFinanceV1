@@ -573,6 +573,14 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 		return internalDistributionAccountRewards[_index][_distributionAccount];
 	}
 
+	function hasClaimedAllYTRewards(address _distributionAccount, address _subAccount, address _FCPaddr) external view override returns(bool) {
+		return internalHasClaimedAllYTrewards[_distributionAccount][_subAccount][_FCPaddr];
+	}
+
+	function subAccountPrevTotalReturnsPerWasset(uint _index, address _distributionAccount, address _subAccount, address _FCPaddr) external view override returns(uint) {
+		return internalSAPTRPW[_index][_distributionAccount][_subAccount][_FCPaddr];
+	}
+
 	function subAccountPositions(
 		address _distributionAccount,
 		address _subAccount, 

@@ -478,7 +478,7 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
         uint[2] calldata _yieldArr,
         uint[2] calldata _wrappedClaims
     ) external override {
-    	(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
+    	(bool success, ) = delegate3Address.delegatecall(abi.encodeWithSignature(
     		"FCPDirectDoubleClaimSubAccountRewards(bool,bool,address[2],uint256[2],uint256[2])",
     		_inPayoutPhase,
     		_claimRewards,

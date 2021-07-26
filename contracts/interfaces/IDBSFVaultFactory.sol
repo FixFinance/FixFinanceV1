@@ -121,6 +121,7 @@ interface IDBSFVaultFactory {
 	function partialYTLiquidationSpecificIn(address _owner, uint _index, address _FCPborrowed, address _FCPsupplied, uint _in, uint _minOut, int _minBondRatio, address _to) external;
 	function partialYTLiquidationSpecificOut(address _owner, uint _index, address _FCPborrowed, address _FCPsupplied, uint _out, int _minBondRatio, uint _maxIn, address _to) external;
 	//--------------------------------------------a-d-m-i-n---------------------------------------------
+	function registerAsDistributionAccount(address _wrapperAddress) external;
 	function setLiquidationRebate(uint _rebateBips) external;
 	function claimRevenue(address _asset) external;
 	function claimYTRevenue(address _FCP, int _bondIn) external;

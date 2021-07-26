@@ -745,6 +745,19 @@ contract DBSFVaultFactory is DBSFVaultFactoryData, IDBSFVaultFactory, nonReentra
 
 	//-------------------------------------a-d-m-i-n---m-a-n-a-g-e-m-e-n-t----------------------------------------------
 
+
+	/*
+		@Description: admin must call this funciton and pass the address of a wrapper contract
+			before that wrapper contract or any derivative FCP contracts may be whitelisted for collateral
+			this function must be called to direct seperate asset rewards of depositors to the holders
+			for ex a depsoit of waUSDC ZCB & YT as collateral will continue to earn the stkAAVE rewards while deposited
+	
+		@param address _wrapperAddress: the address of the wrapper asset
+	*/
+	function registerAsDistributionAccount(address _wrapperAddress) external override onlyOwner {
+		IWrapper(_wrapperAddress).registerAsDistributionAccount();
+	}
+
 	/*
 		@Description: admin may call this function to set the percentage of excess collateral that is retained
 			by vault owners in the event of a liquidation

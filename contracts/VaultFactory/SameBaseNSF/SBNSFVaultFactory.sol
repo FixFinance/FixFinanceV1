@@ -734,6 +734,7 @@ contract SBNSFVaultFactory is SBNSFVaultFactoryData, ISBNSFVaultFactory, Ownable
 		@param address _wrapperAddress: address of the wrapper asset to whitelist
 	*/
 	function whitelistWrapper(address _wrapeprAddress) external override onlyOwner {
+		IWrapper(_wrapeprAddress).registerAsDistributionAccount();
 		_wrapperToUnderlyingAsset[_wrapeprAddress] = IWrapper(_wrapeprAddress).underlyingAssetAddress();
 	}
 
@@ -753,7 +754,9 @@ contract SBNSFVaultFactory is SBNSFVaultFactoryData, ISBNSFVaultFactory, Ownable
 		@param address _fixCapitalPoolAddress: address of the ZCB to whitelist
 	*/
 	function whitelistFixCapitalPool(address _fixCapitalPoolAddress) external override onlyOwner {
-		_fixCapitalPoolToWrapper[_fixCapitalPoolAddress] = address(IFixCapitalPool(_fixCapitalPoolAddress).wrapper());
+		IWrapper wrapper = IFixCapitalPool(_fixCapitalPoolAddress).wrapper();
+		wrapper.registerAsDistributionAccount();
+		_fixCapitalPoolToWrapper[_fixCapitalPoolAddress] = address(wrapper);
 	}
 
 	/*

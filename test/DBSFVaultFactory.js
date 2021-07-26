@@ -146,6 +146,7 @@ contract('DBSFVaultFactory', async function(accounts) {
 		await fcp0.setVaultFactoryAddress(vaultFactoryInstance.address);
 		await fcp1.setVaultFactoryAddress(vaultFactoryInstance.address);
 
+		await vaultFactoryInstance.registerAsDistributionAccount(wAsset1.address);
 		await infoOracleInstance.whitelistWrapper(vaultFactoryInstance.address, wAsset1.address);
 		await vaultFactoryInstance.setLiquidationRebate(rebate_bips);
 

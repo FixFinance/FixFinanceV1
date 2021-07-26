@@ -190,6 +190,7 @@ contract InfoOracle is IInfoOracle, Ownable {
 		@param address _wrapperAddress: the address of the IWrapper to add as collateral
 	*/
 	function whitelistWrapper(address _vaultFactoryAddress, address _wrapperAddress) external override maySetContractParameters(_vaultFactoryAddress) {
+		require(IWrapper(_wrapperAddress).isDistributionAccount(_vaultFactoryAddress));
 		collateralWhitelist[_vaultFactoryAddress][_wrapperAddress] = IWrapper(_wrapperAddress).underlyingAssetAddress();
 	}
 
@@ -210,7 +211,9 @@ contract InfoOracle is IInfoOracle, Ownable {
 		@param address _FCPaddress: the address of the FCP which to add as collateral
 	*/
 	function whitelistFixCapitalPool(address _vaultFactoryAddress, address _FCPaddress) external override maySetContractParameters(_vaultFactoryAddress) {
-		FCPtoWrapper[_vaultFactoryAddress][_FCPaddress] = address(IFixCapitalPool(_FCPaddress).wrapper());
+		IWrapper wrapper = IFixCapitalPool(_FCPaddress).wrapper();
+		require(wrapper.isDistributionAccount(_vaultFactoryAddress));
+		FCPtoWrapper[_vaultFactoryAddress][_FCPaddress] = address(wrapper);
 	}
 
 	//--------------------------------------------v-i-e-w-s------------------------------

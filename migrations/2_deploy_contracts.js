@@ -1,4 +1,5 @@
 const NGBwrapper = artifacts.require('NGBwrapper');
+const FCPDelegate1 = artifacts.require('FCPDelegate1');
 const capitalHandler = artifacts.require('FixCapitalPool');
 const dummyAToken = artifacts.require('dummyAToken');
 const organizer = artifacts.require('Organizer');
@@ -49,7 +50,8 @@ module.exports = async function(deployer) {
 		nsfVaultFactoryDelegate1Instance.address,
 		nsfVaultFactoryDelegate2Instance.address
 	);
-	capitalHandlerDeployerInstance = await deployer.deploy(FixCapitalPoolDeployer);
+	fcpDelegate1Instance = await deployer.deploy(FCPDelegate1);
+	fcpDelployerInstance = await deployer.deploy(FixCapitalPoolDeployer, fcpDelegate1Instance.address);
 	swapRouterDelegateInstance = await deployer.deploy(SwapRouterDelegate);
 	swapRouterDeployerInstance = await deployer.deploy(SwapRouterDeployer, swapRouterDelegateInstance.address);
 	infoOracle = await deployer.deploy(InfoOracle, "0", nullAddress);
@@ -74,7 +76,7 @@ module.exports = async function(deployer) {
 		organizer,
 		NGBwrapperDeployerInstance.address,
 		zcbYtDeployerInstance.address,
-		capitalHandlerDeployerInstance.address,
+		fcpDelployerInstance.address,
 		ZCBammDeployerInstance.address,
 		YTammDeployerInstance.address,
 		swapRouterDeployerInstance.address,

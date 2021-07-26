@@ -4,6 +4,7 @@ const NGBwrapperDelegate2 = artifacts.require('NGBwrapperDelegate2');
 const NGBwrapperDelegate3 = artifacts.require('NGBwrapperDelegate3');
 const NGBwrapper = artifacts.require("NGBwrapper");
 const BigMath = artifacts.require("BigMath");
+const FCPDelegate1 = artifacts.require('FCPDelegate1');
 const fixCapitalPool = artifacts.require("FixCapitalPool");
 const yieldToken = artifacts.require("IYieldToken");
 const zeroCouponBond = artifacts.require("IZeroCouponBond");
@@ -53,7 +54,8 @@ contract('OrderbookExchange', async function(accounts) {
 		let timestamp = (await web3.eth.getBlock('latest')).timestamp;
 		//maturity is 110 days out
 		maturity = timestamp + 110*24*60*60;
-		fixCapitalPoolInstance = await fixCapitalPool.new(NGBwrapperInstance.address, maturity, zcbYtDeployerInstance.address, infoOracleInstance.address);
+		fcpDelegate1Instance = await FCPDelegate1.new();
+		fixCapitalPoolInstance = await fixCapitalPool.new(NGBwrapperInstance.address, maturity, zcbYtDeployerInstance.address, infoOracleInstance.address, fcpDelegate1Instance.address);
 		zcbInstance = await zeroCouponBond.at(await fixCapitalPoolInstance.zeroCouponBondAddress());
 		yieldTokenInstance = await yieldToken.at(await fixCapitalPoolInstance.yieldTokenAddress());
 		orderbookDelegate1Instance = await OrderbookDelegate1.new();

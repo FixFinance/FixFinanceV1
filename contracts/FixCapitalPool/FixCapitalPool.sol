@@ -17,6 +17,8 @@ contract FixCapitalPool is IFixCapitalPool, FCPData, Ownable, nonReentrant {
 	using SafeMath for uint;
 	using SignedSafeMath for int;
 
+	address delegate1Address;
+
     /*
 		init
     */
@@ -24,7 +26,8 @@ contract FixCapitalPool is IFixCapitalPool, FCPData, Ownable, nonReentrant {
 		address _wrapper,
 		uint40 _maturity,
 		address _ZCB_YTdeployerAddr,
-		address _infoOracleAddress
+		address _infoOracleAddress,
+		address _delegate1Address
 	) public {
 		IWrapper temp = IWrapper(_wrapper);
 		internalWrapper = temp;
@@ -36,6 +39,7 @@ contract FixCapitalPool is IFixCapitalPool, FCPData, Ownable, nonReentrant {
 		internalZeroCouponBondAddress = ZCB_YT_Deployer(_ZCB_YTdeployerAddr).deployZCB(_wrapper, _maturity);
 		internalInfoOracleAddress = _infoOracleAddress;
 		flashLoanFee = 100; //default flashloan fee of 100 super bips or 1 basis point or 0.01%
+		delegate1Address = _delegate1Address;
 	}
 
 	//-------------v-i-e-w-s---f-o-r---F-C-P-D-a-t-a---d-a-t-a-----

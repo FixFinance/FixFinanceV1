@@ -4,6 +4,12 @@ import "./FixCapitalPool.sol";
 
 contract FixCapitalPoolDeployer {
 
+	address delegate1Address;
+
+	constructor(address _delegate1Address) public {
+		delegate1Address = _delegate1Address;
+	}
+
 	/*
 		@Description: deploy new FixCapitalPool contract and transfer ownership
 
@@ -24,7 +30,7 @@ contract FixCapitalPoolDeployer {
 		address _infoOracleAddress
 	) public returns (address addr) {
 
-		FixCapitalPool cap = new FixCapitalPool(_aw, _maturity, _yieldTokenDeployer, _infoOracleAddress);
+		FixCapitalPool cap = new FixCapitalPool(_aw, _maturity, _yieldTokenDeployer, _infoOracleAddress, delegate1Address);
 		cap.transferOwnership(_owner);
 		addr = address(cap);
 	}

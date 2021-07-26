@@ -1,6 +1,7 @@
 const dummyAToken = artifacts.require('dummyAToken');
 const VaultHealth = artifacts.require('VaultHealth');
 const NGBwrapper = artifacts.require('NGBwrapper');
+const FCPDelegate1 = artifacts.require('FCPDelegate1');
 const fixCapitalPool = artifacts.require('FixCapitalPool');
 const YieldToken = artifacts.require("YieldToken");
 const zcbYtDeployer = artifacts.require('ZCB_YT_Deployer');
@@ -97,7 +98,8 @@ contract('VaultHealth', async function(accounts) {
 		ZCBammDeployerInstance = await ZCBammDeployer.new();
 		YTammDelegateInstance = await YTammDelegate.new();
 		YTammDeployerInstance = await YTammDeployer.new(YTammDelegateInstance.address);
-		FixCapitalPoolDeployerInstance = await FixCapitalPoolDeployer.new();
+		fcpDelegate1Instance = await FCPDelegate1.new();
+		FixCapitalPoolDeployerInstance = await FixCapitalPoolDeployer.new(fcpDelegate1Instance.address);
 		infoOracleInstance = await InfoOracle.new("0", nullAddress);
 		ngbwDelegate1Instance = await NGBwrapperDelegate1.new();
 		ngbwDelegate2Instance = await NGBwrapperDelegate2.new();

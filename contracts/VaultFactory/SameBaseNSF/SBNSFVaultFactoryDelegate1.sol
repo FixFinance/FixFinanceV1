@@ -644,4 +644,22 @@ contract SBNSFVaultFactoryDelegate1 is SBNSFVaultFactoryData {
 		delete _YTvaults[msg.sender][_index];
 	}
 
+	/*
+		@Description: admin may call this function to claim YT liquidation revenue
+
+		@param address _FCP: the address of the FCP contract for which to claim revenue
+		@param int _bondIn: the amount of bond to send in to make the transfer position have a
+			positive minimum value at maturity
+	*/
+	function claimYTRevenue(address _FCP, int _bondIn) external onlyOwner {
+		require(_bondIn > -1);
+		YTPosition memory pos = _YTRevenue[_FCP];
+		IFixCapitalPool(_FCP).burnZCBFrom(msg.sender, uint(_bondIn));
+		uint yieldToTreasury = pos.amountYield >> 1;
+		int bondToTreasury = pos.amountBond.add(_bondIn) / 2;
+		IFixCapitalPool(_FCP).transferPosition(_treasuryAddress, yieldToTreasury, bondToTreasury);
+		IFixCapitalPool(_FCP).transferPosition(msg.sender, pos.amountYield - yieldToTreasury, (pos.amountBond + _bondIn) - bondToTreasury);
+		delete _YTRevenue[_FCP];
+	}
+
 }

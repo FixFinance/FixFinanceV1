@@ -2,8 +2,9 @@
 pragma solidity >=0.6.8 <0.7.0;
 
 import "../../interfaces/IVaultHealth.sol";
+import "../../helpers/Ownable.sol";
 
-contract SBNSFVaultFactoryData {
+contract SBNSFVaultFactoryData is Ownable {
 	uint internal constant TOTAL_BASIS_POINTS = 10_000;
 
 	int128 internal constant ABDK_1 = 1<<64;

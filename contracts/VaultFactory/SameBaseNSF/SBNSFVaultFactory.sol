@@ -9,11 +9,10 @@ import "../../interfaces/IVaultHealth.sol";
 import "../../interfaces/ISBNSFVaultFactory.sol";
 import "../../interfaces/IWrapper.sol";
 import "../../interfaces/IERC20.sol";
-import "../../helpers/Ownable.sol";
 import "../../helpers/nonReentrant.sol";
 import "./SBNSFVaultFactoryData.sol";
 
-contract SBNSFVaultFactory is SBNSFVaultFactoryData, ISBNSFVaultFactory, Ownable, nonReentrant {
+contract SBNSFVaultFactory is SBNSFVaultFactoryData, ISBNSFVaultFactory, nonReentrant {
 	using SafeMath for uint;
 	using SignedSafeMath for int;
 
@@ -791,15 +790,13 @@ contract SBNSFVaultFactory is SBNSFVaultFactoryData, ISBNSFVaultFactory, Ownable
 		@param int _bondIn: the amount of bond to send in to make the transfer position have a
 			positive minimum value at maturity
 	*/
-	function claimYTRevenue(address _FCP, int _bondIn) external override onlyOwner {
-		require(_bondIn > -1);
-		YTPosition memory pos = _YTRevenue[_FCP];
-		IFixCapitalPool(_FCP).burnZCBFrom(msg.sender, uint(_bondIn));
-		uint yieldToTreasury = pos.amountYield >> 1;
-		int bondToTreasury = pos.amountBond.add(_bondIn) / 2;
-		IFixCapitalPool(_FCP).transferPosition(_treasuryAddress, yieldToTreasury, bondToTreasury);
-		IFixCapitalPool(_FCP).transferPosition(msg.sender, pos.amountYield - yieldToTreasury, (pos.amountBond + _bondIn) - bondToTreasury);
-		delete _YTRevenue[_FCP];
+	function claimYTRevenue(address _FCP, int _bondIn) external override {
+		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
+			"claimYTRevenue(address,int256)",
+			_FCP,
+			_bondIn
+		));
+		require(success);
 	}
 }
 

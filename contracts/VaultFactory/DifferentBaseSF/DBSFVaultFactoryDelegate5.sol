@@ -45,15 +45,9 @@ contract DBSFVaultFactoryDelegate5 is DBSFVaultFactoryDelegateParent {
 		if (vault.amountSupplied > 0) {
 			(, SUPPLIED_ASSET_TYPE sType, address baseFCP, address baseWrapper) = suppliedAssetInfo(vault.assetSupplied, IInfoOracle(_infoOracleAddress));
 			require(vault.amountSupplied <= uint(type(int256).max));
-			int changeAmt = int(vault.amountSupplied);
-			if (sType == SUPPLIED_ASSET_TYPE.WASSET) {
-				IWrapper(vault.assetSupplied).editSubAccountPosition(msg.sender, address(0), -changeAmt, 0);
-				IWrapper(vault.assetSupplied).editSubAccountPosition(_to, address(0), changeAmt, 0);
-			}
-			else if (sType == SUPPLIED_ASSET_TYPE.ZCB) {
-				IWrapper(baseWrapper).editSubAccountPosition(msg.sender, baseFCP, 0, -changeAmt);
-				IWrapper(baseWrapper).editSubAccountPosition(_to, baseFCP, 0, changeAmt);
-			}
+			int intSupplied = int(vault.amountSupplied);
+			editSubAccountStandardVault(msg.sender, sType, baseFCP, baseWrapper, -intSupplied);
+			editSubAccountStandardVault(_to, sType, baseFCP, baseWrapper, intSupplied);
 		}
 		delete _vaults[msg.sender][_index];
 	}

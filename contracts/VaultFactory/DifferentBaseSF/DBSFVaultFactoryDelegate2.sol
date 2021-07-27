@@ -148,6 +148,10 @@ contract DBSFVaultFactoryDelegate2 is DBSFVaultFactoryDelegateParent {
 
 		delete _Liquidations[_index];
 
+		(, SUPPLIED_ASSET_TYPE sType, address baseFCP, address baseWrapper) =
+			suppliedAssetInfo(liq.assetSupplied, IInfoOracle(_infoOracleAddress));
+		require(liq.bidAmount <= uint(type(int256).max));
+		editSubAccountStandardVault(liq.vaultOwner, sType, baseFCP, baseWrapper, -int(liq.bidAmount));
 		IERC20(liq.assetSupplied).transfer(_to, liq.bidAmount);
 	}
 

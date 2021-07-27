@@ -18,6 +18,34 @@ contract DBSFVaultFactoryDelegateParent is DBSFVaultFactoryData {
 	using SignedSafeMath for int;
 
 	/*
+		@Description: edit a sub account registered with the DBSFVaultFactory
+			when there is a change to a standard vault
+
+		@param address _vaultOwner: the owner of the vault that has been changed
+		@param SUPPLIED_ASSET_TYPE sType: the type of collateral supplied to the vault
+		@param address _baseFCP: if the sType is ZCB the address of the base FCP contract of the ZCB should be passed
+			otherwise address(0) is passed
+		@param address _baseWrapper: if the sType is ZCB the address of base wrapper contract of the ZCB should be passed
+			if the sType is WASSET the address of the collateral asset of the vault should be passed
+			otherwise address(0) is passed
+		@param int _changeAmt: the change of the yield or ZCB in the sub account
+	*/
+	function editSubAccountStandardVault(
+		address _vaultOwner,
+		SUPPLIED_ASSET_TYPE sType,
+		address _baseFCP,
+		address _baseWrapper,
+		int _changeAmt
+	) internal {
+		if (sType == SUPPLIED_ASSET_TYPE.WASSET) {
+			IWrapper(_baseWrapper).editSubAccountPosition(_vaultOwner, address(0), _changeAmt, 0);
+		}
+		else if (sType == SUPPLIED_ASSET_TYPE.ZCB) {
+			IWrapper(_baseWrapper).editSubAccountPosition(_vaultOwner, _baseFCP, 0, _changeAmt);
+		}
+	}
+
+	/*
 		@Description: given a supplied asset find its type
 
 		@param address _suppliedAsset: the address of the supplied asset
@@ -52,6 +80,7 @@ contract DBSFVaultFactoryDelegateParent is DBSFVaultFactoryData {
 			suppliedType = SUPPLIED_ASSET_TYPE.ASSET;
 		}
 		else {
+			baseWrapper = _suppliedAsset;
 			suppliedType = SUPPLIED_ASSET_TYPE.WASSET;
 		}
 	}
@@ -174,8 +203,12 @@ contract DBSFVaultFactoryDelegateParent is DBSFVaultFactoryData {
 	*/
 	function distributeSurplus(address _vaultOwner, address _asset, uint _amount) internal {
 		uint retainedSurplus = _amount * _liquidationRebateBips / TOTAL_BASIS_POINTS;
+		uint capturedSurplus = _amount - retainedSurplus;
 		_liquidationRebates[_vaultOwner][_asset] += retainedSurplus;
-		_revenue[_asset] += _amount-retainedSurplus;
+		_revenue[_asset] += capturedSurplus;
+		(, SUPPLIED_ASSET_TYPE sType, address baseFCP, address baseWrapper) = suppliedAssetInfo(_asset, IInfoOracle(_infoOracleAddress));
+		require(capturedSurplus <= uint(type(int256).max));
+		editSubAccountStandardVault(_vaultOwner, sType, baseFCP, baseWrapper, -int(capturedSurplus));
 	}
 
 	/*

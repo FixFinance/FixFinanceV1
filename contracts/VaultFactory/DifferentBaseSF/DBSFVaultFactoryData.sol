@@ -9,6 +9,13 @@ contract DBSFVaultFactoryData is Ownable {
 
 	int128 internal constant ABDK_1 = 1<<64;
 
+	enum SUPPLIED_ASSET_TYPE {
+		ASSET,
+		WASSET,
+		ZCB,
+		INVALID
+	}
+
 	struct Vault {
 		address assetSupplied;
 		address assetBorrowed;

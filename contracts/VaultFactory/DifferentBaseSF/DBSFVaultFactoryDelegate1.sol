@@ -104,13 +104,14 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
 			if necessary
 
 		@param Vault memory _vault: the vault for which to find the info to pass to the vault health contract
+		@param address _whitelistAddr: the output of the collateralWhitelist mapping when the supplied asset is passed
 
 		@return address addr: the address for assetSupplied to pass to the vault health contract
 		@return uint sAmt: the amount for amountSupplied to pass to the vault health contract
 		@return uint bAmt: the amounf for amountBorrowed to pass to the vault health contract
 	*/
-	function passInfoToVaultManager(Vault memory _vault) internal view returns (address addr, uint sAmt, uint bAmt) {
-		addr = IInfoOracle(_infoOracleAddress).collateralWhitelist(address(this), _vault.assetSupplied);
+	function passInfoToVaultManager(Vault memory _vault, address _whitelistAddr) internal view returns (address addr, uint sAmt, uint bAmt) {
+		addr = _whitelistAddr;
 		if (addr == address(0) || addr == address(1)) {
 			addr = _vault.assetSupplied;
 			sAmt = _vault.amountSupplied;
@@ -132,11 +133,7 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
 		@Description: ensure that a vault will not be sent into the liquidation zone if the cross asset price
 			and the borrow and supplied asset rates change a specific amount
 
-		@param address _assetSupplied: the asset used as collateral
-			this asset may be a ZCB or any other asset that is whitelisted
-		@param address _assetBorrowed: the ZCB that is borrowed from the new vault
-`		@param uint _amountSupplied: the amount of _assetSupplied posed as collateral
-		@param uint _amountBorrowed: the amount of _assetBorrowed borrowed
+		@param Vault memory vault: contains the state of the vault which to check
 		@param uint _priceMultiplier: a multiplier > 1
 			we ensure the vault will not be sent into the liquidation zone if the cross asset price
 			of _assetBorrowed to _assetSupplied increases by a factor of _priceMultiplier
@@ -149,33 +146,108 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
 			we ensure the vault will not be sent into the liquidation zone if the rate on the borrow
 			asset decreases by a factor of _borrowRateChange
 			(in ABDK format)
+		@param IInfoOracle _info: reference to the IInfoOracle that is connected to this DBSFVaultFactory
 
 		@return bool: true if vault is not sent into liquidation zone from changes,
 			false otherwise
+		@return SUPPLIED_ASSET_TYPE suppliedType: the type of collateral that the supplied asset is
+		@return address baseFCP: the base FCP contract corresponding to the ZCB contract
+			will be address(0) if the collateral type is not ZCB
+		@return address baseWrapper: the base wrapper contract corresponding to the ZCB contract
+			will be address(0) if the collateral type is not ZCB
 	*/
 	function vaultWithstandsChange(
 		Vault memory vault,
 		uint _priceMultiplier,
 		int128 _suppliedRateChange,
-		int128 _borrowRateChange
-	) internal view returns (bool) {
+		int128 _borrowRateChange,
+		IInfoOracle _info
+	) internal view returns (
+		bool withstands,
+		SUPPLIED_ASSET_TYPE suppliedType,
+		address baseFCP,
+		address baseWrapper
+	) {
 
 		require(_priceMultiplier >= TOTAL_BASIS_POINTS);
 		require(_suppliedRateChange >= ABDK_1);
 		require(_borrowRateChange <= ABDK_1);
 
-		(address _suppliedAddrToPass, uint _suppliedAmtToPass, uint _borrowAmtToPass) = passInfoToVaultManager(vault);
+		address _suppliedAddrToPass;
+		uint _suppliedAmtToPass;
+		uint _borrowAmtToPass;
+		{
+			address whitelistAddr;
+			(whitelistAddr, suppliedType, baseFCP, baseWrapper) = suppliedAssetInfo(vault.assetSupplied, _info);
+			(_suppliedAddrToPass, _suppliedAmtToPass, _borrowAmtToPass) = passInfoToVaultManager(vault, whitelistAddr);
+		}
 
-		return vaultHealthContract.vaultWithstandsChange(
+		address pass2 = vault.assetBorrowed;
+		uint pass5 = _priceMultiplier;
+		int128 pass6 = _suppliedRateChange;
+		int128 pass7 = _borrowRateChange;
+		withstands = vaultHealthContract.vaultWithstandsChange(
 			false,
 			_suppliedAddrToPass,
-			vault.assetBorrowed,
+			pass2,
 			_suppliedAmtToPass,
 			_borrowAmtToPass,
-			_priceMultiplier,
-			_suppliedRateChange,
-			_borrowRateChange
+			pass5,
+			pass6,
+			pass7
 		);
+	}
+
+	/*
+		@Description: returns only the bool from the vaultWithstandsChange function
+			uses SLOAD to get the IInofOracle contract to pass
+	*/
+	function simpleVaultWithstandsChange(
+		Vault memory vault,
+		uint _priceMultiplier,
+		int128 _suppliedRateChange,
+		int128 _borrowRateChange
+	) internal view returns(bool withstands) {
+		(withstands, , , ) = vaultWithstandsChange(vault, _priceMultiplier, _suppliedRateChange, _borrowRateChange, IInfoOracle(_infoOracleAddress));
+	}
+
+	/*
+		@Description: given a supplied asset find its type
+
+		@param address _suppliedAsset: the address of the supplied asset
+		@param IInfoOracle _info: the contract that is this contract's InfoOracle
+
+		@return address whitelistAddr: the address returned from the collateralWhitelist mapping in the IInfoOracle contract
+			when the supplied asset is passed
+		@return SUPPLIED_ASSET_TYPE suppliedType: the type of collateral that the supplied asset is
+		@return address baseFCP: the base FCP contract corresponding to the ZCB contract
+			will be address(0) if the collateral type is not ZCB
+		@return address baseWrapper: the base wrapper contract corresponding to the ZCB contract
+			will be address(0) if the collateral type is not ZCB
+	*/
+	function suppliedAssetInfo(
+		address _suppliedAsset,
+		IInfoOracle _info
+	) internal view returns(
+		address whitelistAddr,
+		SUPPLIED_ASSET_TYPE suppliedType,
+		address baseFCP,
+		address baseWrapper
+	) {
+		whitelistAddr = _info.collateralWhitelist(address(this), _suppliedAsset);
+		if (whitelistAddr == address(0)) {
+			//is likely a ZCB, ensure it is actuall a ZCB and is whitelisted
+			baseFCP = IZeroCouponBond(_suppliedAsset).FixCapitalPoolAddress();
+			baseWrapper = _info.FCPtoWrapper(address(this), baseFCP);
+			require(baseWrapper != address(0));
+			suppliedType = SUPPLIED_ASSET_TYPE.ZCB;
+		}
+		else if (whitelistAddr == address(1)) {
+			suppliedType = SUPPLIED_ASSET_TYPE.ASSET;
+		}
+		else {
+			suppliedType = SUPPLIED_ASSET_TYPE.WASSET;
+		}
 	}
 
 	/*
@@ -211,7 +283,6 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
 
 		require(_assetSupplied != _assetBorrowed);
 		IInfoOracle info = IInfoOracle(_infoOracleAddress);
-		require(info.FCPtoWrapper(address(this), _assetSupplied) != address(0) || info.collateralWhitelist(address(this), _assetSupplied) != address(0));
 
 		address FCPborrowed = IZeroCouponBond(_assetBorrowed).FixCapitalPoolAddress();
 		IWrapper baseBorrowed = IFixCapitalPool(FCPborrowed).wrapper();
@@ -219,7 +290,19 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
 		uint64 wrapperFee = info.StabilityFeeAPR(address(this), address(baseBorrowed));
 		Vault memory vault = Vault(_assetSupplied, _assetBorrowed, _amountSupplied, _amountBorrowed, 0, timestampOpened, wrapperFee);
 
-		require(vaultWithstandsChange(vault, _priceMultiplier, _suppliedRateChange, _borrowRateChange));
+		{
+			(bool withstands, SUPPLIED_ASSET_TYPE suppliedType, address baseFCP, address baseWrapper)
+				= vaultWithstandsChange(vault, _priceMultiplier, _suppliedRateChange, _borrowRateChange, info);
+			require(withstands);
+			require(_amountSupplied <= uint(type(int256).max));
+			int intAmtSupplied = int(_amountSupplied);
+			if (suppliedType == SUPPLIED_ASSET_TYPE.WASSET) {
+				IWrapper(vault.assetSupplied).editSubAccountPosition(msg.sender, address(0), intAmtSupplied, 0);
+			}
+			else if (suppliedType == SUPPLIED_ASSET_TYPE.ZCB) {
+				IWrapper(baseWrapper).editSubAccountPosition(msg.sender, baseFCP, 0, intAmtSupplied);
+			}
+		}
 
 		IERC20(_assetSupplied).transferFrom(msg.sender, address(this), _amountSupplied);
 		IFixCapitalPool(FCPborrowed).mintZCBTo(msg.sender, _amountBorrowed);
@@ -297,33 +380,55 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
 		Vault memory mVault = _vaults[_owner][_index];
 		Vault storage sVault = _vaults[_owner][_index];
 
+		require(
+			msg.sender == _owner ||
+			(
+				_assetSupplied == mVault.assetSupplied &&
+				_assetBorrowed == mVault.assetBorrowed &&
+				_amountSupplied >= mVault.amountSupplied &&
+				_amountBorrowed <= mVault.amountBorrowed
+			)
+		);
+
+		IInfoOracle info = IInfoOracle(_infoOracleAddress);
+		Vault memory nextVault = Vault(
+			_assetSupplied,
+			_assetBorrowed,
+			_amountSupplied,
+			_amountBorrowed,
+			0,
+			0,
+			NO_STABILITY_FEE
+		);
+		SUPPLIED_ASSET_TYPE sType;
+		address baseFCP;
+		address baseWrapper;
+
 		if (_assetBorrowed != mVault.assetBorrowed) {
 			//ensure that after operations vault will be in good health
 			require(_multipliers[0] > 0);
-			require(msg.sender == _owner);
-			require(vaultWithstandsChange(
-				Vault(
-					_assetSupplied,
-					_assetBorrowed,
-					_amountSupplied,
-					_amountBorrowed,
-					0,
-					0,
-					NO_STABILITY_FEE
-				),
-				uint(_multipliers[0]),
-				_multipliers[1],
-				_multipliers[2]
-			));
+			{	
+				bool withstands;
+				(withstands, sType, baseFCP, baseWrapper) = vaultWithstandsChange(
+					nextVault,
+					uint(_multipliers[0]),
+					_multipliers[1],
+					_multipliers[2],
+					info
+				);
+				require(withstands);
+			}
+			bytes memory copyData = _data;
+			address copyReceiverAddr = _receiverAddr;
 			adjVaultChangeBorrow(
 				mVault,
 				sVault,
-				_assetSupplied,
-				_assetBorrowed,
-				_amountSupplied,
-				_amountBorrowed,
-				_data,
-				_receiverAddr
+				nextVault.assetSupplied,
+				nextVault.assetBorrowed,
+				nextVault.amountSupplied,
+				nextVault.amountBorrowed,
+				copyData,
+				copyReceiverAddr
 			);
 		}
 		else {
@@ -336,32 +441,54 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
 			) {
 				//index 0 in multipliers that must be converted to uint
 				require(_multipliers[0] > 0);
-				require(msg.sender == _owner);
-				require(vaultWithstandsChange(
-					Vault(
-						_assetSupplied,
-						_assetBorrowed,
-						_amountSupplied,
-						_amountBorrowed,
-						0,
-						mVault.timestampOpened,
-						mVault.stabilityFeeAPR
-					),
+				nextVault.timestampOpened = mVault.timestampOpened;
+				nextVault.stabilityFeeAPR = mVault.stabilityFeeAPR;
+				bool withstands;
+				(withstands, sType, baseFCP, baseWrapper) = vaultWithstandsChange(
+					nextVault,
 					uint(_multipliers[0]),
 					_multipliers[1],
-					_multipliers[2]
-				));
+					_multipliers[2],
+					info
+				);
+				require(withstands);
 			}
+			bytes memory copyData = _data;
+			address copyReceiverAddr = _receiverAddr;
 			adjVaultSameBorrow(
 				mVault,
 				sVault,
-				_assetSupplied,
-				_assetBorrowed,
-				_amountSupplied,
-				_amountBorrowed,
-				_data,
-				_receiverAddr
+				nextVault.assetSupplied,
+				nextVault.assetBorrowed,
+				nextVault.amountSupplied,
+				nextVault.amountBorrowed,
+				copyData,
+				copyReceiverAddr
 			);
+		}
+		require(_amountSupplied <= uint(type(int256).max));
+		int changeAmt = int(nextVault.amountSupplied);
+		if (mVault.assetSupplied == nextVault.assetSupplied) {
+			require(mVault.amountSupplied <= uint(type(int256).max));
+			changeAmt = changeAmt.sub(int(mVault.amountSupplied));
+		}
+		if (sType == SUPPLIED_ASSET_TYPE.WASSET) {
+			IWrapper(nextVault.assetSupplied).editSubAccountPosition(msg.sender, address(0), changeAmt, 0);
+		}
+		else if (sType == SUPPLIED_ASSET_TYPE.ZCB) {
+			IWrapper(baseWrapper).editSubAccountPosition(msg.sender, baseFCP, 0, changeAmt);
+		}
+
+		if (mVault.assetSupplied != nextVault.assetSupplied && mVault.assetSupplied != address(0)) {
+			(, sType, baseFCP, baseWrapper) = suppliedAssetInfo(mVault.assetSupplied, info);
+			require(mVault.amountSupplied <= uint(type(int256).max));
+			changeAmt = -int(mVault.amountSupplied);
+			if (sType == SUPPLIED_ASSET_TYPE.WASSET) {
+				IWrapper(mVault.assetSupplied).editSubAccountPosition(msg.sender, address(0), changeAmt, 0);
+			}
+			else if (sType == SUPPLIED_ASSET_TYPE.ZCB) {
+				IWrapper(baseWrapper).editSubAccountPosition(msg.sender, baseFCP, 0, changeAmt);
+			}
 		}
 	}
 

@@ -65,53 +65,50 @@ contract NGBwrapperDelegate2 is NGBwrapperDelegateParent {
         }
     }
 
-    function forceDoubleClaimSubAccountRewards(
-        address _subAccount0,
-        address _subAccount1
-    ) external claimRewards(true, msg.sender) {
-        //msg.sender is distributionAccount & FCP
-        claimSubAccountRewardsRetPos(msg.sender, _subAccount0, msg.sender);
-        claimSubAccountRewardsRetPos(msg.sender, _subAccount1, msg.sender);
-    }
-
     function claimSubAccountRewardsRetPos(
         address _distributionAcct,
         address _subAcct,
         address _FCPaddr
     ) internal returns(SubAccountPosition memory mPos) {
+        if(_distributionAcct != _FCPaddr) {
+            mPos = internalSubAccountPositions[_distributionAcct][_subAcct][_FCPaddr];
+        }
         uint len = internalRewardsAssets.length;
         if (len > 0) {
             len = len > type(uint8).max ? type(uint8).max : len;
-            if(_distributionAcct != _FCPaddr) {
-                mPos = internalSubAccountPositions[_distributionAcct][_subAcct][_FCPaddr];
-            }
-            else {
+            if (_distributionAcct == _FCPaddr) {
                 mPos.yield = IFixCapitalPool(_FCPaddr).balanceYield(_subAcct);
             }
-            bool inPayoutPhase = IFixCapitalPool(_FCPaddr).inPayoutPhase();
-            uint16 flags = (inPayoutPhase ? 1 << 15 : 0) |
-                (inPayoutPhase && !internalHasClaimedAllYTrewards[_distributionAcct][_subAcct][_FCPaddr] ? 1 << 14 : 0) |
-                (internalIsDistributionAccount[_subAcct] ? 1 << 13 : 0);
-            if (inPayoutPhase) {
-                if (_distributionAcct == _FCPaddr) {
-                    mPos.bond = IFixCapitalPool(_FCPaddr).balanceBonds(_subAcct);
-                }
-                uint maturityConversionRate = IFixCapitalPool(_FCPaddr).maturityConversionRate();
-                require(maturityConversionRate > 0); //prevent div by 0
-                uint wrappedZCBConvValue;
-                if (mPos.bond >= 0) {
-                    uint wrappedValueBond = uint(mPos.bond).mul(1 ether) / maturityConversionRate;
-                    wrappedZCBConvValue = mPos.yield.add(wrappedValueBond);
-                }
-                else {
-                    uint wrappedValueBond = uint(mPos.bond.abs()).mul(1 ether);
-                    wrappedValueBond = (wrappedValueBond/maturityConversionRate) + (wrappedValueBond%maturityConversionRate == 0 ? 0 : 1);
-                    wrappedZCBConvValue = mPos.yield.sub(wrappedValueBond);
-                }
-                subaccountDistributeRewards(uint8(len), _distributionAcct, _subAcct, _FCPaddr, mPos.yield, wrappedZCBConvValue, flags);
+            if (_FCPaddr == address(0)) {
+                uint16 flags = internalIsDistributionAccount[_subAcct] ? 1 << 13 : 0;
+                subaccountDistributeRewards(uint8(len), _distributionAcct, _subAcct, _FCPaddr, mPos.yield, mPos.yield, flags);
             }
             else {
-                subaccountDistributeRewards(uint8(len), _distributionAcct, _subAcct, _FCPaddr, mPos.yield, mPos.yield, flags);
+                bool inPayoutPhase = IFixCapitalPool(_FCPaddr).inPayoutPhase();
+                uint16 flags = (inPayoutPhase ? 1 << 15 : 0) |
+                    (inPayoutPhase && !internalHasClaimedAllYTrewards[_distributionAcct][_subAcct][_FCPaddr] ? 1 << 14 : 0) |
+                    (internalIsDistributionAccount[_subAcct] ? 1 << 13 : 0);
+                if (inPayoutPhase) {
+                    if (_distributionAcct == _FCPaddr) {
+                        mPos.bond = IFixCapitalPool(_FCPaddr).balanceBonds(_subAcct);
+                    }
+                    uint maturityConversionRate = IFixCapitalPool(_FCPaddr).maturityConversionRate();
+                    require(maturityConversionRate > 0); //prevent div by 0
+                    uint wrappedZCBConvValue;
+                    if (mPos.bond >= 0) {
+                        uint wrappedValueBond = uint(mPos.bond).mul(1 ether) / maturityConversionRate;
+                        wrappedZCBConvValue = mPos.yield.add(wrappedValueBond);
+                    }
+                    else {
+                        uint wrappedValueBond = uint(mPos.bond.abs()).mul(1 ether);
+                        wrappedValueBond = (wrappedValueBond/maturityConversionRate) + (wrappedValueBond%maturityConversionRate == 0 ? 0 : 1);
+                        wrappedZCBConvValue = mPos.yield.sub(wrappedValueBond);
+                    }
+                    subaccountDistributeRewards(uint8(len), _distributionAcct, _subAcct, _FCPaddr, mPos.yield, wrappedZCBConvValue, flags);
+                }
+                else {
+                    subaccountDistributeRewards(uint8(len), _distributionAcct, _subAcct, _FCPaddr, mPos.yield, mPos.yield, flags);
+                }
             }
         }
     }

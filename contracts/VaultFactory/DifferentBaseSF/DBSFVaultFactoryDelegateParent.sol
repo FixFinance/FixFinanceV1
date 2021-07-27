@@ -299,4 +299,112 @@ contract DBSFVaultFactoryDelegateParent is DBSFVaultFactoryData {
 		address whitelistAddr = IInfoOracle(_infoOracleAddress).collateralWhitelist(address(this), _vault.assetSupplied);
 		(addr, sAmt, bAmt) = passInfoToVaultManagerPassWhitelistAddr(_vault, whitelistAddr);
 	}
+
+	/*
+		@Description: given a fix capital pool and a balance from the balanceYield mapping
+			convert the value from wrapped amount to unit amount
+			note that when opening a YTValut this function should NOT be called because it bypasses checking with the
+			FCP whitelist in order to avoid an extra SLOAD opcode, rather when opening a YTVault wrappedToUnitAmount
+			should be called and the address of InfoOracle.FCPtoWrapper(addr(this), FCP) should be passed as the wrapper address
+
+		@param address _FCP: the address of the FCP contract
+		@param uint _amountYield: the wrapper amount to convert to unit amount
+
+		@return uint unitAmountYield: _amountYield of FCP wrapped yield converted to unit amount
+	*/
+	function getUnitValueYield(address _FCP, uint _amountYield) internal view returns (uint unitAmountYield) {
+		address wrapperAddr = address(IFixCapitalPool(_FCP).wrapper());
+		unitAmountYield = wrappedToUnitAmount(wrapperAddr, _amountYield);
+	}
+
+	/*
+		@Description: given a YTVault and change multipliers ensure that if a change of the multipliers would not
+			result in the YTVault being in danger of liquidation
+
+		@param YTVault memory vault: the YTVault for which to ensure will not be liquidated
+		@param uint _priceMultiplier: a multiplier > 1
+			we ensure the vault will not be sent into the liquidation zone if the cross asset price
+			of _assetBorrowed to _assetSupplied increases by a factor of _priceMultiplier
+			(in terms of basis points)
+		@param int128 _suppliedRateChange: a multiplier > 1 if _positiveBondSupplied otherwise < 1
+			we ensure the vault will not be sent into the liquidation zone if the rate on the supplied
+			asset increases by a factor of _suppliedRateChange
+			(in ABDK format)
+		@param int128 _borrowRateChange: a multiplier < 1
+			we ensure the vault will not be sent into the liquidation zone if the rate on the borrow
+			asset decreases by a factor of _borrowRateChange
+			(in ABDK format)
+	*/
+	function YTvaultWithstandsChange(YTVault memory vault, uint _priceMultiplier, int128 _suppliedRateChange, int128 _borrowRateChange) internal view returns (bool) {
+		validateYTvaultMultipliers(_priceMultiplier, _suppliedRateChange, _borrowRateChange, vault.bondSupplied > 0);
+		return vaultHealthContract.YTvaultWithstandsChange(
+			false,
+			vault.FCPsupplied,
+			vault.FCPborrowed,
+			getUnitValueYield(vault.FCPsupplied, vault.yieldSupplied),
+			vault.bondSupplied,
+			stabilityFeeAdjAmountBorrowed(vault.FCPborrowed, vault.amountBorrowed, vault.timestampOpened, vault.stabilityFeeAPR),
+			_priceMultiplier,
+			_suppliedRateChange,
+			_borrowRateChange
+		);
+	}
+
+	/*
+		@Description: given an address of an IWrapper contract convert a wrapped amount to unit amount
+			useful for finding what values to pass to VaultHealth
+
+		@param address _wrapperAddress: the address of the IWrapper contract
+		@param uint _amountWrapped: the wrapper amount to convert to unit amount
+
+		@return uint unitAmountYield: _amountWrapped of the IWrapper contract's wrapped amount converted to unit amount
+	*/
+	function wrappedToUnitAmount(address _wrapperAddress, uint _amountWrapped) internal view returns (uint unitAmountYield) {
+		require(_wrapperAddress != address(0));
+		unitAmountYield = IWrapper(_wrapperAddress).WrappedAmtToUnitAmt_RoundDown(_amountWrapped);
+	}
+
+	/*
+		@Description: ensure that args for YTvaultWithstandsChange() never increase vault health
+			all multipliers should have either no change on vault health or decrease vault health
+			we make this a function and not a modifier because we will not always have the
+			necessary data ready before execution of the functions in which we want to use this
+
+		@param uint _priceMultiplier: a multiplier > 1
+			we ensure the vault will not be sent into the liquidation zone if the cross asset price
+			of _assetBorrowed to _assetSupplied increases by a factor of _priceMultiplier
+			(in terms of basis points)
+		@param int128 _suppliedRateChange: a multiplier > 1 if _positiveBondSupplied otherwise < 1
+			we ensure the vault will not be sent into the liquidation zone if the rate on the supplied
+			asset increases by a factor of _suppliedRateChange
+			(in ABDK format)
+		@param int128 _borrowRateChange: a multiplier < 1
+			we ensure the vault will not be sent into the liquidation zone if the rate on the borrow
+			asset decreases by a factor of _borrowRateChange
+			(in ABDK format)
+		@param bool _positiveBondSupplied: (ZCB supplied to vault > YT supplied to vault)
+	*/
+	function validateYTvaultMultipliers(
+		uint _priceMultiplier,
+		int128 _suppliedRateChange,
+		int128 _borrowRateChange,
+		bool _positiveBondSupplied
+	) internal pure {
+		require(_priceMultiplier >= TOTAL_BASIS_POINTS);
+		require(_borrowRateChange <= ABDK_1);
+		require(
+			(_suppliedRateChange == ABDK_1) ||
+			(_positiveBondSupplied ? _suppliedRateChange > ABDK_1 : _suppliedRateChange < ABDK_1)
+		);
+	}
+
+
+	/*
+		YTVaults must have at least MIN_YIELD_SUPPLIED yield supplied
+		This ensures that there are no problems liquidating vaults
+
+		if a user wishes to have no yield supplied to a vault said user
+		should use a normal vault and not use a YTvault
+	*/
+	uint internal constant MIN_YIELD_SUPPLIED = 1e6;
 }

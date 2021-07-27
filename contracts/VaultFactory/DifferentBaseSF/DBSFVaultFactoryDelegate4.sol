@@ -20,15 +20,6 @@ contract DBSFVaultFactoryDelegate4 is DBSFVaultFactoryDelegateParent {
 	using SignedSafeMath for int;
 
 	/*
-		YTVaults must have at least MIN_YIELD_SUPPLIED yield supplied
-		This ensures that there are no problems liquidating vaults
-
-		if a user wishes to have no yield supplied to a vault said user
-		should use a normal vault and not use a YTvault
-	*/
-	uint internal constant MIN_YIELD_SUPPLIED = 1e6;
-
-	/*
 		@Description: distribute surplus appropriately between vault owner and contract owner
 			this function is called by other liquidation management functions
 
@@ -47,45 +38,6 @@ contract DBSFVaultFactoryDelegate4 is DBSFVaultFactoryDelegateParent {
 		rebate.amountBond += bondRebate;
 		revenue.amountYield += _yieldAmount - yieldRebate;
 		revenue.amountBond += _bondAmount - bondRebate;
-	}
-
-	/*
-		@Description: ensure that we pass the address of the underlying asset of wrapper assets to
-			the vault health contract rather than the address of the wrapper asset
-			also ensure that we adjust the amount from the wrapped amount to the non wrapped amount
-			if necessary
-
-		@param address _suppliedAsset: the address of the asset that is supplied as collateral
-		@param uint _suppliedAmount: the amount of the supplied asset that is being used as collateral
-
-		@return address addr: the address for assetSupplied to pass to the vault health contract
-		@return uint amt: the amount for amountSupplied to pass to the vault health contract
-	*/
-	function passInfoToVaultManager(address _suppliedAsset, uint _suppliedAmount) internal view returns (address addr, uint amt) {
-		addr = IInfoOracle(_infoOracleAddress).collateralWhitelist(address(this), _suppliedAsset);
-		if (addr == address(0) || addr == address(1)) {
-			addr = _suppliedAsset;
-			amt = _suppliedAmount;
-		}
-		else {
-			amt = IWrapper(_suppliedAsset).WrappedAmtToUnitAmt_RoundDown(_suppliedAmount);
-		}
-	}
-
-
-	/*
-		@Description: given a fix capital pool and a balance from the balanceYield mapping
-			convert the value from wrapped amount to unit amount
-
-		@param address _FCP: the address of the FCP contract
-		@param uint _amountYield: the wrapper amount to convert to unit amount
-
-		@return uint unitAmountYield: _amountYield of FCP wrapped yield converted to unit amount
-	*/
-	function getUnitValueYield(address _FCP, uint _amountYield) internal view returns (uint unitAmountYield) {
-		address wrapperAddr = address(IFixCapitalPool(_FCP).wrapper());
-		require(wrapperAddr != address(0));
-		unitAmountYield = IWrapper(wrapperAddr).WrappedAmtToUnitAmt_RoundDown(_amountYield);
 	}
 
 	/*

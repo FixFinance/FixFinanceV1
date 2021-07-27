@@ -21,195 +21,6 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryDelegateParent {
 	using SignedSafeMath for int;
 
 	/*
-		YTVaults must have at least MIN_YIELD_SUPPLIED yield supplied
-		This ensures that there are no problems liquidating vaults
-
-		if a user wishes to have no yield supplied to a vault said user
-		should use a normal vault and not use a YTvault
-	*/
-	uint internal constant MIN_YIELD_SUPPLIED = 1e6;
-
-
-	/*
-		@Description: when stability fee is encured pay out to holders
-
-		@param address _FCPaddr: the FCP which corresponds to the ZCB which the stability fee is paid in
-		@param uint _amount: the amount of ZCB which has been collected from the stability fee
-	*/
-	function claimStabilityFee(address _FCPaddr, uint _amount) internal {
-		address ZCBaddr = IFixCapitalPool(_FCPaddr).zeroCouponBondAddress();
-		if (_amount > 0) {
-			IFixCapitalPool(_FCPaddr).mintZCBTo(address(this), _amount);
-			_revenue[ZCBaddr] += _amount;
-		}
-	}
-
-	/*
-		@Description: ensure that we pass the address of the underlying asset of wrapper assets to
-			the vault health contract rather than the address of the wrapper asset
-			also ensure that we adjust the amount from the wrapped amount to the non wrapped amount
-			if necessary
-
-		@param address _suppliedAsset: the address of the asset that is supplied as collateral
-		@param uint _suppliedAmount: the amount of the supplied asset that is being used as collateral
-
-		@return address addr: the address for assetSupplied to pass to the vault health contract
-		@return uint amt: the amount for amountSupplied to pass to the vault health contract
-	*/
-	function passInfoToVaultManager(address _suppliedAsset, uint _suppliedAmount) internal view returns (address addr, uint amt) {
-		addr = IInfoOracle(_infoOracleAddress).collateralWhitelist(address(this), _suppliedAsset);
-		if (addr == address(0) || addr == address(1)) {
-			addr = _suppliedAsset;
-			amt = _suppliedAmount;
-		}
-		else {
-			amt = IWrapper(_suppliedAsset).WrappedAmtToUnitAmt_RoundDown(_suppliedAmount);
-		}
-	}
-
-
-	/*
-		@Description: given a fix capital pool and a balance from the balanceYield mapping
-			convert the value from wrapped amount to unit amount
-			note that when opening a YTValut this function should NOT be called because it bypasses checking with the
-			FCP whitelist in order to avoid an extra SLOAD opcode, rather when opening a YTVault wrappedToUnitAmount
-			should be called and the address of InfoOracle.FCPtoWrapper(addr(this), FCP) should be passed as the wrapper address
-
-		@param address _FCP: the address of the FCP contract
-		@param uint _amountYield: the wrapper amount to convert to unit amount
-
-		@return uint unitAmountYield: _amountYield of FCP wrapped yield converted to unit amount
-	*/
-	function getUnitValueYield(address _FCP, uint _amountYield) internal view returns (uint unitAmountYield) {
-		address wrapperAddr = address(IFixCapitalPool(_FCP).wrapper());
-		unitAmountYield = wrappedToUnitAmount(wrapperAddr, _amountYield);
-	}
-
-	/*
-		@Description: given an address of an IWrapper contract convert a wrapped amount to unit amount
-			useful for finding what values to pass to VaultHealth
-
-		@param address _wrapperAddress: the address of the IWrapper contract
-		@param uint _amountWrapped: the wrapper amount to convert to unit amount
-
-		@return uint unitAmountYield: _amountWrapped of the IWrapper contract's wrapped amount converted to unit amount
-	*/
-	function wrappedToUnitAmount(address _wrapperAddress, uint _amountWrapped) internal view returns (uint unitAmountYield) {
-		require(_wrapperAddress != address(0));
-		unitAmountYield = IWrapper(_wrapperAddress).WrappedAmtToUnitAmt_RoundDown(_amountWrapped);
-	}
-
-	/*
-		@Description: given an amount of wrapped token and a FCP contract which is based on the same wrapper
-			convert an amount of wrapped token into the current amount of ZCB that is a subasset of the wrapped token
-
-		@param address _FCP: the address of the FCP contract for which to find the amount of ZCB
-		@param uint _amountWrapped: the amount of wrapped token for which to find the amount of ZCB as a subasset
-	*/
-	function getZCBcontainedInWrappedAmt(address _FCP, uint _amountWrapped) internal view returns (uint amountZCB) {
-		if (IFixCapitalPool(_FCP).inPayoutPhase()) {
-			uint conversionRate = IFixCapitalPool(_FCP).maturityConversionRate();
-			amountZCB = conversionRate.mul(_amountWrapped) / (1 ether);
-		}
-		else {
-			amountZCB = getUnitValueYield(_FCP, _amountWrapped);
-		}
-	}
-
-	/*
-		@Description: ensure that args for YTvaultWithstandsChange() never increase vault health
-			all multipliers should have either no change on vault health or decrease vault health
-			we make this a function and not a modifier because we will not always have the
-			necessary data ready before execution of the functions in which we want to use this
-
-		@param uint _priceMultiplier: a multiplier > 1
-			we ensure the vault will not be sent into the liquidation zone if the cross asset price
-			of _assetBorrowed to _assetSupplied increases by a factor of _priceMultiplier
-			(in terms of basis points)
-		@param int128 _suppliedRateChange: a multiplier > 1 if _positiveBondSupplied otherwise < 1
-			we ensure the vault will not be sent into the liquidation zone if the rate on the supplied
-			asset increases by a factor of _suppliedRateChange
-			(in ABDK format)
-		@param int128 _borrowRateChange: a multiplier < 1
-			we ensure the vault will not be sent into the liquidation zone if the rate on the borrow
-			asset decreases by a factor of _borrowRateChange
-			(in ABDK format)
-		@param bool _positiveBondSupplied: (ZCB supplied to vault > YT supplied to vault)
-	*/
-	function validateYTvaultMultipliers(
-		uint _priceMultiplier,
-		int128 _suppliedRateChange,
-		int128 _borrowRateChange,
-		bool _positiveBondSupplied
-	) internal pure {
-		require(_priceMultiplier >= TOTAL_BASIS_POINTS);
-		require(_borrowRateChange <= ABDK_1);
-		require(
-			(_suppliedRateChange == ABDK_1) ||
-			(_positiveBondSupplied ? _suppliedRateChange > ABDK_1 : _suppliedRateChange < ABDK_1)
-		);
-	}
-
-	/*
-		@Description: if a YTVault has the same FCPborrowed and FCPsupplied pay back as much debt as possible
-			with the zcb contained as collateral in the vault
-			this can only be done where FCPborrowed == FCPsupplied because the ZCB that is collateral is the
-			same ZCB as the debt, this will not be true for any other type of Vault or YTVault
-
-		@param address _owner: the owner of the YTVault for which to pay back debt
-		@param uint _index: the index of the YTVault swithin YTvaults[_owner]
-		@param YTVault memory _vault: this parameter will be modified if debt is paid back
-			when this function is finished executing all member variables of _vault will == the member variables of
-			the storage vault which _vault is a copy of
-	*/
-	function autopayYTVault(address _owner, uint _index, YTVault memory _vault) internal {
-		if (_vault.FCPborrowed == _vault.FCPsupplied) {
-			uint unitValueYield = getZCBcontainedInWrappedAmt(_vault.FCPborrowed, _vault.yieldSupplied);
-			uint difference = _vault.bondSupplied >= 0 ? unitValueYield.add(uint(_vault.bondSupplied)) : unitValueYield.sub(uint(-_vault.bondSupplied));
-			difference = difference > _vault.amountBorrowed ? _vault.amountBorrowed : difference;
-			if (difference > 0) {
-				_vault.bondSupplied -= int(difference);
-				_vault.amountBorrowed -= difference;
-				_YTvaults[_owner][_index].bondSupplied = _vault.bondSupplied;
-				_YTvaults[_owner][_index].amountBorrowed = _vault.amountBorrowed;
-			}
-		}
-	}
-
-	/*
-		@Description: given a YTVault and change multipliers ensure that if a change of the multipliers would not
-			result in the YTVault being in danger of liquidation
-
-		@param YTVault memory vault: the YTVault for which to ensure will not be liquidated
-		@param uint _priceMultiplier: a multiplier > 1
-			we ensure the vault will not be sent into the liquidation zone if the cross asset price
-			of _assetBorrowed to _assetSupplied increases by a factor of _priceMultiplier
-			(in terms of basis points)
-		@param int128 _suppliedRateChange: a multiplier > 1 if _positiveBondSupplied otherwise < 1
-			we ensure the vault will not be sent into the liquidation zone if the rate on the supplied
-			asset increases by a factor of _suppliedRateChange
-			(in ABDK format)
-		@param int128 _borrowRateChange: a multiplier < 1
-			we ensure the vault will not be sent into the liquidation zone if the rate on the borrow
-			asset decreases by a factor of _borrowRateChange
-			(in ABDK format)
-	*/
-	function YTvaultWithstandsChange(YTVault memory vault, uint _priceMultiplier, int128 _suppliedRateChange, int128 _borrowRateChange) internal view returns (bool) {
-		validateYTvaultMultipliers(_priceMultiplier, _suppliedRateChange, _borrowRateChange, vault.bondSupplied > 0);
-		return vaultHealthContract.YTvaultWithstandsChange(
-			false,
-			vault.FCPsupplied,
-			vault.FCPborrowed,
-			getUnitValueYield(vault.FCPsupplied, vault.yieldSupplied),
-			vault.bondSupplied,
-			stabilityFeeAdjAmountBorrowed(vault.FCPborrowed, vault.amountBorrowed, vault.timestampOpened, vault.stabilityFeeAPR),
-			_priceMultiplier,
-			_suppliedRateChange,
-			_borrowRateChange
-		);
-	}
-
-	/*
 		@Description: create a new YT vault, deposit some ZCB + YT of a FCP and borrow some ZCB from it
 
 		@param address _FCPsupplied: the address of the FCP contract for which to supply ZCB and YT
@@ -293,7 +104,7 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryDelegateParent {
 			uint sFee = vault.amountSFee;
 			sFee += feeAdjBorrowAmt - vault.amountBorrowed;
 			if (sFee > 0) {
-				claimStabilityFee(vault.FCPborrowed, sFee);
+				claimStabilityFee(IFixCapitalPool(vault.FCPborrowed).zeroCouponBondAddress(), vault.FCPborrowed, sFee);
 			}
 		}
 		if (vault.yieldSupplied > 0 || vault.bondSupplied != 0) {
@@ -569,7 +380,7 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryDelegateParent {
 		}
 		if (mVault.amountBorrowed > _amountBorrowed) {
 			IFixCapitalPool(_FCPborrowed).burnZCBFrom(msg.sender,  change);
-			claimStabilityFee(_FCPborrowed, adjSFee < change ? adjSFee : change);
+			claimStabilityFee(IFixCapitalPool(mVault.FCPborrowed).zeroCouponBondAddress(), _FCPborrowed, adjSFee < change ? adjSFee : change);
 		}
 	}
 
@@ -689,7 +500,7 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryDelegateParent {
 		if (mVault.amountBorrowed > 0) {
 			uint toBurn = stabilityFeeAdjAmountBorrowed(mVault.FCPborrowed, mVault.amountBorrowed, mVault.timestampOpened, mVault.stabilityFeeAPR);
 			IFixCapitalPool(mVault.FCPborrowed).burnZCBFrom(msg.sender, toBurn);
-			claimStabilityFee(mVault.FCPborrowed, toBurn - mVault.amountBorrowed);
+			claimStabilityFee(IFixCapitalPool(mVault.FCPborrowed).zeroCouponBondAddress(), mVault.FCPborrowed, toBurn - mVault.amountBorrowed);
 		}
 	}
 }

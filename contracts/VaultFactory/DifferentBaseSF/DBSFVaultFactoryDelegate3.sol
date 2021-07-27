@@ -11,12 +11,12 @@ import "../../interfaces/IInfoOracle.sol";
 import "../../interfaces/IWrapper.sol";
 import "../../interfaces/IERC20.sol";
 import "../../helpers/Ownable.sol";
-import "./DBSFVaultFactoryData.sol";
+import "./DBSFVaultFactoryDelegateParent.sol";
 
 /*
 	This contract is specifically for handling YTVault functionality
 */
-contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryData {
+contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryDelegateParent {
 	using SafeMath for uint;
 	using SignedSafeMath for int;
 
@@ -29,29 +29,6 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryData {
 	*/
 	uint internal constant MIN_YIELD_SUPPLIED = 1e6;
 
-	/*
-		@Description: ensure that short interst rasing by a specific amount does not push an asset over the debt ceiling
-
-		@param address _fixCapitalPoolAddress: address of the ZCB for which to raise short interst
-		@param uint _amount: amount ny which to raise short interst
-	*/
-	function raiseShortInterest(address _fixCapitalPoolAddress, uint _amount) internal {
-		address underlyingAssetAddress = IFixCapitalPool(_fixCapitalPoolAddress).underlyingAssetAddress();
-		uint temp = _shortInterestAllDurations[underlyingAssetAddress].add(_amount);
-		require(vaultHealthContract.maximumShortInterest(underlyingAssetAddress) >= temp);
-		_shortInterestAllDurations[underlyingAssetAddress] = temp;
-	}
-
-	/*
-		@Description: decrease short interest
-
-		@param address _fixCapitalPoolAddress: address of the ZCB for which to decrease short interest
-		@param uint _amount: the amount by which to decrease short interest
-	*/
-	function lowerShortInterest(address _fixCapitalPoolAddress, uint _amount) internal {
-		address underlyingAssetAddress = IFixCapitalPool(_fixCapitalPoolAddress).underlyingAssetAddress();
-		_shortInterestAllDurations[underlyingAssetAddress] = _shortInterestAllDurations[underlyingAssetAddress].sub(_amount);
-	}
 
 	/*
 		@Description: when stability fee is encured pay out to holders
@@ -197,44 +174,6 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryData {
 				_YTvaults[_owner][_index].amountBorrowed = _vault.amountBorrowed;
 			}
 		}
-	}
-
-	/*
-		@Description: find the multiplier which is multiplied with amount borrowed (when vault was opened)
-			to find the current liability
-
-		@param address _FCPborrrowed: the address of the FCP contract associated with the debt asset of the Vault
-		@param uint64 _timestampOpened: the time at which the vault was opened
-		@param uint64 _stabilityFeeAPR: the annual rate which must be paid for stability fees
-
-		@return uint: the stability rate debt multiplier
-			inflated by (1 ether)
-	*/
-	function getStabilityFeeMultiplier(address _FCPborrrowed, uint64 _timestampOpened, uint64 _stabilityFeeAPR) internal view returns(uint) {
-		if (_stabilityFeeAPR == 0 || _stabilityFeeAPR == NO_STABILITY_FEE)
-			return (1 ether);
-		uint lastUpdate = IFixCapitalPool(_FCPborrrowed).lastUpdate();
-		int128 yearsOpen = int128((uint(lastUpdate - _timestampOpened) << 64) / BigMath.SecondsPerYear);
-		if (yearsOpen == 0)
-			return (1 ether);
-		int128 stabilityFeeMultiplier = BigMath.Pow(int128(uint(_stabilityFeeAPR) << 32), yearsOpen);
-		return uint(stabilityFeeMultiplier).mul(1 ether) >> 64;
-	}
-
-	/*
-		@Description: find the new amount of ZCBs which is a vault's obligation
-
-		@param address _FCPborrrowed: the address of the FCP contract associated with the debt asset of the Vault
-		@param uint _amountBorrowed: the Vault's previous obligation in ZCBs at _timestampOpened
-		@param uint64 _timestampOpened: the time at which the vault was opened
-		@param uint64 _stabilityFeeAPR: the annual rate which must be paid for stability fees
-
-		@return uint: the stability rate debt multiplier
-			inflated by (1 ether)
-	*/
-	function stabilityFeeAdjAmountBorrowed(address _FCPborrrowed, uint _amountBorrowed, uint64 _timestampOpened, uint64 _stabilityFeeAPR) internal view returns (uint) {
-		uint ratio = getStabilityFeeMultiplier(_FCPborrrowed, _timestampOpened, _stabilityFeeAPR);
-		return ratio.mul(_amountBorrowed) / (1 ether);
 	}
 
 	/*
@@ -384,7 +323,7 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryData {
 			that will be supplied as collateral to the YTVault after execution
 		@param uint _amountBorrowed: the total amount of debt of the vault after execution
 		@param int128[3] calldata _multipliers: the 3 multipliers used on call to
-			vaultHealthContract.vaultWithstandsChange
+			vaultHealthContract.YTvaultWithstandsChange
 				uint(_multipliers[0]) is priceMultiplier
 				_multipliers[1] is suppliedRateMultiplier
 				_multipliers[2] is borrowedRateMultiplier

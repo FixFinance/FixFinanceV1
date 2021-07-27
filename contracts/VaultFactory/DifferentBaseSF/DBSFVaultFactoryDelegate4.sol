@@ -10,12 +10,12 @@ import "../../interfaces/IInfoOracle.sol";
 import "../../interfaces/IWrapper.sol";
 import "../../interfaces/IERC20.sol";
 import "../../helpers/Ownable.sol";
-import "./DBSFVaultFactoryData.sol";
+import "./DBSFVaultFactoryDelegateParent.sol";
 
 /*
 	This contract is specifically for handling YTVault functionality
 */
-contract DBSFVaultFactoryDelegate4 is DBSFVaultFactoryData {
+contract DBSFVaultFactoryDelegate4 is DBSFVaultFactoryDelegateParent {
 	using SafeMath for uint;
 	using SignedSafeMath for int;
 
@@ -27,17 +27,6 @@ contract DBSFVaultFactoryDelegate4 is DBSFVaultFactoryData {
 		should use a normal vault and not use a YTvault
 	*/
 	uint internal constant MIN_YIELD_SUPPLIED = 1e6;
-
-	/*
-		@Description: decrease short interest
-
-		@param address _fixCapitalPoolAddress: address of the ZCB for which to decrease short interest
-		@param uint _amount: the amount by which to decrease short interest
-	*/
-	function lowerShortInterest(address _fixCapitalPoolAddress, uint _amount) internal {
-		address underlyingAssetAddress = IFixCapitalPool(_fixCapitalPoolAddress).underlyingAssetAddress();
-		_shortInterestAllDurations[underlyingAssetAddress] = _shortInterestAllDurations[underlyingAssetAddress].sub(_amount);
-	}
 
 	/*
 		@Description: distribute surplus appropriately between vault owner and contract owner
@@ -58,42 +47,6 @@ contract DBSFVaultFactoryDelegate4 is DBSFVaultFactoryData {
 		rebate.amountBond += bondRebate;
 		revenue.amountYield += _yieldAmount - yieldRebate;
 		revenue.amountBond += _bondAmount - bondRebate;
-	}
-
-	/*
-		@Description: when a bidder is outbid return their bid
-
-		@param address _bidder: the address of the bidder
-		@param address _asset: the address of the asset that the bidder posted with their bid in
-		@param uint _amount: the amount of _asset that was posted by the bidder
-	*/
-	function refundBid(address _bidder, address _asset, uint _amount) internal {
-		IFixCapitalPool(_asset).mintZCBTo(_bidder, _amount);
-	}
-
-	/*
-		@Description: when a bidder makes a bid collect collateral for their bid
-
-		@param address _bidder: the address of the bidder
-		@param address _asset: the address of the asset that the bidder is posing as collateral
-		@param uint _amount: the amount of _asset that the bidder is required to post
-	*/
-	function collectBid(address _bidder, address _asset, uint _amount) internal {
-		IFixCapitalPool(_asset).burnZCBFrom(_bidder, _amount);
-	}
-
-	/*
-		@Description: when stability fee is encured pay out to holders
-
-		@param address _ZCBaddr: the ZCB for which to distribute the stability fee
-		@param address _FCPaddr: the FCP which corresponds to the ZCB which the stability fee is paid in
-		@param uint _amount: the amount of ZCB which has been collected from the stability fee
-	*/
-	function claimStabilityFee(address _ZCBaddr, address _FCPaddr, uint _amount) internal {
-		if (_amount > 0) {
-			IFixCapitalPool(_FCPaddr).mintZCBTo(address(this), _amount);
-			_revenue[_ZCBaddr] += _amount;
-		}
 	}
 
 	/*
@@ -176,44 +129,6 @@ contract DBSFVaultFactoryDelegate4 is DBSFVaultFactoryData {
 				_YTvaults[_owner][_index].amountBorrowed = _vault.amountBorrowed;
 			}
 		}
-	}
-
-	/*
-		@Description: find the multiplier which is multiplied with amount borrowed (when vault was opened)
-			to find the current liability
-
-		@param address _FCPborrrowed: the address of the FCP contract associated with the debt asset of the Vault
-		@param uint64 _timestampOpened: the time at which the vault was opened
-		@param uint64 _stabilityFeeAPR: the annual rate which must be paid for stability fees
-
-		@return uint: the stability rate debt multiplier
-			inflated by (1 ether)
-	*/
-	function getStabilityFeeMultiplier(address _FCPborrrowed, uint64 _timestampOpened, uint64 _stabilityFeeAPR) internal view returns(uint) {
-		if (_stabilityFeeAPR == 0 || _stabilityFeeAPR == NO_STABILITY_FEE)
-			return (1 ether);
-		uint lastUpdate = IFixCapitalPool(_FCPborrrowed).lastUpdate();
-		int128 yearsOpen = int128((uint(lastUpdate - _timestampOpened) << 64) / BigMath.SecondsPerYear);
-		if (yearsOpen == 0)
-			return (1 ether);
-		int128 stabilityFeeMultiplier = BigMath.Pow(int128(uint(_stabilityFeeAPR) << 32), yearsOpen);
-		return uint(stabilityFeeMultiplier).mul(1 ether) >> 64;
-	}
-
-	/*
-		@Description: find the new amount of ZCBs which is a vault's obligation
-
-		@param address _FCPborrrowed: the address of the FCP contract associated with the debt asset of the Vault
-		@param uint _amountBorrowed: the Vault's previous obligation in ZCBs at _timestampOpened
-		@param uint64 _timestampOpened: the time at which the vault was opened
-		@param uint64 _stabilityFeeAPR: the annual rate which must be paid for stability fees
-
-		@return uint: the stability rate debt multiplier
-			inflated by (1 ether)
-	*/
-	function stabilityFeeAdjAmountBorrowed(address _FCPborrrowed, uint _amountBorrowed, uint64 _timestampOpened, uint64 _stabilityFeeAPR) internal view returns (uint) {
-		uint ratio = getStabilityFeeMultiplier(_FCPborrrowed, _timestampOpened, _stabilityFeeAPR);
-		return ratio.mul(_amountBorrowed) / (1 ether);
 	}
 
 	/*

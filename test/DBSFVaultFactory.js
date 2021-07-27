@@ -14,6 +14,7 @@ const DBSFVaultFactoryDelegate1 = artifacts.require("DBSFVaultFactoryDelegate1")
 const DBSFVaultFactoryDelegate2 = artifacts.require("DBSFVaultFactoryDelegate2");
 const DBSFVaultFactoryDelegate3 = artifacts.require("DBSFVaultFactoryDelegate3");
 const DBSFVaultFactoryDelegate4 = artifacts.require("DBSFVaultFactoryDelegate4");
+const DBSFVaultFactoryDelegate5 = artifacts.require("DBSFVaultFactoryDelegate5");
 const DBSFVaultFactory = artifacts.require('DBSFVaultFactory');
 const IERC20 = artifacts.require("IERC20");
 const BigMath = artifacts.require("BigMath");
@@ -106,6 +107,7 @@ contract('DBSFVaultFactory', async function(accounts) {
 		dbsfVaultFactoryDelegate2Instance = await DBSFVaultFactoryDelegate2.new();
 		dbsfVaultFactoryDelegate3Instance = await DBSFVaultFactoryDelegate3.new();
 		dbsfVaultFactoryDelegate4Instance = await DBSFVaultFactoryDelegate4.new();
+		dbsfVaultFactoryDelegate5Instance = await DBSFVaultFactoryDelegate5.new();
 		treasuryAccount = accounts[5];
 		vaultFactoryInstance = await DBSFVaultFactory.new(
 			vaultHealthInstance.address,
@@ -115,6 +117,7 @@ contract('DBSFVaultFactory', async function(accounts) {
 			dbsfVaultFactoryDelegate2Instance.address,
 			dbsfVaultFactoryDelegate3Instance.address,
 			dbsfVaultFactoryDelegate4Instance.address,
+			dbsfVaultFactoryDelegate5Instance.address,
 		);
 
 		maturity = ((await web3.eth.getBlock('latest')).timestamp + _8days).toString();
@@ -276,11 +279,14 @@ contract('DBSFVaultFactory', async function(accounts) {
 		vaults = await vaultFactoryInstance.allVaults(accounts[0]);
 		assert.equal(vaults.length, 1, "correct amount of vaults");
 		vault = vaults[0];
+		subAcctPosW1A0 = await wAsset1.subAccountPositions(vaultFactoryInstance.address, accounts[0], nullAddress);
 
 		assert.equal(vault.assetSupplied, wAsset1.address, "correct address for assetSupplied in vault");
 		assert.equal(vault.assetBorrowed, zcbAsset0.address, "correct address for assetBorrowed in vault");
 		assert.equal(vault.amountSupplied.toString(), _10To18.toString(), "correct vaule of amountSupplied in vault");
 		assert.equal(vault.amountBorrowed.toString(), amountBorrowed, "correct vaule of amountBorrowed in vault");
+		assert.equal(subAcctPosW1A0.yield.toString(), vault.amountSupplied.toString(), "correct yield value in sub account position");
+		assert.equal(subAcctPosW1A0.bond.toString(), "0", "correct bond value in sub account position");
 	});
 
 	it('deposits into vault', async () => {
@@ -305,12 +311,18 @@ contract('DBSFVaultFactory', async function(accounts) {
 		);
 
 		vault = await vaultFactoryInstance.vaults(accounts[0], 0);
+		let prevSubAcctPosW1A0 = subAcctPosW1A0;
+		subAcctPosW1A0 = await wAsset1.subAccountPositions(vaultFactoryInstance.address, accounts[0], nullAddress);
+		let changeYield = subAcctPosW1A0.yield.sub(prevSubAcctPosW1A0.yield);
 
 		assert.equal((await wAsset1.balanceOf(accounts[0])).toString(), expectedNewBalance.toString(), "correct amount of wAsset1 supplied");
 		assert.equal(vault.amountSupplied.toString(), expectedNewSupplied.toString(), "correct increase in supplied asset in vault");
 
 		assert.equal((await wAsset1.balanceOf(accounts[0])).toString(), prevBalanceW1.sub(_10To18).toString(), "correct amount of wAsset1 supplied");
 		assert.equal(vault.amountSupplied.sub(_10To18).toString(), prevSupplied.toString(), "correct increase in supplied asset in vault");
+
+		assert.equal(changeYield.toString(), toSupply.toString(), "correct yield value in sub account position");
+		assert.equal(subAcctPosW1A0.bond.toString(), "0", "correct bond value in sub account position");
 	});
 
 	it('removes from vault', async () => {
@@ -355,10 +367,16 @@ contract('DBSFVaultFactory', async function(accounts) {
 		);
 
 		vault = await vaultFactoryInstance.vaults(accounts[0], 0);
+		let prevSubAcctPosW1A0 = subAcctPosW1A0;
+		subAcctPosW1A0 = await wAsset1.subAccountPositions(vaultFactoryInstance.address, accounts[0], nullAddress);
+		let changeYield = subAcctPosW1A0.yield.sub(prevSubAcctPosW1A0.yield);
 
 		currentSupplied = new BN((await vaultFactoryInstance.vaults(accounts[0], 0)).amountSupplied);
 		assert.equal((await wAsset1.balanceOf(accounts[0])).toString(), prevBalanceW1.add(toRemove).toString(), "correct amount of wAsset1 supplied");
 		assert.equal(prevVault.amountSupplied.sub(vault.amountSupplied).toString(), toRemove.toString(), "correct increase in supplied asset in vault");
+
+		assert.equal(changeYield.toString(), toRemove.neg().toString(), "correct yield value in sub account position");
+		assert.equal(subAcctPosW1A0.bond.toString(), "0", "correct bond value in sub account position");
 	});
 
 
@@ -393,9 +411,15 @@ contract('DBSFVaultFactory', async function(accounts) {
 
 		let actualRepayment = parseInt(prevBalanceZCB.sub(currentBalanceZCB).toString());
 		let actualDebt = parseInt(vault.amountBorrowed.toString());
+		let prevSubAcctPosW1A0 = subAcctPosW1A0;
+		subAcctPosW1A0 = await wAsset1.subAccountPositions(vaultFactoryInstance.address, accounts[0], nullAddress);
+		let changeYield = subAcctPosW1A0.yield.sub(prevSubAcctPosW1A0.yield);
 
 		assert.isBelow(AmountError(actualRepayment, expectedRepayment), AcceptableMarginOfError, "repayment amount within error range");
 		assert.isBelow(AmountError(actualDebt, expectedDebt), AcceptableMarginOfError, "vault.amountBorrowed is within error range");
+
+		assert.equal(changeYield.toString(), "0");
+		assert.equal(subAcctPosW1A0.bond.toString(), "0");
 	});
 
 	it('borrows from vault', async () => {
@@ -427,22 +451,33 @@ contract('DBSFVaultFactory', async function(accounts) {
 		let multiplier = Math.pow(stabilityFee0, yearsOpen);
 		let expectedBorrow = multiplier * parseInt(toBorrow.toString());
 		let expectedDebt = multiplier * parseInt(newDebt.toString());
+		let prevSubAcctPosW1A0 = subAcctPosW1A0;
+		subAcctPosW1A0 = await wAsset1.subAccountPositions(vaultFactoryInstance.address, accounts[0], nullAddress);
+		let changeYield = subAcctPosW1A0.yield.sub(prevSubAcctPosW1A0.yield);
 
 		let actualBorrow = parseInt(currentBalanceZCB.sub(prevBalanceZCB).toString())
 		let actualDebt = parseInt(vault.amountBorrowed.toString());
 
 		assert.isBelow(AmountError(expectedBorrow, actualBorrow), AcceptableMarginOfError, "borrowed amount within error range");
 		assert.isBelow(AmountError(expectedDebt, actualDebt), AcceptableMarginOfError, "vault.amountBorrowed is within error range");
+
+		assert.equal(changeYield.toString(), "0");
+		assert.equal(subAcctPosW1A0.bond.toString(), "0");
 	});
 
 	it('transfer standard vault', async () => {
 		await helper.advanceTime(1000);
 		let prevVault = vault;
 
+
 		await vaultFactoryInstance.transferVault(0, accounts[2], false);
 
 		let newVaultAcct0Ind0 = await vaultFactoryInstance.vaults(accounts[0], 0);
 		let newVaultAcct2 = await vaultFactoryInstance.vaults(accounts[2], 0);
+		let prevSubAcctPosW1A0 = subAcctPosW1A0;
+		subAcctPosW1A0 = await wAsset1.subAccountPositions(vaultFactoryInstance.address, accounts[0], nullAddress);
+		subAcctPosW1A2 = await wAsset1.subAccountPositions(vaultFactoryInstance.address, accounts[2], nullAddress);
+		let changeYieldA0 = subAcctPosW1A0.yield.sub(prevSubAcctPosW1A0.yield);
 
 		assert.equal(newVaultAcct0Ind0.assetSupplied, nullAddress);
 		assert.equal(newVaultAcct0Ind0.assetBorrowed, nullAddress);
@@ -454,10 +489,21 @@ contract('DBSFVaultFactory', async function(accounts) {
 		assert.equal(newVaultAcct2.amountSupplied.toString(), prevVault.amountSupplied.toString());
 		assert.equal(newVaultAcct2.amountBorrowed.toString(), prevVault.amountBorrowed.toString());
 
+		assert.equal(changeYieldA0.toString(), prevVault.amountSupplied.neg().toString());
+		assert.equal(subAcctPosW1A0.bond.toString(), "0");
+		assert.equal(subAcctPosW1A2.yield.toString(), prevVault.amountSupplied.toString());
+		assert.equal(subAcctPosW1A2.bond.toString(), "0");
+
 		await vaultFactoryInstance.transferVault(0, accounts[0], false, {from: accounts[2]});
 
 		let newVaultAcct0Ind1 = await vaultFactoryInstance.vaults(accounts[0], 1);
 		newVaultAcct2 = await vaultFactoryInstance.vaults(accounts[2], 0);
+		prevSubAcctPosW1A0 = subAcctPosW1A0;
+		let prevSubAcctPosW1A2 = subAcctPosW1A2;
+		subAcctPosW1A0 = await wAsset1.subAccountPositions(vaultFactoryInstance.address, accounts[0], nullAddress);
+		subAcctPosW1A2 = await wAsset1.subAccountPositions(vaultFactoryInstance.address, accounts[2], nullAddress);
+		changeYieldA0 = subAcctPosW1A0.yield.sub(prevSubAcctPosW1A0.yield);
+		let changeYieldA2 = subAcctPosW1A2.yield.sub(prevSubAcctPosW1A2.yield);
 
 		assert.equal(newVaultAcct0Ind0.assetSupplied, nullAddress);
 		assert.equal(newVaultAcct0Ind0.assetBorrowed, nullAddress);
@@ -473,6 +519,11 @@ contract('DBSFVaultFactory', async function(accounts) {
 		assert.equal(newVaultAcct0Ind1.assetBorrowed, prevVault.assetBorrowed);
 		assert.equal(newVaultAcct0Ind1.amountSupplied.toString(), prevVault.amountSupplied.toString());
 		assert.equal(newVaultAcct0Ind1.amountBorrowed.toString(), prevVault.amountBorrowed.toString());
+
+		assert.equal(changeYieldA0.toString(), prevVault.amountSupplied.toString());
+		assert.equal(subAcctPosW1A0.bond.toString(), "0");
+		assert.equal(changeYieldA2.toString(), prevVault.amountSupplied.neg().toString());
+		assert.equal(subAcctPosW1A2.bond.toString(), "0");
 	});
 
 	it('close vault', async () => {

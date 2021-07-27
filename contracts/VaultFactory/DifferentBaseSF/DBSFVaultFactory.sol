@@ -21,6 +21,7 @@ contract DBSFVaultFactory is DBSFVaultFactoryData, IDBSFVaultFactory, nonReentra
 	address delegate2Address;
 	address delegate3Address;
 	address delegate4Address;
+	address delegate5Address;
 
 	constructor(
 		address _vaultHealthContract,
@@ -29,7 +30,8 @@ contract DBSFVaultFactory is DBSFVaultFactoryData, IDBSFVaultFactory, nonReentra
 		address _delegate1Address,
 		address _delegate2Address,
 		address _delegate3Address,
-		address _delegate4Address
+		address _delegate4Address,
+		address _delegate5Address
 	) public {
 		vaultHealthContract = IVaultHealth(_vaultHealthContract);
 		_treasuryAddress = _treasuryAddr;
@@ -38,6 +40,7 @@ contract DBSFVaultFactory is DBSFVaultFactoryData, IDBSFVaultFactory, nonReentra
 		delegate2Address = _delegate2Address;
 		delegate3Address = _delegate3Address;
 		delegate4Address = _delegate4Address;
+		delegate5Address = _delegate5Address;
 	}
 
 	//-----------------------------------views-------------------------------------
@@ -410,7 +413,7 @@ contract DBSFVaultFactory is DBSFVaultFactoryData, IDBSFVaultFactory, nonReentra
 		@param bool _isYTVault: true when the vault to transfer is a YTvault, false otherwise
 	*/
 	function transferVault(uint _index, address _to, bool _isYTVault) external override noReentry {
-		(bool success, ) = delegate1Address.delegatecall(abi.encodeWithSignature(
+		(bool success, ) = delegate5Address.delegatecall(abi.encodeWithSignature(
 			"transferVault(uint256,address,bool)",
 			_index,
 			_to,

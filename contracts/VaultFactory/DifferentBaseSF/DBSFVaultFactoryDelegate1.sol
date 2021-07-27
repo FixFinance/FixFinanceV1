@@ -13,9 +13,9 @@ import "../../interfaces/IInfoOracle.sol";
 import "../../interfaces/IWrapper.sol";
 import "../../interfaces/IERC20.sol";
 import "../../helpers/Ownable.sol";
-import "./DBSFVaultFactoryData.sol";
+import "./DBSFVaultFactoryDelegateParent.sol";
 
-contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
+contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryDelegateParent {
 	using SafeMath for uint;
 	using SignedSafeMath for int;
 
@@ -212,45 +212,6 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
 	}
 
 	/*
-		@Description: given a supplied asset find its type
-
-		@param address _suppliedAsset: the address of the supplied asset
-		@param IInfoOracle _info: the contract that is this contract's InfoOracle
-
-		@return address whitelistAddr: the address returned from the collateralWhitelist mapping in the IInfoOracle contract
-			when the supplied asset is passed
-		@return SUPPLIED_ASSET_TYPE suppliedType: the type of collateral that the supplied asset is
-		@return address baseFCP: the base FCP contract corresponding to the ZCB contract
-			will be address(0) if the collateral type is not ZCB
-		@return address baseWrapper: the base wrapper contract corresponding to the ZCB contract
-			will be address(0) if the collateral type is not ZCB
-	*/
-	function suppliedAssetInfo(
-		address _suppliedAsset,
-		IInfoOracle _info
-	) internal view returns(
-		address whitelistAddr,
-		SUPPLIED_ASSET_TYPE suppliedType,
-		address baseFCP,
-		address baseWrapper
-	) {
-		whitelistAddr = _info.collateralWhitelist(address(this), _suppliedAsset);
-		if (whitelistAddr == address(0)) {
-			//is likely a ZCB, ensure it is actuall a ZCB and is whitelisted
-			baseFCP = IZeroCouponBond(_suppliedAsset).FixCapitalPoolAddress();
-			baseWrapper = _info.FCPtoWrapper(address(this), baseFCP);
-			require(baseWrapper != address(0));
-			suppliedType = SUPPLIED_ASSET_TYPE.ZCB;
-		}
-		else if (whitelistAddr == address(1)) {
-			suppliedType = SUPPLIED_ASSET_TYPE.ASSET;
-		}
-		else {
-			suppliedType = SUPPLIED_ASSET_TYPE.WASSET;
-		}
-	}
-
-	/*
 		@Description: create a new vault, deposit some asset and borrow some ZCB from it
 
 		@param address _assetSupplied: the asset that will be used as collateral
@@ -334,8 +295,18 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
 				claimStabilityFee(vault.assetBorrowed, FCPborrowed, sFee);
 			}
 		}
-		if (vault.amountSupplied > 0)
+		if (vault.amountSupplied > 0) {
 			IERC20(vault.assetSupplied).transfer(_to, vault.amountSupplied);
+			(, SUPPLIED_ASSET_TYPE sType, address baseFCP, address baseWrapper) = suppliedAssetInfo(vault.assetSupplied, IInfoOracle(_infoOracleAddress));
+			require(vault.amountSupplied <= uint(type(int256).max));
+			int changeAmt = -int(vault.amountSupplied);
+			if (sType == SUPPLIED_ASSET_TYPE.WASSET) {
+				IWrapper(vault.assetSupplied).editSubAccountPosition(msg.sender, address(0), changeAmt, 0);
+			}
+			else if (sType == SUPPLIED_ASSET_TYPE.ZCB) {
+				IWrapper(baseWrapper).editSubAccountPosition(msg.sender, baseFCP, 0, changeAmt);
+			}
+		}
 
 		delete _vaults[msg.sender][_index];
 	}
@@ -380,8 +351,10 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
 		Vault memory mVault = _vaults[_owner][_index];
 		Vault storage sVault = _vaults[_owner][_index];
 
+		//index 0 in multipliers that must be converted to uint
 		require(
-			msg.sender == _owner ||
+			(msg.sender == _owner && _multipliers[0] > 0)
+				||
 			(
 				_assetSupplied == mVault.assetSupplied &&
 				_assetBorrowed == mVault.assetBorrowed &&
@@ -406,8 +379,7 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
 
 		if (_assetBorrowed != mVault.assetBorrowed) {
 			//ensure that after operations vault will be in good health
-			require(_multipliers[0] > 0);
-			{	
+			{
 				bool withstands;
 				(withstands, sType, baseFCP, baseWrapper) = vaultWithstandsChange(
 					nextVault,
@@ -439,8 +411,6 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
 				_amountSupplied < mVault.amountSupplied ||
 				_amountBorrowed > mVault.amountBorrowed
 			) {
-				//index 0 in multipliers that must be converted to uint
-				require(_multipliers[0] > 0);
 				nextVault.timestampOpened = mVault.timestampOpened;
 				nextVault.stabilityFeeAPR = mVault.stabilityFeeAPR;
 				bool withstands;
@@ -452,6 +422,9 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
 					info
 				);
 				require(withstands);
+			}
+			else {
+				(, sType, baseFCP, baseWrapper) = suppliedAssetInfo(_assetSupplied, info);
 			}
 			bytes memory copyData = _data;
 			address copyReceiverAddr = _receiverAddr;
@@ -466,7 +439,7 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
 				copyReceiverAddr
 			);
 		}
-		require(_amountSupplied <= uint(type(int256).max));
+		require(nextVault.amountSupplied <= uint(type(int256).max));
 		int changeAmt = int(nextVault.amountSupplied);
 		if (mVault.assetSupplied == nextVault.assetSupplied) {
 			require(mVault.amountSupplied <= uint(type(int256).max));
@@ -708,48 +681,6 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryData {
 			oldFCPBorrowed.burnZCBFrom(msg.sender, feeAdjBorrowAmt);
 			claimStabilityFee(mVault.assetBorrowed, address(oldFCPBorrowed), mVault.amountSFee + feeAdjBorrowAmt - mVault.amountBorrowed);
 		}
-	}
-
-	/*
-		@Description: assign a vault/YTvault to a new owner
-
-		@param uint _index: the index within vaults/YTvaults[msg.sender] at which the vault to transfer is located
-		@param address _to: the new owner of the vault/YTvault
-		@param bool _isYTVault: true when the vault to transfer is a YTvault, false otherwise
-	*/
-	function transferVault(uint _index, address _to, bool _isYTVault) external {
-		if (_isYTVault) {
-			transferYTVault(_index, _to);
-		}
-		else {
-			transferStandardVault(_index, _to);
-		}
-	}
-
-	/*
-		@Description: assign a vault to a new owner
-
-		@param uint _index: the index within vaults[msg.sender] at which the vault to transfer is located
-		@param address _to: the new owner of the vault
-	*/
-	function transferStandardVault(uint _index, address _to) internal {
-		require(_vaults[msg.sender].length > _index);
-		Vault memory vault = _vaults[msg.sender][_index];
-		_vaults[_to].push(vault);
-		delete _vaults[msg.sender][_index];
-	}
-
-	/*
-		@Description: assign a YT vault to a new owner
-
-		@param uint _index: the index within YTvaults[msg.sender] at which the YT vault to transfer is located
-		@param address _to: the new owner of the YT vault
-	*/
-	function transferYTVault(uint _index, address _to) internal {
-		require(_YTvaults[msg.sender].length > _index);
-		YTVault memory vault = _YTvaults[msg.sender][_index];
-		_YTvaults[_to].push(vault);
-		delete _YTvaults[msg.sender][_index];
 	}
 
 }

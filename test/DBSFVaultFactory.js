@@ -540,6 +540,10 @@ contract('DBSFVaultFactory', async function(accounts) {
 		let multiplier = Math.pow(stabilityFee0, yearsOpen);
 		let expectedRepayment = multiplier * parseInt(prevVault.amountBorrowed.toString());
 
+		let prevSubAcctPosW1A0 = subAcctPosW1A0;
+		subAcctPosW1A0 = await wAsset1.subAccountPositions(vaultFactoryInstance.address, accounts[0], nullAddress);
+		let changeYieldA0 = subAcctPosW1A0.yield.sub(prevSubAcctPosW1A0.yield);
+
 		let currentBalanceZCB = await zcbAsset0.balanceOf(accounts[0]);
 		let currentBalanceW1 = await wAsset1.balanceOf(accounts[0]);
 		vault = await vaultFactoryInstance.vaults(accounts[0], 1);
@@ -555,6 +559,8 @@ contract('DBSFVaultFactory', async function(accounts) {
 		assert.equal(vault.amountBorrowed.toString(), "0", "correct value of vault.amountBorrowed");
 		assert.equal(incW1Balance.toString(), prevVault.amountSupplied.toString(), "correct change in balance of collateral asset");
 		assert.isBelow(AmountError(expectedRepayment, actualRepayment), AcceptableMarginOfError, "zcb0 repayment amount is within error range");
+		assert.equal(changeYieldA0.toString(), prevVault.amountSupplied.neg().toString());
+		assert.equal(subAcctPosW1A0.bond.toString(), "0");
 	});
 
 	it('reopen vault via adjustment', async () => {
@@ -584,6 +590,10 @@ contract('DBSFVaultFactory', async function(accounts) {
 		let currentBalanceW1 = await wAsset1.balanceOf(accounts[0]);
 		vault = await vaultFactoryInstance.vaults(accounts[0], 0);
 
+		let prevSubAcctPosW1A0 = subAcctPosW1A0;
+		subAcctPosW1A0 = await wAsset1.subAccountPositions(vaultFactoryInstance.address, accounts[0], nullAddress);
+		let changeYieldA0 = subAcctPosW1A0.yield.sub(prevSubAcctPosW1A0.yield);
+
 		let incZCBBalance = currentBalanceZCB.sub(prevBalanceZCB);
 		let decW1Balance = prevBalanceW1.sub(currentBalanceW1);
 
@@ -593,6 +603,8 @@ contract('DBSFVaultFactory', async function(accounts) {
 		assert.equal(vault.amountBorrowed.toString(), amountBorrowed.toString(), "correct value of vault.amountBorrowed");
 		assert.equal(decW1Balance.toString(), amountSupplied.toString(), "correct change in balance of collateral asset");
 		assert.equal(incZCBBalance.toString(), amountBorrowed.toString(), "correct change in balance of debt asset");
+		assert.equal(changeYieldA0.toString(), amountSupplied.toString());
+		assert.equal(subAcctPosW1A0.bond.toString(), "0");
 	});
 
 	it('send undercollateralised vaults to liquidation', async () => {

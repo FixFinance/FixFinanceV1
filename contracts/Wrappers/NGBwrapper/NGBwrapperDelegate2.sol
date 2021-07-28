@@ -17,14 +17,15 @@ contract NGBwrapperDelegate2 is NGBwrapperDelegateParent {
 
 
     function editSubAccountPosition(
+        bool _claimRewards,
         address _subAcct,
         address _FCPaddr,
         int changeYield,
         int changeBond
-    ) external claimRewards(true, (_FCPaddr == address(0) ? msg.sender : _FCPaddr)) {
+    ) external claimRewards(_claimRewards, (_FCPaddr == address(0) ? msg.sender : _FCPaddr)) {
         require(msg.sender != _FCPaddr); //must not be an FCP direct subaccount
         //msg.sender is the distributionAccount
-        if (_FCPaddr != address(0)) {
+        if (_FCPaddr != address(0) && _claimRewards) {
             claimSubAccountRewardsRetPos(_FCPaddr, msg.sender, _FCPaddr);
         }
         SubAccountPosition memory mPos = claimSubAccountRewardsRetPos(msg.sender, _subAcct, _FCPaddr);

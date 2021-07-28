@@ -368,6 +368,8 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 	/*
 		@Description: change the amount of bond and yield in a subaccount
 
+		@param address _claimRewards: pass true to enter the claimRewards modifier
+			for either msg.sender or the _FCPaddr, depending on if _FCPaddr == address(0)
 		@param address _subAccount: the sub account owner address, receives rewards
 		@param address _FCPaddr: the address of the FCP for which sub account balances are held
 		@param int _changeYield: change in the yield amount in the sub account,
@@ -376,13 +378,15 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 			final amount - initial amount
 	*/
 	function editSubAccountPosition(
+		bool _claimRewards,
 		address _subAccount,
 		address _FCPaddr,
 		int _changeYield,
 		int _changeBond
 	) external override {
 		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
-			"editSubAccountPosition(address,address,int256,int256)",
+			"editSubAccountPosition(bool,address,address,int256,int256)",
+			_claimRewards,
 			_subAccount,
 			_FCPaddr,
 			_changeYield,

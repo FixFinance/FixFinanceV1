@@ -84,7 +84,7 @@ contract DBSFVaultFactoryDelegate2 is DBSFVaultFactoryDelegateParent {
 		lowerShortInterest(FCPborrowed, _amtIn);
 		//any surplus in the bid may be added as _revenue
 		if (_bid < maxBid){
-			distributeSurplus(_owner, vault.assetSupplied, maxBid - _bid);
+			distributeSurplus(_owner, vault.assetSupplied, maxBid - _bid, true);
 		}
 		if (_amtIn == vault.amountBorrowed) {
 			delete _vaults[_owner][_index];
@@ -122,7 +122,7 @@ contract DBSFVaultFactoryDelegate2 is DBSFVaultFactoryDelegateParent {
 		address FCPborrowed = IZeroCouponBond(liq.assetBorrowed).FixCapitalPoolAddress();
 		refundBid(liq.bidder, FCPborrowed, _amtIn);
 		collectBid(msg.sender, FCPborrowed, _amtIn);
-		distributeSurplus(liq.vaultOwner, liq.assetSupplied, maxBid - _bid);
+		distributeSurplus(liq.vaultOwner, liq.assetSupplied, maxBid - _bid, true);
 
 		if (_amtIn == liq.amountBorrowed) {
 			_Liquidations[_index].bidAmount = _bid;
@@ -159,11 +159,12 @@ contract DBSFVaultFactoryDelegate2 is DBSFVaultFactoryDelegateParent {
 
 		delete _Liquidations[_index];
 
+		IERC20(liq.assetSupplied).transfer(_to, liq.bidAmount);
+
 		(, SUPPLIED_ASSET_TYPE sType, address baseFCP, address baseWrapper) =
 			suppliedAssetInfo(liq.assetSupplied, IInfoOracle(_infoOracleAddress));
 		require(liq.bidAmount <= uint(type(int256).max));
-		editSubAccountStandardVault(liq.vaultOwner, sType, baseFCP, baseWrapper, -int(liq.bidAmount));
-		IERC20(liq.assetSupplied).transfer(_to, liq.bidAmount);
+		editSubAccountStandardVault(false, liq.vaultOwner, sType, baseFCP, baseWrapper, -int(liq.bidAmount));
 	}
 
 	/*
@@ -190,6 +191,13 @@ contract DBSFVaultFactoryDelegate2 is DBSFVaultFactoryDelegateParent {
 		vault.amountBorrowed = vault.amountBorrowed.sub(vault.amountSFee);
 		require(vault.amountBorrowed <= _maxIn);
 		require(vault.amountSupplied >= _minOut && _minOut > 0);
+
+		//burn borrowed ZCB
+		address FCPborrowed = IZeroCouponBond(vault.assetBorrowed).FixCapitalPoolAddress();
+		IFixCapitalPool(FCPborrowed).burnZCBFrom(_to, vault.amountBorrowed);
+		lowerShortInterest(FCPborrowed, vault.amountBorrowed);
+		IERC20(_assetSupplied).transfer(_to, vault.amountSupplied);
+
 		{
 			SUPPLIED_ASSET_TYPE sType;
 			address baseFCP;
@@ -204,14 +212,8 @@ contract DBSFVaultFactoryDelegate2 is DBSFVaultFactoryDelegateParent {
 			}
 			require(vault.amountSupplied <= uint(type(int256).max));
 			int changeAmt = -int(vault.amountSupplied);
-			editSubAccountStandardVault(_owner, sType, baseFCP, baseWrapper, changeAmt);
+			editSubAccountStandardVault(false, _owner, sType, baseFCP, baseWrapper, changeAmt);
 		}
-
-		//burn borrowed ZCB
-		address FCPborrowed = IZeroCouponBond(vault.assetBorrowed).FixCapitalPoolAddress();
-		IFixCapitalPool(FCPborrowed).burnZCBFrom(_to, vault.amountBorrowed);
-		lowerShortInterest(FCPborrowed, vault.amountBorrowed);
-		IERC20(_assetSupplied).transfer(_to, vault.amountSupplied);
 
 		delete _vaults[_owner][_index];
 	}
@@ -242,6 +244,13 @@ contract DBSFVaultFactoryDelegate2 is DBSFVaultFactoryDelegateParent {
 		require(0 < _in && _in <= vault.amountBorrowed);
 		uint amtOut = _in*vault.amountSupplied/vault.amountBorrowed;
 		require(amtOut >= _minOut);
+
+		//burn borrowed ZCB
+		address FCPborrowed = IZeroCouponBond(vault.assetBorrowed).FixCapitalPoolAddress();
+		IFixCapitalPool(FCPborrowed).burnZCBFrom(_to, _in);
+		lowerShortInterest(FCPborrowed, _in);
+		IERC20(_assetSupplied).transfer(_to, amtOut);
+
 		{
 			SUPPLIED_ASSET_TYPE sType;
 			address baseFCP;
@@ -256,14 +265,8 @@ contract DBSFVaultFactoryDelegate2 is DBSFVaultFactoryDelegateParent {
 			}
 			require(amtOut <= uint(type(int256).max));
 			int changeAmt = -int(amtOut);
-			editSubAccountStandardVault(_owner, sType, baseFCP, baseWrapper, changeAmt);
+			editSubAccountStandardVault(false, _owner, sType, baseFCP, baseWrapper, changeAmt);
 		}
-
-		//burn borrowed ZCB
-		address FCPborrowed = IZeroCouponBond(vault.assetBorrowed).FixCapitalPoolAddress();
-		IFixCapitalPool(FCPborrowed).burnZCBFrom(_to, _in);
-		lowerShortInterest(FCPborrowed, _in);
-		IERC20(_assetSupplied).transfer(_to, amtOut);
 
 		_vaults[_owner][_index].amountBorrowed = vault.amountBorrowed - _in;
 		_vaults[_owner][_index].amountSupplied = vault.amountSupplied - amtOut;
@@ -297,6 +300,13 @@ contract DBSFVaultFactoryDelegate2 is DBSFVaultFactoryDelegateParent {
 		uint amtIn = _out*vault.amountBorrowed;
 		amtIn = amtIn/vault.amountSupplied + (amtIn%vault.amountSupplied == 0 ? 0 : 1);
 		require(0 < amtIn && amtIn <= _maxIn);
+
+		//burn borrowed ZCB
+		address FCPborrowed = IZeroCouponBond(_assetBorrowed).FixCapitalPoolAddress();
+		IFixCapitalPool(FCPborrowed).burnZCBFrom(_to, amtIn);
+		lowerShortInterest(FCPborrowed, amtIn);
+		IERC20(_assetSupplied).transfer(_to, _out);
+
 		{
 			SUPPLIED_ASSET_TYPE sType;
 			address baseFCP;
@@ -311,14 +321,8 @@ contract DBSFVaultFactoryDelegate2 is DBSFVaultFactoryDelegateParent {
 			}
 			require(_out <= uint(type(int256).max));
 			int changeAmt = -int(_out);
-			editSubAccountStandardVault(_owner, sType, baseFCP, baseWrapper, changeAmt);
+			editSubAccountStandardVault(false, _owner, sType, baseFCP, baseWrapper, changeAmt);
 		}
-
-		//burn borrowed ZCB
-		address FCPborrowed = IZeroCouponBond(_assetBorrowed).FixCapitalPoolAddress();
-		IFixCapitalPool(FCPborrowed).burnZCBFrom(_to, amtIn);
-		lowerShortInterest(FCPborrowed, amtIn);
-		IERC20(_assetSupplied).transfer(_to, _out);
 
 		_vaults[_owner][_index].amountBorrowed = vault.amountBorrowed - amtIn;
 		_vaults[_owner][_index].amountSupplied = vault.amountSupplied - _out;

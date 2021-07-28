@@ -21,6 +21,7 @@ contract DBSFVaultFactoryDelegateParent is DBSFVaultFactoryData {
 		@Description: edit a sub account registered with the DBSFVaultFactory
 			when there is a change to a standard vault
 
+		@param bool _claimRewards: pass true to enter the claimRewards modifier upon wrapper.editSubAccountPosition
 		@param address _vaultOwner: the owner of the vault that has been changed
 		@param SUPPLIED_ASSET_TYPE sType: the type of collateral supplied to the vault
 		@param address _baseFCP: if the sType is ZCB the address of the base FCP contract of the ZCB should be passed
@@ -31,6 +32,7 @@ contract DBSFVaultFactoryDelegateParent is DBSFVaultFactoryData {
 		@param int _changeAmt: the change of the yield or ZCB in the sub account
 	*/
 	function editSubAccountStandardVault(
+		bool _claimRewards,
 		address _vaultOwner,
 		SUPPLIED_ASSET_TYPE sType,
 		address _baseFCP,
@@ -38,10 +40,10 @@ contract DBSFVaultFactoryDelegateParent is DBSFVaultFactoryData {
 		int _changeAmt
 	) internal {
 		if (sType == SUPPLIED_ASSET_TYPE.WASSET) {
-			IWrapper(_baseWrapper).editSubAccountPosition(_vaultOwner, address(0), _changeAmt, 0);
+			IWrapper(_baseWrapper).editSubAccountPosition(_claimRewards, _vaultOwner, address(0), _changeAmt, 0);
 		}
 		else if (sType == SUPPLIED_ASSET_TYPE.ZCB) {
-			IWrapper(_baseWrapper).editSubAccountPosition(_vaultOwner, _baseFCP, 0, _changeAmt);
+			IWrapper(_baseWrapper).editSubAccountPosition(_claimRewards, _vaultOwner, _baseFCP, 0, _changeAmt);
 		}
 	}
 
@@ -200,16 +202,19 @@ contract DBSFVaultFactoryDelegateParent is DBSFVaultFactoryData {
 		@param address _vaultOwner: the owner of the vault that has between liquidated
 		@param address _asset: the address of the asset for which surplus has been acquired
 		@param uint _amount: the amount of surplus
+		@param address _claimRewards: pass true to enter the claimRewards modifier in NGBwrapper
+			for either msg.sender or the _FCPaddr, depending on if _FCPaddr == address(0)
 	*/
-	function distributeSurplus(address _vaultOwner, address _asset, uint _amount) internal {
+	function distributeSurplus(address _vaultOwner, address _asset, uint _amount, bool _claimRewards) internal {
 		uint retainedSurplus = _amount * _liquidationRebateBips / TOTAL_BASIS_POINTS;
 		uint toTreasury = _amount - retainedSurplus;
 		_liquidationRebates[_vaultOwner][_asset] += retainedSurplus;
 		_revenue[_asset] += toTreasury;
 		(, SUPPLIED_ASSET_TYPE sType, address baseFCP, address baseWrapper) = suppliedAssetInfo(_asset, IInfoOracle(_infoOracleAddress));
 		require(toTreasury <= uint(type(int256).max));
-		editSubAccountStandardVault(_vaultOwner, sType, baseFCP, baseWrapper, -int(toTreasury));
-		editSubAccountStandardVault(_treasuryAddress, sType, baseFCP, baseWrapper, int(toTreasury));
+		editSubAccountStandardVault(_claimRewards, _vaultOwner, sType, baseFCP, baseWrapper, -int(toTreasury));
+		//passing claimRewards:true a second time would needlessly waste gas
+		editSubAccountStandardVault(false, _treasuryAddress, sType, baseFCP, baseWrapper, int(toTreasury));
 	}
 
 	/*

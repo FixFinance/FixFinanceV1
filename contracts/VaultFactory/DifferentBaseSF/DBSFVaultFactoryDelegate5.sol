@@ -46,8 +46,9 @@ contract DBSFVaultFactoryDelegate5 is DBSFVaultFactoryDelegateParent {
 			(, SUPPLIED_ASSET_TYPE sType, address baseFCP, address baseWrapper) = suppliedAssetInfo(vault.assetSupplied, IInfoOracle(_infoOracleAddress));
 			require(vault.amountSupplied <= uint(type(int256).max));
 			int intSupplied = int(vault.amountSupplied);
-			editSubAccountStandardVault(msg.sender, sType, baseFCP, baseWrapper, -intSupplied);
-			editSubAccountStandardVault(_to, sType, baseFCP, baseWrapper, intSupplied);
+			editSubAccountStandardVault(true, msg.sender, sType, baseFCP, baseWrapper, -intSupplied);
+			//passing claimRewards:true a second time would needlessly waste gas
+			editSubAccountStandardVault(false, _to, sType, baseFCP, baseWrapper, intSupplied);
 		}
 		delete _vaults[msg.sender][_index];
 	}
@@ -79,7 +80,7 @@ contract DBSFVaultFactoryDelegate5 is DBSFVaultFactoryDelegateParent {
 		IERC20(_asset).transfer(treasuryAddr, toTreasury);
 		IERC20(_asset).transfer(msg.sender, rev - toTreasury);
 		(, SUPPLIED_ASSET_TYPE sType, address baseFCP, address baseWrapper) = suppliedAssetInfo(_asset, IInfoOracle(_infoOracleAddress));
-		editSubAccountStandardVault(_treasuryAddress, sType, baseFCP, baseWrapper, -int(rev));
+		editSubAccountStandardVault(true, _treasuryAddress, sType, baseFCP, baseWrapper, -int(rev));
 		delete _revenue[_asset];
 	}
 

@@ -60,18 +60,18 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryDelegateParent {
 		uint64 wrapperFee = info.StabilityFeeAPR(address(this), address(baseBorrowed));
 		Vault memory vault = Vault(_assetSupplied, _assetBorrowed, _amountSupplied, _amountBorrowed, 0, timestampOpened, wrapperFee);
 
+		IERC20(_assetSupplied).transferFrom(msg.sender, address(this), _amountSupplied);
+		IFixCapitalPool(FCPborrowed).mintZCBTo(msg.sender, _amountBorrowed);
+		raiseShortInterest(FCPborrowed, _amountBorrowed);
+
 		{
 			(bool withstands, SUPPLIED_ASSET_TYPE sType, address baseFCP, address baseWrapper)
 				= vaultWithstandsChange(vault, _priceMultiplier, _suppliedRateChange, _borrowRateChange, info);
 			require(withstands);
 			require(_amountSupplied <= uint(type(int256).max));
 			int changeAmt = int(_amountSupplied);
-			editSubAccountStandardVault(msg.sender, sType, baseFCP, baseWrapper, changeAmt);
+			editSubAccountStandardVault(false, msg.sender, sType, baseFCP, baseWrapper, changeAmt);
 		}
-
-		IERC20(_assetSupplied).transferFrom(msg.sender, address(this), _amountSupplied);
-		IFixCapitalPool(FCPborrowed).mintZCBTo(msg.sender, _amountBorrowed);
-		raiseShortInterest(FCPborrowed, _amountBorrowed);
 
 		_vaults[msg.sender].push(vault);
 	}
@@ -103,7 +103,7 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryDelegateParent {
 			IERC20(vault.assetSupplied).transfer(_to, vault.amountSupplied);
 			(, SUPPLIED_ASSET_TYPE sType, address baseFCP, address baseWrapper) = suppliedAssetInfo(vault.assetSupplied, IInfoOracle(_infoOracleAddress));
 			require(vault.amountSupplied <= uint(type(int256).max));
-			editSubAccountStandardVault(msg.sender, sType, baseFCP, baseWrapper, -int(vault.amountSupplied));
+			editSubAccountStandardVault(false, msg.sender, sType, baseFCP, baseWrapper, -int(vault.amountSupplied));
 		}
 
 		delete _vaults[msg.sender][_index];
@@ -243,13 +243,13 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryDelegateParent {
 			require(mVault.amountSupplied <= uint(type(int256).max));
 			changeAmt = changeAmt.sub(int(mVault.amountSupplied));
 		}
-		editSubAccountStandardVault(msg.sender, sType, baseFCP, baseWrapper, changeAmt);
+		editSubAccountStandardVault(false, msg.sender, sType, baseFCP, baseWrapper, changeAmt);
 
 		if (mVault.assetSupplied != nextVault.assetSupplied && mVault.assetSupplied != address(0)) {
 			(, sType, baseFCP, baseWrapper) = suppliedAssetInfo(mVault.assetSupplied, info);
 			require(mVault.amountSupplied <= uint(type(int256).max));
 			changeAmt = -int(mVault.amountSupplied);
-			editSubAccountStandardVault(msg.sender, sType, baseFCP, baseWrapper, changeAmt);
+			editSubAccountStandardVault(false, msg.sender, sType, baseFCP, baseWrapper, changeAmt);
 		}
 	}
 

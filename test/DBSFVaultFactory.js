@@ -62,6 +62,8 @@ const NON_CHANGE_MULTIPLIERS = [TOTAL_BASIS_POINTS, ABDK_1, ABDK_1];
 
 const rebate_bips = 120;
 
+const AUCTION_COOLDOWN = 10 * 60;
+
 contract('DBSFVaultFactory', async function(accounts) {
 	/*
 		for simplicity of testing in this contract we assume that 1 unit of each asset is equal in vaulue to 1 unit of any other asset
@@ -71,6 +73,7 @@ contract('DBSFVaultFactory', async function(accounts) {
 		asset0 = await dummyAToken.new("aCOIN");
 		//supply asset 1
 		asset1 = await dummyAToken.new("aTOKEN");
+		rewardsAsset = await dummyAToken.new("RWD");
 		zcbYtDeployerInstance = await zcbYtDeployer.new();
 		vaultHealthInstance = await dummyVaultHealth.new();
 		EiInstance = await Ei.new();
@@ -182,7 +185,20 @@ contract('DBSFVaultFactory', async function(accounts) {
 		await wAsset0.approve(fcp0.address, _10To19, {from: accounts[1]});
 		await fcp0.depositWrappedToken(accounts[1], _10To19, {from: accounts[1]});
 		await zcbAsset0.approve(vaultFactoryInstance.address, _10To19, {from: accounts[1]});
+
+		await wAsset1.addRewardAsset(rewardsAsset.address);
 	});
+
+	function rand(min, max) {
+		return Math.floor(Math.random() * (max - min)) + min + 1;
+	}
+
+	async function addRewards() {
+		let amtToMint = _10To18.div(new BN(rand(1, 10000)));
+		let currentBal = await rewardsAsset.balanceOf(wAsset1.address);
+		let newBal = currentBal.add(amtToMint);
+		await rewardsAsset.mintTo(wAsset1.address, newBal);
+	}
 
 	it('assign ratios', async () => {
 		//assign ratios in vault
@@ -213,6 +229,7 @@ contract('DBSFVaultFactory', async function(accounts) {
 	});
 
 	it('opens vault', async () => {
+		await addRewards();
 		amountBorrowed = _10To18.mul(_10To18).div(new BN(upperRatio)).toString();
 		let caught = false;
 		maxShortInterest0 = "0";
@@ -268,7 +285,7 @@ contract('DBSFVaultFactory', async function(accounts) {
 		if (!caught) assert.fail('for call to openVault(), remove(), or borrow() to be sucessful borrowedRateChange parameter must be <= ABDK_1');
 
 		amountBorrowed = (new BN(amountBorrowed)).sub(new BN('1')).toString();
-		var prevBalanceW1 = await wAsset1.balanceOf(accounts[0]);
+		let prevBalanceW1 = await wAsset1.balanceOf(accounts[0]);
 
 		await vaultFactoryInstance.openVault(wAsset1.address, zcbAsset0.address, _10To18.toString(), amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
 
@@ -290,6 +307,7 @@ contract('DBSFVaultFactory', async function(accounts) {
 	});
 
 	it('deposits into vault', async () => {
+		await addRewards();
 		await helper.advanceTime(1000);
 		let prevBalanceW1 = await wAsset1.balanceOf(accounts[0]);
 		prevSupplied = new BN(vault.amountSupplied);
@@ -326,6 +344,7 @@ contract('DBSFVaultFactory', async function(accounts) {
 	});
 
 	it('removes from vault', async () => {
+		await addRewards();
 		await helper.advanceTime(1000);
 		let toRemove = _10To18;
 		let prevBalanceW1 = await wAsset1.balanceOf(accounts[0]);
@@ -381,6 +400,7 @@ contract('DBSFVaultFactory', async function(accounts) {
 
 
 	it('repays vault', async () => {
+		await addRewards();
 		await helper.advanceTime(1000);
 		toRepay = _10To18.div(new BN('2'));
 		let prevBalanceZCB = await zcbAsset0.balanceOf(accounts[0]);
@@ -423,6 +443,7 @@ contract('DBSFVaultFactory', async function(accounts) {
 	});
 
 	it('borrows from vault', async () => {
+		await addRewards();
 		await helper.advanceTime(1000);
 		toBorrow = toRepay;
 		let prevBalanceZCB = await zcbAsset0.balanceOf(accounts[0]);
@@ -466,9 +487,9 @@ contract('DBSFVaultFactory', async function(accounts) {
 	});
 
 	it('transfer standard vault', async () => {
+		await addRewards();
 		await helper.advanceTime(1000);
 		let prevVault = vault;
-
 
 		await vaultFactoryInstance.transferVault(0, accounts[2], false);
 
@@ -527,6 +548,7 @@ contract('DBSFVaultFactory', async function(accounts) {
 	});
 
 	it('close vault', async () => {
+		await addRewards();
 		await helper.advanceTime(1000);
 		let prevVault = vault;
 		let prevBalanceZCB = await zcbAsset0.balanceOf(accounts[0]);
@@ -564,6 +586,7 @@ contract('DBSFVaultFactory', async function(accounts) {
 	});
 
 	it('reopen vault via adjustment', async () => {
+		await addRewards();
 		await helper.advanceTime(1000);
 		let prevVault = await vaultFactoryInstance.vaults(accounts[0], 0);
 		let prevBalanceZCB = await zcbAsset0.balanceOf(accounts[0]);
@@ -608,6 +631,7 @@ contract('DBSFVaultFactory', async function(accounts) {
 	});
 
 	it('send undercollateralised vaults to liquidation', async () => {
+		await addRewards();
 		await helper.advanceTime(1000);
 		/*
 			increase collateralisation ratio limits such that the open vault will be sent to liquidation
@@ -630,7 +654,8 @@ contract('DBSFVaultFactory', async function(accounts) {
 		await vaultHealthInstance.setUpper(asset1.address, zcbAsset0.address, upperRatio);
 
 		let prevRevenue = await vaultFactoryInstance.revenue(wAsset1.address);
-		
+		let prevContractBalanceW1 = await wAsset1.balanceOf(vaultFactoryInstance.address);
+
 		let rec = await vaultFactoryInstance.auctionLiquidation(accounts[0], 0, zcbAsset0.address, wAsset1.address, bid.toString(), vault.amountBorrowed.toString(), {from: accounts[1]});
 
 		let timestamp = (await web3.eth.getBlock(rec.receipt.blockNumber)).timestamp;
@@ -639,6 +664,7 @@ contract('DBSFVaultFactory', async function(accounts) {
 		let multiplier = Math.pow(stabilityFee0, yearsOpen);
 		let expectedActualIn = multiplier * parseInt(vault.amountBorrowed.toString());
 
+		let contractBalanceW1 = await wAsset1.balanceOf(vaultFactoryInstance.address);
 		let currentRevenue = await vaultFactoryInstance.revenue(wAsset1.address);
 
 		let rebate = surplus.mul(new BN(rebate_bips)).div(new BN(TOTAL_BASIS_POINTS));
@@ -647,6 +673,7 @@ contract('DBSFVaultFactory', async function(accounts) {
 		subAcctPosW1A0 = await wAsset1.subAccountPositions(vaultFactoryInstance.address, accounts[0], nullAddress);
 		let changeYieldA0 = subAcctPosW1A0.yield.sub(prevSubAcctPosW1A0.yield);
 
+		assert.equal(contractBalanceW1.toString(), prevContractBalanceW1.toString());
 		assert.equal(changeYieldA0.toString(), toTreasury.neg().toString(), "correct change yield in sub account position");
 		assert.equal(currentRevenue.sub(prevRevenue).toString(), toTreasury.toString(), "correct amount of revenue");
 
@@ -672,6 +699,7 @@ contract('DBSFVaultFactory', async function(accounts) {
 	});
 
 	it('bid on liquidation auctions', async () => {
+		await addRewards();
 		await helper.advanceTime(1000);
 		/*
 			bid with account 1
@@ -680,11 +708,13 @@ contract('DBSFVaultFactory', async function(accounts) {
 		bid = bid.sub(surplus);
 		
 		let prevRevenue = await vaultFactoryInstance.revenue(wAsset1.address);
+		let prevContractBalanceW1 = await wAsset1.balanceOf(vaultFactoryInstance.address);
 
 		let rec = await vaultFactoryInstance.bidOnLiquidation(0, bid.toString(), liquidation.amountBorrowed, {from: accounts[1]});
 
 		let timestamp = (await web3.eth.getBlock(rec.receipt.blockNumber)).timestamp;
 
+		let contractBalanceW1 = await wAsset1.balanceOf(vaultFactoryInstance.address);
 		let currentRevenue = await vaultFactoryInstance.revenue(wAsset1.address);
 
 		let rebate = surplus.mul(new BN(rebate_bips)).div(new BN(TOTAL_BASIS_POINTS));
@@ -693,6 +723,7 @@ contract('DBSFVaultFactory', async function(accounts) {
 		subAcctPosW1A0 = await wAsset1.subAccountPositions(vaultFactoryInstance.address, accounts[0], nullAddress);
 		let changeYieldA0 = subAcctPosW1A0.yield.sub(prevSubAcctPosW1A0.yield);
 
+		assert.equal(contractBalanceW1.toString(), prevContractBalanceW1.toString());
 		assert.equal(changeYieldA0.toString(), toTreasury.neg().toString(), "correct change yield in sub account position");
 		assert.equal(currentRevenue.sub(prevRevenue).toString(), toTreasury.toString(), "correct amount of revenue");
 
@@ -709,32 +740,41 @@ contract('DBSFVaultFactory', async function(accounts) {
 	});
 
 	it('claim liquidation auction rewards', async () => {
+		await addRewards();
 		await helper.advanceTime(1000);
 		//go 10 minuites into the future to claim liquidation
 		await helper.advanceTime(10*60 + 1);
 
+		let prevContractBalanceW1 = await wAsset1.balanceOf(vaultFactoryInstance.address);
 		let prevBalW1 = await wAsset1.balanceOf(accounts[1]);
 
 		await vaultFactoryInstance.claimLiquidation(0, accounts[1], {from: accounts[1]});
 
+		let contractBalanceW1 = await wAsset1.balanceOf(vaultFactoryInstance.address);
 		let newBalW1 = await wAsset1.balanceOf(accounts[1]);
 		let prevSubAcctPosW1A0 = subAcctPosW1A0;
 		subAcctPosW1A0 = await wAsset1.subAccountPositions(vaultFactoryInstance.address, accounts[0], nullAddress);
 		let changeYieldA0 = subAcctPosW1A0.yield.sub(prevSubAcctPosW1A0.yield);
 
+		assert.equal(contractBalanceW1.toString(), prevContractBalanceW1.sub(liquidation.bidAmount).toString());
 		assert.equal(changeYieldA0.toString(), liquidation.bidAmount.neg().toString(), "correct change yield in sub account position");
 		assert.equal(newBalW1.sub(prevBalW1).toString(), liquidation.bidAmount.toString(), "correct payout after winning liquidation");
 	});
 
 	it('instant liquidations upon dropping below lowerCollateralLimit', async () => {
+		await addRewards();
 		await helper.advanceTime(1000);
 		/*
 			first open vaults
 		*/
 		let toSupply = _10To18
+		let prevContractBalanceW1 = await wAsset1.balanceOf(vaultFactoryInstance.address);
 		amountBorrowed = toSupply.mul(_10To18).div(new BN(upperRatio)).sub(new BN(1)).toString();
 		await vaultFactoryInstance.openVault(wAsset1.address, zcbAsset0.address, toSupply, amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
 		await vaultFactoryInstance.openVault(wAsset1.address, zcbAsset0.address, toSupply, amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
+
+		let contractBalanceW1 = await wAsset1.balanceOf(vaultFactoryInstance.address);
+		assert.equal(contractBalanceW1.toString(), prevContractBalanceW1.add(toSupply.mul(new BN(2))).toString());
 
 		lowerRatio =  _10To18.mul(_10To18).div(new BN(amountBorrowed)).add(new BN(10000)).toString();
 		await vaultHealthInstance.setLower(asset1.address, zcbAsset0.address, lowerRatio);
@@ -747,15 +787,18 @@ contract('DBSFVaultFactory', async function(accounts) {
 		assert.equal(changeYieldA0.toString(), toSupply.mul(new BN(2)).toString());
 
 		let prevVault = await vaultFactoryInstance.vaults(accounts[0], vaultIndex);
+		prevContractBalanceW1 = contractBalanceW1;
 
 		await vaultFactoryInstance.instantLiquidation(accounts[0], vaultIndex, zcbAsset0.address, wAsset1.address, amountBorrowed.toString(), _10To18.toString(), accounts[1], {from: accounts[1]});
 
 		vault = await vaultFactoryInstance.vaults(accounts[0], vaultIndex);
 
+		contractBalanceW1 = await wAsset1.balanceOf(vaultFactoryInstance.address);
 		prevSubAcctPosW1A0 = subAcctPosW1A0;
 		subAcctPosW1A0 = await wAsset1.subAccountPositions(vaultFactoryInstance.address, accounts[0], nullAddress);
 		changeYieldA0 = subAcctPosW1A0.yield.sub(prevSubAcctPosW1A0.yield);
 
+		assert.equal(contractBalanceW1.toString(), prevContractBalanceW1.sub(toSupply).toString());
 		assert.equal(changeYieldA0.toString(), prevVault.amountSupplied.neg().toString());
 		assert.equal(vault.assetBorrowed, nullAddress, "assetBorrowed is null");
 		assert.equal(vault.assetSupplied, nullAddress, "assetSupplied is null");
@@ -764,6 +807,7 @@ contract('DBSFVaultFactory', async function(accounts) {
 	});
 
 	it('partial vault liquidations Specific In', async () => {
+		await addRewards();
 		await helper.advanceTime(1000);
 		vaultIndex++;
 
@@ -771,16 +815,20 @@ contract('DBSFVaultFactory', async function(accounts) {
 
 		let amtIn = (new BN(amountBorrowed)).div(new BN(2))
 		let minOut = _10To18.div(new BN(3));
+		let prevContractBalanceW1 = await wAsset1.balanceOf(vaultFactoryInstance.address);
+
 		await vaultFactoryInstance.partialLiquidationSpecificIn(accounts[0], vaultIndex, zcbAsset0.address, wAsset1.address, amtIn, minOut, accounts[1], {from: accounts[1]});
 
 		vault = await vaultFactoryInstance.vaults(accounts[0], vaultIndex);
 
+		let contractBalanceW1 = await wAsset1.balanceOf(vaultFactoryInstance.address);
 		let expectedOut = prevVault.amountSupplied.mul(amtIn).div(prevVault.amountBorrowed);
 		let prevSubAcctPosW1A0 = subAcctPosW1A0;
 		subAcctPosW1A0 = await wAsset1.subAccountPositions(vaultFactoryInstance.address, accounts[0], nullAddress);
 		let changeYieldA0 = subAcctPosW1A0.yield.sub(prevSubAcctPosW1A0.yield);
 
 		assert.equal(changeYieldA0.toString(), expectedOut.neg().toString());
+		assert.equal(contractBalanceW1.toString(), prevContractBalanceW1.sub(expectedOut).toString());
 
 		assert.equal(vault.assetBorrowed, zcbAsset0.address, "assetBorrowed is correct");
 		assert.equal(vault.assetSupplied, wAsset1.address, "assetSupplied is correct");
@@ -789,19 +837,23 @@ contract('DBSFVaultFactory', async function(accounts) {
 	});
 
 	it('partial vault liquidation Specific Out', async () => {
+		await addRewards();
 		await helper.advanceTime(1000);
 
 		let prevVault = await vaultFactoryInstance.vaults(accounts[0], vaultIndex);
+		let prevContractBalanceW1 = await wAsset1.balanceOf(vaultFactoryInstance.address);
 
 		await vaultFactoryInstance.partialLiquidationSpecificOut(accounts[0], vaultIndex, zcbAsset0.address, wAsset1.address,
 			prevVault.amountSupplied, prevVault.amountBorrowed, accounts[1], {from: accounts[1]});
 
 		vault = await vaultFactoryInstance.vaults(accounts[0], vaultIndex);
 
+		let contractBalanceW1 = await wAsset1.balanceOf(vaultFactoryInstance.address);
 		let prevSubAcctPosW1A0 = subAcctPosW1A0;
 		subAcctPosW1A0 = await wAsset1.subAccountPositions(vaultFactoryInstance.address, accounts[0], nullAddress);
 		let changeYieldA0 = subAcctPosW1A0.yield.sub(prevSubAcctPosW1A0.yield);
 
+		assert.equal(contractBalanceW1.toString(), prevContractBalanceW1.sub(prevVault.amountSupplied).toString());
 		assert.equal(changeYieldA0.toString(), prevVault.amountSupplied.neg().toString());
 		assert.equal(vault.assetBorrowed, zcbAsset0.address, "assetBorrowed is correct");
 		assert.equal(vault.assetSupplied, wAsset1.address, "assetSupplied is correct");
@@ -810,6 +862,7 @@ contract('DBSFVaultFactory', async function(accounts) {
 	});
 
 	it('liquidates vaults due to time', async () => {
+		await addRewards();
 		await helper.advanceTime(1000);
 		let amountSupplied = _10To18;
 
@@ -868,6 +921,7 @@ contract('DBSFVaultFactory', async function(accounts) {
 	});
 
 	it('instant vault liquidations due to time to maturity', async () => {
+		await addRewards();
 		await helper.advanceTime(1000);
 		vaultIndex++;
 		let caught = false;
@@ -919,6 +973,35 @@ contract('DBSFVaultFactory', async function(accounts) {
 		assert.equal(newBalanceTreasury.sub(prevBalanceTreasury).toString(), expToTreasury.toString(), "correct amount paid to treasury");
 	});
 
+	it('claim rebate', async () => {
+		let rebate = await vaultFactoryInstance.liquidationRebates(accounts[0], wAsset1.address);
+		let prevBalanceW1 = await wAsset1.balanceOf(accounts[0]);
+		await vaultFactoryInstance.claimRebate(wAsset1.address);
+		let balanceW1 = await wAsset1.balanceOf(accounts[0]);
+		assert.equal(balanceW1.sub(prevBalanceW1).toString(), rebate.toString());
+	});
+
+	it('can manage all vault and reward obligations', async() => {
+		for (let i = 0; i < accounts.length; i++) {
+			let vaults = await vaultFactoryInstance.allVaults(accounts[i]);
+			for (let j = 0; j < vaults.length; j++) {
+				if (vaults[j].amountSupplied.toString() !== "0") {
+					await vaultFactoryInstance.closeVault(j, accounts[i], {from: accounts[i]});
+				}
+			}
+		}
+		let numLiqs = (await vaultFactoryInstance.liquidationsLength()).toNumber();
+		await helper.advanceTime(AUCTION_COOLDOWN+1);
+		for (let i = 0; i < numLiqs; i++) {
+			let liq = await vaultFactoryInstance.Liquidations(i);
+			if (liq.bidAmount.toString() !== "0") {
+				await vaultFactoryInstance.claimLiquidation(i, accounts[0], {from: liq.bidder});
+			}
+		}
+		let bal = await wAsset1.balanceOf(vaultFactoryInstance.address);
+		let rewards = await wAsset1.distributionAccountRewards(0, vaultFactoryInstance.address);
+		assert.isBelow(rewards.toNumber(), 100);
+	});
 
 	/*
 		-------------------------------------------------Y-T---V-a-u-l-t-s-----------------------------------------------------

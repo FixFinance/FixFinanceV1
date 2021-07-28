@@ -203,12 +203,13 @@ contract DBSFVaultFactoryDelegateParent is DBSFVaultFactoryData {
 	*/
 	function distributeSurplus(address _vaultOwner, address _asset, uint _amount) internal {
 		uint retainedSurplus = _amount * _liquidationRebateBips / TOTAL_BASIS_POINTS;
-		uint capturedSurplus = _amount - retainedSurplus;
+		uint toTreasury = _amount - retainedSurplus;
 		_liquidationRebates[_vaultOwner][_asset] += retainedSurplus;
-		_revenue[_asset] += capturedSurplus;
+		_revenue[_asset] += toTreasury;
 		(, SUPPLIED_ASSET_TYPE sType, address baseFCP, address baseWrapper) = suppliedAssetInfo(_asset, IInfoOracle(_infoOracleAddress));
-		require(capturedSurplus <= uint(type(int256).max));
-		editSubAccountStandardVault(_vaultOwner, sType, baseFCP, baseWrapper, -int(capturedSurplus));
+		require(toTreasury <= uint(type(int256).max));
+		editSubAccountStandardVault(_vaultOwner, sType, baseFCP, baseWrapper, -int(toTreasury));
+		editSubAccountStandardVault(_treasuryAddress, sType, baseFCP, baseWrapper, int(toTreasury));
 	}
 
 	/*

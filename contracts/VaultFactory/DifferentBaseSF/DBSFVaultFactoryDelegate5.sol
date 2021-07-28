@@ -64,4 +64,40 @@ contract DBSFVaultFactoryDelegate5 is DBSFVaultFactoryDelegateParent {
 		_YTvaults[_to].push(vault);
 		delete _YTvaults[msg.sender][_index];
 	}
+
+	//--------------------admin-------------------
+
+	/*
+		@Description: admin may call this function to claim liquidation revenue
+
+		@address _asset: the address of the asset for which to claim revenue
+	*/
+	function claimRevenue(address _asset) external {
+		uint rev = _revenue[_asset];
+		uint toTreasury = rev >> 1;
+		address treasuryAddr = _treasuryAddress;
+		IERC20(_asset).transfer(treasuryAddr, toTreasury);
+		IERC20(_asset).transfer(msg.sender, rev - toTreasury);
+		(, SUPPLIED_ASSET_TYPE sType, address baseFCP, address baseWrapper) = suppliedAssetInfo(_asset, IInfoOracle(_infoOracleAddress));
+		editSubAccountStandardVault(_treasuryAddress, sType, baseFCP, baseWrapper, -int(rev));
+		delete _revenue[_asset];
+	}
+
+	/*
+		@Description: admin may call this function to claim YT liquidation revenue
+
+		@param address _FCP: the address of the FCP contract for which to claim revenue
+		@param int _bondIn: the amount of bond to send in to make the transfer position have a
+			positive minimum value at maturity
+	*/
+	function claimYTRevenue(address _FCP, int _bondIn) external {
+		require(_bondIn > -1);
+		YTPosition memory pos = _YTRevenue[_FCP];
+		IFixCapitalPool(_FCP).burnZCBFrom(msg.sender, uint(_bondIn));
+		uint yieldToTreasury = pos.amountYield >> 1;
+		int bondToTreasury = pos.amountBond.add(_bondIn) / 2;
+		IFixCapitalPool(_FCP).transferPosition(_treasuryAddress, yieldToTreasury, bondToTreasury);
+		IFixCapitalPool(_FCP).transferPosition(msg.sender, pos.amountYield - yieldToTreasury, (pos.amountBond + _bondIn) - bondToTreasury);
+		delete _YTRevenue[_FCP];
+	}
 }

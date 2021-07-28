@@ -83,6 +83,16 @@ contract DBSFVaultFactory is DBSFVaultFactoryData, IDBSFVaultFactory, nonReentra
 		bond = pos.amountBond;
 	}
 
+	function liquidationRebates(address _owner, address _asset) external view override returns(uint) {
+		return _liquidationRebates[_owner][_asset];
+	}
+
+	function YTLiquidationRebates(address _owner, address _FCP) external view override returns(uint yield, int bond) {
+		YTPosition memory pos = _YTLiquidationRebates[_owner][_FCP];
+		yield = pos.amountYield;
+		bond = pos.amountBond;
+	}
+
 	function vaults(address _owner, uint _index) external view override returns (
 		address assetSupplied,
 		address assetBorrowed,
@@ -779,11 +789,8 @@ contract DBSFVaultFactory is DBSFVaultFactoryData, IDBSFVaultFactory, nonReentra
 		@address _asset: the address of the asset for which to claim revenue
 	*/
 	function claimRevenue(address _asset) external override onlyOwner {
-		uint rev = _revenue[_asset];
-		uint toTreasury = rev >> 1;
-		IERC20(_asset).transfer(_treasuryAddress, toTreasury);
-		IERC20(_asset).transfer(msg.sender, rev - toTreasury);
-		delete _revenue[_asset];
+		(bool success, ) = delegate5Address.delegatecall(abi.encodeWithSignature("claimRevenue(address)", _asset));
+		require(success);
 	}
 
 	/*
@@ -794,14 +801,8 @@ contract DBSFVaultFactory is DBSFVaultFactoryData, IDBSFVaultFactory, nonReentra
 			positive minimum value at maturity
 	*/
 	function claimYTRevenue(address _FCP, int _bondIn) external override onlyOwner {
-		require(_bondIn > -1);
-		YTPosition memory pos = _YTRevenue[_FCP];
-		IFixCapitalPool(_FCP).burnZCBFrom(msg.sender, uint(_bondIn));
-		uint yieldToTreasury = pos.amountYield >> 1;
-		int bondToTreasury = pos.amountBond.add(_bondIn) / 2;
-		IFixCapitalPool(_FCP).transferPosition(_treasuryAddress, yieldToTreasury, bondToTreasury);
-		IFixCapitalPool(_FCP).transferPosition(msg.sender, pos.amountYield - yieldToTreasury, (pos.amountBond + _bondIn) - bondToTreasury);
-		delete _YTRevenue[_FCP];
+		(bool success, ) = delegate5Address.delegatecall(abi.encodeWithSignature("claimYTRevenue(address,int256)",_FCP, _bondIn));
+		require(success);
 	}
 }
 

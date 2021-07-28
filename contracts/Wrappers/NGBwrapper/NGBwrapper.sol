@@ -3,6 +3,7 @@ pragma solidity >=0.6.8 <0.7.0;
 import "../../interfaces/IERC20.sol";
 import "../../interfaces/INGBWrapper.sol";
 import "../../interfaces/IInfoOracle.sol";
+import "../../interfaces/IFixCapitalPool.sol";
 import "../../libraries/SafeMath.sol";
 import "../../libraries/ABDKMath64x64.sol";
 import "../../libraries/BigMath.sol";
@@ -570,9 +571,15 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 		uint yield,
 		int bond
 	) {
-		SubAccountPosition memory position = internalSubAccountPositions[_distributionAccount][_subAccount][_FCPaddr];
-		yield = position.yield;
-		bond = position.bond;
+		if (_distributionAccount == _FCPaddr) {
+			yield = IFixCapitalPool(_FCPaddr).balanceYield(_subAccount);
+			bond = IFixCapitalPool(_FCPaddr).balanceBonds(_subAccount);
+		}
+		else {
+			SubAccountPosition memory position = internalSubAccountPositions[_distributionAccount][_subAccount][_FCPaddr];
+			yield = position.yield;
+			bond = position.bond;
+		}
 	}
 
     //------------------------------------a-d-m-i-n----------------------------

@@ -25,7 +25,7 @@ contract NGBwrapperDelegate2 is NGBwrapperDelegateParent {
         require(msg.sender != _FCPaddr); //must not be an FCP direct subaccount
         //msg.sender is the distributionAccount
         if (_FCPaddr != address(0)) {
-            claimSubAccountRewardsRetPos(_FCPaddr, _subAcct, _FCPaddr);
+            claimSubAccountRewardsRetPos(_FCPaddr, msg.sender, _FCPaddr);
         }
         SubAccountPosition memory mPos = claimSubAccountRewardsRetPos(msg.sender, _subAcct, _FCPaddr);
         SubAccountPosition storage sPos = internalSubAccountPositions[msg.sender][_subAcct][_FCPaddr];

@@ -45,24 +45,25 @@ contract NGBwrapperDelegateParent is NGBwrapperData {
 				newTRPW = internalTotalRewardsPerWasset[uint8(i)].add(newRewardsPerWasset);
 			}
 			uint prevTRPW = internalPrevTotalRewardsPerWasset[uint8(i)][_addr];
-			bool getContractBalanceAgain = false;
 			if (prevTRPW < newTRPW) {
 				uint dividend = (newTRPW - prevTRPW).mul(balanceAddr) / (1 ether);
-				getContractBalanceAgain = dividend > 0;
 				internalPrevTotalRewardsPerWasset[uint8(i)][_addr] = newTRPW;
-				if (i >> 15 > 0) {
-					internalDistributionAccountRewards[uint8(i)][_addr] = internalDistributionAccountRewards[uint8(i)][_addr].add(dividend);
-					totalUnspentDARewards = totalUnspentDARewards.add(dividend);
-					internalTotalUnspentDistributionAccountRewards[uint8(i)] = totalUnspentDARewards;
-				}
-				else {
-					bool success = IERC20(_rewardsAddr).transfer(_addr, dividend);
-					require(success);
+				if (dividend > 0) {
+					CBRA = CBRA.sub(dividend);
+					if (i >> 15 > 0) {
+						internalDistributionAccountRewards[uint8(i)][_addr] = internalDistributionAccountRewards[uint8(i)][_addr].add(dividend);
+						totalUnspentDARewards = totalUnspentDARewards.add(dividend);
+						internalTotalUnspentDistributionAccountRewards[uint8(i)] = totalUnspentDARewards;
+					}
+					else {
+						bool success = IERC20(_rewardsAddr).transfer(_addr, dividend);
+						require(success);
+					}
 				}
 			}
 			//fetch balanceOf again rather than taking CBRA and subtracting dividend because of small rounding errors that may occur
 			//however if no transfers were executed it is fine to use the previously fetched CBRA value
-			internalPrevContractBalance[uint8(i)] = (getContractBalanceAgain ? IERC20(_rewardsAddr).balanceOf(address(this)).sub(totalUnspentDARewards) : CBRA);
+			internalPrevContractBalance[uint8(i)] = CBRA;
 			internalTotalRewardsPerWasset[uint8(i)] = newTRPW;
 		}
 		_;
@@ -89,7 +90,7 @@ contract NGBwrapperDelegateParent is NGBwrapperData {
 			least significant 8 bits = current index
 		*/
 		uint16 i = (internalIsDistributionAccount[_addr0] ? 1 << 15 : 0)
-			& (internalIsDistributionAccount[_addr1] ? 1 << 14 : 0);
+			| (internalIsDistributionAccount[_addr1] ? 1 << 14 : 0);
 		for (; uint8(i) < len; i++) {
 			address _rewardsAddr = internalRewardsAssets[uint8(i)];
 			if (_rewardsAddr == address(0)) {

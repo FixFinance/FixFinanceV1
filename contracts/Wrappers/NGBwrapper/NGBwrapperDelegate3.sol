@@ -27,13 +27,10 @@ contract NGBwrapperDelegate3 is NGBwrapperDelegateParent {
             len = len > type(uint8).max ? type(uint8).max : len;
             bool copyInPayoutPhase = _inPayoutPhase;
             uint16 flags = (copyInPayoutPhase ? 1 << 15 : 0);
-            {
-                flags = flags | (copyInPayoutPhase && !internalHasClaimedAllYTrewards[msg.sender][_subAccts[0]][msg.sender] ? 1 << 14 : 0);
-                flags = flags | (internalIsDistributionAccount[_subAccts[0]] ? 1 << 13 : 0);
-
-                flags = flags | (copyInPayoutPhase && !internalHasClaimedAllYTrewards[msg.sender][_subAccts[1]][msg.sender] ? 1 << 12 : 0);
-                flags = flags | (internalIsDistributionAccount[_subAccts[1]] ? 1 << 11 : 0);
-            }
+            flags = flags | (copyInPayoutPhase && !internalHasClaimedAllYTrewards[msg.sender][_subAccts[0]][msg.sender] ? 1 << 14 : 0);
+            flags = flags | (internalIsDistributionAccount[_subAccts[0]] ? 1 << 13 : 0);
+            flags = flags | (copyInPayoutPhase && !internalHasClaimedAllYTrewards[msg.sender][_subAccts[1]][msg.sender] ? 1 << 12 : 0);
+            flags = flags | (internalIsDistributionAccount[_subAccts[1]] ? 1 << 11 : 0);
             doubleSubaccountDistributeRewards(uint8(len), msg.sender, _subAccts, _yieldArr, _wrappedClaims, flags);
         }
     }
@@ -61,7 +58,7 @@ contract NGBwrapperDelegate3 is NGBwrapperDelegateParent {
                 continue;
             }
             uint newTRPC = internalTotalRewardsPerWasset[uint8(i)];
-            uint TRPY = i & ((1 << 14) | (1 << 12)) > 0 ? IFixCapitalPool(_FCPaddr).TotalRewardsPerWassetAtMaturity(uint8(i)) : 0;
+            uint TRPY = (i & ((1 << 14) | (1 << 12))) > 0 ? IFixCapitalPool(_FCPaddr).TotalRewardsPerWassetAtMaturity(uint8(i)) : 0;
             uint dividend;
             uint prevTotalRewardsPerClaim = internalSAPTRPW[uint8(i)][_FCPaddr][_subAccts[0]][_FCPaddr];
             if (i & (1 << 14) > 0) {

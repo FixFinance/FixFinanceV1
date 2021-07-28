@@ -32,15 +32,23 @@ contract DBSFVaultFactoryDelegate2 is DBSFVaultFactoryDelegateParent {
 	function satisfiesLimit(
 		Vault memory _vault,
 		bool _upper
-	) internal view returns (bool) {
+	) internal view returns (
+		bool withstands,
+		SUPPLIED_ASSET_TYPE sType,
+		address baseFCP,
+		address baseWrapper
+	) {
 
-		(address _suppliedAddrToPass, uint _suppliedAmtToPass, uint _borrowAmtToPass) = passInfoToVaultManager(_vault);
+		IInfoOracle info = IInfoOracle(_infoOracleAddress);
+		address whitelistAddr;
+		(whitelistAddr, sType, baseFCP, baseWrapper) = suppliedAssetInfo(_vault.assetSupplied, info);
+		(address _suppliedAddrToPass, uint _suppliedAmtToPass, uint _borrowAmtToPass) = passInfoToVaultManagerPassWhitelistAddr(_vault, whitelistAddr);
 
-		return ( _upper ?
+		withstands = ( _upper ?
 			vaultHealthContract.satisfiesUpperLimit(_suppliedAddrToPass, _vault.assetBorrowed, _suppliedAmtToPass, _borrowAmtToPass)
 				:
 			vaultHealthContract.satisfiesLowerLimit(_suppliedAddrToPass, _vault.assetBorrowed, _suppliedAmtToPass, _borrowAmtToPass)
-			);
+		);
 	}
 
 	/*
@@ -61,9 +69,12 @@ contract DBSFVaultFactoryDelegate2 is DBSFVaultFactoryDelegateParent {
 		require(vault.amountBorrowed >= _amtIn && _amtIn > 0);
 		uint maxBid = vault.amountSupplied * _amtIn / vault.amountBorrowed;
 		require(maxBid >= _bid);
-		if (satisfiesLimit(vault, true)) {
-			uint maturity = IZeroCouponBond(vault.assetBorrowed).maturity();
-			require(maturity < block.timestamp + MAX_TIME_TO_MATURITY);
+		{
+			(bool satisfies, , , ) = satisfiesLimit(vault, true);
+			if (satisfies) {
+				uint maturity = IZeroCouponBond(vault.assetBorrowed).maturity();
+				require(maturity < block.timestamp + MAX_TIME_TO_MATURITY);
+			}
 		}
 		//burn borrowed ZCB
 		address FCPborrowed = IZeroCouponBond(_assetBorrowed).FixCapitalPoolAddress();
@@ -179,8 +190,22 @@ contract DBSFVaultFactoryDelegate2 is DBSFVaultFactoryDelegateParent {
 		vault.amountBorrowed = vault.amountBorrowed.sub(vault.amountSFee);
 		require(vault.amountBorrowed <= _maxIn);
 		require(vault.amountSupplied >= _minOut && _minOut > 0);
-		require(IZeroCouponBond(_assetBorrowed).maturity() < block.timestamp + CRITICAL_TIME_TO_MATURITY || 
-			!satisfiesLimit(vault, false));
+		{
+			SUPPLIED_ASSET_TYPE sType;
+			address baseFCP;
+			address baseWrapper;
+			if (IZeroCouponBond(_assetBorrowed).maturity() >= block.timestamp + CRITICAL_TIME_TO_MATURITY) {
+				bool satisfies;
+				(satisfies, sType, baseFCP, baseWrapper) = satisfiesLimit(vault, false);
+				require(!satisfies);
+			}
+			else {
+				(, sType, baseFCP, baseWrapper) = suppliedAssetInfo(_assetSupplied, IInfoOracle(_infoOracleAddress));
+			}
+			require(vault.amountSupplied <= uint(type(int256).max));
+			int changeAmt = -int(vault.amountSupplied);
+			editSubAccountStandardVault(_owner, sType, baseFCP, baseWrapper, changeAmt);
+		}
 
 		//burn borrowed ZCB
 		address FCPborrowed = IZeroCouponBond(vault.assetBorrowed).FixCapitalPoolAddress();
@@ -217,8 +242,22 @@ contract DBSFVaultFactoryDelegate2 is DBSFVaultFactoryDelegateParent {
 		require(0 < _in && _in <= vault.amountBorrowed);
 		uint amtOut = _in*vault.amountSupplied/vault.amountBorrowed;
 		require(amtOut >= _minOut);
-		require(IFixCapitalPool(_assetBorrowed).maturity() < block.timestamp + (1 days) || 
-			!satisfiesLimit(vault, false));
+		{
+			SUPPLIED_ASSET_TYPE sType;
+			address baseFCP;
+			address baseWrapper;
+			if (IZeroCouponBond(_assetBorrowed).maturity() >= block.timestamp + CRITICAL_TIME_TO_MATURITY) {
+				bool satisfies;
+				(satisfies, sType, baseFCP, baseWrapper) = satisfiesLimit(vault, false);
+				require(!satisfies);
+			}
+			else {
+				(, sType, baseFCP, baseWrapper) = suppliedAssetInfo(_assetSupplied, IInfoOracle(_infoOracleAddress));
+			}
+			require(amtOut <= uint(type(int256).max));
+			int changeAmt = -int(amtOut);
+			editSubAccountStandardVault(_owner, sType, baseFCP, baseWrapper, changeAmt);
+		}
 
 		//burn borrowed ZCB
 		address FCPborrowed = IZeroCouponBond(vault.assetBorrowed).FixCapitalPoolAddress();
@@ -227,7 +266,7 @@ contract DBSFVaultFactoryDelegate2 is DBSFVaultFactoryDelegateParent {
 		IERC20(_assetSupplied).transfer(_to, amtOut);
 
 		_vaults[_owner][_index].amountBorrowed = vault.amountBorrowed - _in;
-		_vaults[_owner][_index].amountSupplied -= amtOut;
+		_vaults[_owner][_index].amountSupplied = vault.amountSupplied - amtOut;
 		_vaults[_owner][_index].amountSFee = 0;
 	}
 
@@ -258,8 +297,22 @@ contract DBSFVaultFactoryDelegate2 is DBSFVaultFactoryDelegateParent {
 		uint amtIn = _out*vault.amountBorrowed;
 		amtIn = amtIn/vault.amountSupplied + (amtIn%vault.amountSupplied == 0 ? 0 : 1);
 		require(0 < amtIn && amtIn <= _maxIn);
-		require(IFixCapitalPool(_assetBorrowed).maturity() < block.timestamp + (1 days) || 
-			!satisfiesLimit(vault, false));
+		{
+			SUPPLIED_ASSET_TYPE sType;
+			address baseFCP;
+			address baseWrapper;
+			if (IZeroCouponBond(_assetBorrowed).maturity() >= block.timestamp + CRITICAL_TIME_TO_MATURITY) {
+				bool satisfies;
+				(satisfies, sType, baseFCP, baseWrapper) = satisfiesLimit(vault, false);
+				require(!satisfies);
+			}
+			else {
+				(, sType, baseFCP, baseWrapper) = suppliedAssetInfo(_assetSupplied, IInfoOracle(_infoOracleAddress));
+			}
+			require(_out <= uint(type(int256).max));
+			int changeAmt = -int(_out);
+			editSubAccountStandardVault(_owner, sType, baseFCP, baseWrapper, changeAmt);
+		}
 
 		//burn borrowed ZCB
 		address FCPborrowed = IZeroCouponBond(_assetBorrowed).FixCapitalPoolAddress();
@@ -268,7 +321,7 @@ contract DBSFVaultFactoryDelegate2 is DBSFVaultFactoryDelegateParent {
 		IERC20(_assetSupplied).transfer(_to, _out);
 
 		_vaults[_owner][_index].amountBorrowed = vault.amountBorrowed - amtIn;
-		_vaults[_owner][_index].amountSupplied -= _out;
+		_vaults[_owner][_index].amountSupplied = vault.amountSupplied - _out;
 		_vaults[_owner][_index].amountSFee = 0;
 	}
 

@@ -626,9 +626,6 @@ contract('DBSFVaultFactory', async function(accounts) {
 		}
 		if (!caught) assert.fail("liquidation was triggered despite vault health being above upper limit");
 
-/*		upperRatio = "16" + _10To18.toString().substring(2);
-		await vaultHealthInstance.setUpper(asset1.address, zcbAsset0.address, upperRatio);
-*/
 		upperRatio = vault.amountSupplied.mul(_10To18).div(vault.amountBorrowed).div(new BN(9)).mul(new BN(10));
 		await vaultHealthInstance.setUpper(asset1.address, zcbAsset0.address, upperRatio);
 
@@ -646,6 +643,11 @@ contract('DBSFVaultFactory', async function(accounts) {
 
 		let rebate = surplus.mul(new BN(rebate_bips)).div(new BN(TOTAL_BASIS_POINTS));
 		let toTreasury = surplus.sub(rebate);
+		let prevSubAcctPosW1A0 = subAcctPosW1A0;
+		subAcctPosW1A0 = await wAsset1.subAccountPositions(vaultFactoryInstance.address, accounts[0], nullAddress);
+		let changeYieldA0 = subAcctPosW1A0.yield.sub(prevSubAcctPosW1A0.yield);
+
+		assert.equal(changeYieldA0.toString(), toTreasury.neg().toString(), "correct change yield in sub account position");
 		assert.equal(currentRevenue.sub(prevRevenue).toString(), toTreasury.toString(), "correct amount of revenue");
 
 		assert.equal((await vaultFactoryInstance.liquidationsLength()).toString(), "1", "correct length of liquidations array");
@@ -687,6 +689,11 @@ contract('DBSFVaultFactory', async function(accounts) {
 
 		let rebate = surplus.mul(new BN(rebate_bips)).div(new BN(TOTAL_BASIS_POINTS));
 		let toTreasury = surplus.sub(rebate);
+		let prevSubAcctPosW1A0 = subAcctPosW1A0;
+		subAcctPosW1A0 = await wAsset1.subAccountPositions(vaultFactoryInstance.address, accounts[0], nullAddress);
+		let changeYieldA0 = subAcctPosW1A0.yield.sub(prevSubAcctPosW1A0.yield);
+
+		assert.equal(changeYieldA0.toString(), toTreasury.neg().toString(), "correct change yield in sub account position");
 		assert.equal(currentRevenue.sub(prevRevenue).toString(), toTreasury.toString(), "correct amount of revenue");
 
 		let prevLiq = liquidation;
@@ -711,7 +718,11 @@ contract('DBSFVaultFactory', async function(accounts) {
 		await vaultFactoryInstance.claimLiquidation(0, accounts[1], {from: accounts[1]});
 
 		let newBalW1 = await wAsset1.balanceOf(accounts[1]);
+		let prevSubAcctPosW1A0 = subAcctPosW1A0;
+		subAcctPosW1A0 = await wAsset1.subAccountPositions(vaultFactoryInstance.address, accounts[0], nullAddress);
+		let changeYieldA0 = subAcctPosW1A0.yield.sub(prevSubAcctPosW1A0.yield);
 
+		assert.equal(changeYieldA0.toString(), liquidation.bidAmount.neg().toString(), "correct change yield in sub account position");
 		assert.equal(newBalW1.sub(prevBalW1).toString(), liquidation.bidAmount.toString(), "correct payout after winning liquidation");
 	});
 
@@ -720,19 +731,32 @@ contract('DBSFVaultFactory', async function(accounts) {
 		/*
 			first open vaults
 		*/
-		amountBorrowed = _10To18.mul(_10To18).div(new BN(upperRatio)).sub(new BN(1)).toString();
-		await vaultFactoryInstance.openVault(wAsset1.address, zcbAsset0.address, _10To18.toString(), amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
-		await vaultFactoryInstance.openVault(wAsset1.address, zcbAsset0.address, _10To18.toString(), amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
+		let toSupply = _10To18
+		amountBorrowed = toSupply.mul(_10To18).div(new BN(upperRatio)).sub(new BN(1)).toString();
+		await vaultFactoryInstance.openVault(wAsset1.address, zcbAsset0.address, toSupply, amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
+		await vaultFactoryInstance.openVault(wAsset1.address, zcbAsset0.address, toSupply, amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
 
 		lowerRatio =  _10To18.mul(_10To18).div(new BN(amountBorrowed)).add(new BN(10000)).toString();
 		await vaultHealthInstance.setLower(asset1.address, zcbAsset0.address, lowerRatio);
 
 		vaultIndex = (await vaultFactoryInstance.vaultsLength(accounts[0])).toNumber() - 2;
 
+		let prevSubAcctPosW1A0 = subAcctPosW1A0;
+		subAcctPosW1A0 = await wAsset1.subAccountPositions(vaultFactoryInstance.address, accounts[0], nullAddress);
+		let changeYieldA0 = subAcctPosW1A0.yield.sub(prevSubAcctPosW1A0.yield);
+		assert.equal(changeYieldA0.toString(), toSupply.mul(new BN(2)).toString());
+
+		let prevVault = await vaultFactoryInstance.vaults(accounts[0], vaultIndex);
+
 		await vaultFactoryInstance.instantLiquidation(accounts[0], vaultIndex, zcbAsset0.address, wAsset1.address, amountBorrowed.toString(), _10To18.toString(), accounts[1], {from: accounts[1]});
 
 		vault = await vaultFactoryInstance.vaults(accounts[0], vaultIndex);
 
+		prevSubAcctPosW1A0 = subAcctPosW1A0;
+		subAcctPosW1A0 = await wAsset1.subAccountPositions(vaultFactoryInstance.address, accounts[0], nullAddress);
+		changeYieldA0 = subAcctPosW1A0.yield.sub(prevSubAcctPosW1A0.yield);
+
+		assert.equal(changeYieldA0.toString(), prevVault.amountSupplied.neg().toString());
 		assert.equal(vault.assetBorrowed, nullAddress, "assetBorrowed is null");
 		assert.equal(vault.assetSupplied, nullAddress, "assetSupplied is null");
 		assert.equal(vault.amountBorrowed.toString(), "0", "amountBorrowed is null");
@@ -743,24 +767,42 @@ contract('DBSFVaultFactory', async function(accounts) {
 		await helper.advanceTime(1000);
 		vaultIndex++;
 
-		await vaultFactoryInstance.partialLiquidationSpecificIn(accounts[0], vaultIndex, zcbAsset0.address, wAsset1.address,
-			(new BN(amountBorrowed)).div(new BN(2)).toString(), _10To18.div(new BN(3)).toString(), accounts[1], {from: accounts[1]});
+		let prevVault = await vaultFactoryInstance.vaults(accounts[0], vaultIndex);
+
+		let amtIn = (new BN(amountBorrowed)).div(new BN(2))
+		let minOut = _10To18.div(new BN(3));
+		await vaultFactoryInstance.partialLiquidationSpecificIn(accounts[0], vaultIndex, zcbAsset0.address, wAsset1.address, amtIn, minOut, accounts[1], {from: accounts[1]});
 
 		vault = await vaultFactoryInstance.vaults(accounts[0], vaultIndex);
 
+		let expectedOut = prevVault.amountSupplied.mul(amtIn).div(prevVault.amountBorrowed);
+		let prevSubAcctPosW1A0 = subAcctPosW1A0;
+		subAcctPosW1A0 = await wAsset1.subAccountPositions(vaultFactoryInstance.address, accounts[0], nullAddress);
+		let changeYieldA0 = subAcctPosW1A0.yield.sub(prevSubAcctPosW1A0.yield);
+
+		assert.equal(changeYieldA0.toString(), expectedOut.neg().toString());
+
 		assert.equal(vault.assetBorrowed, zcbAsset0.address, "assetBorrowed is correct");
 		assert.equal(vault.assetSupplied, wAsset1.address, "assetSupplied is correct");
-		assert.equal(vault.amountBorrowed.toString(), (new BN(amountBorrowed)).div(new BN(2)).add(new BN(1)).toString(), "amountBorrowed is correct");
-		assert.equal(vault.amountSupplied.toString(), _10To18.div(new BN(2)).add(new BN(3)).toString(), "amountSupplied is correct");
+		assert.equal(vault.amountBorrowed.toString(), prevVault.amountBorrowed.sub(amtIn).toString(), "amountBorrowed is correct");
+		assert.equal(vault.amountSupplied.toString(), prevVault.amountSupplied.sub(expectedOut).toString(), "amountSupplied is correct");
 	});
 
 	it('partial vault liquidation Specific Out', async () => {
 		await helper.advanceTime(1000);
+
+		let prevVault = await vaultFactoryInstance.vaults(accounts[0], vaultIndex);
+
 		await vaultFactoryInstance.partialLiquidationSpecificOut(accounts[0], vaultIndex, zcbAsset0.address, wAsset1.address,
-			vault.amountSupplied.toString(), vault.amountBorrowed.toString(), accounts[1], {from: accounts[1]});
+			prevVault.amountSupplied, prevVault.amountBorrowed, accounts[1], {from: accounts[1]});
 
 		vault = await vaultFactoryInstance.vaults(accounts[0], vaultIndex);
 
+		let prevSubAcctPosW1A0 = subAcctPosW1A0;
+		subAcctPosW1A0 = await wAsset1.subAccountPositions(vaultFactoryInstance.address, accounts[0], nullAddress);
+		let changeYieldA0 = subAcctPosW1A0.yield.sub(prevSubAcctPosW1A0.yield);
+
+		assert.equal(changeYieldA0.toString(), prevVault.amountSupplied.neg().toString());
 		assert.equal(vault.assetBorrowed, zcbAsset0.address, "assetBorrowed is correct");
 		assert.equal(vault.assetSupplied, wAsset1.address, "assetSupplied is correct");
 		assert.equal(vault.amountBorrowed.toString(), "0", "amountBorrowed is correct");

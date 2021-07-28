@@ -53,9 +53,10 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryDelegateParent {
 		int128 _suppliedRateChange,
 		int128 _borrowRateChange
 	) external {
-		require(_yieldSupplied >= MIN_YIELD_SUPPLIED);
+		require(_yieldSupplied >= MIN_YIELD_SUPPLIED && _yieldSupplied <= uint(type(int256).max));
 		validateYTvaultMultipliers(_priceMultiplier, _suppliedRateChange, _borrowRateChange, _bondSupplied > 0);
-		uint _unitYieldSupplied = wrappedToUnitAmount(IInfoOracle(_infoOracleAddress).FCPtoWrapper(address(this), _FCPsupplied), _yieldSupplied);
+		address baseWrapperSupplied = IInfoOracle(_infoOracleAddress).FCPtoWrapper(address(this), _FCPsupplied);
+		uint _unitYieldSupplied = wrappedToUnitAmount(baseWrapperSupplied, _yieldSupplied);
 
 		require(YTvaultWithstandsChange(
 			YTVault(
@@ -76,6 +77,8 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryDelegateParent {
 		IFixCapitalPool(_FCPsupplied).transferPositionFrom(msg.sender, address(this), _yieldSupplied, _bondSupplied);
 		IFixCapitalPool(_FCPborrowed).mintZCBTo(msg.sender, _amountBorrowed);
 		raiseShortInterest(_FCPborrowed, _amountBorrowed);
+
+		editSubAccountYTVault(false, msg.sender, _FCPsupplied, baseWrapperSupplied, int(_yieldSupplied), _bondSupplied);
 
 		IWrapper baseBorrowed = IFixCapitalPool(_FCPborrowed).wrapper();
 		uint64 timestampOpened = uint64(baseBorrowed.lastUpdate());
@@ -108,8 +111,11 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryDelegateParent {
 			}
 		}
 		if (vault.yieldSupplied > 0 || vault.bondSupplied != 0) {
+			require(vault.yieldSupplied <= uint(type(int256).max));
 			//we already know the vault would pass the check so no need to check
 			IFixCapitalPool(vault.FCPsupplied).transferPosition(_to, vault.yieldSupplied, vault.bondSupplied);
+			address baseWrapperSupplied = address(IFixCapitalPool(vault.FCPsupplied).wrapper());
+			editSubAccountYTVault(false, msg.sender, vault.FCPsupplied, baseWrapperSupplied, -int(vault.yieldSupplied), vault.bondSupplied.mul(-1));
 		}
 
 		delete _YTvaults[msg.sender][_index];

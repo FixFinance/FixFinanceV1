@@ -147,7 +147,9 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryDelegateParent {
 		require(_index < _vaults[_owner].length);
 
 		Vault memory mVault = _vaults[_owner][_index];
-		Vault storage sVault = _vaults[_owner][_index];
+		address copyVaultOwner = _owner;
+		uint copyIndex = _index;
+//		Vault storage sVault = _vaults[_owner][_index];
 
 		//index 0 in multipliers that must be converted to uint
 		require(
@@ -179,20 +181,17 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryDelegateParent {
 			//ensure that after operations vault will be in good health
 			{
 				bool withstands;
-				(withstands, sType, baseFCP, baseWrapper) = vaultWithstandsChange(
-					nextVault,
-					uint(_multipliers[0]),
-					_multipliers[1],
-					_multipliers[2],
-					info
-				);
+				uint m0 = uint(_multipliers[0]); // prevent stack too deep
+				int128 m1 = _multipliers[1]; // prevent stack too deep
+				int128 m2 = _multipliers[2]; // prevent stack too deep
+				(withstands, sType, baseFCP, baseWrapper) = vaultWithstandsChange(nextVault, m0, m1, m2, info);
 				require(withstands);
 			}
 			bytes memory copyData = _data;
 			address copyReceiverAddr = _receiverAddr;
 			adjVaultChangeBorrow(
 				mVault,
-				sVault,
+				_vaults[copyVaultOwner][copyIndex],
 				nextVault.assetSupplied,
 				nextVault.assetBorrowed,
 				nextVault.amountSupplied,
@@ -205,30 +204,27 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryDelegateParent {
 			//ensure that after operations vault will be in good health
 			//only check health if at any point funds are being removed from the vault
 			if (
-				_assetSupplied != mVault.assetSupplied ||
-				_amountSupplied < mVault.amountSupplied ||
-				_amountBorrowed > mVault.amountBorrowed
+				nextVault.assetSupplied != mVault.assetSupplied ||
+				nextVault.amountSupplied < mVault.amountSupplied ||
+				nextVault.amountBorrowed > mVault.amountBorrowed
 			) {
 				nextVault.timestampOpened = mVault.timestampOpened;
 				nextVault.stabilityFeeAPR = mVault.stabilityFeeAPR;
 				bool withstands;
-				(withstands, sType, baseFCP, baseWrapper) = vaultWithstandsChange(
-					nextVault,
-					uint(_multipliers[0]),
-					_multipliers[1],
-					_multipliers[2],
-					info
-				);
+				uint m0 = uint(_multipliers[0]); // prevent stack too deep
+				int128 m1 = _multipliers[1]; // prevent stack too deep
+				int128 m2 = _multipliers[2]; // prevent stack too deep
+				(withstands, sType, baseFCP, baseWrapper) = vaultWithstandsChange(nextVault, m0, m1, m2, info);
 				require(withstands);
 			}
 			else {
-				(, sType, baseFCP, baseWrapper) = suppliedAssetInfo(_assetSupplied, info);
+				(, sType, baseFCP, baseWrapper) = suppliedAssetInfo(nextVault.assetSupplied, info);
 			}
 			bytes memory copyData = _data;
 			address copyReceiverAddr = _receiverAddr;
 			adjVaultSameBorrow(
 				mVault,
-				sVault,
+				_vaults[copyVaultOwner][copyIndex],
 				nextVault.assetSupplied,
 				nextVault.assetBorrowed,
 				nextVault.amountSupplied,
@@ -243,13 +239,13 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryDelegateParent {
 			require(mVault.amountSupplied <= uint(type(int256).max));
 			changeAmt = changeAmt.sub(int(mVault.amountSupplied));
 		}
-		editSubAccountStandardVault(false, msg.sender, sType, baseFCP, baseWrapper, changeAmt);
+		editSubAccountStandardVault(false, copyVaultOwner, sType, baseFCP, baseWrapper, changeAmt);
 
 		if (mVault.assetSupplied != nextVault.assetSupplied && mVault.assetSupplied != address(0)) {
 			(, sType, baseFCP, baseWrapper) = suppliedAssetInfo(mVault.assetSupplied, info);
 			require(mVault.amountSupplied <= uint(type(int256).max));
 			changeAmt = -int(mVault.amountSupplied);
-			editSubAccountStandardVault(false, msg.sender, sType, baseFCP, baseWrapper, changeAmt);
+			editSubAccountStandardVault(false, copyVaultOwner, sType, baseFCP, baseWrapper, changeAmt);
 		}
 	}
 

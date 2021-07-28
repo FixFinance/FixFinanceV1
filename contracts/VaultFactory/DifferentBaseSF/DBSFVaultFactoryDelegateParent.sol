@@ -48,6 +48,31 @@ contract DBSFVaultFactoryDelegateParent is DBSFVaultFactoryData {
 	}
 
 	/*
+		@Description: edit a sub acount registered with the DBSFVaultFactory
+			when there is a change in a YT Vault
+
+		@param bool _claimRewards: pass true to enter the claimRewards modifier upon wrapper.editSubAccountPosition
+		@param address _vaultOwner: the owner of the YT vault that has been changed
+		@param address _FCP: the address of the FCP contract from which collateral is being supplied to the YT vault
+		@param address _baseWrapper: the base wrapper address of the FCP contract with address _FCP
+		@param int _changeYield: the change in the yield amount of collateral supplied
+			finalYield - initialYield
+		@param int _changeBond: the change in the bond amount of collateral supplied
+			finalBond - initialBond
+	*/
+	function editSubAccountYTVault(
+		bool _claimRewards,
+		address _vaultOwner,
+		address _FCP,
+		address _baseWrapper,
+		int _changeYield,
+		int _changeBond
+	) internal {
+		IWrapper(_baseWrapper).editSubAccountPosition(_claimRewards, _vaultOwner, _FCP, _changeYield, _changeBond);
+	}
+
+
+	/*
 		@Description: given a supplied asset find its type
 
 		@param address _suppliedAsset: the address of the supplied asset

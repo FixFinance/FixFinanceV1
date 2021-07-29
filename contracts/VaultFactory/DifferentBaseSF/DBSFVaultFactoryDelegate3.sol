@@ -234,6 +234,27 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryDelegateParent {
 				_receiverAddr
 			);
 		}
+
+		require(_yieldSupplied <= uint(type(int256).max));
+		require(mVault.yieldSupplied <= uint(type(int256).max));
+		address copyVaultOwner = _owner; //prevent stack too deep
+		address copyFCPsupplied = _FCPsupplied; //prevent stack too deep
+		if (mVault.FCPsupplied == _FCPsupplied || mVault.FCPsupplied == address(0)) {
+			int yieldChange = int(_yieldSupplied).sub(int(mVault.yieldSupplied));
+			int bondChange = _bondSupplied.sub(mVault.bondSupplied);
+			address baseWrapperSupplied = address(IFixCapitalPool(copyFCPsupplied).wrapper());
+			editSubAccountYTVault(false, copyVaultOwner, copyFCPsupplied, baseWrapperSupplied, yieldChange, bondChange);
+		}
+		else {
+			int yieldChange = int(_yieldSupplied);
+			int bondChange = _bondSupplied;
+			address baseWrapperSupplied = IInfoOracle(_infoOracleAddress).FCPtoWrapper(address(this), copyFCPsupplied);
+			editSubAccountYTVault(false, copyVaultOwner, copyFCPsupplied, baseWrapperSupplied, yieldChange, bondChange);
+			yieldChange = -int(mVault.yieldSupplied);
+			bondChange = mVault.bondSupplied.mul(-1);
+			baseWrapperSupplied = address(IFixCapitalPool(mVault.FCPsupplied).wrapper());
+			editSubAccountYTVault(false, copyVaultOwner, mVault.FCPsupplied, baseWrapperSupplied, yieldChange, bondChange);
+		}
 	}
 
 	/*

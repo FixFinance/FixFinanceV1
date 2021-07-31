@@ -370,6 +370,25 @@ contract DBSFVaultFactoryDelegateParent is DBSFVaultFactoryData {
 			note that when opening a YTValut this function should NOT be called because it bypasses checking with the
 			FCP whitelist in order to avoid an extra SLOAD opcode, rather when opening a YTVault wrappedToUnitAmount
 			should be called and the address of InfoOracle.FCPtoWrapper(addr(this), FCP) should be passed as the wrapper address
+			also return the address of the base wrapper contract
+
+		@param address _FCP: the address of the FCP contract
+		@param uint _amountYield: the wrapper amount to convert to unit amount
+
+		@return uint unitAmountYield: _amountYield of FCP wrapped yield converted to unit amount
+		@return address baseWrapper: the base wrapper of the FCP contract
+	*/
+	function getUnitValueYieldAndWrapper(address _FCP, uint _amountYield) internal view returns(uint unitAmountYield, address baseWrapper) {
+		baseWrapper = address(IFixCapitalPool(_FCP).wrapper());
+		unitAmountYield = wrappedToUnitAmount(baseWrapper, _amountYield);
+	}
+
+	/*
+		@Description: given a fix capital pool and a balance from the balanceYield mapping
+			convert the value from wrapped amount to unit amount
+			note that when opening a YTValut this function should NOT be called because it bypasses checking with the
+			FCP whitelist in order to avoid an extra SLOAD opcode, rather when opening a YTVault wrappedToUnitAmount
+			should be called and the address of InfoOracle.FCPtoWrapper(addr(this), FCP) should be passed as the wrapper address
 
 		@param address _FCP: the address of the FCP contract
 		@param uint _amountYield: the wrapper amount to convert to unit amount
@@ -377,8 +396,7 @@ contract DBSFVaultFactoryDelegateParent is DBSFVaultFactoryData {
 		@return uint unitAmountYield: _amountYield of FCP wrapped yield converted to unit amount
 	*/
 	function getUnitValueYield(address _FCP, uint _amountYield) internal view returns (uint unitAmountYield) {
-		address wrapperAddr = address(IFixCapitalPool(_FCP).wrapper());
-		unitAmountYield = wrappedToUnitAmount(wrapperAddr, _amountYield);
+		(unitAmountYield, ) = getUnitValueYieldAndWrapper(_FCP, _amountYield);
 	}
 
 	/*

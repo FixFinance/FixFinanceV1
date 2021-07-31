@@ -1585,6 +1585,7 @@ contract('DBSFVaultFactory', async function(accounts) {
 
 
 	it('bid on YT liquidation auctions', async () => {
+//process.exit();
 		/*
 			bid with account 1
 		*/

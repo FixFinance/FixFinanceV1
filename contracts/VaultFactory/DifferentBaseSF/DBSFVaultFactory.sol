@@ -582,9 +582,11 @@ contract DBSFVaultFactory is DBSFVaultFactoryData, IDBSFVaultFactory, nonReentra
 		@param address _asset: the address of the asset for which to claim rebated collateral
 	*/
 	function claimRebate(address _asset) external override {
-		uint amt = _liquidationRebates[msg.sender][_asset];
-		IERC20(_asset).transfer(msg.sender, amt);
-		delete _liquidationRebates[msg.sender][_asset];
+		(bool success, ) = delegate5Address.delegatecall(abi.encodeWithSignature(
+			"claimRebate(address)",
+			_asset
+		));
+		require(success);
 	}
 
 	//------------------------------------Y-T---v-a-u-l-t---L-i-q-u-i-d-a-t-i-o-n-s-------------------------------------
@@ -597,9 +599,11 @@ contract DBSFVaultFactory is DBSFVaultFactoryData, IDBSFVaultFactory, nonReentra
 		@param address _asset: the address of the FCP contract for which to claim the rebate
 	*/
 	function claimYTRebate(address _asset) external override {
-		YTPosition memory position = _YTLiquidationRebates[msg.sender][_asset];
-		IFixCapitalPool(_asset).transferPosition(msg.sender, position.amountYield, position.amountBond);
-		delete _YTLiquidationRebates[msg.sender][_asset];
+		(bool success, ) = delegate5Address.delegatecall(abi.encodeWithSignature(
+			"claimYTRebate(address)",
+			_asset
+		));
+		require(success);
 	}
 
 

@@ -101,4 +101,35 @@ contract DBSFVaultFactoryDelegate5 is DBSFVaultFactoryDelegateParent {
 		IFixCapitalPool(_FCP).transferPosition(msg.sender, pos.amountYield - yieldToTreasury, (pos.amountBond + _bondIn) - bondToTreasury);
 		delete _YTRevenue[_FCP];
 	}
+
+
+	/*
+		@Description: allows a user to claim the excess collateral that was received as a rebate
+			when their vault(s) were liquidated
+
+		@param address _asset: the address of the asset for which to claim rebated collateral
+	*/
+	function claimRebate(address _asset) external {
+		uint amt = _liquidationRebates[msg.sender][_asset];
+		require(amt <= uint(type(int256).max));
+		(, SUPPLIED_ASSET_TYPE sType, address baseFCP, address baseWrapper) = suppliedAssetInfo(_asset, IInfoOracle(_infoOracleAddress));
+		IERC20(_asset).transfer(msg.sender, amt);
+		editSubAccountStandardVault(false, msg.sender, sType, baseFCP, baseWrapper, -int(amt));
+		delete _liquidationRebates[msg.sender][_asset];
+	}
+
+	/*
+		@Description: allows a user to claim the excess collateral that was received as a rebate
+			when their YT vault(s) were liquidated
+	
+		@param address _FCP: the address of the FCP contract for which to claim the rebate
+	*/
+	function claimYTRebate(address _FCP) external {
+		YTPosition memory position = _YTLiquidationRebates[msg.sender][_FCP];
+		require(position.amountYield <= uint(type(int256).max));
+		IFixCapitalPool(_FCP).transferPosition(msg.sender, position.amountYield, position.amountBond);
+		address baseWrapper = address(IFixCapitalPool(_FCP).wrapper());
+		editSubAccountYTVault(false, msg.sender, _FCP, baseWrapper, -int(position.amountYield), position.amountBond.mul(-1));
+		delete _YTLiquidationRebates[msg.sender][_FCP];
+	}
 }

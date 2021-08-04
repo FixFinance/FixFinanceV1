@@ -62,6 +62,10 @@ contract DBSFVaultFactoryDelegate5 is DBSFVaultFactoryDelegateParent {
 	function transferYTVault(uint _index, address _to) internal {
 		require(_YTvaults[msg.sender].length > _index);
 		YTVault memory vault = _YTvaults[msg.sender][_index];
+		require(vault.yieldSupplied <= uint(type(int256).max));
+		address baseWrapper = address(IFixCapitalPool(vault.FCPsupplied).wrapper());
+		editSubAccountYTVault(true, msg.sender, vault.FCPsupplied, baseWrapper, -int(vault.yieldSupplied), vault.bondSupplied.mul(-1));
+		editSubAccountYTVault(false, _to, vault.FCPsupplied, baseWrapper, int(vault.yieldSupplied), vault.bondSupplied);
 		_YTvaults[_to].push(vault);
 		delete _YTvaults[msg.sender][_index];
 	}

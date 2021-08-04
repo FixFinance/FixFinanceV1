@@ -596,12 +596,12 @@ contract DBSFVaultFactory is DBSFVaultFactoryData, IDBSFVaultFactory, nonReentra
 		@Description: allows a user to claim the excess collateral that was received as a rebate
 			when their YT vault(s) were liquidated
 	
-		@param address _asset: the address of the FCP contract for which to claim the rebate
+		@param address _FCP: the address of the FCP contract for which to claim the rebate
 	*/
-	function claimYTRebate(address _asset) external override {
+	function claimYTRebate(address _FCP) external override {
 		(bool success, ) = delegate5Address.delegatecall(abi.encodeWithSignature(
 			"claimYTRebate(address)",
-			_asset
+			_FCP
 		));
 		require(success);
 	}

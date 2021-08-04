@@ -84,11 +84,9 @@ contract NGBwrapperDelegate3 is NGBwrapperDelegateParent {
                     internalDistributionAccountRewards[uint8(i)][_subAccts[0]] = internalDistributionAccountRewards[uint8(i)][_subAccts[0]].add(dividend);
                 }
                 else {
-                    uint totalUnspentDARewards = internalTotalUnspentDistributionAccountRewards[uint8(i)].sub(dividend);
-                    internalTotalUnspentDistributionAccountRewards[uint8(i)] = totalUnspentDARewards;
                     bool success = IERC20(_rewardsAddr).transfer(_subAccts[0], dividend);
                     require(success);
-                    internalPrevContractBalance[uint8(i)] = IERC20(_rewardsAddr).balanceOf(address(this)).sub(totalUnspentDARewards);
+                    internalPrevContractBalance[uint8(i)] = IERC20(_rewardsAddr).balanceOf(address(this));
                 }
             }
 
@@ -117,11 +115,9 @@ contract NGBwrapperDelegate3 is NGBwrapperDelegateParent {
                     internalDistributionAccountRewards[uint8(i)][_subAccts[1]] = internalDistributionAccountRewards[uint8(i)][_subAccts[1]].add(dividend);
                 }
                 else {
-                    uint totalUnspentDARewards = internalTotalUnspentDistributionAccountRewards[uint8(i)].sub(dividend);
-                    internalTotalUnspentDistributionAccountRewards[uint8(i)] = totalUnspentDARewards;
                     bool success = IERC20(_rewardsAddr).transfer(_subAccts[1], dividend);
                     require(success);
-                    internalPrevContractBalance[uint8(i)] = IERC20(_rewardsAddr).balanceOf(address(this)).sub(totalUnspentDARewards);
+                    internalPrevContractBalance[uint8(i)] = IERC20(_rewardsAddr).balanceOf(address(this));
                 }
             }
         }

@@ -46,7 +46,6 @@ contract NGBwrapperData is nonReentrant, Ownable {
 		uint yield;
 		int bond;
 	}
-	uint[] internalTotalUnspentDistributionAccountRewards;
 	mapping(address => uint)[] internalDistributionAccountRewards;
 	mapping(address => bool) internalIsDistributionAccount;
 

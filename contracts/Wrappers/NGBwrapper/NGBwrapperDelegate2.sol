@@ -165,11 +165,9 @@ contract NGBwrapperDelegate2 is NGBwrapperDelegateParent {
                     internalDistributionAccountRewards[uint8(i)][_subAcct] = internalDistributionAccountRewards[uint8(i)][_subAcct].add(dividend);
                 }
                 else {
-                    uint totalUnspentDARewards = internalTotalUnspentDistributionAccountRewards[uint8(i)].sub(dividend);
-                    internalTotalUnspentDistributionAccountRewards[uint8(i)] = totalUnspentDARewards;
                     bool success = IERC20(_rewardsAddr).transfer(_subAcct, dividend);
                     require(success);
-                    internalPrevContractBalance[uint8(i)] = IERC20(_rewardsAddr).balanceOf(address(this)).sub(totalUnspentDARewards);
+                    internalPrevContractBalance[uint8(i)] = IERC20(_rewardsAddr).balanceOf(address(this));
                 }
             }
         }

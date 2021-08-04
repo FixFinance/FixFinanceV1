@@ -46,7 +46,6 @@ interface IWrapper is IERC20, IERC3156FlashLender {
         uint[2] calldata _wrappedClaims
     ) external;
 	function isDistributionAccount(address _addr) external view returns(bool);
-	function totalUnspentDistributionAccountRewards(uint _index) external view returns(uint);
 	function distributionAccountRewards(uint _index, address _distributionAccount) external view returns(uint);
 	function hasClaimedAllYTRewards(address _distributionAccount, address _subAccount, address _FCPaddr) external view returns(bool);
 	function subAccountPrevTotalReturnsPerWasset(uint _index, address _distributionAccount, address _subAccount, address _FCPaddr) external view returns(uint);

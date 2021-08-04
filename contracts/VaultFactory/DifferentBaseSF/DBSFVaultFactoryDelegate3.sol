@@ -81,7 +81,7 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryDelegateParent {
 		editSubAccountYTVault(false, msg.sender, _FCPsupplied, baseWrapperSupplied, int(_yieldSupplied), _bondSupplied);
 
 		IWrapper baseBorrowed = IFixCapitalPool(_FCPborrowed).wrapper();
-		uint64 timestampOpened = uint64(baseBorrowed.lastUpdate());
+		uint64 timestampOpened = uint64(block.timestamp);
 		uint64 wrapperFee = IInfoOracle(_infoOracleAddress).StabilityFeeAPR(address(this), address(baseBorrowed));
 
 		_YTvaults[msg.sender].push(YTVault(_FCPsupplied, _FCPborrowed, _yieldSupplied, _bondSupplied, _amountBorrowed, 0, timestampOpened, wrapperFee));
@@ -101,7 +101,7 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryDelegateParent {
 
 		//burn borrowed ZCB
 		if (vault.amountBorrowed > 0) {
-			uint feeAdjBorrowAmt = stabilityFeeAdjAmountBorrowed(vault.FCPborrowed, vault.amountBorrowed, vault.timestampOpened, vault.stabilityFeeAPR);
+			uint feeAdjBorrowAmt = stabilityFeeAdjAmountBorrowed(vault.amountBorrowed, vault.timestampOpened, vault.stabilityFeeAPR);
 			IFixCapitalPool(vault.FCPborrowed).burnZCBFrom(msg.sender, feeAdjBorrowAmt);
 			lowerShortInterest(vault.FCPborrowed, vault.amountBorrowed);
 			uint sFee = vault.amountSFee;
@@ -322,7 +322,7 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryDelegateParent {
 		uint change;
 		uint adjSFee;
 		if (mVault.amountBorrowed < _amountBorrowed) {
-			uint stabilityFeeMultiplier = getStabilityFeeMultiplier(_FCPborrowed, mVault.timestampOpened, mVault.stabilityFeeAPR);
+			uint stabilityFeeMultiplier = getStabilityFeeMultiplier(mVault.timestampOpened, mVault.stabilityFeeAPR);
 			change = stabilityFeeMultiplier.mul(_amountBorrowed - mVault.amountBorrowed) / (1 ether);
 			IFixCapitalPool(_FCPborrowed).mintZCBTo(_receiverAddr, change);
 			uint adjBorrowed = stabilityFeeMultiplier.mul(_amountBorrowed) / (1 ether);
@@ -335,10 +335,10 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryDelegateParent {
 				adjSFee = adjSFee.add(temp);
 				sVault.amountSFee = adjSFee;
 			}
-			sVault.timestampOpened = uint64(IFixCapitalPool(_FCPborrowed).lastUpdate());
+			sVault.timestampOpened = uint64(block.timestamp);
 		}
 		else if (mVault.amountBorrowed > _amountBorrowed) {
-			uint stabilityFeeMultiplier = getStabilityFeeMultiplier(_FCPborrowed, mVault.timestampOpened, mVault.stabilityFeeAPR);
+			uint stabilityFeeMultiplier = getStabilityFeeMultiplier(mVault.timestampOpened, mVault.stabilityFeeAPR);
 			change = stabilityFeeMultiplier.mul(mVault.amountBorrowed - _amountBorrowed) / (1 ether); //amt to burn
 			uint adjBorrowed = stabilityFeeMultiplier.mul(_amountBorrowed) / (1 ether);
 			if (adjBorrowed > mVault.amountBorrowed) {
@@ -361,7 +361,7 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryDelegateParent {
 					sVault.amountSFee = adjSFee - change;
 				}
 			}
-			sVault.timestampOpened = uint64(IFixCapitalPool(_FCPborrowed).lastUpdate());
+			sVault.timestampOpened = uint64(block.timestamp);
 		}
 
 		//-----------------------------flashloan------------------
@@ -477,7 +477,7 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryDelegateParent {
 		if (_FCPborrowed != address(0)) {
 			raiseShortInterest(_FCPborrowed, _amountBorrowed);
 			IWrapper wrapper = IFixCapitalPool(_FCPborrowed).wrapper();
-			sVault.timestampOpened = uint64(wrapper.lastUpdate());
+			sVault.timestampOpened = uint64(block.timestamp);
 			sVault.stabilityFeeAPR = IInfoOracle(_infoOracleAddress).StabilityFeeAPR(address(this), address(wrapper));
 		}
 		else {
@@ -525,7 +525,7 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryDelegateParent {
 		}
 
 		if (mVault.amountBorrowed > 0) {
-			uint toBurn = stabilityFeeAdjAmountBorrowed(mVault.FCPborrowed, mVault.amountBorrowed, mVault.timestampOpened, mVault.stabilityFeeAPR);
+			uint toBurn = stabilityFeeAdjAmountBorrowed(mVault.amountBorrowed, mVault.timestampOpened, mVault.stabilityFeeAPR);
 			IFixCapitalPool(mVault.FCPborrowed).burnZCBFrom(msg.sender, toBurn);
 			claimStabilityFee(IFixCapitalPool(mVault.FCPborrowed).zeroCouponBondAddress(), mVault.FCPborrowed, toBurn - mVault.amountBorrowed);
 		}

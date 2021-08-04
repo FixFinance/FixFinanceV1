@@ -139,7 +139,7 @@ contract DBSFVaultFactoryDelegate4 is DBSFVaultFactoryDelegateParent {
 			require(maturity < block.timestamp + MAX_TIME_TO_MATURITY);
 		}
 		//burn borrowed ZCB
-		uint feeAdjAmtIn = stabilityFeeAdjAmountBorrowed(_FCPborrowed, _amtIn, vault.timestampOpened, vault.stabilityFeeAPR);
+		uint feeAdjAmtIn = stabilityFeeAdjAmountBorrowed(_amtIn, vault.timestampOpened, vault.stabilityFeeAPR);
 		collectBid(msg.sender, _FCPborrowed, feeAdjAmtIn);
 		claimStabilityFee(IFixCapitalPool(_FCPborrowed).zeroCouponBondAddress(), _FCPborrowed, feeAdjAmtIn - _amtIn);
 		lowerShortInterest(_FCPborrowed, _amtIn);

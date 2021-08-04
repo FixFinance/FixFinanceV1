@@ -284,18 +284,16 @@ contract DBSFVaultFactoryDelegateParent is DBSFVaultFactoryData {
 		@Description: find the multiplier which is multiplied with amount borrowed (when vault was opened)
 			to find the current liability
 
-		@param address _FCPborrrowed: the address of the FCP contract associated with the debt asset of the Vault
 		@param uint64 _timestampOpened: the time at which the vault was opened
 		@param uint64 _stabilityFeeAPR: the annual rate which must be paid for stability fees
 
 		@return uint: the stability rate debt multiplier
 			inflated by (1 ether)
 	*/
-	function getStabilityFeeMultiplier(address _FCPborrrowed, uint64 _timestampOpened, uint64 _stabilityFeeAPR) internal view returns(uint) {
+	function getStabilityFeeMultiplier(uint64 _timestampOpened, uint64 _stabilityFeeAPR) internal view returns(uint) {
 		if (_stabilityFeeAPR == 0 || _stabilityFeeAPR == NO_STABILITY_FEE)
 			return (1 ether);
-		uint lastUpdate = IFixCapitalPool(_FCPborrrowed).lastUpdate();
-		int128 yearsOpen = int128((uint(lastUpdate - _timestampOpened) << 64) / BigMath.SecondsPerYear);
+		int128 yearsOpen = int128((uint(block.timestamp - _timestampOpened) << 64) / BigMath.SecondsPerYear);
 		if (yearsOpen == 0)
 			return (1 ether);
 		int128 stabilityFeeMultiplier = BigMath.Pow(int128(uint(_stabilityFeeAPR) << 32), yearsOpen);
@@ -305,7 +303,6 @@ contract DBSFVaultFactoryDelegateParent is DBSFVaultFactoryData {
 	/*
 		@Description: find the new amount of ZCBs which is a vault's obligation
 
-		@param address _FCPborrrowed: the address of the FCP contract associated with the debt asset of the Vault
 		@param uint _amountBorrowed: the Vault's previous obligation in ZCBs at _timestampOpened
 		@param uint64 _timestampOpened: the time at which the vault was opened
 		@param uint64 _stabilityFeeAPR: the annual rate which must be paid for stability fees
@@ -313,8 +310,8 @@ contract DBSFVaultFactoryDelegateParent is DBSFVaultFactoryData {
 		@return uint: the stability rate debt multiplier
 			inflated by (1 ether)
 	*/
-	function stabilityFeeAdjAmountBorrowed(address _FCPborrrowed, uint _amountBorrowed, uint64 _timestampOpened, uint64 _stabilityFeeAPR) internal view returns (uint) {
-		uint ratio = getStabilityFeeMultiplier(_FCPborrrowed, _timestampOpened, _stabilityFeeAPR);
+	function stabilityFeeAdjAmountBorrowed(uint _amountBorrowed, uint64 _timestampOpened, uint64 _stabilityFeeAPR) internal view returns (uint) {
+		uint ratio = getStabilityFeeMultiplier(_timestampOpened, _stabilityFeeAPR);
 		return ratio.mul(_amountBorrowed) / (1 ether);
 	}
 
@@ -342,8 +339,7 @@ contract DBSFVaultFactoryDelegateParent is DBSFVaultFactoryData {
 			bAmt = _vault.amountBorrowed;
 		}
 		else {
-			address FCPaddr = IZeroCouponBond(_vault.assetBorrowed).FixCapitalPoolAddress();
-			bAmt = stabilityFeeAdjAmountBorrowed(FCPaddr, _vault.amountBorrowed, _vault.timestampOpened, _vault.stabilityFeeAPR);
+			bAmt = stabilityFeeAdjAmountBorrowed(_vault.amountBorrowed, _vault.timestampOpened, _vault.stabilityFeeAPR);
 		}
 	}
 
@@ -425,7 +421,7 @@ contract DBSFVaultFactoryDelegateParent is DBSFVaultFactoryData {
 			vault.FCPborrowed,
 			getUnitValueYield(vault.FCPsupplied, vault.yieldSupplied),
 			vault.bondSupplied,
-			stabilityFeeAdjAmountBorrowed(vault.FCPborrowed, vault.amountBorrowed, vault.timestampOpened, vault.stabilityFeeAPR),
+			stabilityFeeAdjAmountBorrowed(vault.amountBorrowed, vault.timestampOpened, vault.stabilityFeeAPR),
 			_priceMultiplier,
 			_suppliedRateChange,
 			_borrowRateChange

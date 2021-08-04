@@ -78,7 +78,7 @@ contract DBSFVaultFactoryDelegate2 is DBSFVaultFactoryDelegateParent {
 		}
 		//burn borrowed ZCB
 		address FCPborrowed = IZeroCouponBond(_assetBorrowed).FixCapitalPoolAddress();
-		uint feeAdjAmtIn = stabilityFeeAdjAmountBorrowed(FCPborrowed, _amtIn, vault.timestampOpened, vault.stabilityFeeAPR);
+		uint feeAdjAmtIn = stabilityFeeAdjAmountBorrowed(_amtIn, vault.timestampOpened, vault.stabilityFeeAPR);
 		collectBid(msg.sender, FCPborrowed, feeAdjAmtIn);
 		claimStabilityFee(vault.assetBorrowed, FCPborrowed, feeAdjAmtIn - _amtIn);
 		lowerShortInterest(FCPborrowed, _amtIn);

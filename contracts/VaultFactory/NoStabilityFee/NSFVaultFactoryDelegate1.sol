@@ -48,16 +48,21 @@ contract NSFVaultFactoryDelegate1 is NSFVaultFactoryDelegateParent {
 		int128 _borrowRateChange
 	) external {
 
-		require(_assetSupplied != _assetBorrowed);
+		require(_assetSupplied != _assetBorrowed && _amountSupplied <= uint(type(int256).max));
 		require(_fixCapitalPoolToWrapper[_assetSupplied] != address(0) || _wrapperToUnderlyingAsset[_assetSupplied] != address(0));
-		require(vaultWithstandsChange(_assetSupplied, _assetBorrowed, _amountSupplied, _amountBorrowed, _priceMultiplier, _suppliedRateChange, _borrowRateChange));
 
 		IERC20(_assetSupplied).transferFrom(msg.sender, address(this), _amountSupplied);
 		address FCPborrowed = IZeroCouponBond(_assetBorrowed).FixCapitalPoolAddress();
 		IFixCapitalPool(FCPborrowed).mintZCBTo(msg.sender, _amountBorrowed);
 		raiseShortInterest(FCPborrowed, _amountBorrowed);
+		Vault memory vault = Vault(_assetSupplied, _assetBorrowed, _amountSupplied, _amountBorrowed);
+		{
+			(bool withstands, SUPPLIED_ASSET_TYPE sType, address baseFCP, address baseWrapper) = vaultWithstandsChange(vault, _priceMultiplier, _suppliedRateChange, _borrowRateChange);
+			require(withstands);
+			editSubAccountStandardVault(false, msg.sender, sType, baseFCP, baseWrapper, int(vault.amountSupplied));
+		}
 
-		_vaults[msg.sender].push(Vault(_assetSupplied, _assetBorrowed, _amountSupplied, _amountBorrowed));
+		_vaults[msg.sender].push(vault);
 	}
 
 	/*
@@ -77,8 +82,13 @@ contract NSFVaultFactoryDelegate1 is NSFVaultFactoryDelegateParent {
 			IFixCapitalPool(FCPborrowed).burnZCBFrom(msg.sender, vault.amountBorrowed);
 			lowerShortInterest(FCPborrowed, vault.amountBorrowed);
 		}
-		if (vault.amountSupplied > 0)
-			IERC20(vault.assetSupplied).transfer(_to, vault.amountSupplied);
+		if (vault.amountSupplied > 0) {
+			require(vault.amountSupplied <= uint(type(int256).max));
+			bool success = IERC20(vault.assetSupplied).transfer(_to, vault.amountSupplied);
+			require(success);
+			(, SUPPLIED_ASSET_TYPE sType, address baseFCP, address baseWrapper) = suppliedAssetInfo(vault.assetSupplied);
+			editSubAccountStandardVault(false, msg.sender, sType, baseFCP, baseWrapper, -int(vault.amountSupplied));
+		}
 
 		delete _vaults[msg.sender][_index];
 	}
@@ -122,9 +132,14 @@ contract NSFVaultFactoryDelegate1 is NSFVaultFactoryDelegateParent {
 
 		Vault memory mVault = _vaults[_owner][_index];
 		Vault storage sVault = _vaults[_owner][_index];
+		Vault memory newVault = Vault(_assetSupplied, _assetBorrowed, _amountSupplied, _amountBorrowed);
+		address copyVaultOwner = _owner; //prevent stack too deep
 
 		//ensure that after operations vault will be in good health
 		//only check health if at any point funds are being removed from the vault
+		SUPPLIED_ASSET_TYPE sType;
+		address baseFCPsupplied;
+		address baseWrapperSupplied;
 		if (
 			_assetBorrowed != mVault.assetBorrowed ||
 			_assetSupplied != mVault.assetSupplied ||
@@ -133,16 +148,20 @@ contract NSFVaultFactoryDelegate1 is NSFVaultFactoryDelegateParent {
 		) {
 			//index 0 in multipliers that must be converted to uint
 			require(_multipliers[0] > 0);
-			require(msg.sender == _owner);
-			require(vaultWithstandsChange(
-				_assetSupplied,
-				_assetBorrowed,
-				_amountSupplied,
-				_amountBorrowed,
-				uint(_multipliers[0]),
-				_multipliers[1],
-				_multipliers[2]
-			));
+			require(msg.sender == copyVaultOwner);
+			{
+				bool withstands;
+				(withstands, sType, baseFCPsupplied, baseWrapperSupplied) = vaultWithstandsChange(
+					newVault,
+					uint(_multipliers[0]),
+					_multipliers[1],
+					_multipliers[2]
+				);
+				require(withstands);
+			}
+		}
+		else {
+			(, sType, baseFCPsupplied, baseWrapperSupplied) = suppliedAssetInfo(_assetSupplied);
 		}
 
 		//------------------distribute funds----------------------
@@ -151,70 +170,86 @@ contract NSFVaultFactoryDelegate1 is NSFVaultFactoryDelegateParent {
 				bool success = IERC20(mVault.assetSupplied).transfer(_receiverAddr, mVault.amountSupplied);
 				require(success);
 			}
-			sVault.assetSupplied = _assetSupplied;
-			sVault.amountSupplied = _amountSupplied;
+			sVault.assetSupplied =  newVault.assetSupplied;
+			sVault.amountSupplied = newVault.amountSupplied;
 		}
-		else if (mVault.amountSupplied > _amountSupplied) {
-			bool succes = IERC20(_assetSupplied).transfer(_receiverAddr, mVault.amountSupplied - _amountSupplied);
+		else if (mVault.amountSupplied > newVault.amountSupplied) {
+			bool succes = IERC20(_assetSupplied).transfer(_receiverAddr, mVault.amountSupplied - newVault.amountSupplied);
 			require(succes);
-			sVault.amountSupplied = _amountSupplied;
+			sVault.amountSupplied = newVault.amountSupplied;
 		}
-		else if (mVault.amountSupplied < _amountSupplied) {
-			sVault.amountSupplied = _amountSupplied;
+		else if (mVault.amountSupplied < newVault.amountSupplied) {
+			sVault.amountSupplied = newVault.amountSupplied;
 		}
 
 		IFixCapitalPool oldFCPBorrowed;
-		if (mVault.assetBorrowed != _assetBorrowed) {
-			if (address(_assetBorrowed) != address(0)) {
-				IFixCapitalPool newFCPBorrowed = IFixCapitalPool(IZeroCouponBond(_assetBorrowed).FixCapitalPoolAddress());
-				raiseShortInterest(address(newFCPBorrowed), _amountBorrowed);
-				newFCPBorrowed.mintZCBTo(_receiverAddr, _amountBorrowed);
+		if (mVault.assetBorrowed != newVault.assetBorrowed) {
+			if (newVault.assetBorrowed != address(0)) {
+				IFixCapitalPool newFCPBorrowed = IFixCapitalPool(IZeroCouponBond(newVault.assetBorrowed).FixCapitalPoolAddress());
+				raiseShortInterest(address(newFCPBorrowed), newVault.amountBorrowed);
+				newFCPBorrowed.mintZCBTo(_receiverAddr, newVault.amountBorrowed);
 			}
 			if (address(mVault.assetBorrowed) != address(0)) {
 				oldFCPBorrowed = IFixCapitalPool(IZeroCouponBond(mVault.assetBorrowed).FixCapitalPoolAddress());
 				lowerShortInterest(address(oldFCPBorrowed), mVault.amountBorrowed);
 			}
-			sVault.assetBorrowed = _assetBorrowed;
-			sVault.amountBorrowed = _amountBorrowed;
+			sVault.assetBorrowed = newVault.assetBorrowed;
+			sVault.amountBorrowed = newVault.amountBorrowed;
 		}
-		else if (mVault.amountBorrowed < _amountBorrowed) {
-			oldFCPBorrowed = IFixCapitalPool(IZeroCouponBond(_assetBorrowed).FixCapitalPoolAddress());
-			raiseShortInterest(address(oldFCPBorrowed), _amountBorrowed - mVault.amountBorrowed);
-			oldFCPBorrowed.mintZCBTo(_receiverAddr, _amountBorrowed - mVault.amountBorrowed);
-			sVault.amountBorrowed = _amountBorrowed;
+		else if (mVault.amountBorrowed < newVault.amountBorrowed) {
+			oldFCPBorrowed = IFixCapitalPool(IZeroCouponBond(newVault.assetBorrowed).FixCapitalPoolAddress());
+			raiseShortInterest(address(oldFCPBorrowed), newVault.amountBorrowed - mVault.amountBorrowed);
+			oldFCPBorrowed.mintZCBTo(_receiverAddr, newVault.amountBorrowed - mVault.amountBorrowed);
+			sVault.amountBorrowed = newVault.amountBorrowed;
 		}
-		else if (mVault.amountBorrowed > _amountBorrowed) {
-			oldFCPBorrowed = IFixCapitalPool(IZeroCouponBond(_assetBorrowed).FixCapitalPoolAddress());
-			sVault.amountBorrowed = _amountBorrowed;
+		else if (mVault.amountBorrowed > newVault.amountBorrowed) {
+			oldFCPBorrowed = IFixCapitalPool(IZeroCouponBond(newVault.assetBorrowed).FixCapitalPoolAddress());
+			sVault.amountBorrowed = newVault.amountBorrowed;
 		}
 
 		//-----------------------------flashloan------------------
 		if (_data.length > 0) {
+			bytes memory copyData = _data; //prevent stack too deep
 			IVaultManagerFlashReceiver(_receiverAddr).onFlashLoan(msg.sender,
 				mVault.assetSupplied,
 				mVault.assetBorrowed,
 				mVault.amountSupplied,
 				mVault.amountBorrowed,
-				_data
+				copyData
 			);
 		}
 
 		//-----------------------------get funds-------------------------
-		if (mVault.assetSupplied != _assetSupplied) {
-			bool success = IERC20(_assetSupplied).transferFrom(msg.sender, address(this), _amountSupplied);
+		if (mVault.assetSupplied != newVault.assetSupplied) {
+			bool success = IERC20(newVault.assetSupplied).transferFrom(msg.sender, address(this), newVault.amountSupplied);
 			require(success);
+			require(newVault.amountSupplied <= uint(type(int256).max));
+			require(mVault.amountSupplied <= uint(type(int256).max));
+			int changeAmt = int(newVault.amountSupplied);
+			editSubAccountStandardVault(false, copyVaultOwner, sType, baseFCPsupplied, baseWrapperSupplied, changeAmt);
+			if (mVault.assetSupplied != address(0)) {
+				changeAmt = -int(mVault.amountSupplied);
+				(, sType, baseFCPsupplied, baseWrapperSupplied) = suppliedAssetInfo(mVault.assetSupplied);
+				editSubAccountStandardVault(false, copyVaultOwner, sType, baseFCPsupplied, baseWrapperSupplied, changeAmt);
+			}
 		}
-		else if (mVault.amountSupplied < _amountSupplied) {
-			bool success = IERC20(_assetSupplied).transferFrom(msg.sender, address(this), _amountSupplied - mVault.amountSupplied);
-			require(success);
+		else {
+			if (mVault.amountSupplied < newVault.amountSupplied) {
+				bool success = IERC20(newVault.assetSupplied).transferFrom(msg.sender, address(this), newVault.amountSupplied - mVault.amountSupplied);
+				require(success);
+			}
+			require(newVault.amountSupplied <= uint(type(int256).max));
+			require(mVault.amountSupplied <= uint(type(int256).max));
+			int changeAmt = int(newVault.amountSupplied).sub(int(mVault.amountSupplied));
+			editSubAccountStandardVault(false, copyVaultOwner, sType, baseFCPsupplied, baseWrapperSupplied, changeAmt);
 		}
 
-		if (mVault.assetBorrowed != _assetBorrowed) {
+		if (mVault.assetBorrowed != newVault.assetBorrowed) {
 			if (mVault.amountBorrowed > 0) {
 				oldFCPBorrowed.burnZCBFrom(msg.sender, mVault.amountBorrowed);
 			}
 		}
-		else if (mVault.amountBorrowed > _amountBorrowed) {
+		else if (mVault.amountBorrowed > newVault.amountBorrowed) {
 			lowerShortInterest(address(oldFCPBorrowed), mVault.amountBorrowed - _amountBorrowed);
 			oldFCPBorrowed.burnZCBFrom(msg.sender,  mVault.amountBorrowed - _amountBorrowed);
 		}

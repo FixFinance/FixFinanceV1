@@ -149,7 +149,6 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryDelegateParent {
 		Vault memory mVault = _vaults[_owner][_index];
 		address copyVaultOwner = _owner;
 		uint copyIndex = _index;
-//		Vault storage sVault = _vaults[_owner][_index];
 
 		//index 0 in multipliers that must be converted to uint
 		require(

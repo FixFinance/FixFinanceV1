@@ -92,6 +92,31 @@ contract NSFVaultFactoryDelegateParent is NSFVaultFactoryData {
 		@Description: ensure that we pass the address of the underlying asset of wrapper assets to
 			the vault health contract rather than the address of the wrapper asset
 			also ensure that we adjust the amount from the wrapped amount to the non wrapped amount
+			if necessary, also pass the _wrapperAddr to prevent use of an extra SLOAD
+
+		@param address _suppliedAsset: the address of the asset that is supplied as collateral
+		@param uint _suppliedAmount: the amount of the supplied asset that is being used as collateral
+		@param address _whitelistAddr: the address returned when the supplied asset address is unsed
+			as the key in the wrapper to underlying asset mapping
+
+		@return address addr: the address for assetSupplied to pass to the vault health contract
+		@return uint amt: the amount for amountSupplied to pass to the vault health contract
+	*/
+	function passInfoToVaultManagerPassWhitelistAddr(address _suppliedAsset, uint _suppliedAmount, address _whitelistAddr) internal view returns (address addr, uint amt) {
+		if (_whitelistAddr == address(0) || _whitelistAddr == address(1)) {
+			addr = _suppliedAsset;
+			amt = _suppliedAmount;
+		}
+		else {
+			amt = IWrapper(_suppliedAsset).WrappedAmtToUnitAmt_RoundDown(_suppliedAmount);
+			addr = _whitelistAddr;
+		}
+	}
+
+	/*
+		@Description: ensure that we pass the address of the underlying asset of wrapper assets to
+			the vault health contract rather than the address of the wrapper asset
+			also ensure that we adjust the amount from the wrapped amount to the non wrapped amount
 			if necessary
 
 		@param address _suppliedAsset: the address of the asset that is supplied as collateral
@@ -101,29 +126,18 @@ contract NSFVaultFactoryDelegateParent is NSFVaultFactoryData {
 		@return uint amt: the amount for amountSupplied to pass to the vault health contract
 	*/
 	function passInfoToVaultManager(address _suppliedAsset, uint _suppliedAmount) internal view returns (address addr, uint amt) {
-		addr = _wrapperToUnderlyingAsset[_suppliedAsset];
-		if (addr == address(0) || addr == address(1)) {
-			addr = _suppliedAsset;
-			amt = _suppliedAmount;
-		}
-		else {
-			amt = IWrapper(_suppliedAsset).WrappedAmtToUnitAmt_RoundDown(_suppliedAmount);
-		}
+		address wrapperAddr = _wrapperToUnderlyingAsset[_suppliedAsset];
+		return passInfoToVaultManagerPassWhitelistAddr(_suppliedAsset, _suppliedAmount, wrapperAddr);
 	}
-
 
 	/*
 		@Description: ensure that a vault will not be sent into the liquidation zone if the cross asset price
 			and the borrow and supplied asset rates change a specific amount
 
-		@param address _assetSupplied: the asset used as collateral
-			this asset may be a ZCB or any other asset that is whitelisted
-		@param address _assetBorrowed: the ZCB that is borrowed from the new vault
-`		@param uint _amountSupplied: the amount of _assetSupplied posed as collateral
-		@param uint _amountBorrowed: the amount of _assetBorrowed borrowed
+		@param Vault memory vault: the state of the vault which to check
 		@param uint _priceMultiplier: a multiplier > 1
 			we ensure the vault will not be sent into the liquidation zone if the cross asset price
-			of _assetBorrowed to _assetSupplied increases by a factor of _priceMultiplier
+			of vault.assetBorrowed to vault.assetSupplied increases by a factor of _priceMultiplier
 			(in terms of basis points)
 		@param int128 _suppliedRateChange: a multiplier > 1
 			we ensure the vault will not be sent into the liquidation zone if the rate on the supplied
@@ -138,31 +152,132 @@ contract NSFVaultFactoryDelegateParent is NSFVaultFactoryData {
 			false otherwise
 	*/
 	function vaultWithstandsChange(
-		address _assetSupplied,
-		address _assetBorrowed,
-		uint _amountSupplied,
-		uint _amountBorrowed,
+		Vault memory vault,
 		uint _priceMultiplier,
 		int128 _suppliedRateChange,
 		int128 _borrowRateChange
-	) internal view returns (bool) {
+	) internal view returns (
+		bool withstands,
+		SUPPLIED_ASSET_TYPE suppliedType,
+		address baseFCP,
+		address baseWrapper
+	) {
 
 		require(_priceMultiplier >= TOTAL_BASIS_POINTS);
 		require(_suppliedRateChange >= ABDK_1);
 		require(_borrowRateChange <= ABDK_1);
 
-		(address _suppliedAddrToPass, uint _suppliedAmtToPass) = passInfoToVaultManager(_assetSupplied, _amountSupplied);
+		address _suppliedAddrToPass;
+		uint _suppliedAmtToPass;
+		{
+			address whitelistAddr;
+			(whitelistAddr, suppliedType, baseFCP, baseWrapper) = suppliedAssetInfo(vault.assetSupplied);
+			(_suppliedAddrToPass, _suppliedAmtToPass) = passInfoToVaultManagerPassWhitelistAddr(vault.assetSupplied, vault.amountSupplied, whitelistAddr);
+		}
 
-		return vaultHealthContract.vaultWithstandsChange(
+		withstands = vaultHealthContract.vaultWithstandsChange(
 			false,
 			_suppliedAddrToPass,
-			_assetBorrowed,
+			vault.assetBorrowed,
 			_suppliedAmtToPass,
-			_amountBorrowed,
+			vault.amountBorrowed,
 			_priceMultiplier,
 			_suppliedRateChange,
 			_borrowRateChange
 		);
+	}
+
+	/*
+		@Description: edit a sub account registered with the DBSFVaultFactory
+			when there is a change to a standard vault
+
+		@param bool _claimRewards: pass true to enter the claimRewards modifier upon wrapper.editSubAccountPosition
+		@param address _vaultOwner: the owner of the vault that has been changed
+		@param SUPPLIED_ASSET_TYPE sType: the type of collateral supplied to the vault
+		@param address _baseFCP: if the sType is ZCB the address of the base FCP contract of the ZCB should be passed
+			otherwise address(0) is passed
+		@param address _baseWrapper: if the sType is ZCB the address of base wrapper contract of the ZCB should be passed
+			if the sType is WASSET the address of the collateral asset of the vault should be passed
+			otherwise address(0) is passed
+		@param int _changeAmt: the change of the yield or ZCB in the sub account
+	*/
+	function editSubAccountStandardVault(
+		bool _claimRewards,
+		address _vaultOwner,
+		SUPPLIED_ASSET_TYPE sType,
+		address _baseFCP,
+		address _baseWrapper,
+		int _changeAmt
+	) internal {
+		if (sType == SUPPLIED_ASSET_TYPE.WASSET) {
+			IWrapper(_baseWrapper).editSubAccountPosition(_claimRewards, _vaultOwner, address(0), _changeAmt, 0);
+		}
+		else if (sType == SUPPLIED_ASSET_TYPE.ZCB) {
+			IWrapper(_baseWrapper).editSubAccountPosition(_claimRewards, _vaultOwner, _baseFCP, 0, _changeAmt);
+		}
+	}
+
+	/*
+		@Description: edit a sub acount registered with the DBSFVaultFactory
+			when there is a change in a YT Vault
+
+		@param bool _claimRewards: pass true to enter the claimRewards modifier upon wrapper.editSubAccountPosition
+		@param address _vaultOwner: the owner of the YT vault that has been changed
+		@param address _FCP: the address of the FCP contract from which collateral is being supplied to the YT vault
+		@param address _baseWrapper: the base wrapper address of the FCP contract with address _FCP
+		@param int _changeYield: the change in the yield amount of collateral supplied
+			finalYield - initialYield
+		@param int _changeBond: the change in the bond amount of collateral supplied
+			finalBond - initialBond
+	*/
+	function editSubAccountYTVault(
+		bool _claimRewards,
+		address _vaultOwner,
+		address _FCP,
+		address _baseWrapper,
+		int _changeYield,
+		int _changeBond
+	) internal {
+		IWrapper(_baseWrapper).editSubAccountPosition(_claimRewards, _vaultOwner, _FCP, _changeYield, _changeBond);
+	}
+
+	/*
+		@Description: given a supplied asset find its type
+
+		@param address _suppliedAsset: the address of the supplied asset
+
+		@return address whitelistAddr: the address returned from the collateralWhitelist mapping in the IInfoOracle contract
+			when the supplied asset is passed
+		@return SUPPLIED_ASSET_TYPE suppliedType: the type of collateral that the supplied asset is
+		@return address baseFCP: the base FCP contract corresponding to the ZCB contract
+			will be address(0) if the collateral type is not ZCB
+		@return address baseWrapper: the base wrapper contract corresponding to the ZCB contract
+			will be address(0) if the collateral type is not ZCB
+	*/
+
+	function suppliedAssetInfo(
+		address _suppliedAsset
+	) internal view returns(
+		address whitelistAddr,
+		SUPPLIED_ASSET_TYPE suppliedType,
+		address baseFCP,
+		address baseWrapper
+	) {
+		whitelistAddr = _wrapperToUnderlyingAsset[_suppliedAsset];
+		if (whitelistAddr == address(0)) {
+			//is likely a ZCB, ensure it is actuall a ZCB and is whitelisted
+			baseFCP = IZeroCouponBond(_suppliedAsset).FixCapitalPoolAddress();
+			baseWrapper = _fixCapitalPoolToWrapper[baseFCP];
+			require(baseWrapper != address(0));
+			suppliedType = SUPPLIED_ASSET_TYPE.ZCB;
+		}
+		else if (whitelistAddr == address(1)) {
+			suppliedType = SUPPLIED_ASSET_TYPE.ASSET;
+		}
+		else {
+			baseWrapper = _suppliedAsset;
+			suppliedType = SUPPLIED_ASSET_TYPE.WASSET;
+		}
 	}
 
 	/*

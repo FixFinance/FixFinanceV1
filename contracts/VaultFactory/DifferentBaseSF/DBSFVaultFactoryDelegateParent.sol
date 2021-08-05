@@ -291,7 +291,7 @@ contract DBSFVaultFactoryDelegateParent is DBSFVaultFactoryData {
 			inflated by (1 ether)
 	*/
 	function getStabilityFeeMultiplier(uint64 _timestampOpened, uint64 _stabilityFeeAPR) internal view returns(uint) {
-		if (_stabilityFeeAPR == 0 || _stabilityFeeAPR == NO_STABILITY_FEE)
+		if (_stabilityFeeAPR == 0 || _stabilityFeeAPR == NO_STABILITY_FEE || _timestampOpened == block.timestamp)
 			return (1 ether);
 		int128 yearsOpen = int128((uint(block.timestamp - _timestampOpened) << 64) / BigMath.SecondsPerYear);
 		if (yearsOpen == 0)
@@ -335,7 +335,7 @@ contract DBSFVaultFactoryDelegateParent is DBSFVaultFactoryData {
 		else {
 			sAmt = IWrapper(_vault.assetSupplied).WrappedAmtToUnitAmt_RoundDown(_vault.amountSupplied);
 		}
-		if (_vault.stabilityFeeAPR == 0 || _vault.stabilityFeeAPR == NO_STABILITY_FEE) {
+		if (_vault.stabilityFeeAPR == 0 || _vault.stabilityFeeAPR == NO_STABILITY_FEE || _vault.timestampOpened == block.timestamp) {
 			bAmt = _vault.amountBorrowed;
 		}
 		else {

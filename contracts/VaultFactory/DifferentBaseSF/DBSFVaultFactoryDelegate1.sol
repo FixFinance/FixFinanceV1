@@ -163,15 +163,26 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryDelegateParent {
 		);
 
 		IInfoOracle info = IInfoOracle(_infoOracleAddress);
-		Vault memory nextVault = Vault(
-			_assetSupplied,
-			_assetBorrowed,
-			_amountSupplied,
-			_amountBorrowed,
-			0,
-			0,
-			NO_STABILITY_FEE
-		);
+		Vault memory nextVault = _assetBorrowed == mVault.assetBorrowed ?
+			Vault(
+				_assetSupplied,
+				_assetBorrowed,
+				_amountSupplied,
+				_amountBorrowed,
+				0, //nextVault.amountSFee is not ever used, keep 0
+				mVault.timestampOpened,
+				mVault.stabilityFeeAPR
+			)
+			 :
+			Vault(
+				_assetSupplied,
+				_assetBorrowed,
+				_amountSupplied,
+				_amountBorrowed,
+				0, //nextVault.amountSFee is not ever used, keep 0
+				0, //with no stability fee newVault.timestampOpened is irrelevant
+				NO_STABILITY_FEE //new borrow asset has been put in place, no stability has been accumulated yet
+			);
 		SUPPLIED_ASSET_TYPE sType;
 		address baseFCP;
 		address baseWrapper;

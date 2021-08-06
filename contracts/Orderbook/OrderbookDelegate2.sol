@@ -7,107 +7,15 @@ import "../libraries/SafeMath.sol";
 import "../libraries/SignedSafeMath.sol";
 import "../libraries/ABDKMath64x64.sol";
 import "../libraries/BigMath.sol";
-import "./OrderbookData.sol";
+import "./OrderbookDelegateParent.sol";
 
-contract OrderbookDelegate2 is OrderbookData {
+contract OrderbookDelegate2 is OrderbookDelegateParent {
 
 	using SafeMath for uint256;
 	using SignedSafeMath for int256;
 	using ABDKMath64x64 for int128;
 
-	uint private constant TOTAL_BASIS_POINTS = 10_000;
-
-	function minimumZCBLimitAmount(uint _maturityConversionRate, uint _ratio) internal view returns(uint minimum) {
-		uint yieldToMaturity = _maturityConversionRate.mul(1 ether).div(_ratio);
-		require(yieldToMaturity > 1 ether);
-		/*
-			U * NPVu == Z * NPVzcb0
-			NPVu == 1
-			NPVzcb == 1/yieldToMaturity
-			U == Z * NPVzcb
-			Z == U / NPVzcb
-			Z == U * yieldToMaturity
-		*/
-		minimum = minimumOrderSize.mul(yieldToMaturity).div(1 ether);
-	}
-
-	function minimumYTlimitAmount(uint _maturityConversionRate, uint _ratio) internal view returns(uint minimum) {
-		uint zcbDilutionToMatutity = _ratio.mul(1 ether).div(_maturityConversionRate);
-		require(zcbDilutionToMatutity < 1 ether);
-		/*
-			U * NPVu == YT * NPVyt
-			NPVu == 1
-			NPVyt == (1 - zcbDilutiontoMatutity) * ratio
-			U == YT * NPVyt
-			YT == U / NPVyt
-			YT == U / ((1 - zcbDilutiontoMatutity) * ratio)
-		*/
-		minimum = minimumOrderSize.mul(1 ether)
-			.div(uint(1 ether).sub(zcbDilutionToMatutity).mul(_ratio) / (1 ether));
-	}
-
-	modifier ensureValidZCBSell(uint _amountZCB, uint _maturityConversionRate) {
-		uint ratio = internalWrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
-		uint minimumZCBamount = minimumZCBLimitAmount(_maturityConversionRate, ratio);
-		require(_amountZCB > minimumZCBamount);
-		_;
-	}
-
-	modifier ensureValidYTSell(uint _amountYT, uint _maturityConversionRate) {
-		uint ratio = internalWrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
-		uint minimumYTamount = minimumYTlimitAmount(_maturityConversionRate, ratio);
-		require(_amountYT > minimumYTamount);
-		_;
-	}
-
-	function requireValidCollateral(uint _YD, int _BD, uint _wrappedAmtLockedYT, uint _ratio) internal pure {
-		uint unitAmtLockedYT = _wrappedAmtLockedYT.mul(_ratio)/(1 ether);
-		uint minimumYieldCollateral = _YD.sub(_wrappedAmtLockedYT);
-		int minimumBondCollateral = _BD.add(int(unitAmtLockedYT));
-		require(minimumBondCollateral >= 0 || minimumYieldCollateral.mul(_ratio)/(1 ether) >= uint(-minimumBondCollateral));
-	}
-
 	//---------------i-n-t-e-r-n-a-l---m-o-d-i-f-y---o-r-d-e-r-b-o-o-k--------------------
-
-	function manageCollateral_SellZCB_makeOrder(address _addr, uint _amount) internal {
-		require(_amount < uint(type(int256).max));
-		uint YD = internalYieldDeposited[_addr];
-		int BD = internalBondDeposited[_addr];
-		uint wrappedAmtLockedYT = internalLockedYT[_addr];
-		uint ratio = internalWrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
-
-		int resultantBD = BD.sub(int(_amount));
-
-		requireValidCollateral(YD, resultantBD, wrappedAmtLockedYT, ratio);
-
-		internalBondDeposited[_addr] = resultantBD;
-	}
-
-	function manageCollateral_ReceiveZCB(address _addr, uint _amount) internal {
-		require(_amount < uint(type(int256).max));
-		int BD = internalBondDeposited[_addr];
-		internalBondDeposited[_addr] = BD.add(int(_amount));
-	}
-
-	function manageCollateral_SellYT_makeOrder(address _addr, uint _amount) internal {
-		require(_amount < uint(type(int256).max));
-		uint YD = internalYieldDeposited[_addr];
-		int BD = internalBondDeposited[_addr];
-		uint wrappedAmtLockedYT = internalLockedYT[_addr];
-		uint ratio = internalWrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
-
-		uint newWrappedAmtLockedYT = wrappedAmtLockedYT.add(_amount);
-
-		requireValidCollateral(YD, BD, newWrappedAmtLockedYT, ratio);
-
-		internalLockedYT[_addr] = newWrappedAmtLockedYT;
-	}
-
-	function manageCollateral_ReceiveYT_makeOrder(address _addr, uint _amount) internal {
-		require(_amount < uint(type(int256).max));
-		uint _internalLockedYT = internalLockedYT[_addr];
-		internalLockedYT[_addr] = _internalLockedYT.sub(_amount);
-	}
 
  	function insertFromHead_SellZCB(uint _amount, uint _maturityConversionRate, uint _newID, uint _maxSteps) internal returns(uint prevID) {
 		uint currentID = internalHeadZCBSellID;
@@ -540,37 +448,6 @@ contract OrderbookDelegate2 is OrderbookData {
 		@Description: force this contract to store a data point in its rate oracle
 	*/
 	function forceRateDataUpdate() external setRateModifier {}
-
-	/*
-		@Description: write the next rate datapoint to storage
-
-		@param uint8 _index: the index within the impliedRates array for which to set a value
-	*/
-	function internalSetOracleMCR(uint8 _index) internal {
-		uint YThead = internalHeadYTSellID;
-		if (YThead == 0) return;
-		uint ZCBhead = internalHeadZCBSellID;
-		if (ZCBhead == 0) return;
-
-		uint ytMCR = internalYTSells[YThead].maturityConversionRate;
-		uint zcbMCR = internalZCBSells[ZCBhead].maturityConversionRate;
-		uint ratio = internalWrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
-		ytMCR = ytMCR < ratio ? ratio : ytMCR;
-		zcbMCR = zcbMCR < ratio ? ratio : zcbMCR;
-		//take average, not as good as geometric mean scaled with ratio as 1.0, though this is more computationally efficient
-		uint impliedMCR = ytMCR.add(zcbMCR) >> 1;
-		impliedMCRs[_index] = impliedMCR;
-		lastDatapointCollection = uint40(block.timestamp);
-		toSet = (_index+1) % LENGTH_RATE_SERIES;
-	}
-
-	/*
-		@Description: if enough time has elapsed automatically update the rate data in the oracle
-	*/
-	modifier setRateModifier() {
-		if (block.timestamp > lastDatapointCollection + TIME_BETWEEN_DATAPOINTS) internalSetOracleMCR(toSet);
-		_;
-	}
 
 	/*
 		@Description: set the median of all datapoints in the impliedRates array as the

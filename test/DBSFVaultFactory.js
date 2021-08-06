@@ -769,14 +769,14 @@ contract('DBSFVaultFactory', async function(accounts) {
 		*/
 		let toSupply = _10To18
 		let prevContractBalanceW1 = await wAsset1.balanceOf(vaultFactoryInstance.address);
-		amountBorrowed = toSupply.mul(_10To18).div(new BN(upperRatio)).sub(new BN(1)).toString();
+		amountBorrowed = toSupply.mul(_10To18).div(new BN(upperRatio)).sub(new BN(1));
 		await vaultFactoryInstance.openVault(wAsset1.address, zcbAsset0.address, toSupply, amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
 		await vaultFactoryInstance.openVault(wAsset1.address, zcbAsset0.address, toSupply, amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
 
 		let contractBalanceW1 = await wAsset1.balanceOf(vaultFactoryInstance.address);
 		assert.equal(contractBalanceW1.toString(), prevContractBalanceW1.add(toSupply.mul(new BN(2))).toString());
 
-		lowerRatio =  _10To18.mul(_10To18).div(new BN(amountBorrowed)).add(new BN(10000)).toString();
+		lowerRatio =  _10To18.mul(_10To18).div(amountBorrowed).add(new BN(10000)).toString();
 		await vaultHealthInstance.setLower(asset1.address, zcbAsset0.address, lowerRatio);
 
 		vaultIndex = (await vaultFactoryInstance.vaultsLength(accounts[0])).toNumber() - 2;
@@ -789,7 +789,7 @@ contract('DBSFVaultFactory', async function(accounts) {
 		let prevVault = await vaultFactoryInstance.vaults(accounts[0], vaultIndex);
 		prevContractBalanceW1 = contractBalanceW1;
 
-		await vaultFactoryInstance.instantLiquidation(accounts[0], vaultIndex, zcbAsset0.address, wAsset1.address, amountBorrowed.toString(), _10To18.toString(), accounts[1], {from: accounts[1]});
+		await vaultFactoryInstance.instantLiquidation(accounts[0], vaultIndex, zcbAsset0.address, wAsset1.address, amountBorrowed, _10To18.toString(), accounts[1], {from: accounts[1]});
 
 		vault = await vaultFactoryInstance.vaults(accounts[0], vaultIndex);
 
@@ -813,7 +813,7 @@ contract('DBSFVaultFactory', async function(accounts) {
 
 		let prevVault = await vaultFactoryInstance.vaults(accounts[0], vaultIndex);
 
-		let amtIn = (new BN(amountBorrowed)).div(new BN(2))
+		let amtIn = amountBorrowed.div(new BN(2))
 		let minOut = _10To18.div(new BN(3));
 		let prevContractBalanceW1 = await wAsset1.balanceOf(vaultFactoryInstance.address);
 
@@ -976,9 +976,15 @@ contract('DBSFVaultFactory', async function(accounts) {
 	it('claim rebate', async () => {
 		let rebate = await vaultFactoryInstance.liquidationRebates(accounts[0], wAsset1.address);
 		let prevBalanceW1 = await wAsset1.balanceOf(accounts[0]);
+		let prevSubAcctPosW1A0 = await wAsset1.subAccountPositions(vaultFactoryInstance.address, accounts[0], nullAddress);
+
 		await vaultFactoryInstance.claimRebate(wAsset1.address);
+
+		subAcctPosW1A0 = await wAsset1.subAccountPositions(vaultFactoryInstance.address, accounts[0], nullAddress);
 		let balanceW1 = await wAsset1.balanceOf(accounts[0]);
 		assert.equal(balanceW1.sub(prevBalanceW1).toString(), rebate.toString());
+		assert.equal(subAcctPosW1A0.yield.sub(prevSubAcctPosW1A0.yield).toString(), rebate.neg().toString());
+		assert.equal(subAcctPosW1A0.bond.toString(), prevSubAcctPosW1A0.bond.toString());
 	});
 
 	it('can manage all vault and reward obligations', async() => {
@@ -1916,7 +1922,7 @@ contract('DBSFVaultFactory', async function(accounts) {
 		assert.equal(changeBondA0.toString(), prevVault.bondSupplied.neg().toString());
 	});
 
-	it('liquidates vaults due to time', async () => {
+	it('liquidates YT vaults due to time', async () => {
 		await addRewards();
 		let amountSupplied = _10To18;
 
@@ -2079,18 +2085,24 @@ contract('DBSFVaultFactory', async function(accounts) {
 		assert.equal(newTreasuryBalanceBond.sub(prevTreasuryBalanceBond).toString(), expBondToTreasury.toString(), "correct amount bond paid to treasury");
 	});
 
-	it('claim rebate', async () => {
+	it('claim YT vault rebate', async () => {
 		let rebate = await vaultFactoryInstance.YTLiquidationRebates(accounts[0], fcp1.address);
 		let prevYieldF1 = await fcp1.balanceYield(accounts[0]);
 		let prevBondF1 = await fcp1.balanceBonds(accounts[0]);
+		let prevSubAcctPosF1A0 = await wAsset1.subAccountPositions(vaultFactoryInstance.address, accounts[0], fcp1.address);
+
 		await vaultFactoryInstance.claimYTRebate(fcp1.address);
+
+		subAcctPosF1A0 = await wAsset1.subAccountPositions(vaultFactoryInstance.address, accounts[0], fcp1.address);
 		let yieldF1 = await fcp1.balanceYield(accounts[0]);
 		let bondF1 = await fcp1.balanceBonds(accounts[0]);
 		assert.equal(yieldF1.sub(prevYieldF1).toString(), rebate.yield.toString());
 		assert.equal(bondF1.sub(prevBondF1).toString(), rebate.bond.toString());
+		assert.equal(subAcctPosF1A0.yield.sub(prevSubAcctPosF1A0.yield).toString(), rebate.yield.neg().toString());
+		assert.equal(subAcctPosF1A0.bond.sub(prevSubAcctPosF1A0.bond).toString(), rebate.bond.neg().toString());
 	});
 
-	it('can manage all vault and reward obligations', async() => {
+	it('can manage all YT vault and reward obligations', async() => {
 		for (let i = 0; i < accounts.length; i++) {
 			let ytVaultLen = await vaultFactoryInstance.YTvaultsLength(accounts[i]);
 			for (let j = 0; j < ytVaultLen; j++) {

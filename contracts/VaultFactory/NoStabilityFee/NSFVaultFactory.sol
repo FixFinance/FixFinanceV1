@@ -74,6 +74,16 @@ contract NSFVaultFactory is NSFVaultFactoryData, INSFVaultFactory, nonReentrant 
 		bond = pos.amountBond;
 	}
 
+	function liquidationRebates(address _owner, address _asset) external view override returns(uint) {
+		return _liquidationRebates[_owner][_asset];
+	}
+
+	function YTLiquidationRebates(address _owner, address _FCP) external view override returns(uint yield, int bond) {
+		YTPosition memory pos = _YTLiquidationRebates[_owner][_FCP];
+		yield = pos.amountYield;
+		bond = pos.amountBond;
+	}
+
 	function vaults(address _owner, uint _index) external view override returns (
 		address assetSupplied,
 		address assetBorrowed,
@@ -551,9 +561,11 @@ contract NSFVaultFactory is NSFVaultFactoryData, INSFVaultFactory, nonReentrant 
 		@param address _asset: the address of the asset for which to claim rebated collateral
 	*/
 	function claimRebate(address _asset) external override {
-		uint amt = _liquidationRebates[msg.sender][_asset];
-		IERC20(_asset).transfer(msg.sender, amt);
-		delete _liquidationRebates[msg.sender][_asset];
+		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
+			"claimRebate(address)",
+			_asset
+		));
+		require(success);
 	}
 
 	//------------------------------------Y-T---v-a-u-l-t---L-i-q-u-i-d-a-t-i-o-n-s-------------------------------------
@@ -563,12 +575,14 @@ contract NSFVaultFactory is NSFVaultFactoryData, INSFVaultFactory, nonReentrant 
 		@Description: allows a user to claim the excess collateral that was received as a rebate
 			when their YT vault(s) were liquidated
 	
-		@param address _asset: the address of the FCP contract for which to claim the rebate
+		@param address _FCP: the address of the FCP contract for which to claim the rebate
 	*/
-	function claimYTRebate(address _asset) external override {
-		YTPosition memory position = _YTLiquidationRebates[msg.sender][_asset];
-		IFixCapitalPool(_asset).transferPosition(msg.sender, position.amountYield, position.amountBond);
-		delete _YTLiquidationRebates[msg.sender][_asset];
+	function claimYTRebate(address _FCP) external override {
+		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
+			"claimYTRebate(address)",
+			_FCP
+		));
+		require(success);
 	}
 
 

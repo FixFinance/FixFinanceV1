@@ -285,7 +285,7 @@ contract NSFVaultFactoryDelegate1 is NSFVaultFactoryDelegateParent {
 		lowerShortInterest(FCPborrowed, _amtIn);
 		//any surplus in the bid may be added as _revenue
 		if (_bid < maxBid){
-			distributeSurplus(_owner, vault.assetSupplied, maxBid - _bid);
+			distributeSurplus(_owner, vault.assetSupplied, maxBid - _bid, true);
 		}
 		if (_amtIn == vault.amountBorrowed) {
 			delete _vaults[_owner][_index];
@@ -323,7 +323,7 @@ contract NSFVaultFactoryDelegate1 is NSFVaultFactoryDelegateParent {
 		address FCPborrowed = IZeroCouponBond(liq.assetBorrowed).FixCapitalPoolAddress();
 		refundBid(liq.bidder, FCPborrowed, _amtIn);
 		collectBid(msg.sender, FCPborrowed, _amtIn);
-		distributeSurplus(liq.vaultOwner, liq.assetSupplied, maxBid - _bid);
+		distributeSurplus(liq.vaultOwner, liq.assetSupplied, maxBid - _bid, true);
 
 		if (_amtIn == liq.amountBorrowed) {
 			_Liquidations[_index].bidAmount = _bid;
@@ -361,6 +361,10 @@ contract NSFVaultFactoryDelegate1 is NSFVaultFactoryDelegateParent {
 		delete _Liquidations[_index];
 
 		IERC20(liq.assetSupplied).transfer(_to, liq.bidAmount);
+
+		(, SUPPLIED_ASSET_TYPE sType, address baseFCP, address baseWrapper) = suppliedAssetInfo(liq.assetSupplied);
+		require(liq.bidAmount <= uint(type(int256).max));
+		editSubAccountStandardVault(false, liq.vaultOwner, sType, baseFCP, baseWrapper, -int(liq.bidAmount));
 	}
 
 	/*
@@ -383,14 +387,29 @@ contract NSFVaultFactoryDelegate1 is NSFVaultFactoryDelegateParent {
 		require(vault.assetSupplied == _assetSupplied);
 		require(vault.amountBorrowed <= _maxIn);
 		require(vault.amountSupplied >= _minOut && _minOut > 0);
-		require(IZeroCouponBond(_assetBorrowed).maturity() < block.timestamp + CRITICAL_TIME_TO_MATURITY || 
-			!satisfiesLimit(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied, vault.amountBorrowed, false));
 
 		//burn borrowed ZCB
 		address FCPborrowed = IZeroCouponBond(vault.assetBorrowed).FixCapitalPoolAddress();
 		IFixCapitalPool(FCPborrowed).burnZCBFrom(_to, vault.amountBorrowed);
 		lowerShortInterest(FCPborrowed, vault.amountBorrowed);
 		IERC20(_assetSupplied).transfer(_to, vault.amountSupplied);
+
+		{
+			SUPPLIED_ASSET_TYPE sType;
+			address baseFCP;
+			address baseWrapper;
+			if (IZeroCouponBond(_assetBorrowed).maturity() >= block.timestamp + CRITICAL_TIME_TO_MATURITY) {
+				bool satisfies;
+				(satisfies, sType, baseFCP, baseWrapper) = satisfiesLimitRetAllData(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied, vault.amountBorrowed, false);
+				require(!satisfies);
+			}
+			else {
+				(, sType, baseFCP, baseWrapper) = suppliedAssetInfo(_assetSupplied);
+			}
+			require(vault.amountSupplied <= uint(type(int256).max));
+			int changeAmt = -int(vault.amountSupplied);
+			editSubAccountStandardVault(false, _owner, sType, baseFCP, baseWrapper, changeAmt);
+		}
 
 		delete _vaults[_owner][_index];
 	}
@@ -417,14 +436,29 @@ contract NSFVaultFactoryDelegate1 is NSFVaultFactoryDelegateParent {
 		require(0 < _in && _in <= vault.amountBorrowed);
 		uint amtOut = _in*vault.amountSupplied/vault.amountBorrowed;
 		require(amtOut >= _minOut);
-		require(IFixCapitalPool(_assetBorrowed).maturity() < block.timestamp + (1 days) || 
-			!satisfiesLimit(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied, vault.amountBorrowed, false));
 
 		//burn borrowed ZCB
 		address FCPborrowed = IZeroCouponBond(vault.assetBorrowed).FixCapitalPoolAddress();
 		IFixCapitalPool(FCPborrowed).burnZCBFrom(_to, _in);
 		lowerShortInterest(FCPborrowed, _in);
 		IERC20(_assetSupplied).transfer(_to, amtOut);
+
+		{
+			SUPPLIED_ASSET_TYPE sType;
+			address baseFCP;
+			address baseWrapper;
+			if (IZeroCouponBond(_assetBorrowed).maturity() >= block.timestamp + CRITICAL_TIME_TO_MATURITY) {
+				bool satisfies;
+				(satisfies, sType, baseFCP, baseWrapper) = satisfiesLimitRetAllData(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied, vault.amountBorrowed, false);
+				require(!satisfies);
+			}
+			else {
+				(, sType, baseFCP, baseWrapper) = suppliedAssetInfo(_assetSupplied);
+			}
+			require(amtOut <= uint(type(int256).max));
+			int changeAmt = -int(amtOut);
+			editSubAccountStandardVault(false, _owner, sType, baseFCP, baseWrapper, changeAmt);
+		}
 
 		_vaults[_owner][_index].amountBorrowed -= _in;
 		_vaults[_owner][_index].amountSupplied -= amtOut;
@@ -453,14 +487,29 @@ contract NSFVaultFactoryDelegate1 is NSFVaultFactoryDelegateParent {
 		uint amtIn = _out*vault.amountBorrowed;
 		amtIn = amtIn/vault.amountSupplied + (amtIn%vault.amountSupplied == 0 ? 0 : 1);
 		require(0 < amtIn && amtIn <= _maxIn);
-		require(IFixCapitalPool(_assetBorrowed).maturity() < block.timestamp + (1 days) || 
-			!satisfiesLimit(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied, vault.amountBorrowed, false));
 
 		//burn borrowed ZCB
 		address FCPborrowed = IZeroCouponBond(_assetBorrowed).FixCapitalPoolAddress();
 		IFixCapitalPool(FCPborrowed).burnZCBFrom(_to, amtIn);
 		lowerShortInterest(FCPborrowed, amtIn);
 		IERC20(_assetSupplied).transfer(_to, _out);
+
+		{
+			SUPPLIED_ASSET_TYPE sType;
+			address baseFCP;
+			address baseWrapper;
+			if (IZeroCouponBond(_assetBorrowed).maturity() >= block.timestamp + CRITICAL_TIME_TO_MATURITY) {
+				bool satisfies;
+				(satisfies, sType, baseFCP, baseWrapper) = satisfiesLimitRetAllData(vault.assetSupplied, vault.assetBorrowed, vault.amountSupplied, vault.amountBorrowed, false);
+				require(!satisfies);
+			}
+			else {
+				(, sType, baseFCP, baseWrapper) = suppliedAssetInfo(_assetSupplied);
+			}
+			require(_out <= uint(type(int256).max));
+			int changeAmt = -int(_out);
+			editSubAccountStandardVault(false, _owner, sType, baseFCP, baseWrapper, changeAmt);
+		}
 
 		_vaults[_owner][_index].amountBorrowed -= amtIn;
 		_vaults[_owner][_index].amountSupplied -= _out;
@@ -492,6 +541,14 @@ contract NSFVaultFactoryDelegate1 is NSFVaultFactoryDelegateParent {
 		require(_vaults[msg.sender].length > _index);
 		Vault memory vault = _vaults[msg.sender][_index];
 		_vaults[_to].push(vault);
+		if (vault.amountSupplied > 0) {
+			(, SUPPLIED_ASSET_TYPE sType, address baseFCP, address baseWrapper) = suppliedAssetInfo(vault.assetSupplied);
+			require(vault.amountSupplied <= uint(type(int256).max));
+			int intSupplied = int(vault.amountSupplied);
+			editSubAccountStandardVault(true, msg.sender, sType, baseFCP, baseWrapper, -intSupplied);
+			//passing claimRewards:true a second time would needlessly waste gas
+			editSubAccountStandardVault(false, _to, sType, baseFCP, baseWrapper, intSupplied);
+		}
 		delete _vaults[msg.sender][_index];
 	}
 
@@ -504,6 +561,10 @@ contract NSFVaultFactoryDelegate1 is NSFVaultFactoryDelegateParent {
 	function transferYTVault(uint _index, address _to) internal {
 		require(_YTvaults[msg.sender].length > _index);
 		YTVault memory vault = _YTvaults[msg.sender][_index];
+		require(vault.yieldSupplied <= uint(type(int256).max));
+		address baseWrapper = address(IFixCapitalPool(vault.FCPsupplied).wrapper());
+		editSubAccountYTVault(true, msg.sender, vault.FCPsupplied, baseWrapper, -int(vault.yieldSupplied), vault.bondSupplied.mul(-1));
+		editSubAccountYTVault(false, _to, vault.FCPsupplied, baseWrapper, int(vault.yieldSupplied), vault.bondSupplied);
 		_YTvaults[_to].push(vault);
 		delete _YTvaults[msg.sender][_index];
 	}
@@ -524,6 +585,36 @@ contract NSFVaultFactoryDelegate1 is NSFVaultFactoryDelegateParent {
 		IFixCapitalPool(_FCP).transferPosition(_treasuryAddress, yieldToTreasury, bondToTreasury);
 		IFixCapitalPool(_FCP).transferPosition(msg.sender, pos.amountYield - yieldToTreasury, (pos.amountBond + _bondIn) - bondToTreasury);
 		delete _YTRevenue[_FCP];
+	}
+
+	/*
+		@Description: allows a user to claim the excess collateral that was received as a rebate
+			when their vault(s) were liquidated
+
+		@param address _asset: the address of the asset for which to claim rebated collateral
+	*/
+	function claimRebate(address _asset) external {
+		uint amt = _liquidationRebates[msg.sender][_asset];
+		require(amt <= uint(type(int256).max));
+		(, SUPPLIED_ASSET_TYPE sType, address baseFCP, address baseWrapper) = suppliedAssetInfo(_asset);
+		IERC20(_asset).transfer(msg.sender, amt);
+		editSubAccountStandardVault(false, msg.sender, sType, baseFCP, baseWrapper, -int(amt));
+		delete _liquidationRebates[msg.sender][_asset];
+	}
+
+	/*
+		@Description: allows a user to claim the excess collateral that was received as a rebate
+			when their YT vault(s) were liquidated
+	
+		@param address _FCP: the address of the FCP contract for which to claim the rebate
+	*/
+	function claimYTRebate(address _FCP) external {
+		YTPosition memory position = _YTLiquidationRebates[msg.sender][_FCP];
+		require(position.amountYield <= uint(type(int256).max));
+		IFixCapitalPool(_FCP).transferPosition(msg.sender, position.amountYield, position.amountBond);
+		address baseWrapper = address(IFixCapitalPool(_FCP).wrapper());
+		editSubAccountYTVault(false, msg.sender, _FCP, baseWrapper, -int(position.amountYield), position.amountBond.mul(-1));
+		delete _YTLiquidationRebates[msg.sender][_FCP];
 	}
 
 }

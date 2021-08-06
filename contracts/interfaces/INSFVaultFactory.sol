@@ -18,6 +18,7 @@ interface INSFVaultFactory {
 	function VaultHealthAddress() external view returns (address);
 	//-----------vault-related-views-----
 	function revenue(address _asset) external view returns (uint);
+	function liquidationRebates(address _owner, address _asset) external view returns(uint);
 	function vaults(address _owner, uint _index) external view returns (
 		address assetSupplied,
 		address assetBorrowed,
@@ -35,6 +36,7 @@ interface INSFVaultFactory {
 	);
 	//-------------YT-vault-related-views-----------
 	function YTrevenue(address _FCPaddress) external view returns (uint yield, int bond);
+	function YTLiquidationRebates(address _owner, address _FCP) external view returns(uint yield, int bond);
 	function YTvaults(address _owner, uint _index) external view returns (
 		address FCPsupplied,
 		address FCPborrowed,

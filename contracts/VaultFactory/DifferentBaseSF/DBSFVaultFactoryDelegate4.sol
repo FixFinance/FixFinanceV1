@@ -255,7 +255,7 @@ contract DBSFVaultFactoryDelegate4 is DBSFVaultFactoryDelegateParent {
 	function instantYTLiquidation(address _owner, uint _index, address _FCPborrowed, address _FCPsupplied, uint _maxIn, uint _minOut, int _minBondRatio, address _to) external {
 		require(_YTvaults[_owner].length > _index);
 		YTVault memory vault = _YTvaults[_owner][_index];
-		address baseWrapper = autopayYTVault(_owner, _index, vault);
+		address baseWrapperSupplied = autopayYTVault(_owner, _index, vault);
 		require(vault.FCPborrowed == _FCPborrowed);
 		require(vault.FCPsupplied == _FCPsupplied);
 		/*
@@ -288,7 +288,7 @@ contract DBSFVaultFactoryDelegate4 is DBSFVaultFactoryDelegateParent {
 		IFixCapitalPool(_FCPborrowed).burnZCBFrom(_to, vault.amountBorrowed);
 		lowerShortInterest(_FCPborrowed, vault.amountBorrowed);
 		IFixCapitalPool(_FCPsupplied).transferPosition(_to, vault.yieldSupplied, vault.bondSupplied);
-		editSubAccountYTVault(false, _owner, vault.FCPsupplied, baseWrapper, -int(vault.yieldSupplied), vault.bondSupplied.mul(-1));
+		editSubAccountYTVault(false, _owner, vault.FCPsupplied, baseWrapperSupplied, -int(vault.yieldSupplied), vault.bondSupplied.mul(-1));
 
 		delete _YTvaults[_owner][_index];
 	}
@@ -314,7 +314,7 @@ contract DBSFVaultFactoryDelegate4 is DBSFVaultFactoryDelegateParent {
 	function partialYTLiquidationSpecificIn(address _owner, uint _index, address _FCPborrowed, address _FCPsupplied, uint _in, uint _minOut, int _minBondRatio, address _to) external {
 		require(_YTvaults[_owner].length > _index);
 		YTVault memory vault = _YTvaults[_owner][_index];
-		address baseWrapper = autopayYTVault(_owner, _index, vault);
+		address baseWrapperSupplied = autopayYTVault(_owner, _index, vault);
 		require(vault.FCPborrowed == _FCPborrowed);
 		require(vault.FCPsupplied == _FCPsupplied);
 		/*
@@ -347,7 +347,7 @@ contract DBSFVaultFactoryDelegate4 is DBSFVaultFactoryDelegateParent {
 		IFixCapitalPool(_FCPborrowed).burnZCBFrom(_to, _in);
 		lowerShortInterest(_FCPborrowed, _in);
 		IFixCapitalPool(_FCPsupplied).transferPosition(_to, yieldOut, bondOut);
-		editSubAccountYTVault(false, _owner, vault.FCPsupplied, baseWrapper, -int(yieldOut), bondOut.mul(-1));
+		editSubAccountYTVault(false, _owner, vault.FCPsupplied, baseWrapperSupplied, -int(yieldOut), bondOut.mul(-1));
 
 		_YTvaults[_owner][_index].amountBorrowed = vault.amountBorrowed - _in;
 		_YTvaults[_owner][_index].yieldSupplied -= yieldOut;
@@ -375,7 +375,7 @@ contract DBSFVaultFactoryDelegate4 is DBSFVaultFactoryDelegateParent {
 		require(_YTvaults[_owner].length > _index);
 		require(_out <= uint(type(int256).max));
 		YTVault memory vault = _YTvaults[_owner][_index];
-		address baseWrapper = autopayYTVault(_owner, _index, vault);
+		address baseWrapperSupplied = autopayYTVault(_owner, _index, vault);
 		require(vault.FCPborrowed == _FCPborrowed);
 		require(vault.FCPsupplied == _FCPsupplied);
 		require(vault.yieldSupplied >= _out);
@@ -406,7 +406,7 @@ contract DBSFVaultFactoryDelegate4 is DBSFVaultFactoryDelegateParent {
 		IFixCapitalPool(_FCPborrowed).burnZCBFrom(_to, amtIn);
 		lowerShortInterest(_FCPborrowed, amtIn);
 		IFixCapitalPool(_FCPsupplied).transferPosition(_to, _out, bondOut);
-		editSubAccountYTVault(false, _owner, vault.FCPsupplied, baseWrapper, -int(_out), bondOut.mul(-1));
+		editSubAccountYTVault(false, _owner, vault.FCPsupplied, baseWrapperSupplied, -int(_out), bondOut.mul(-1));
 
 		_YTvaults[_owner][_index].amountBorrowed = vault.amountBorrowed - amtIn;
 		_YTvaults[_owner][_index].yieldSupplied -= _out;

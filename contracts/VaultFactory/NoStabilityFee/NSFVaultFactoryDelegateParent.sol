@@ -57,11 +57,19 @@ contract NSFVaultFactoryDelegateParent is NSFVaultFactoryData {
 		@param address _vaultOwner: the owner of the vault that has between liquidated
 		@param address _asset: the address of the asset for which surplus has been acquired
 		@param uint _amount: the amount of surplus
+		@param address _claimRewards: pass true to enter the claimRewards modifier in NGBwrapper
+			for either msg.sender or the _FCPaddr, depending on if _FCPaddr == address(0)
 	*/
-	function distributeSurplus(address _vaultOwner, address _asset, uint _amount) internal {
-		uint retainedSurplus = _amount * _liquidationRebateBips / TOTAL_BASIS_POINTS;
+	function distributeSurplus(address _vaultOwner, address _asset, uint _amount, bool _claimRewards) internal {
+		uint retainedSurplus = _amount.mul(_liquidationRebateBips) / TOTAL_BASIS_POINTS;
+		uint toTreasury = _amount - retainedSurplus;
 		_liquidationRebates[_vaultOwner][_asset] += retainedSurplus;
-		_revenue[_asset] += _amount-retainedSurplus;
+		_revenue[_asset] += toTreasury;
+		(, SUPPLIED_ASSET_TYPE sType, address baseFCP, address baseWrapper) = suppliedAssetInfo(_asset);
+		require(toTreasury <= uint(type(int256).max));
+		editSubAccountStandardVault(_claimRewards, _vaultOwner, sType, baseFCP, baseWrapper, -int(toTreasury));
+		//passing claimRewards:true a second time would needlessly waste gas
+		editSubAccountStandardVault(false, _treasuryAddress, sType, baseFCP, baseWrapper, int(toTreasury));
 	}
 
 	/*
@@ -282,17 +290,56 @@ contract NSFVaultFactoryDelegateParent is NSFVaultFactoryData {
 
 	/*
 		@Description: check if a vault is above the upper or lower collateralization limit
+			return valuable info found while finding if the limit was satisfied
 
 		@param address _assetSupplied: the asset used as collateral
 			this asset may be a ZCB or any other asset that is whitelisted
 		@param address _assetBorrowed: the ZCB that is borrowed from the new vault
 `		@param uint _amountSupplied: the amount of _assetSupplied posed as collateral
 		@param uint _amountBorrowed: the amount of _assetBorrowed borrowed
-		@param bool _upper: true if we are to check the upper collateralization limit,
-			false otherwise
+		@param bool _upper: true if we are to check the upper collateralization limit, false otherwise
 
-		@return bool: true if vault satisfies the limit,
-			false otherwise
+		@return bool satisfies: true if vault satisfies the limit, false otherwise
+		@return SUPPLIED_ASSET_TYPE sType: the type of collateral supplied to the vault
+		@return address baseFCP: the base FCP of the collateral supplied to the vault
+		@return address baseWrapper: the base wrapper of the collateral supplied to the vault
+	*/
+	function satisfiesLimitRetAllData(
+		address _assetSupplied,
+		address _assetBorrowed,
+		uint _amountSupplied,
+		uint _amountBorrowed,
+		bool _upper
+	) internal view returns (
+		bool satisfies,
+		SUPPLIED_ASSET_TYPE sType,
+		address baseFCP,
+		address baseWrapper
+	) {
+
+		address whitelistAddr;
+		(whitelistAddr, sType, baseFCP, baseWrapper) = suppliedAssetInfo(_assetSupplied);
+		(address _suppliedAddrToPass, uint _suppliedAmtToPass) = passInfoToVaultManagerPassWhitelistAddr(_assetSupplied, _amountSupplied, whitelistAddr);
+
+		satisfies = ( _upper ?
+			vaultHealthContract.satisfiesUpperLimit(_suppliedAddrToPass, _assetBorrowed, _suppliedAmtToPass, _amountBorrowed)
+				:
+			vaultHealthContract.satisfiesLowerLimit(_suppliedAddrToPass, _assetBorrowed, _suppliedAmtToPass, _amountBorrowed)
+		);
+	}
+
+
+	/*
+		@Description: check if a vault is above the upper or lower collateralization limit
+
+		@param address _assetSupplied: the asset used as collateral
+			this asset may be a ZCB or any other asset that is whitelisted
+		@param address _assetBorrowed: the ZCB that is borrowed from the new vault
+`		@param uint _amountSupplied: the amount of _assetSupplied posed as collateral
+		@param uint _amountBorrowed: the amount of _assetBorrowed borrowed
+		@param bool _upper: true if we are to check the upper collateralization limit, false otherwise
+
+		@return bool: true if vault satisfies the limit, false otherwise
 	*/
 	function satisfiesLimit(
 		address _assetSupplied,
@@ -300,15 +347,8 @@ contract NSFVaultFactoryDelegateParent is NSFVaultFactoryData {
 		uint _amountSupplied,
 		uint _amountBorrowed,
 		bool _upper
-	) internal view returns (bool) {
-
-		(address _suppliedAddrToPass, uint _suppliedAmtToPass) = passInfoToVaultManager(_assetSupplied, _amountSupplied);
-
-		return ( _upper ?
-			vaultHealthContract.satisfiesUpperLimit(_suppliedAddrToPass, _assetBorrowed, _suppliedAmtToPass, _amountBorrowed)
-				:
-			vaultHealthContract.satisfiesLowerLimit(_suppliedAddrToPass, _assetBorrowed, _suppliedAmtToPass, _amountBorrowed)
-		);
+	) internal view returns (bool satisfies) {
+		(satisfies, , , ) = satisfiesLimitRetAllData(_assetSupplied, _assetBorrowed, _amountSupplied, _amountBorrowed, _upper);
 	}
 
 	/*
@@ -319,8 +359,15 @@ contract NSFVaultFactoryDelegateParent is NSFVaultFactoryData {
 		@param address _FCPaddr: the address of the fix capital pool for which to distribte surplus
 		@param uint _yieldAmount: value to add to rebate.amountYield
 		@param int _bondAmount: value to add to rebate.amountBond
+		@param address _baseWrapper: the base wrapper of the FCP
 	*/
-	function distributeYTSurplus(address _vaultOwner, address _FCPaddr, uint _yieldAmount, int _bondAmount) internal {
+	function distributeYTSurplus(
+		address _vaultOwner,
+		address _FCPaddr,
+		uint _yieldAmount,
+		int _bondAmount,
+		address _baseWrapper
+	) internal {
 		YTPosition storage rebate = _YTLiquidationRebates[_vaultOwner][_FCPaddr];
 		YTPosition storage revenue = _YTRevenue[_FCPaddr];
 		uint _rebateBips = _liquidationRebateBips;
@@ -328,8 +375,13 @@ contract NSFVaultFactoryDelegateParent is NSFVaultFactoryData {
 		int bondRebate = _bondAmount * int(_rebateBips) / int(TOTAL_BASIS_POINTS);
 		rebate.amountYield += yieldRebate;
 		rebate.amountBond += bondRebate;
-		revenue.amountYield += _yieldAmount - yieldRebate;
-		revenue.amountBond += _bondAmount - bondRebate;
+		uint yieldRevenue = _yieldAmount - yieldRebate;
+		require(yieldRevenue <= uint(type(int256).max));
+		int bondRevenue = _bondAmount - bondRebate;
+		revenue.amountYield += yieldRevenue;
+		revenue.amountBond += bondRevenue;
+		editSubAccountYTVault(true, _vaultOwner, _FCPaddr, _baseWrapper, -int(yieldRevenue), bondRevenue.mul(-1));
+		editSubAccountYTVault(false, _treasuryAddress, _FCPaddr, _baseWrapper, int(yieldRevenue), bondRevenue);
 	}
 
 	/*
@@ -348,14 +400,20 @@ contract NSFVaultFactoryDelegateParent is NSFVaultFactoryData {
 
 		@param address _FCP: the address of the FCP contract for which to find the amount of ZCB
 		@param uint _amountWrapped: the amount of wrapped token for which to find the amount of ZCB as a subasset
+
+		@return uint amountZCB: the amount of ZCB contained in specific amount of wrapped asset
+		@return address baseWrapper: the base wrapper of the FCP contract
 	*/
-	function getZCBcontainedInWrappedAmt(address _FCP, uint _amountWrapped) internal view returns (uint amountZCB) {
+	function getZCBcontainedInWrappedAmt(address _FCP, uint _amountWrapped) internal view returns(uint amountZCB, address baseWrapper) {
 		if (IFixCapitalPool(_FCP).inPayoutPhase()) {
 			uint conversionRate = IFixCapitalPool(_FCP).maturityConversionRate();
 			amountZCB = conversionRate.mul(_amountWrapped) / (1 ether);
+			baseWrapper = address(IFixCapitalPool(_FCP).wrapper());
 		}
 		else {
-			amountZCB = getUnitValueYield(_FCP, _amountWrapped);
+			baseWrapper = address(IFixCapitalPool(_FCP).wrapper());
+			require(baseWrapper != address(0));
+			amountZCB = IWrapper(baseWrapper).WrappedAmtToUnitAmt_RoundDown(_amountWrapped);
 		}
 	}
 
@@ -398,16 +456,20 @@ contract NSFVaultFactoryDelegateParent is NSFVaultFactoryData {
 			with the zcb contained as collateral in the vault
 			this can only be done where FCPborrowed == FCPsupplied because the ZCB that is collateral is the
 			same ZCB as the debt, this will not be true for any other type of Vault or YTVault
+			return info fetched during execution so that it is not needed to be fetched again
 
 		@param address _owner: the owner of the YTVault for which to pay back debt
 		@param uint _index: the index of the YTVault swithin YTvaults[_owner]
 		@param YTVault memory _vault: this parameter will be modified if debt is paid back
 			when this function is finished executing all member variables of _vault will == the member variables of
 			the storage vault which _vault is a copy of
+
+		@return address baseWrapperSupplied: the base wrapper of the FCP of the supplied collateral
 	*/
-	function autopayYTVault(address _owner, uint _index, YTVault memory _vault) internal {
+	function autopayYTVault(address _owner, uint _index, YTVault memory _vault) internal returns(address baseWrapperSupplied) {
 		if (_vault.FCPborrowed == _vault.FCPsupplied) {
-			uint unitValueYield = getZCBcontainedInWrappedAmt(_vault.FCPborrowed, _vault.yieldSupplied);
+			uint unitValueYield;
+			(unitValueYield, baseWrapperSupplied) = getZCBcontainedInWrappedAmt(_vault.FCPborrowed, _vault.yieldSupplied);
 			uint difference = _vault.bondSupplied >= 0 ? unitValueYield.add(uint(_vault.bondSupplied)) : unitValueYield.sub(uint(-_vault.bondSupplied));
 			difference = difference > _vault.amountBorrowed ? _vault.amountBorrowed : difference;
 			if (difference > 0) {
@@ -416,6 +478,9 @@ contract NSFVaultFactoryDelegateParent is NSFVaultFactoryData {
 				_YTvaults[_owner][_index].bondSupplied = _vault.bondSupplied;
 				_YTvaults[_owner][_index].amountBorrowed = _vault.amountBorrowed;
 			}
+		}
+		else {
+			baseWrapperSupplied = address(IFixCapitalPool(_vault.FCPsupplied).wrapper());
 		}
 	}
 

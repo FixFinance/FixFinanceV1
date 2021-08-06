@@ -231,7 +231,7 @@ contract DBSFVaultFactoryDelegateParent is DBSFVaultFactoryData {
 			for either msg.sender or the _FCPaddr, depending on if _FCPaddr == address(0)
 	*/
 	function distributeSurplus(address _vaultOwner, address _asset, uint _amount, bool _claimRewards) internal {
-		uint retainedSurplus = _amount * _liquidationRebateBips / TOTAL_BASIS_POINTS;
+		uint retainedSurplus = _amount.mul(_liquidationRebateBips) / TOTAL_BASIS_POINTS;
 		uint toTreasury = _amount - retainedSurplus;
 		_liquidationRebates[_vaultOwner][_asset] += retainedSurplus;
 		_revenue[_asset] += toTreasury;

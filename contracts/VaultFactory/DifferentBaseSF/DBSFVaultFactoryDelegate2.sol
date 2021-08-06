@@ -161,8 +161,7 @@ contract DBSFVaultFactoryDelegate2 is DBSFVaultFactoryDelegateParent {
 
 		IERC20(liq.assetSupplied).transfer(_to, liq.bidAmount);
 
-		(, SUPPLIED_ASSET_TYPE sType, address baseFCP, address baseWrapper) =
-			suppliedAssetInfo(liq.assetSupplied, IInfoOracle(_infoOracleAddress));
+		(, SUPPLIED_ASSET_TYPE sType, address baseFCP, address baseWrapper) = suppliedAssetInfo(liq.assetSupplied, IInfoOracle(_infoOracleAddress));
 		require(liq.bidAmount <= uint(type(int256).max));
 		editSubAccountStandardVault(false, liq.vaultOwner, sType, baseFCP, baseWrapper, -int(liq.bidAmount));
 	}
@@ -270,6 +269,9 @@ contract DBSFVaultFactoryDelegate2 is DBSFVaultFactoryDelegateParent {
 
 		_vaults[_owner][_index].amountBorrowed = vault.amountBorrowed - _in;
 		_vaults[_owner][_index].amountSupplied = vault.amountSupplied - amtOut;
+		/*
+			if instant liquidations are happening we do not care about collecting stability fees, we care about system solvency
+		*/
 		_vaults[_owner][_index].amountSFee = 0;
 	}
 
@@ -326,6 +328,9 @@ contract DBSFVaultFactoryDelegate2 is DBSFVaultFactoryDelegateParent {
 
 		_vaults[_owner][_index].amountBorrowed = vault.amountBorrowed - amtIn;
 		_vaults[_owner][_index].amountSupplied = vault.amountSupplied - _out;
+		/*
+			if instant liquidations are happening we do not care about collecting stability fees, we care about system solvency
+		*/
 		_vaults[_owner][_index].amountSFee = 0;
 	}
 

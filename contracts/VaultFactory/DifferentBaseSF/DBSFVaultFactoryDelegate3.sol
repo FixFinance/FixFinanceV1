@@ -250,10 +250,12 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryDelegateParent {
 			int bondChange = _bondSupplied;
 			address baseWrapperSupplied = IInfoOracle(_infoOracleAddress).FCPtoWrapper(address(this), copyFCPsupplied);
 			editSubAccountYTVault(false, copyVaultOwner, copyFCPsupplied, baseWrapperSupplied, yieldChange, bondChange);
-			yieldChange = -int(mVault.yieldSupplied);
-			bondChange = mVault.bondSupplied.mul(-1);
-			baseWrapperSupplied = address(IFixCapitalPool(mVault.FCPsupplied).wrapper());
-			editSubAccountYTVault(false, copyVaultOwner, mVault.FCPsupplied, baseWrapperSupplied, yieldChange, bondChange);
+			if (mVault.FCPsupplied != address(0)) {
+				yieldChange = -int(mVault.yieldSupplied);
+				bondChange = mVault.bondSupplied.mul(-1);
+				baseWrapperSupplied = address(IFixCapitalPool(mVault.FCPsupplied).wrapper());
+				editSubAccountYTVault(false, copyVaultOwner, mVault.FCPsupplied, baseWrapperSupplied, yieldChange, bondChange);
+			}
 		}
 	}
 

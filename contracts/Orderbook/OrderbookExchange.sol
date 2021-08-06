@@ -446,6 +446,10 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 		return internalLockedYT[_depositor];
 	}
 
+	function lockedZCB(address _depositor) external view override returns(uint) {
+		return internalLockedZCB[_depositor];
+	}
+
 	function YTSells(uint _ID) external view override returns(
 		address maker,
 		uint amount,

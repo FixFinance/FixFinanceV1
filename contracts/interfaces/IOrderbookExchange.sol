@@ -61,6 +61,7 @@ interface IOrderbookExchange {
 	function YieldDeposited(address _depositor) external view returns(uint);
 	function BondDeposited(address _depositor) external view returns(int);
 	function lockedYT(address _depositor) external view returns(uint);
+	function lockedZCB(address _depositor) external view returns(uint);
 	function YTSells(uint _ID) external view returns(
 		address maker,
 		uint amount,

@@ -57,8 +57,16 @@ contract OrderbookData {
 	mapping(address => uint) internal internalYieldDeposited;
 	mapping(address => int) internal internalBondDeposited;
 
-	//amount of static YT that is being used as collateral for a limit order
+	/*
+		amount of static YT that is being used as collateral for a limit order,
+		when YT is locked lockedYT increases and YieldDeposited remains the same
+	*/
 	mapping(address => uint) internal internalLockedYT;
+	/*
+		amount of ZCB that is being used as collateral for a limit order
+		when ZCB is locked lockedZCB increases and BondDeposited remains the same
+	*/
+	mapping(address => uint) internal internalLockedZCB;
 
 	mapping(uint => LimitSellYT) internal internalYTSells;
 	mapping(uint => LimitSellZCB) internal internalZCBSells;

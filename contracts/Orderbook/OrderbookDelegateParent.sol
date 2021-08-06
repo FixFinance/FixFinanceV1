@@ -60,10 +60,11 @@ contract OrderbookDelegateParent is OrderbookData {
 		_;
 	}
 
-	function requireValidCollateral(uint _YD, int _BD, uint _wrappedAmtLockedYT, uint _ratio) internal pure {
+	function requireValidCollateral(uint _YD, int _BD, uint _wrappedAmtLockedYT, uint _lockedZCB, uint _ratio) internal pure {
+		require(_lockedZCB <= uint(type(int256).max));
 		uint unitAmtLockedYT = _wrappedAmtLockedYT.mul(_ratio)/(1 ether);
 		uint minimumYieldCollateral = _YD.sub(_wrappedAmtLockedYT);
-		int minimumBondCollateral = _BD.add(int(unitAmtLockedYT));
+		int minimumBondCollateral = _BD.add(int(unitAmtLockedYT)).sub(int(_lockedZCB));
 		require(minimumBondCollateral >= 0 || minimumYieldCollateral.mul(_ratio)/(1 ether) >= uint(-minimumBondCollateral));
 	}
 
@@ -93,19 +94,12 @@ contract OrderbookDelegateParent is OrderbookData {
 		uint YD = internalYieldDeposited[_addr];
 		int BD = internalBondDeposited[_addr];
 		uint wrappedAmtLockedYT = internalLockedYT[_addr];
+		uint resultantLockedZCB = internalLockedZCB[_addr].add(_amount);
 		uint ratio = internalWrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
 
-		int resultantBD = BD.sub(int(_amount));
+		requireValidCollateral(YD, BD, wrappedAmtLockedYT, resultantLockedZCB, ratio);
 
-		requireValidCollateral(YD, resultantBD, wrappedAmtLockedYT, ratio);
-
-		internalBondDeposited[_addr] = resultantBD;
-	}
-
-	function manageCollateral_ReceiveZCB(address _addr, uint _amount) internal {
-		require(_amount < uint(type(int256).max));
-		int BD = internalBondDeposited[_addr];
-		internalBondDeposited[_addr] = BD.add(int(_amount));
+		internalLockedZCB[_addr] = resultantLockedZCB;
 	}
 
 	function manageCollateral_BuyZCB_takeOrder(address _addr, uint _amountZCB, uint _amountWrappedYT, uint _ratio, bool _useInternalBalances) internal {
@@ -115,10 +109,11 @@ contract OrderbookDelegateParent is OrderbookData {
 
 			uint YD = internalYieldDeposited[_addr];
 			uint wrappedAmtLockedYT = internalLockedYT[_addr];
+			uint _lockedZCB = internalLockedZCB[_addr];
 			int BD = internalBondDeposited[_addr];
 			uint resultantYD = YD.sub(_amountWrappedYT+1); //+1 to prevent off by 1 errors
 			int resultantBD = BD.add(int(bondValChange));
-			requireValidCollateral(resultantYD, resultantBD, wrappedAmtLockedYT, _ratio);
+			requireValidCollateral(resultantYD, resultantBD, wrappedAmtLockedYT, _lockedZCB, _ratio);
 			internalYieldDeposited[_addr] = resultantYD;
 			internalBondDeposited[_addr] = resultantBD;
 		}
@@ -136,32 +131,15 @@ contract OrderbookDelegateParent is OrderbookData {
 		require(_amount < uint(type(int256).max));
 		uint YD = internalYieldDeposited[_addr];
 		int BD = internalBondDeposited[_addr];
-		uint wrappedAmtLockedYT = internalLockedYT[_addr];
+		uint resultantWrappedAmtLockedYT = internalLockedYT[_addr].add(_amount);
+		uint _lockedZCB = internalLockedZCB[_addr];
 		uint ratio = internalWrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
 
-		uint newWrappedAmtLockedYT = wrappedAmtLockedYT.add(_amount);
+		requireValidCollateral(YD, BD, resultantWrappedAmtLockedYT, _lockedZCB, ratio);
 
-		requireValidCollateral(YD, BD, newWrappedAmtLockedYT, ratio);
-
-		internalLockedYT[_addr] = newWrappedAmtLockedYT;
+		internalLockedYT[_addr] = resultantWrappedAmtLockedYT;
 	}
 
-	function manageCollateral_ReceiveYT_makeOrder(address _addr, uint _amount) internal {
-		require(_amount < uint(type(int256).max));
-		uint _internalLockedYT = internalLockedYT[_addr];
-		internalLockedYT[_addr] = _internalLockedYT.sub(_amount);
-	}
-
-	function manageCollateral_ReceiveYT_fillOrder(address _addr, uint _amount, uint _ratio) internal {
-		require(_amount < uint(type(int256).max));
-		uint unitAmtYT = _amount.mul(_ratio) / (1 ether);
-		uint YD = internalYieldDeposited[_addr];
-		int BD = internalBondDeposited[_addr];
-		uint resultantYD = YD.add(_amount);
-		int resultantBD = BD.sub(int(unitAmtYT));
-		internalYieldDeposited[_addr] = resultantYD;
-		internalBondDeposited[_addr] = resultantBD;
-	}
 
 	function manageCollateral_BuyYT_takeOrder(
 		address _addr,
@@ -176,10 +154,11 @@ contract OrderbookDelegateParent is OrderbookData {
 
 			uint YD = internalYieldDeposited[_addr];
 			uint wrappedAmtLockedYT = internalLockedYT[_addr];
+			uint _lockedZCB = internalLockedZCB[_addr];
 			int BD = internalBondDeposited[_addr];
 			uint resultantYD = YD.add(_amountWrappedYT);
 			int resultantBD = BD.sub(int(bondValChange));
-			requireValidCollateral(resultantYD, resultantBD, wrappedAmtLockedYT, _ratio);
+			requireValidCollateral(resultantYD, resultantBD, wrappedAmtLockedYT, _lockedZCB, _ratio);
 			internalYieldDeposited[_addr] = resultantYD;
 			internalBondDeposited[_addr] = resultantBD;
 		}
@@ -191,6 +170,35 @@ contract OrderbookDelegateParent is OrderbookData {
 			//send YT
 			internalFCP.transferPosition(msg.sender, _amountWrappedYT, -int(unitAmtYT));
 		}
+	}
+
+	function manageCollateral_ReceiveZCB_closeOrder(address _addr, uint _amount) internal {
+		require(_amount < uint(type(int256).max));
+		uint resultantLockedZCB = internalLockedZCB[_addr].sub(_amount);
+		internalLockedZCB[_addr] = resultantLockedZCB;
+	}
+
+	function manageCollateral_ReceiveZCB_fillOrder(address _addr, uint _amount) internal {
+		require(_amount < uint(type(int256).max));
+		int resultantBD = internalBondDeposited[_addr].add(int(_amount));
+		internalBondDeposited[_addr] = resultantBD;
+	}
+
+	function manageCollateral_ReceiveYT_closeOrder(address _addr, uint _amount) internal {
+		require(_amount < uint(type(int256).max));
+		uint resultantLockedYT = internalLockedYT[_addr].sub(_amount);
+		internalLockedYT[_addr] = resultantLockedYT;
+	}
+
+	function manageCollateral_ReceiveYT_fillOrder(address _addr, uint _amount, uint _ratio) internal {
+		require(_amount < uint(type(int256).max));
+		uint unitAmtYT = _amount.mul(_ratio) / (1 ether);
+		uint YD = internalYieldDeposited[_addr];
+		int BD = internalBondDeposited[_addr];
+		uint resultantYD = YD.add(_amount);
+		int resultantBD = BD.sub(int(unitAmtYT));
+		internalYieldDeposited[_addr] = resultantYD;
+		internalBondDeposited[_addr] = resultantBD;
 	}
 
 	function manageCollateral_payFee(uint _amount, uint _ratio) internal {

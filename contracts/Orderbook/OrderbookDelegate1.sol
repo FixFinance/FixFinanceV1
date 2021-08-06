@@ -19,12 +19,13 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 		uint YD = internalYieldDeposited[msg.sender];
 		int BD = internalBondDeposited[msg.sender];
 		uint wrappedAmtLockedYT = internalLockedYT[msg.sender];
+		uint _lockedZCB = internalLockedZCB[msg.sender];
 		uint ratio = internalWrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
 
 		uint resultantYD = YD.sub(_amountYield);
 		int resultantBD = BD.sub(_amountBond);
 
-		requireValidCollateral(resultantYD, resultantBD, wrappedAmtLockedYT, ratio);
+		requireValidCollateral(resultantYD, resultantBD, wrappedAmtLockedYT, _lockedZCB, ratio);
 		internalFCP.transferPosition(msg.sender, _amountYield, _amountBond);
 
 		internalYieldDeposited[msg.sender] = resultantYD;
@@ -65,7 +66,7 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 				ZCBsold += scaledZCBamt;
 				YTbought += _amountYT;
 
-				manageCollateral_ReceiveZCB(order.maker, scaledZCBamt);
+				manageCollateral_ReceiveZCB_fillOrder(order.maker, scaledZCBamt);
 				if (order.amount == _amountYT) {
 					internalHeadYTSellID = order.nextID;
 					delete internalYTSells[newHeadID];
@@ -89,7 +90,7 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 			}
 			else {
 
-				manageCollateral_ReceiveZCB(order.maker, orderZCBamt);
+				manageCollateral_ReceiveZCB_fillOrder(order.maker, orderZCBamt);
 				delete internalYTSells[newHeadID];
 
 				ZCBsold += orderZCBamt;
@@ -303,7 +304,7 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 				ZCBsold += _amountZCB;
 				YTbought += scaledYTamt;
 
-				manageCollateral_ReceiveZCB(order.maker, _amountZCB);
+				manageCollateral_ReceiveZCB_fillOrder(order.maker, _amountZCB);
 				if (order.amount == scaledYTamt) {
 					internalHeadYTSellID = order.nextID;
 					delete internalYTSells[newHeadID];
@@ -326,7 +327,7 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 			}
 			else {
 
-				manageCollateral_ReceiveZCB(order.maker, orderZCBamt);
+				manageCollateral_ReceiveZCB_fillOrder(order.maker, orderZCBamt);
 				delete internalYTSells[newHeadID];
 
 				ZCBsold += orderZCBamt;
@@ -410,7 +411,7 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 				YTbought += YTtoBuy;
 				ZCBsold += ZCBtoSell;
 
-				manageCollateral_ReceiveZCB(order.maker, ZCBtoSell.mul(TOTAL_BASIS_POINTS) / (TOTAL_BASIS_POINTS + (i >> 16)));
+				manageCollateral_ReceiveZCB_fillOrder(order.maker, ZCBtoSell.mul(TOTAL_BASIS_POINTS) / (TOTAL_BASIS_POINTS + (i >> 16)));
 				if (order.amount <= ZCBtoSell) {
 					internalHeadYTSellID = order.nextID;
 					delete internalYTSells[newHeadID];
@@ -447,7 +448,7 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 			}
 			else {
 
-				manageCollateral_ReceiveZCB(order.maker, orderZCBamt_orderRatio);
+				manageCollateral_ReceiveZCB_fillOrder(order.maker, orderZCBamt_orderRatio);
 				delete internalYTSells[newHeadID];
 
 				ZCBsold += feeAdjOrderZCBamt;

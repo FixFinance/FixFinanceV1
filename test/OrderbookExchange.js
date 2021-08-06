@@ -97,11 +97,13 @@ contract('OrderbookExchange', async function(accounts) {
 
 		YD = await exchange.YieldDeposited(accounts[0]);
 		BD = await exchange.BondDeposited(accounts[0]);
-		let lockedYT = await exchange.lockedYT(accounts[0]);
+		lockedYT = await exchange.lockedYT(accounts[0]);
+		lockedZCB = await exchange.lockedZCB(accounts[0]);
 
 		assert.equal(YD.toString(), yieldToDeposit.toString());
 		assert.equal(BD.toString(), bondToDeposit.toString());
 		assert.equal(lockedYT.toString(), "0");
+		assert.equal(lockedZCB.toString(), "0");
 		assert.equal(prevYieldBalance.sub(yieldBalance).toString(), yieldToDeposit.toString());
 		assert.equal(prevBondBalance.sub(bondBalance).toString(), bondToDeposit.toString());
 	});
@@ -124,10 +126,12 @@ contract('OrderbookExchange', async function(accounts) {
 		YD = await exchange.YieldDeposited(accounts[0]);
 		BD = await exchange.BondDeposited(accounts[0]);
 		lockedYT = await exchange.lockedYT(accounts[0]);
+		lockedZCB = await exchange.lockedZCB(accounts[0]);
 
 		assert.equal(prevYD.sub(YD).toString(), yieldToWithdraw.toString());
 		assert.equal(prevBD.sub(BD).toString(), bondToWithdraw.toString());
 		assert.equal(lockedYT.toString(), "0");
+		assert.equal(lockedZCB.toString(), "0");
 		assert.equal(yieldBalance.sub(prevYieldBalance).toString(), yieldToWithdraw.toString());
 		assert.equal(bondBalance.sub(prevBondBalance).toString(), bondToWithdraw.toString());
 	});
@@ -168,11 +172,12 @@ contract('OrderbookExchange', async function(accounts) {
 		let willSet = prevMCRzcbHead.toString() !== "0" && prevMCRytHead.toString() !== "0";
 		let newMCRdatapoint = prevMCRzcbHead.add(prevMCRytHead).div(new BN(2));
 		let prevOrcData = await exchange.getOracleData();
+		let prevYD = YD;
+		let prevBD = BD;
+		let prevLockedYT = lockedYT;
+		let prevLockedZCB = lockedZCB;
 		let rec;
 		if (isZCBLimitSell) {
-			let prevYD = YD;
-			let prevBD = BD;
-			let prevLockedYT = lockedYT;
 
 			rec = await exchange.limitSellZCB(amt, MCR, hintID, maxSteps);
 			let log = rec.receipt.logs[0];
@@ -192,6 +197,7 @@ contract('OrderbookExchange', async function(accounts) {
 			YD = await exchange.YieldDeposited(accounts[0]);
 			BD = await exchange.BondDeposited(accounts[0]);
 			lockedYT = await exchange.lockedYT(accounts[0]);
+			lockedZCB = await exchange.lockedZCB(accounts[0]);
 
 			let currentID = (await exchange.headZCBSellID()).toString();
 			let order;
@@ -203,8 +209,9 @@ contract('OrderbookExchange', async function(accounts) {
 			assert.equal(currentID, "0", "end of orderbook refers to null order");
 
 			assert.equal(YD.toString(), prevYD.toString());
-			assert.equal(prevBD.sub(BD).toString(), amt.toString());
+			assert.equal(BD.toString(), prevBD.toString());
 			assert.equal(lockedYT.toString(), prevLockedYT.toString());
+			assert.equal(lockedZCB.sub(prevLockedZCB).toString(), amt.toString());
 
 			order = await exchange.ZCBSells(targetID);
 
@@ -213,12 +220,9 @@ contract('OrderbookExchange', async function(accounts) {
 			assert.equal(order.maturityConversionRate.toString(), MCR.toString());
 		}
 		else {
-			let prevYD = YD;
-			let prevBD = BD;
-			let prevLockedYT = lockedYT;
-		try {
+
 			rec = await exchange.limitSellYT(amt, MCR, hintID, maxSteps);
-		} catch (err) {process.exit();}
+
 			let log = rec.receipt.logs[0];
 			let logArgs = log.args;
 			assert.equal(log.event, 'MakeLimitSellYT');
@@ -236,6 +240,7 @@ contract('OrderbookExchange', async function(accounts) {
 			YD = await exchange.YieldDeposited(accounts[0]);
 			BD = await exchange.BondDeposited(accounts[0]);
 			lockedYT = await exchange.lockedYT(accounts[0]);
+			lockedZCB = await exchange.lockedZCB(accounts[0]);
 
 			let currentID = (await exchange.headYTSellID()).toString();
 			let order;
@@ -274,6 +279,8 @@ contract('OrderbookExchange', async function(accounts) {
 		await helper.advanceTime(61);
 		let prevYD = YD;
 		let prevBD = BD;
+		let prevLockedYT = lockedYT;
+		let prevLockedZCB = lockedZCB;
 		let prevZCBsellHeadID = await exchange.headZCBSellID();
 		let prevYTsellHeadID = await exchange.headYTSellID();
 		let ratio = await NGBwrapperInstance.WrappedAmtToUnitAmt_RoundDown(_10To18);
@@ -310,6 +317,8 @@ contract('OrderbookExchange', async function(accounts) {
 
 			YD = await exchange.YieldDeposited(accounts[0]);
 			BD = await exchange.BondDeposited(accounts[0]);
+			lockedYT = await exchange.lockedYT(accounts[0]);
+			lockedZCB = await exchange.lockedZCB(accounts[0]);
 
 			assert.equal(log.event, 'ModifyOrder');
 
@@ -322,7 +331,9 @@ contract('OrderbookExchange', async function(accounts) {
 
 			assert.equal(resultantChange.toString(), expectedChange.toString());
 			assert.equal(YD.toString(), prevYD.toString());
-			assert.equal(prevBD.sub(BD).toString(), resultantChange.toString());
+			assert.equal(BD.toString(), prevBD.toString());
+			assert.equal(lockedYT.toString(), prevLockedYT.toString());
+			assert.equal(lockedZCB.sub(prevLockedZCB).toString(), expectedChange.toString());
 		}
 		else {
 			//YT == U / ((1 - zcbDilutiontoMatutity) * ratio)
@@ -340,7 +351,6 @@ contract('OrderbookExchange', async function(accounts) {
 					expectedChange = prevOrder.amount.sub(minimumYT).neg();
 				}
 			}
-			let prevLockedYT = lockedYT;
 
 			rec = await exchange.modifyYTLimitSell(change, ID, hintID, maxSteps, removeBelowLimit);
 			let log = rec.receipt.logs[0];
@@ -357,11 +367,13 @@ contract('OrderbookExchange', async function(accounts) {
 			YD = await exchange.YieldDeposited(accounts[0]);
 			BD = await exchange.BondDeposited(accounts[0]);
 			lockedYT = await exchange.lockedYT(accounts[0]);
+			lockedZCB = await exchange.lockedZCB(accounts[0]);
 
 			assert.equal(resultantChange.toString(), expectedChange.toString());
 			assert.equal(BD.toString(), prevBD.toString());
 			assert.equal(YD.toString(), prevYD.toString());
 			assert.equal(lockedYT.sub(prevLockedYT).toString(), resultantChange.toString());
+			assert.equal(lockedZCB.toString(), prevLockedZCB.toString());
 		}
 		if (expectedDeleted) {
 			assert.equal(order.maker, nullAddress);

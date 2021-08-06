@@ -172,33 +172,40 @@ contract OrderbookDelegateParent is OrderbookData {
 		}
 	}
 
-	function manageCollateral_ReceiveZCB_closeOrder(address _addr, uint _amount) internal {
-		require(_amount < uint(type(int256).max));
-		uint resultantLockedZCB = internalLockedZCB[_addr].sub(_amount);
+	function manageCollateral_closeZCBSell(address _addr, uint _ZCBclosed) internal {
+		require(_ZCBclosed < uint(type(int256).max));
+		uint resultantLockedZCB = internalLockedZCB[_addr].sub(_ZCBclosed);
 		internalLockedZCB[_addr] = resultantLockedZCB;
 	}
 
-	function manageCollateral_ReceiveZCB_fillOrder(address _addr, uint _amount) internal {
-		require(_amount < uint(type(int256).max));
-		int resultantBD = internalBondDeposited[_addr].add(int(_amount));
+	function manageCollateral_fillYTSell(address _addr, uint _ZCBreceived, uint _YTsold) internal {
+		require(_ZCBreceived < uint(type(int256).max));
+		int resultantBD = internalBondDeposited[_addr].add(int(_ZCBreceived));
+		uint resultantYD = internalYieldDeposited[_addr].sub(_YTsold);
+		uint resultantWrappedAmtLockedYT = internalLockedYT[_addr].sub(_YTsold);
 		internalBondDeposited[_addr] = resultantBD;
+		internalYieldDeposited[_addr] = resultantYD;
+		internalLockedYT[_addr] = resultantWrappedAmtLockedYT;
 	}
 
-	function manageCollateral_ReceiveYT_closeOrder(address _addr, uint _amount) internal {
-		require(_amount < uint(type(int256).max));
-		uint resultantLockedYT = internalLockedYT[_addr].sub(_amount);
+	function manageCollateral_closeYTSell(address _addr, uint _YTclosed) internal {
+		require(_YTclosed < uint(type(int256).max));
+		uint resultantLockedYT = internalLockedYT[_addr].sub(_YTclosed);
 		internalLockedYT[_addr] = resultantLockedYT;
 	}
 
-	function manageCollateral_ReceiveYT_fillOrder(address _addr, uint _amount, uint _ratio) internal {
-		require(_amount < uint(type(int256).max));
-		uint unitAmtYT = _amount.mul(_ratio) / (1 ether);
+	function manageCollateral_fillZCBSell(address _addr, uint _YTreceived, uint _ZCBsold, uint _ratio) internal {
+		require(_YTreceived <= uint(type(int256).max));
+		require(_ZCBsold <= uint(type(int256).max));
+		uint unitAmtYT = _YTreceived.mul(_ratio) / (1 ether);
 		uint YD = internalYieldDeposited[_addr];
 		int BD = internalBondDeposited[_addr];
-		uint resultantYD = YD.add(_amount);
-		int resultantBD = BD.sub(int(unitAmtYT));
+		uint resultantLockedZCB = internalLockedZCB[_addr].sub(_ZCBsold);
+		uint resultantYD = YD.add(_YTreceived);
+		int resultantBD = BD.sub(int(unitAmtYT)).sub(int(_ZCBsold));
 		internalYieldDeposited[_addr] = resultantYD;
 		internalBondDeposited[_addr] = resultantBD;
+		internalLockedZCB[_addr] = resultantLockedZCB;
 	}
 
 	function manageCollateral_payFee(uint _amount, uint _ratio) internal {

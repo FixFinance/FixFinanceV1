@@ -412,7 +412,7 @@ contract OrderbookDelegate2 is OrderbookDelegateParent {
 			manageCollateral_SellZCB_makeOrder(msg.sender, uint(change));
 		}
 		else if (change < 0) {
-			manageCollateral_ReceiveZCB_closeOrder(msg.sender, uint(-change));
+			manageCollateral_closeZCBSell(msg.sender, uint(-change));
 		}
 	}
 
@@ -438,7 +438,7 @@ contract OrderbookDelegate2 is OrderbookDelegateParent {
 			manageCollateral_SellYT_makeOrder(msg.sender, uint(change));
 		}
 		else if (change < 0) {
-			manageCollateral_ReceiveYT_closeOrder(msg.sender, uint(-change));
+			manageCollateral_closeYTSell(msg.sender, uint(-change));
 		}
 	}
 

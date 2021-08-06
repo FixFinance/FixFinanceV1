@@ -1,0 +1,134 @@
+// SPDX-License-Identifier: MIT
+pragma experimental ABIEncoderV2;
+pragma solidity >=0.6.8 <0.7.0;
+
+import "../../libraries/SafeMath.sol";
+import "../../libraries/SignedSafeMath.sol";
+import "../../interfaces/IVaultManagerFlashReceiver.sol";
+import "../../interfaces/IFixCapitalPool.sol";
+import "../../interfaces/IZeroCouponBond.sol";
+import "../../interfaces/IVaultHealth.sol";
+import "../../interfaces/IWrapper.sol";
+import "../../interfaces/IERC20.sol";
+import "../../helpers/Ownable.sol";
+import "./SBNSFVaultFactoryDelegateParent.sol";
+
+contract SBNSFVaultFactoryDelegate5 is SBNSFVaultFactoryDelegateParent {
+	using SafeMath for uint;
+	using SignedSafeMath for int;
+
+	/*
+		@Description: assign a vault/YTvault to a new owner
+
+		@param uint _index: the index within vaults/YTvaults[msg.sender] at which the vault to transfer is located
+		@param address _to: the new owner of the vault/YTvault
+		@param bool _isYTVault: true when the vault to transfer is a YTvault, false otherwise
+	*/
+	function transferVault(uint _index, address _to, bool _isYTVault) external {
+		if (_isYTVault) {
+			transferYTVault(_index, _to);
+		}
+		else {
+			transferStandardVault(_index, _to);
+		}
+	}
+
+	/*
+		@Description: assign a vault to a new owner
+
+		@param uint _index: the index within vaults[msg.sender] at which the vault to transfer is located
+		@param address _to: the new owner of the vault
+	*/
+	function transferStandardVault(uint _index, address _to) internal {
+		require(_vaults[msg.sender].length > _index);
+		Vault memory vault = _vaults[msg.sender][_index];
+		_vaults[_to].push(vault);
+		if (vault.amountSupplied > 0) {
+			(, SUPPLIED_ASSET_TYPE sType, address baseFCP, address baseWrapper) = suppliedAssetInfo(vault.assetSupplied);
+			require(vault.amountSupplied <= uint(type(int256).max));
+			int intSupplied = int(vault.amountSupplied);
+			editSubAccountStandardVault(true, msg.sender, sType, baseFCP, baseWrapper, -intSupplied);
+			//passing claimRewards:true a second time would needlessly waste gas
+			editSubAccountStandardVault(false, _to, sType, baseFCP, baseWrapper, intSupplied);
+		}
+		delete _vaults[msg.sender][_index];
+	}
+
+	/*
+		@Description: assign a YT vault to a new owner
+
+		@param uint _index: the index within YTvaults[msg.sender] at which the YT vault to transfer is located
+		@param address _to: the new owner of the YT vault
+	*/
+	function transferYTVault(uint _index, address _to) internal {
+		require(_YTvaults[msg.sender].length > _index);
+		YTVault memory vault = _YTvaults[msg.sender][_index];
+		require(vault.yieldSupplied <= uint(type(int256).max));
+		address baseWrapper = address(IFixCapitalPool(vault.FCPsupplied).wrapper());
+		editSubAccountYTVault(true, msg.sender, vault.FCPsupplied, baseWrapper, -int(vault.yieldSupplied), vault.bondSupplied.mul(-1));
+		editSubAccountYTVault(false, _to, vault.FCPsupplied, baseWrapper, int(vault.yieldSupplied), vault.bondSupplied);
+		_YTvaults[_to].push(vault);
+		delete _YTvaults[msg.sender][_index];
+	}
+
+	/*
+		@Description: admin may call this function to claim liquidation revenue
+
+		@address _asset: the address of the asset for which to claim revenue
+	*/
+	function claimRevenue(address _asset) external onlyOwner {
+		uint rev = _revenue[_asset];
+		uint toTreasury = rev >> 1;
+		IERC20(_asset).transfer(_treasuryAddress, toTreasury);
+		IERC20(_asset).transfer(msg.sender, rev - toTreasury);
+		delete _revenue[_asset];
+	}
+
+	/*
+		@Description: admin may call this function to claim YT liquidation revenue
+
+		@param address _FCP: the address of the FCP contract for which to claim revenue
+		@param int _bondIn: the amount of bond to send in to make the transfer position have a
+			positive minimum value at maturity
+	*/
+	function claimYTRevenue(address _FCP, int _bondIn) external onlyOwner {
+		require(_bondIn > -1);
+		YTPosition memory pos = _YTRevenue[_FCP];
+		IFixCapitalPool(_FCP).burnZCBFrom(msg.sender, uint(_bondIn));
+		uint yieldToTreasury = pos.amountYield >> 1;
+		int bondToTreasury = pos.amountBond.add(_bondIn) / 2;
+		IFixCapitalPool(_FCP).transferPosition(_treasuryAddress, yieldToTreasury, bondToTreasury);
+		IFixCapitalPool(_FCP).transferPosition(msg.sender, pos.amountYield - yieldToTreasury, (pos.amountBond + _bondIn) - bondToTreasury);
+		delete _YTRevenue[_FCP];
+	}
+
+	/*
+		@Description: allows a user to claim the excess collateral that was received as a rebate
+			when their vault(s) were liquidated
+
+		@param address _asset: the address of the asset for which to claim rebated collateral
+	*/
+	function claimRebate(address _asset) external {
+		uint amt = _liquidationRebates[msg.sender][_asset];
+		require(amt <= uint(type(int256).max));
+		(, SUPPLIED_ASSET_TYPE sType, address baseFCP, address baseWrapper) = suppliedAssetInfo(_asset);
+		IERC20(_asset).transfer(msg.sender, amt);
+		editSubAccountStandardVault(false, msg.sender, sType, baseFCP, baseWrapper, -int(amt));
+		delete _liquidationRebates[msg.sender][_asset];
+	}
+
+	/*
+		@Description: allows a user to claim the excess collateral that was received as a rebate
+			when their YT vault(s) were liquidated
+	
+		@param address _FCP: the address of the FCP contract for which to claim the rebate
+	*/
+	function claimYTRebate(address _FCP) external {
+		YTPosition memory position = _YTLiquidationRebates[msg.sender][_FCP];
+		require(position.amountYield <= uint(type(int256).max));
+		IFixCapitalPool(_FCP).transferPosition(msg.sender, position.amountYield, position.amountBond);
+		address baseWrapper = address(IFixCapitalPool(_FCP).wrapper());
+		editSubAccountYTVault(false, msg.sender, _FCP, baseWrapper, -int(position.amountYield), position.amountBond.mul(-1));
+		delete _YTLiquidationRebates[msg.sender][_FCP];
+	}
+}

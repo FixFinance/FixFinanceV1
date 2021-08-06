@@ -10,6 +10,9 @@ const NGBwrapperDeployer = artifacts.require('NGBwrapperDeployer');
 const zcbYtDeployer = artifacts.require('ZCB_YT_Deployer');
 const NSFVaultFactoryDelegate1 = artifacts.require("NSFVaultFactoryDelegate1");
 const NSFVaultFactoryDelegate2 = artifacts.require("NSFVaultFactoryDelegate2");
+const NSFVaultFactoryDelegate3 = artifacts.require("NSFVaultFactoryDelegate3");
+const NSFVaultFactoryDelegate4 = artifacts.require("NSFVaultFactoryDelegate4");
+const NSFVaultFactoryDelegate5 = artifacts.require("NSFVaultFactoryDelegate5");
 const NSFVaultFactory = artifacts.require("NSFVaultFactory");
 const FixCapitalPoolDeployer = artifacts.require('FixCapitalPoolDeployer');
 const ZCBammDeployer = artifacts.require('ZCBammDeployer');
@@ -43,12 +46,18 @@ module.exports = async function(deployer) {
 	zcbYtDeployerInstance = await deployer.deploy(zcbYtDeployer);
 	nsfVaultFactoryDelegate1Instance = await deployer.deploy(NSFVaultFactoryDelegate1);
 	nsfVaultFactoryDelegate2Instance = await deployer.deploy(NSFVaultFactoryDelegate2);
+	nsfVaultFactoryDelegate3Instance = await deployer.deploy(NSFVaultFactoryDelegate3);
+	nsfVaultFactoryDelegate4Instance = await deployer.deploy(NSFVaultFactoryDelegate4);
+	nsfVaultFactoryDelegate5Instance = await deployer.deploy(NSFVaultFactoryDelegate5);
 	vaultFactoryInstance = await deployer.deploy(
 		NSFVaultFactory,
 		nullAddress,
 		accounts[0],
 		nsfVaultFactoryDelegate1Instance.address,
-		nsfVaultFactoryDelegate2Instance.address
+		nsfVaultFactoryDelegate2Instance.address,
+		nsfVaultFactoryDelegate3Instance.address,
+		nsfVaultFactoryDelegate4Instance.address,
+		nsfVaultFactoryDelegate5Instance.address
 	);
 	fcpDelegate1Instance = await deployer.deploy(FCPDelegate1);
 	fcpDelployerInstance = await deployer.deploy(FixCapitalPoolDeployer, fcpDelegate1Instance.address);

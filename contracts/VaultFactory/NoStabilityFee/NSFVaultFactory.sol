@@ -16,14 +16,28 @@ contract NSFVaultFactory is NSFVaultFactoryData, INSFVaultFactory, nonReentrant 
 	using SafeMath for uint;
 	using SignedSafeMath for int;
 
-	address delegateAddress;
+	address delegate1Address;
 	address delegate2Address;
+	address delegate3Address;
+	address delegate4Address;
+	address delegate5Address;
 
-	constructor(address _vaultHealthContract, address _treasuryAddr, address _delegateAddress, address _delegate2Address) public {
+	constructor(
+		address _vaultHealthContract,
+		address _treasuryAddr,
+		address _delegate1Address,
+		address _delegate2Address,
+		address _delegate3Address,
+		address _delegate4Address,
+		address _delegate5Address
+	) public {
 		vaultHealthContract = IVaultHealth(_vaultHealthContract);
 		_treasuryAddress = _treasuryAddr;
-		delegateAddress = _delegateAddress;
+		delegate1Address = _delegate1Address;
 		delegate2Address = _delegate2Address;
+		delegate3Address = _delegate3Address;
+		delegate4Address = _delegate4Address;
+		delegate5Address = _delegate5Address;
 	}
 
 	//-----------------------------------views-------------------------------------
@@ -189,7 +203,7 @@ contract NSFVaultFactory is NSFVaultFactoryData, INSFVaultFactory, nonReentrant 
 		int128 _borrowRateChange
 		) external override {
 
-		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
+		(bool success, ) = delegate1Address.delegatecall(abi.encodeWithSignature(
 			"openVault(address,address,uint256,uint256,uint256,int128,int128)",
 			_assetSupplied,
 			_assetBorrowed,
@@ -210,7 +224,7 @@ contract NSFVaultFactory is NSFVaultFactoryData, INSFVaultFactory, nonReentrant 
 		@param address _to: the address to which to send all collateral after closing the vault
 	*/
 	function closeVault(uint _index, address _to) external override noReentry {
-		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
+		(bool success, ) = delegate1Address.delegatecall(abi.encodeWithSignature(
 			"closeVault(uint256,address)",
 			_index,
 			_to
@@ -254,7 +268,7 @@ contract NSFVaultFactory is NSFVaultFactoryData, INSFVaultFactory, nonReentrant 
 		bytes calldata _data,
 		address _receiverAddr
 	) external override noReentry {
-		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
+		(bool success, ) = delegate1Address.delegatecall(abi.encodeWithSignature(
 			"adjustVault(address,uint256,address,address,uint256,uint256,int128[3],bytes,address)",
 			_owner,
 			_index,
@@ -305,7 +319,7 @@ contract NSFVaultFactory is NSFVaultFactoryData, INSFVaultFactory, nonReentrant 
 		int128 _suppliedRateChange,
 		int128 _borrowRateChange
 	) external override {
-		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
+		(bool success, ) = delegate3Address.delegatecall(abi.encodeWithSignature(
 			"openYTVault(address,address,uint256,int256,uint256,uint256,int128,int128)",
 			_FCPsupplied,
 			_FCPborrowed,
@@ -327,7 +341,7 @@ contract NSFVaultFactory is NSFVaultFactoryData, INSFVaultFactory, nonReentrant 
 		@param address _to: the address to which to send all collateral after closing the vault
 	*/
 	function closeYTVault(uint _index, address _to) external override noReentry {
-		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
+		(bool success, ) = delegate3Address.delegatecall(abi.encodeWithSignature(
 			"closeYTVault(uint256,address)",
 			_index,
 			_to
@@ -375,7 +389,7 @@ contract NSFVaultFactory is NSFVaultFactoryData, INSFVaultFactory, nonReentrant 
 		bytes calldata _data,
 		address _receiverAddr
 	) external override noReentry {
-		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
+		(bool success, ) = delegate3Address.delegatecall(abi.encodeWithSignature(
 			"adjustYTVault(address,uint256,address,address,uint256,int256,uint256,int128[3],bytes,address)",
 			_owner,
 			_index,
@@ -402,7 +416,7 @@ contract NSFVaultFactory is NSFVaultFactoryData, INSFVaultFactory, nonReentrant 
 		@param bool _isYTVault: true when the vault to transfer is a YTvault, false otherwise
 	*/
 	function transferVault(uint _index, address _to, bool _isYTVault) external override noReentry {
-		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
+		(bool success, ) = delegate5Address.delegatecall(abi.encodeWithSignature(
 			"transferVault(uint256,address,bool)",
 			_index,
 			_to,
@@ -425,7 +439,7 @@ contract NSFVaultFactory is NSFVaultFactoryData, INSFVaultFactory, nonReentrant 
 		@param uint _maxIn: the maximum amount of _assetBorrowed to send in
 	*/
 	function auctionLiquidation(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _bid, uint _maxIn) external override noReentry {
-		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
+		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
 			"auctionLiquidation(address,uint256,address,address,uint256,uint256)",
 			_owner,
 			_index,
@@ -446,7 +460,7 @@ contract NSFVaultFactory is NSFVaultFactoryData, INSFVaultFactory, nonReentrant 
 		@param uint _amtIn: the amount of borrowed asset that the liquidator will be sending in
 	*/
 	function bidOnLiquidation(uint _index, uint _bid, uint _amtIn) external override {
-		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
+		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
 			"bidOnLiquidation(uint256,uint256,uint256)",
 			_index,
 			_bid,
@@ -462,7 +476,7 @@ contract NSFVaultFactory is NSFVaultFactoryData, INSFVaultFactory, nonReentrant 
 		@param address _to: the address to which to send the proceeds
 	*/
 	function claimLiquidation(uint _index, address _to) external override {
-		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
+		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
 			"claimLiquidation(uint256,address)",
 			_index,
 			_to
@@ -484,7 +498,7 @@ contract NSFVaultFactory is NSFVaultFactoryData, INSFVaultFactory, nonReentrant 
 		@param address _to: the address to which to send all of the collateral from the vault
 	*/
 	function instantLiquidation(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _maxIn, uint _minOut, address _to) external override noReentry {
-		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
+		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
 			"instantLiquidation(address,uint256,address,address,uint256,uint256,address)",
 			_owner,
 			_index,
@@ -512,7 +526,7 @@ contract NSFVaultFactory is NSFVaultFactoryData, INSFVaultFactory, nonReentrant 
 		@param address _to: the address to which to send all of the collateral from the vault
 	*/
 	function partialLiquidationSpecificIn(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _in, uint _minOut, address _to) external override noReentry{
-		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
+		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
 			"partialLiquidationSpecificIn(address,uint256,address,address,uint256,uint256,address)",
 			_owner,
 			_index,
@@ -540,7 +554,7 @@ contract NSFVaultFactory is NSFVaultFactoryData, INSFVaultFactory, nonReentrant 
 		@param address _to: the address to which to send all of the collateral from the vault
 	*/
 	function partialLiquidationSpecificOut(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _out, uint _maxIn, address _to) external override noReentry {
-		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
+		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
 			"partialLiquidationSpecificOut(address,uint256,address,address,uint256,uint256,address)",
 			_owner,
 			_index,
@@ -561,7 +575,7 @@ contract NSFVaultFactory is NSFVaultFactoryData, INSFVaultFactory, nonReentrant 
 		@param address _asset: the address of the asset for which to claim rebated collateral
 	*/
 	function claimRebate(address _asset) external override {
-		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
+		(bool success, ) = delegate5Address.delegatecall(abi.encodeWithSignature(
 			"claimRebate(address)",
 			_asset
 		));
@@ -578,7 +592,7 @@ contract NSFVaultFactory is NSFVaultFactoryData, INSFVaultFactory, nonReentrant 
 		@param address _FCP: the address of the FCP contract for which to claim the rebate
 	*/
 	function claimYTRebate(address _FCP) external override {
-		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
+		(bool success, ) = delegate5Address.delegatecall(abi.encodeWithSignature(
 			"claimYTRebate(address)",
 			_FCP
 		));
@@ -600,7 +614,7 @@ contract NSFVaultFactory is NSFVaultFactoryData, INSFVaultFactory, nonReentrant 
 		@param uint _amtIn: the amount of the borrowed ZCB to send in
 	*/
 	function auctionYTLiquidation(address _owner, uint _index, address _FCPborrowed, address _FCPsupplied, uint _bidYield, int _minBondRatio, uint _amtIn) external override noReentry {
-		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
+		(bool success, ) = delegate4Address.delegatecall(abi.encodeWithSignature(
 			"auctionYTLiquidation(address,uint256,address,address,uint256,int256,uint256)",
 			_owner,
 			_index,
@@ -622,7 +636,7 @@ contract NSFVaultFactory is NSFVaultFactoryData, INSFVaultFactory, nonReentrant 
 		@param uint _amtIn: the amount of borrowed asset that the liquidator will be sending in
 	*/
 	function bidOnYTLiquidation(uint _index, uint _bidYield, uint _amtIn) external override {
-		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
+		(bool success, ) = delegate4Address.delegatecall(abi.encodeWithSignature(
 			"bidOnYTLiquidation(uint256,uint256,uint256)",
 			_index,
 			_bidYield,
@@ -638,7 +652,7 @@ contract NSFVaultFactory is NSFVaultFactoryData, INSFVaultFactory, nonReentrant 
 		@param address _to: the address to which to send the proceeds
 	*/
 	function claimYTLiquidation(uint _index, address _to) external override {
-		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
+		(bool success, ) = delegate4Address.delegatecall(abi.encodeWithSignature(
 			"claimYTLiquidation(uint256,address)",
 			_index,
 			_to
@@ -662,7 +676,7 @@ contract NSFVaultFactory is NSFVaultFactoryData, INSFVaultFactory, nonReentrant 
 		@param address _to: the address to which to send all of the collateral from the vault
 	*/
 	function instantYTLiquidation(address _owner, uint _index, address _FCPborrowed, address _FCPsupplied, uint _maxIn, uint _minOut, int _minBondRatio, address _to) external override noReentry {
-		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
+		(bool success, ) = delegate4Address.delegatecall(abi.encodeWithSignature(
 			"instantYTLiquidation(address,uint256,address,address,uint256,uint256,int256,address)",
 			_owner,
 			_index,
@@ -693,7 +707,7 @@ contract NSFVaultFactory is NSFVaultFactoryData, INSFVaultFactory, nonReentrant 
 		@param address _to: the address to which to send all of the collateral from the vault
 	*/
 	function partialYTLiquidationSpecificIn(address _owner, uint _index, address _FCPborrowed, address _FCPsupplied, uint _in, uint _minOut, int _minBondRatio, address _to) external override noReentry {
-		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
+		(bool success, ) = delegate4Address.delegatecall(abi.encodeWithSignature(
 			"partialYTLiquidationSpecificIn(address,uint256,address,address,uint256,uint256,int256,address)",
 			_owner,
 			_index,
@@ -724,7 +738,7 @@ contract NSFVaultFactory is NSFVaultFactoryData, INSFVaultFactory, nonReentrant 
 		@param address _to: the address to which to send all of the collateral from the vault
 	*/
 	function partialYTLiquidationSpecificOut(address _owner, uint _index, address _FCPborrowed, address _FCPsupplied, uint _out, int _minBondRatio, uint _maxIn, address _to) external override noReentry {
-		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
+		(bool success, ) = delegate4Address.delegatecall(abi.encodeWithSignature(
 			"partialYTLiquidationSpecificOut(address,uint256,address,address,uint256,int256,uint256,address)",
 			_owner,
 			_index,
@@ -789,12 +803,9 @@ contract NSFVaultFactory is NSFVaultFactoryData, INSFVaultFactory, nonReentrant 
 
 		@address _asset: the address of the asset for which to claim revenue
 	*/
-	function claimRevenue(address _asset) external override onlyOwner {
-		uint rev = _revenue[_asset];
-		uint toTreasury = rev >> 1;
-		IERC20(_asset).transfer(_treasuryAddress, toTreasury);
-		IERC20(_asset).transfer(msg.sender, rev - toTreasury);
-		delete _revenue[_asset];
+	function claimRevenue(address _asset) external override {
+		(bool success, ) = delegate5Address.delegatecall(abi.encodeWithSignature("claimRevenue(address)", _asset));
+		require(success);
 	}
 
 	/*
@@ -805,7 +816,7 @@ contract NSFVaultFactory is NSFVaultFactoryData, INSFVaultFactory, nonReentrant 
 			positive minimum value at maturity
 	*/
 	function claimYTRevenue(address _FCP, int _bondIn) external override {
-		(bool success, ) = delegateAddress.delegatecall(abi.encodeWithSignature(
+		(bool success, ) = delegate5Address.delegatecall(abi.encodeWithSignature(
 			"claimYTRevenue(address,int256)",
 			_FCP,
 			_bondIn

@@ -99,4 +99,8 @@ interface IOrderbookExchange {
 		uint8 _toSet
 	);
 
+	//------a-d-m-i-n---------
+	function claimRevenue() external;
+	function setMinimumOrderSize(uint _minimumOrderSize) external;
+	function getMinimumOrderSize() external view returns(uint);
 }

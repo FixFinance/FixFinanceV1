@@ -1451,10 +1451,57 @@ contract('OrderbookExchange', async function(accounts) {
 		}
 	});
 
+	it('Claim Revenue', async () => {
+		let owner = accounts[0];
+		let YR = await exchange.YieldRevenue();
+		let BR = await exchange.BondRevenue();
+		let prevSubAcctPosTreasury = await NGBwrapperInstance.subAccountPositions(exchange.address, treasuryAddress, fixCapitalPoolInstance.address);
+		let prevYieldTreasury = await fixCapitalPoolInstance.balanceYield(treasuryAddress);
+		let prevBondTreasury = await fixCapitalPoolInstance.balanceBonds(treasuryAddress);
+		let prevYieldOwner = await fixCapitalPoolInstance.balanceYield(owner);
+		let prevBondOwner = await fixCapitalPoolInstance.balanceBonds(owner);
+
+		await exchange.claimRevenue();
+
+		let subAcctPosTreasury = await NGBwrapperInstance.subAccountPositions(exchange.address, treasuryAddress, fixCapitalPoolInstance.address);
+		let yieldTreasury = await fixCapitalPoolInstance.balanceYield(treasuryAddress);
+		let bondTreasury = await fixCapitalPoolInstance.balanceBonds(treasuryAddress);
+		let yieldOwner = await fixCapitalPoolInstance.balanceYield(owner);
+		let bondOwner = await fixCapitalPoolInstance.balanceBonds(owner);
+		let expectedYieldToTreasury = YR.div(new BN(2));
+		let expectedBondToTreasury = BR.div(new BN(2));
+		let expectedYieldToOwner = YR.sub(expectedYieldToTreasury);
+		let expectedBondToOwner = BR.sub(expectedBondToTreasury);
+		let newYR = await exchange.YieldRevenue();
+		let newBR = await exchange.BondRevenue();
+		assert.equal(newYR.toString(), "0");
+		assert.equal(newBR.toString(), "0");
+		assert.equal(subAcctPosTreasury.yield.toString(), "0");
+		assert.equal(subAcctPosTreasury.bond.toString(), "0");
+		assert.equal(prevSubAcctPosTreasury.yield.toString(), YR.toString());
+		assert.equal(prevSubAcctPosTreasury.bond.toString(), BR.toString());
+		assert.equal(yieldTreasury.sub(prevYieldTreasury).toString(), expectedYieldToTreasury.toString());
+		assert.equal(bondTreasury.sub(prevBondTreasury).toString(), expectedBondToTreasury.toString());
+		assert.equal(yieldOwner.sub(prevYieldOwner).toString(), expectedYieldToOwner.toString());
+		assert.equal(bondOwner.sub(prevBondOwner).toString(), expectedBondToOwner.toString());
+	});
+
 	it('Can handle all sub account obligations', async () => {
+		let cumulativePositions = {yield: new BN(0), bond: new BN(0)};
 		for (let i = 0; i < accounts.length; i++) {
+			let subAcctPos = await NGBwrapperInstance.subAccountPositions(exchange.address, accounts[i], fixCapitalPoolInstance.address);
+			cumulativePositions.yield = cumulativePositions.yield.add(subAcctPos.yield);
+			cumulativePositions.bond = cumulativePositions.bond.add(subAcctPos.bond);
 			await exchange.forceClaimSubAccountRewards({from: accounts[i]});
 		}
+		let subAcctPosContract = await NGBwrapperInstance.subAccountPositions(fixCapitalPoolInstance.address, exchange.address, fixCapitalPoolInstance.address);
+		let yieldErr = subAcctPosContract.yield.sub(cumulativePositions.yield);
+		let bondErr = subAcctPosContract.bond.sub(cumulativePositions.bond);
+		assert.equal(yieldErr.cmp(new BN(-1)), 1, "cumulative yield of sub accounts must be less than or equal to total yield of distribution account");
+		assert.equal(yieldErr.cmp(new BN(100)), -1, "diff between cumulative yield of sub accts and total dist acct yield must be under 100");
+		assert.equal(bondErr.cmp(yieldErr.neg()), 1, "cumulative sub acct bond - total dist acct bond must be greater than negative yield error");
+		assert.equal(bondErr.abs().cmp(new BN(100)), -1, "diff between cumulative bond of sub accts and total dist acct bond must be under 100");
 		let rewards = (await NGBwrapperInstance.distributionAccountRewards(0, exchange.address)).toNumber();
+		assert.isBelow(rewards, 100, "untouched rewards are within accpetable error range");
 	});
 });

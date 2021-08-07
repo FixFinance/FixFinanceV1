@@ -434,11 +434,34 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 	//-----------------admin-------------------------
 
 	/*
+		@Description: payout fees earned by the orderbook contract
+	*/
+	function claimRevenue() external override {
+		require(msg.sender == Ownable(address(internalFCP)).owner());
+		address treasury = internalTreasuryAddress;
+		uint YR = internalYieldRevenue;
+		int BR = internalBondRevenue;
+		require(YR <= uint(type(int256).max));
+		uint yieldToTreasury = YR / 2;
+		int bondToTreasury = BR / 2;
+		IFixCapitalPool fcp = internalFCP;
+		fcp.transferPosition(treasury, yieldToTreasury, bondToTreasury);
+		fcp.transferPosition(msg.sender, YR - yieldToTreasury, BR - bondToTreasury);
+		/*
+			all yield was owned by treasury none was owned by FCP owner,
+			thus take away all yield from the treasury
+		*/
+		internalWrapper.editSubAccountPosition(false, treasury, address(fcp), -int(YR), BR.mul(-1));
+		internalYieldRevenue = 0;
+		internalBondRevenue = 0;
+	}
+
+	/*
 		@Description: set the minimum size of an order on the orderbook
 			size is determined by the amount of U that the collateral for the order
 			would be valued at using the MCR of that order
 	*/
-	function setMinimumOrderSize(uint _minimumOrderSize) external {
+	function setMinimumOrderSize(uint _minimumOrderSize) external override {
 		require(msg.sender == Ownable(address(internalFCP)).owner());
 		minimumOrderSize = _minimumOrderSize;
 	}
@@ -447,7 +470,7 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 		@Description: get the minimum NPV of a limit order
 			where NPV is in U and is determined using the MCR of the limit order
 	*/
-	function getMinimumOrderSize() external view returns(uint) {
+	function getMinimumOrderSize() external view override returns(uint) {
 		return minimumOrderSize;
 	}
 

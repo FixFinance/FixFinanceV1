@@ -12,6 +12,9 @@ const NGBwrapperDeployer = artifacts.require('NGBwrapperDeployer');
 const organizer = artifacts.require('Organizer');
 const NSFVaultFactoryDelegate1 = artifacts.require('NSFVaultFactoryDelegate1');
 const NSFVaultFactoryDelegate2 = artifacts.require('NSFVaultFactoryDelegate2');
+const NSFVaultFactoryDelegate3 = artifacts.require('NSFVaultFactoryDelegate3');
+const NSFVaultFactoryDelegate4 = artifacts.require('NSFVaultFactoryDelegate4');
+const NSFVaultFactoryDelegate5 = artifacts.require('NSFVaultFactoryDelegate5');
 const NSFVaultFactory = artifacts.require('NSFVaultFactory');
 const IERC20 = artifacts.require("IERC20");
 const BigMath = artifacts.require("BigMath");
@@ -84,11 +87,17 @@ contract('VaultHealth', async function(accounts) {
 		vaultHealthInstance = await VaultHealth.new(OracleContainerInstance.address);
 		nsfVaultFactoryDelegate1Instance = await NSFVaultFactoryDelegate1.new();
 		nsfVaultFactoryDelegate2Instance = await NSFVaultFactoryDelegate2.new();
+		nsfVaultFactoryDelegate3Instance = await NSFVaultFactoryDelegate3.new();
+		nsfVaultFactoryDelegate4Instance = await NSFVaultFactoryDelegate4.new();
+		nsfVaultFactoryDelegate5Instance = await NSFVaultFactoryDelegate5.new();
 		vaultFactoryInstance = await NSFVaultFactory.new(
 			vaultHealthInstance.address,
 			nullAddress,
 			nsfVaultFactoryDelegate1Instance.address,
-			nsfVaultFactoryDelegate2Instance.address
+			nsfVaultFactoryDelegate2Instance.address,
+			nsfVaultFactoryDelegate3Instance.address,
+			nsfVaultFactoryDelegate4Instance.address,
+			nsfVaultFactoryDelegate5Instance.address
 		);
 		EiInstance = await Ei.new();
 		await BigMath.link("Ei", EiInstance.address);

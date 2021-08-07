@@ -162,6 +162,14 @@ contract('OrderbookExchange', async function(accounts) {
 		}
 	}
 
+	async function assert_valid_subaccount_position(acct) {
+		let yieldDeposited = await exchange.YieldDeposited(acct);
+		let bondDeposited = await exchange.BondDeposited(acct);
+		let subAcctPos = await NGBwrapperInstance.subAccountPositions(exchange.address, acct, fixCapitalPoolInstance.address);
+		assert.equal(subAcctPos.yield.toString(), yieldDeposited.toString());
+		assert.equal(subAcctPos.bond.toString(), bondDeposited.toString());
+	}
+
 	async function test_place_limit_order(amt, MCR, targetID, hintID, expectedIDs, isZCBLimitSell) {
 		await helper.advanceTime(61);
 		const maxSteps = 100;
@@ -273,6 +281,8 @@ contract('OrderbookExchange', async function(accounts) {
 			assert.equal(orcData._impliedMCRs[prevOrcData._toSet.toNumber()].toString(), prevOrcData._impliedMCRs[prevOrcData._toSet.toNumber()].toString());
 			assert.equal(orcData._lastDatapointCollection.toString(), prevOrcData._lastDatapointCollection.toString());
 		}
+		await assert_valid_subaccount_position(accounts[0]);
+		return rec;
 	}
 
 	async function test_modify(change, ID, hintID, maxSteps, removeBelowLimit, isZCBLimitSell) {
@@ -403,6 +413,7 @@ contract('OrderbookExchange', async function(accounts) {
 			assert.equal(orcData._impliedMCRs[prevOrcData._toSet.toNumber()].toString(), prevOrcData._impliedMCRs[prevOrcData._toSet.toNumber()].toString());
 			assert.equal(orcData._lastDatapointCollection.toString(), prevOrcData._lastDatapointCollection.toString());
 		}
+		await assert_valid_subaccount_position(accounts[0]);
 		return rec;
 	}
 
@@ -767,6 +778,8 @@ contract('OrderbookExchange', async function(accounts) {
 		assert.equal(balYield.sub(prevBalYield).toString(), YTbought.toString());
 		let changeBondNum = prevBalBonds.sub(balBonds).toString();
 		assert.equal(changeBondNum, dynamicYTbought.add(ZCBsold).toString());
+		await assert_valid_subaccount_position(accounts[0]);
+		await assert_valid_subaccount_position(accounts[1]);
 		return rec;
 	}
 
@@ -861,6 +874,8 @@ contract('OrderbookExchange', async function(accounts) {
 		assert.equal(balYield.sub(prevBalYield).toString(), YTbought.toString());
 		let changeBondNum = prevBalBonds.sub(balBonds).toString();
 		assert.equal(changeBondNum, dynamicYTbought.add(ZCBsold).toString());
+		await assert_valid_subaccount_position(accounts[0]);
+		await assert_valid_subaccount_position(accounts[1]);
 		return rec;
 	}
 
@@ -958,6 +973,8 @@ contract('OrderbookExchange', async function(accounts) {
 		assert.equal(cmp, -1, "acceptable range of error is 2 units");
 		let changeBondNum = balBonds.sub(prevBalBonds).toString();
 		assert.equal(changeBondNum, dynamicYTsold.add(ZCBbought).toString());
+		await assert_valid_subaccount_position(accounts[0]);
+		await assert_valid_subaccount_position(accounts[1]);
 		return rec;
 	}
 
@@ -1056,6 +1073,8 @@ contract('OrderbookExchange', async function(accounts) {
 		assert.equal(cmp, -1, "acceptable range of error is 2 units");
 		let changeBondNum = balBonds.sub(prevBalBonds).toString();
 		assert.equal(changeBondNum, dynamicYTsold.add(ZCBbought).toString());
+		await assert_valid_subaccount_position(accounts[0]);
+		await assert_valid_subaccount_position(accounts[1]);
 		return rec;
 	}
 
@@ -1162,6 +1181,8 @@ contract('OrderbookExchange', async function(accounts) {
 		assert.equal(balYield.sub(prevBalYield).toString(), YTbought.toString());
 		let changeBondNum = prevBalBonds.sub(balBonds).toString();
 		assert.equal(changeBondNum, dynamicYTbought.add(ZCBsold).toString());
+		await assert_valid_subaccount_position(accounts[0]);
+		await assert_valid_subaccount_position(accounts[1]);
 		return rec;
 	}
 
@@ -1278,6 +1299,8 @@ contract('OrderbookExchange', async function(accounts) {
 		diff = parseInt(changeBondNum.sub(expected).toString());
 		assert.isBelow(diff, 1, "actual must be less than or equal to expected");
 		assert.isBelow(Math.abs(diff), 3, "acceptable range of error is 2 units");
+		await assert_valid_subaccount_position(accounts[0]);
+		await assert_valid_subaccount_position(accounts[1]);
 		return rec;
 	}
 

@@ -16,6 +16,7 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 	using ABDKMath64x64 for int128;
 
 	function withdraw(uint _amountYield, int _amountBond) external {
+		require(_amountYield <= uint(type(int256).max));
 		uint YD = internalYieldDeposited[msg.sender];
 		int BD = internalBondDeposited[msg.sender];
 		uint wrappedAmtLockedYT = internalLockedYT[msg.sender];
@@ -26,7 +27,11 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 		int resultantBD = BD.sub(_amountBond);
 
 		requireValidCollateral(resultantYD, resultantBD, wrappedAmtLockedYT, _lockedZCB, ratio);
-		internalFCP.transferPosition(msg.sender, _amountYield, _amountBond);
+		IFixCapitalPool fcp = internalFCP;
+		fcp.transferPosition(msg.sender, _amountYield, _amountBond);
+		int yieldChange = -int(_amountYield);
+		int bondChange = _amountBond.mul(-1);
+		internalWrapper.editSubAccountPosition(false, msg.sender, address(fcp), yieldChange, bondChange);
 
 		internalYieldDeposited[msg.sender] = resultantYD;
 		internalBondDeposited[msg.sender] = resultantBD;
@@ -68,7 +73,7 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 
 				{
 					uint copyAmtYT = _amountYT; //prevent stack too deep
-					manageCollateral_fillYTSell(order.maker, scaledZCBamt, copyAmtYT);
+					manageCollateral_fillYTSell(order.maker, scaledZCBamt, copyAmtYT, ratio);
 				}
 
 				if (order.amount == _amountYT) {
@@ -94,7 +99,7 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 			}
 			else {
 
-				manageCollateral_fillYTSell(order.maker, orderZCBamt, order.amount);
+				manageCollateral_fillYTSell(order.maker, orderZCBamt, order.amount, ratio);
 				delete internalYTSells[newHeadID];
 
 				ZCBsold += orderZCBamt;
@@ -312,7 +317,7 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 				ZCBsold += _amountZCB;
 				YTbought += scaledYTamt;
 
-				manageCollateral_fillYTSell(order.maker, _amountZCB, scaledYTamt);
+				manageCollateral_fillYTSell(order.maker, _amountZCB, scaledYTamt, ratio);
 				if (order.amount == scaledYTamt) {
 					internalHeadYTSellID = order.nextID;
 					delete internalYTSells[newHeadID];
@@ -335,7 +340,7 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 			}
 			else {
 
-				manageCollateral_fillYTSell(order.maker, orderZCBamt, order.amount);
+				manageCollateral_fillYTSell(order.maker, orderZCBamt, order.amount, ratio);
 				delete internalYTSells[newHeadID];
 
 				ZCBsold += orderZCBamt;
@@ -421,7 +426,7 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 				YTbought += YTtoBuy;
 				ZCBsold += ZCBtoSell;
 
-				manageCollateral_fillYTSell(order.maker, ZCBtoSell.mul(TOTAL_BASIS_POINTS) / (TOTAL_BASIS_POINTS + (i >> 16)), YTtoBuy);
+				manageCollateral_fillYTSell(order.maker, ZCBtoSell.mul(TOTAL_BASIS_POINTS) / (TOTAL_BASIS_POINTS + (i >> 16)), YTtoBuy, ratio);
 				if (order.amount == YTtoBuy) {
 					internalHeadYTSellID = order.nextID;
 					delete internalYTSells[newHeadID];
@@ -458,7 +463,7 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 			}
 			else {
 
-				manageCollateral_fillYTSell(order.maker, orderZCBamt_orderRatio, order.amount);
+				manageCollateral_fillYTSell(order.maker, orderZCBamt_orderRatio, order.amount, ratio);
 				delete internalYTSells[newHeadID];
 
 				ZCBsold += feeAdjOrderZCBamt;

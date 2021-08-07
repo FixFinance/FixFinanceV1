@@ -104,13 +104,16 @@ contract OrderbookDelegateParent is OrderbookData {
 
 	function manageCollateral_BuyZCB_takeOrder(address _addr, uint _amountZCB, uint _amountWrappedYT, uint _ratio, bool _useInternalBalances) internal {
 		if (_useInternalBalances) {
+			require(_amountWrappedYT < uint(type(int256).max));
 			uint bondValChange = (_amountWrappedYT.mul(_ratio) / (1 ether)).add(_amountZCB);
-			require(bondValChange < uint(type(int256).max));
+			require(bondValChange <= uint(type(int256).max));
 
 			uint YD = internalYieldDeposited[_addr];
+			int BD = internalBondDeposited[_addr];
 			uint wrappedAmtLockedYT = internalLockedYT[_addr];
 			uint _lockedZCB = internalLockedZCB[_addr];
-			int BD = internalBondDeposited[_addr];
+			int changeYield = int(_amountWrappedYT+1).mul(-1);
+			internalWrapper.editSubAccountPosition(false, _addr, address(internalFCP), changeYield, int(bondValChange));
 			uint resultantYD = YD.sub(_amountWrappedYT+1); //+1 to prevent off by 1 errors
 			int resultantBD = BD.add(int(bondValChange));
 			requireValidCollateral(resultantYD, resultantBD, wrappedAmtLockedYT, _lockedZCB, _ratio);
@@ -120,10 +123,11 @@ contract OrderbookDelegateParent is OrderbookData {
 		else {
 			require(_amountZCB < uint(type(int256).max));
 			uint unitAmtYT = _amountWrappedYT.mul(_ratio) / (1 ether);
+			IFixCapitalPool fcp = internalFCP;
 			//get YT
-			internalFCP.transferPositionFrom(msg.sender, address(this), _amountWrappedYT+1, -int(unitAmtYT)); //+1 to prevent off by 1 errors
+			fcp.transferPositionFrom(msg.sender, address(this), _amountWrappedYT+1, -int(unitAmtYT)); //+1 to prevent off by 1 errors
 			//send ZCB
-			internalFCP.transferPosition(msg.sender, 0, int(_amountZCB));
+			fcp.transferPosition(msg.sender, 0, int(_amountZCB));
 		}
 	}
 
@@ -149,15 +153,18 @@ contract OrderbookDelegateParent is OrderbookData {
 		bool _useInternalBalances
 	) internal {
 		if (_useInternalBalances) {
-			uint bondValChange = (_amountWrappedYT.mul(_ratio) / (1 ether)).add(_amountZCB);
-			require(bondValChange < uint(type(int256).max));
+			require(_amountWrappedYT <= uint(type(int256).max));
+			uint bondDecrease = (_amountWrappedYT.mul(_ratio) / (1 ether)).add(_amountZCB);
+			require(bondDecrease <= uint(type(int256).max));
+			int bondChange = -int(bondDecrease);
 
 			uint YD = internalYieldDeposited[_addr];
+			int BD = internalBondDeposited[_addr];
 			uint wrappedAmtLockedYT = internalLockedYT[_addr];
 			uint _lockedZCB = internalLockedZCB[_addr];
-			int BD = internalBondDeposited[_addr];
+			internalWrapper.editSubAccountPosition(false, _addr, address(internalFCP), int(_amountWrappedYT), bondChange);
 			uint resultantYD = YD.add(_amountWrappedYT);
-			int resultantBD = BD.sub(int(bondValChange));
+			int resultantBD = BD.add(bondChange);
 			requireValidCollateral(resultantYD, resultantBD, wrappedAmtLockedYT, _lockedZCB, _ratio);
 			internalYieldDeposited[_addr] = resultantYD;
 			internalBondDeposited[_addr] = resultantBD;
@@ -178,34 +185,39 @@ contract OrderbookDelegateParent is OrderbookData {
 		internalLockedZCB[_addr] = resultantLockedZCB;
 	}
 
-	function manageCollateral_fillYTSell(address _addr, uint _ZCBreceived, uint _YTsold) internal {
-		require(_ZCBreceived < uint(type(int256).max));
-		int resultantBD = internalBondDeposited[_addr].add(int(_ZCBreceived));
-		uint resultantYD = internalYieldDeposited[_addr].sub(_YTsold);
-		uint resultantWrappedAmtLockedYT = internalLockedYT[_addr].sub(_YTsold);
-		internalBondDeposited[_addr] = resultantBD;
-		internalYieldDeposited[_addr] = resultantYD;
-		internalLockedYT[_addr] = resultantWrappedAmtLockedYT;
+	function manageCollateral_fillYTSell(address _addr, uint _ZCBreceived, uint _YTsold, uint _ratio) internal {
+		require(_ZCBreceived <= uint(type(int256).max));
+		require(_YTsold <= uint(type(int256).max));
+		uint unitAmtYT = _YTsold.mul(_ratio) / (1 ether);
+		int prevBD = internalBondDeposited[_addr];
+		uint prevYD = internalYieldDeposited[_addr];
+		uint prevWrappedAmtLockedYT = internalLockedYT[_addr];
+		int changeYield = -int(_YTsold);
+		int changeBond = int(unitAmtYT).add(int(_ZCBreceived));
+		internalBondDeposited[_addr] = prevBD.add(changeBond);
+		internalYieldDeposited[_addr] = prevYD.sub(_YTsold);
+		internalLockedYT[_addr] = prevWrappedAmtLockedYT.sub(_YTsold);
+		internalWrapper.editSubAccountPosition(false, _addr, address(internalFCP), changeYield, changeBond);
 	}
 
 	function manageCollateral_closeYTSell(address _addr, uint _YTclosed) internal {
 		require(_YTclosed < uint(type(int256).max));
-		uint resultantLockedYT = internalLockedYT[_addr].sub(_YTclosed);
-		internalLockedYT[_addr] = resultantLockedYT;
+		uint prevLockedYT = internalLockedYT[_addr];
+		internalLockedYT[_addr] = prevLockedYT.sub(_YTclosed);
 	}
 
 	function manageCollateral_fillZCBSell(address _addr, uint _YTreceived, uint _ZCBsold, uint _ratio) internal {
 		require(_YTreceived <= uint(type(int256).max));
 		require(_ZCBsold <= uint(type(int256).max));
 		uint unitAmtYT = _YTreceived.mul(_ratio) / (1 ether);
-		uint YD = internalYieldDeposited[_addr];
-		int BD = internalBondDeposited[_addr];
-		uint resultantLockedZCB = internalLockedZCB[_addr].sub(_ZCBsold);
-		uint resultantYD = YD.add(_YTreceived);
-		int resultantBD = BD.sub(int(unitAmtYT)).sub(int(_ZCBsold));
-		internalYieldDeposited[_addr] = resultantYD;
-		internalBondDeposited[_addr] = resultantBD;
-		internalLockedZCB[_addr] = resultantLockedZCB;
+		uint prevYD = internalYieldDeposited[_addr];
+		int prevBD = internalBondDeposited[_addr];
+		uint prevLockedZCB = internalLockedZCB[_addr];
+		int changeBond = int(unitAmtYT).add(int(_ZCBsold)).mul(-1);
+		internalYieldDeposited[_addr] = prevYD.add(_YTreceived);
+		internalBondDeposited[_addr] = prevBD.add(changeBond);
+		internalLockedZCB[_addr] = prevLockedZCB.sub(_ZCBsold);
+		internalWrapper.editSubAccountPosition(false, _addr, address(internalFCP), int(_YTreceived), changeBond);
 	}
 
 	function manageCollateral_payFee(uint _amount, uint _ratio) internal {

@@ -28,16 +28,21 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 	) public {
 		internalFCP = IFixCapitalPool(_internalFCPaddress);
 		internalIORC = IInfoOracle(_infoOracleAddress);
-		internalWrapper = IFixCapitalPool(_internalFCPaddress).wrapper();
+		IWrapper tempWrapper = IFixCapitalPool(_internalFCPaddress).wrapper();
 		internalMaturity = IFixCapitalPool(_internalFCPaddress).maturity();
+		internalWrapper = tempWrapper;
 		delegate1Address = _delegate1Address;
 		delegate2Address = _delegate2Address;
+		tempWrapper.registerAsDistributionAccount();
 	}
 
 	function deposit(uint _amountYield, int _amountBond) external override {
-		internalFCP.transferPositionFrom(msg.sender, address(this), _amountYield, _amountBond);
-		internalYieldDeposited[msg.sender] += _amountYield;
-		internalBondDeposited[msg.sender] += _amountBond;
+		require(_amountYield <= uint(type(int256).max));
+		IFixCapitalPool fcp = internalFCP; //gas savings
+		fcp.transferPositionFrom(msg.sender, address(this), _amountYield, _amountBond);
+		internalWrapper.editSubAccountPosition(false, msg.sender, address(fcp), int(_amountYield), _amountBond);
+		internalYieldDeposited[msg.sender] = internalYieldDeposited[msg.sender].add(_amountYield);
+		internalBondDeposited[msg.sender] = internalBondDeposited[msg.sender].add(_amountBond);
 	}
 
 	function withdraw(uint _amountYield, int _amountBond) external override {

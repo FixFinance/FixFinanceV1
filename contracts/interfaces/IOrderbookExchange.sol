@@ -56,6 +56,7 @@ interface IOrderbookExchange {
 		bool _useInternalBalances
 	) external returns(uint ZCBbought, uint YTsold);
 
+	function forceClaimSubAccountRewards() external;
 
 	//--------------v-i-e-w-s------------------
 	function YieldDeposited(address _depositor) external view returns(uint);

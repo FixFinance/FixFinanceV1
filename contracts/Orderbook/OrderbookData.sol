@@ -86,6 +86,7 @@ contract OrderbookData {
 	uint public internalYieldRevenue;
 	int public internalBondRevenue;
 
+	address internalTreasuryAddress;
 
 	//--------------data for rate oracle---------------
 	uint8 constant LENGTH_RATE_SERIES = 31;

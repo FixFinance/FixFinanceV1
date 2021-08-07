@@ -221,19 +221,25 @@ contract OrderbookDelegateParent is OrderbookData {
 	}
 
 	function manageCollateral_payFee(uint _amount, uint _ratio) internal {
+		require(_amount <= uint(type(int256).max));
 		int BR = internalBondRevenue;
 		if (_ratio == 0) {
 			//ratio of 0 means fee is in ZCB
-			require(_amount <= uint(type(int256).max));
 			internalBondRevenue = BR.add(int(_amount));
+			internalWrapper.editSubAccountPosition(false, internalTreasuryAddress, address(internalFCP), 0, int(_amount));
 		}
 		else {
 			//the conversion below is always safe because / (1 ether) always deflates enough
-			int bondAmount = int(_amount.mul(_ratio) / (1 ether));
+			int bondAmount = -int(_amount.mul(_ratio) / (1 ether));
 			uint YR = internalYieldRevenue;
 			internalYieldRevenue = YR.add(_amount);
-			internalBondRevenue = BR.sub(bondAmount);
+			internalBondRevenue = BR.add(bondAmount);
+			internalWrapper.editSubAccountPosition(false, internalTreasuryAddress, address(internalFCP), int(_amount), bondAmount);
 		}
+	}
+
+	function claimContractSubAccountRewards(address _wrapperAddress, address _fcpAddress) internal {
+		IWrapper(_wrapperAddress).forceClaimSubAccountRewards(true, _fcpAddress, address(this), _fcpAddress);
 	}
 
 	//---------------------------R-a-t-e---O-r-a-c-l-e---------------------------------

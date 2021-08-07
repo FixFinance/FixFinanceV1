@@ -18,6 +18,7 @@ const helper = require("../helper/helper.js");
 
 const BN = web3.utils.BN;
 const nullAddress = "0x0000000000000000000000000000000000000000";
+const treasuryAddress = "0x0000000000000000000000000000000000000001";
 const _10 = new BN(10);
 const _10To18 = _10.pow(new BN("18"));
 const LENGTH_RATE_SERIES = 31;
@@ -38,6 +39,7 @@ contract('OrderbookExchange', async function(accounts) {
 
 	it('before each', async () => {
 		aTokenInstance = await aToken.new("aCOIN");
+		rewardsAsset = await aToken.new("RWD");
 		infoOracleInstance = await InfoOracle.new(BipsToTreasury, nullAddress);
 		ngbwDelegate1Instance = await NGBwrapperDelegate1.new();
 		ngbwDelegate2Instance = await NGBwrapperDelegate2.new();
@@ -60,7 +62,7 @@ contract('OrderbookExchange', async function(accounts) {
 		yieldTokenInstance = await yieldToken.at(await fixCapitalPoolInstance.yieldTokenAddress());
 		orderbookDelegate1Instance = await OrderbookDelegate1.new();
 		orderbookDelegate2Instance = await OrderbookDelegate2.new();
-		exchange = await OrderbookExchange.new(fixCapitalPoolInstance.address, infoOracleInstance.address, orderbookDelegate1Instance.address, orderbookDelegate2Instance.address);
+		exchange = await OrderbookExchange.new(treasuryAddress, fixCapitalPoolInstance.address, infoOracleInstance.address, orderbookDelegate1Instance.address, orderbookDelegate2Instance.address);
 		await exchange.setMinimumOrderSize(_10To18.div(new BN(400000)));
 		FeeBips = 25;
 		await infoOracleInstance.setMinimumOrderbookFee(FeeBips);
@@ -80,9 +82,22 @@ contract('OrderbookExchange', async function(accounts) {
 
 		//simulate generation of 100% returns in money market
 		await aTokenInstance.setInflation("2"+_10To18.toString().substring(1));
+		await NGBwrapperInstance.addRewardAsset(rewardsAsset.address);
 	});
 
+	function rand(min, max) {
+		return Math.floor(Math.random() * (max - min)) + min + 1;
+	}
+
+	async function addRewards() {
+		let amtToMint = _10To18.div(new BN(rand(1, 10000)));
+		let currentBal = await rewardsAsset.balanceOf(NGBwrapperInstance.address);
+		let newBal = currentBal.add(amtToMint);
+		await rewardsAsset.mintTo(NGBwrapperInstance.address, newBal);
+	}
+
 	it('deposit', async () => {
+		await addRewards();
 		let yieldToDeposit = _10To18.div(_10);
 		let bondToDeposit = _10To18.div(new BN(7)).neg();
 
@@ -109,6 +124,7 @@ contract('OrderbookExchange', async function(accounts) {
 	});
 
 	it ('withdraw', async () => {
+		await addRewards();
 		let yieldToWithdraw = _10To18.div(new BN(20));
 		let bondToWithdraw = _10To18.div(new BN(14)).neg();
 
@@ -418,6 +434,7 @@ contract('OrderbookExchange', async function(accounts) {
 	}
 
 	it('limitSellZCB at head, blank list', async () => {
+		await addRewards();
 		let amtZCB = _10To18.div(new BN(200));
 		let MCR = _10To18.mul(new BN(5));
 		let expectedIDs = ["1"];
@@ -425,6 +442,7 @@ contract('OrderbookExchange', async function(accounts) {
 	});
 
 	it('limitSellZCB at head, head exists', async () => {
+		await addRewards();
 		let amtZCB = _10To18.div(new BN(500));
 		let MCR = _10To18.mul(new BN(8));
 		let expectedIDs = ["2", "1"];
@@ -432,6 +450,7 @@ contract('OrderbookExchange', async function(accounts) {
 	});
 
 	it('limitSellZCB in middle, no hint', async () => {
+		await addRewards();
 		let amtZCB = _10To18.div(new BN(500));
 		let MCR = _10To18.mul(new BN(7));
 		let expectedIDs = ["2", "3", "1"];
@@ -439,6 +458,7 @@ contract('OrderbookExchange', async function(accounts) {
 	});
 
 	it('limitSellZCB in middle, use hint', async () => {
+		await addRewards();
 		let amtZCB = _10To18.div(new BN(500));
 		let MCR = _10To18.mul(new BN(6));
 		let expectedIDs = ["2", "3", "4", "1"];
@@ -446,6 +466,7 @@ contract('OrderbookExchange', async function(accounts) {
 	});
 
 	it('limitSellZCB at tail, no hint', async () => {
+		await addRewards();
 		let amtZCB = _10To18.div(new BN(800));
 		let MCR = _10To18.mul(new BN(4));
 		let expectedIDs = ["2", "3", "4", "1", "5"];
@@ -453,6 +474,7 @@ contract('OrderbookExchange', async function(accounts) {
 	});
 
 	it('limitSellZCB at tail, use hint', async () => {
+		await addRewards();
 		let amtZCB = _10To18.div(new BN(700));
 		let MCR = _10To18.mul(new BN(3));
 		let expectedIDs = ["2", "3", "4", "1", "5", "6"];
@@ -460,6 +482,7 @@ contract('OrderbookExchange', async function(accounts) {
 	});
 
 	it('cannot limitSellZCB where MCR is under current ratio', async () => {
+		await addRewards();
 		let MCR = _10To18.mul(new BN(3)).div(new BN(2));
 		let amtZCB = _10To18.div(new BN(900));
 		let caught = false;
@@ -475,26 +498,32 @@ contract('OrderbookExchange', async function(accounts) {
 	});
 
 	it('modifyZCBLimitSell at head', async () => {
+		await addRewards();
 		await test_modify(_10To18.div(new BN(1200)), "2", "0", 10, false, true);
 	});
 
 	it('modifyZCBLimitSell in middle, no hint', async () => {
+		await addRewards();
 		await test_modify(_10To18.div(new BN(7500)).neg(), "4", "0", 10, false, true);
 	});
 
 	it('modifyZCBLimitSell in middle, use hint', async () => {
+		await addRewards();
 		await test_modify(_10To18.div(new BN(6500)).neg(), "4", "3", 10, false, true);
 	});
 
 	it('modifyZCBLimitSell at tail, no hint', async () => {
+		await addRewards();
 		await test_modify(_10To18.div(new BN(6500)).neg(), "6", "0", 10, false, true);
 	});
 
 	it('modifyZCBLimitSell at tail, use hint', async () => {
+		await addRewards();
 		await test_modify(_10To18.neg(), "6", "1", 10, false, true);
 	});
 
 	it('modifyZCBLimitSell at head, reultant amount under minimum', async () => {
+		await addRewards();
 		let order = await exchange.ZCBSells("2");
 		let minimumOrderSize = await exchange.getMinimumOrderSize();
 		let ratio = await NGBwrapperInstance.WrappedAmtToUnitAmt_RoundDown(_10To18);
@@ -508,6 +537,7 @@ contract('OrderbookExchange', async function(accounts) {
 	});
 
 	it('modifyZCBLimitSell in middle use hint, resultant amount under minimum', async () => {
+		await addRewards();
 		let order = await exchange.ZCBSells("1");
 		let minimumOrderSize = await exchange.getMinimumOrderSize();
 		let ratio = await NGBwrapperInstance.WrappedAmtToUnitAmt_RoundDown(_10To18);
@@ -521,6 +551,7 @@ contract('OrderbookExchange', async function(accounts) {
 	});
 
 	it('modifyZCBLimitSell in middle no hint, resultant amount under minimum', async () => {
+		await addRewards();
 		let order = await exchange.ZCBSells("4");
 		let minimumOrderSize = await exchange.getMinimumOrderSize();
 		let ratio = await NGBwrapperInstance.WrappedAmtToUnitAmt_RoundDown(_10To18);
@@ -534,6 +565,7 @@ contract('OrderbookExchange', async function(accounts) {
 	});
 
 	it('Resupply Liquidity to ZCB Sell side of orderbook', async () => {
+		await addRewards();
 		let amtZCB = _10To18.div(new BN(200));
 		let MCR = _10To18.mul(new BN(7));
 		let expectedIDs = ["3", "7", "5"];
@@ -545,6 +577,7 @@ contract('OrderbookExchange', async function(accounts) {
 	//other side of orderbook
 
 	it('limitSellYT at head, blank list', async () => {
+		await addRewards();
 		let amtYT = _10To18.div(new BN(800));
 		let MCR = _10To18.mul(new BN(6));
 		let expectedIDs = ["9"];
@@ -552,6 +585,7 @@ contract('OrderbookExchange', async function(accounts) {
 	});
 
 	it('limitSellYT at head, head exists', async () => {
+		await addRewards();
 		let amtYT = _10To18.div(new BN(900));
 		let MCR = _10To18.mul(new BN(3));
 		let expectedIDs = ["10", "9"];
@@ -559,6 +593,7 @@ contract('OrderbookExchange', async function(accounts) {
 	});
 
 	it('limitSellYT in middle, no hint', async () => {
+		await addRewards();
 		let amtYT = _10To18.div(new BN(700));
 		let MCR = _10To18.mul(new BN(4));
 		let expectedIDs = ["10", "11", "9"];
@@ -566,6 +601,7 @@ contract('OrderbookExchange', async function(accounts) {
 	});
 
 	it('limitSellYT in middle, use hint', async () => {
+		await addRewards();
 		let amtYT = _10To18.div(new BN(450));
 		let MCR = _10To18.mul(new BN(5));
 		let expectedIDs = ["10", "11", "12", "9"];
@@ -573,6 +609,7 @@ contract('OrderbookExchange', async function(accounts) {
 	});
 
 	it('limitSellYT at tail, no hint', async () => {
+		await addRewards();
 		let amtYT = _10To18.div(new BN(870));
 		let MCR = _10To18.mul(new BN(7));
 		let expectedIDs = ["10", "11", "12", "9", "13"];
@@ -580,6 +617,7 @@ contract('OrderbookExchange', async function(accounts) {
 	});
 
 	it('limitSellYT at tail, use hint', async () => {
+		await addRewards();
 		let amtYT = _10To18.div(new BN(900));
 		let MCR = _10To18.mul(new BN(7));
 		let expectedIDs = ["10", "11", "12", "9", "13", "14"];
@@ -587,6 +625,7 @@ contract('OrderbookExchange', async function(accounts) {
 	});
 
 	it('cannot limitSellYT where MCR is under current ratio', async () => {
+		await addRewards();
 		let MCR = _10To18.mul(new BN(3)).div(new BN(2));
 		let amtYT = _10To18.div(new BN(1900));
 		let caught = false;
@@ -602,26 +641,32 @@ contract('OrderbookExchange', async function(accounts) {
 	});
 
 	it('modifyYTLimitSell at head', async () => {
+		await addRewards();
 		await test_modify(_10To18.neg(), "10", "0", 10, false, false);
 	});
 
 	it('modifyYTLimitSell in middle, no hint', async () => {
+		await addRewards();
 		await test_modify(_10To18.div(new BN(5000)), "12", "0", 10, false, false);
 	});
 
 	it('modifyYTLimitSell in middle, use hint', async () => {
+		await addRewards();
 		await test_modify(_10To18.div(new BN(1000)), "13", "12", 10, false, false);
 	});
 
 	it('modifyYTLimitSell at tail, no hint', async () => {
+		await addRewards();
 		await test_modify(_10To18.div(new BN(7000)).neg(), "14", "0", 10, false, false);
 	});
 
 	it('modifyYTLimitSell at tail, use hint', async () => {
+		await addRewards();
 		await test_modify(_10To18.div(new BN(9000)).neg(), "14", "13", 10, false, false);
 	});
 
 	it('modifyYTLimitSell at head, reultant amount under minimum', async () => {
+		await addRewards();
 		let order = await exchange.YTSells("11");
 		let minimumOrderSize = await exchange.getMinimumOrderSize();
 		let ratio = await NGBwrapperInstance.WrappedAmtToUnitAmt_RoundDown(_10To18);
@@ -637,6 +682,7 @@ contract('OrderbookExchange', async function(accounts) {
 	});
 
 	it('modifyYTLimitSell in middle use hint, reultant amount under minimum', async () => {
+		await addRewards();
 		let order = await exchange.YTSells("9");
 		let minimumOrderSize = await exchange.getMinimumOrderSize();
 		let ratio = await NGBwrapperInstance.WrappedAmtToUnitAmt_RoundDown(_10To18);
@@ -653,6 +699,7 @@ contract('OrderbookExchange', async function(accounts) {
 
 	it('modifyYTLimitSell at tail no hint, reultant amount under minimum', async () => {
 		let order = await exchange.YTSells("14");
+		await addRewards();
 		let minimumOrderSize = await exchange.getMinimumOrderSize();
 		let ratio = await NGBwrapperInstance.WrappedAmtToUnitAmt_RoundDown(_10To18);
 		//YT == U / ((1 - zcbDilutiontoMatutity) * ratio)
@@ -667,6 +714,7 @@ contract('OrderbookExchange', async function(accounts) {
 	});
 
 	it('Resupply Liquidity to YT Sell side of orderbook', async () => {
+		await addRewards();
 		let amtYT = _10To18.div(new BN(450));
 		let MCR = _10To18.mul(new BN(6));
 		let expectedIDs = ["12", "15", "13"];
@@ -1305,6 +1353,7 @@ contract('OrderbookExchange', async function(accounts) {
 	}
 
 	it('marketBuyYT, no mcr blockers', async () => {
+		await addRewards();
 		let amtToBuy = _10To18.div(new BN(300));
 		let maxMCR = _10To18.mul(new BN(10));
 		let maxCumulativeMCR = maxMCR;
@@ -1314,6 +1363,7 @@ contract('OrderbookExchange', async function(accounts) {
 	});
 
 	it('marketSellZCB, no mcr blockers', async () => {
+		await addRewards();
 		let amtToSell = _10To18.div(new BN(780));
 		let maxMCR = _10To18.mul(new BN(10));
 		let maxCumulativeMCR = maxMCR;
@@ -1323,6 +1373,7 @@ contract('OrderbookExchange', async function(accounts) {
 	});
 
 	it('marketBuyZCB, no mcr blockers', async () => {
+		await addRewards();
 		let amtToBuy = _10To18.div(new BN(300));
 		let minMCR = _10To18.div(new BN(10));
 		let minCumulativeMCR = minMCR;
@@ -1332,6 +1383,7 @@ contract('OrderbookExchange', async function(accounts) {
 	});
 
 	it('marketSellYT, no mcr blockers', async () => {
+		await addRewards();
 		let amtToSell = _10To18.div(new BN(780));
 		let minMCR = _10To18.div(new BN(10));
 		let minCumulativeMCR = minMCR;
@@ -1341,6 +1393,7 @@ contract('OrderbookExchange', async function(accounts) {
 	});
 
 	it('marketSellZCBtoU, no mcr blockers', async () => {
+		await addRewards();
 		let amtZCB = _10To18.div(new BN(780));
 		let maxMCR = _10To18.mul(new BN(10));
 		let maxCumulativeMCR = maxMCR;
@@ -1350,6 +1403,7 @@ contract('OrderbookExchange', async function(accounts) {
 	});
 
 	it('marketSellUnitYTtoU, no mcr blockers', async () => {
+		await addRewards();
 		let unitAmtToSell = _10To18.div(new BN(780));
 		let minMCR = _10To18.div(new BN(10));
 		let minCumulativeMCR = minMCR;
@@ -1359,6 +1413,7 @@ contract('OrderbookExchange', async function(accounts) {
 	});
 
 	it('Set Oracle MCR', async () => {
+		await addRewards();
 		let orcData = await exchange.getOracleData();
 		for (let i = LENGTH_RATE_SERIES-1; orcData._impliedMCRs[i].cmp(new BN(0)) === 0; i--) {
 			await helper.advanceTime(61);
@@ -1385,5 +1440,12 @@ contract('OrderbookExchange', async function(accounts) {
 		if (!caught) {
 			assert.fail('managed to set the wrong median MCR as the MCR');
 		}
-	})
+	});
+
+	it('Can handle all sub account obligations', async () => {
+		for (let i = 0; i < accounts.length; i++) {
+			await exchange.forceClaimSubAccountRewards({from: accounts[i]});
+		}
+		let rewards = (await NGBwrapperInstance.distributionAccountRewards(0, exchange.address)).toNumber();
+	});
 });

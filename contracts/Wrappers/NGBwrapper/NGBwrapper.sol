@@ -398,17 +398,20 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 	/*
 		@Description: force rewards for a sub account to be distributed
 
+		@param bool _claimRewards: pass true to enter the claimRewards modifier for the distribution account
 		@param address _distributionAccount: the address of the distribution account for the sub account
 		@param address _subAccount: the address that is the owner of the sub account and shall receive the rewards
 		@param address _FCPaddr: the address of the FCP contract for which the sub account amounts are denominated
 	*/
 	function forceClaimSubAccountRewards(
+		bool _claimRewards,
 		address _distributionAccount,
 		address _subAccount,
 		address _FCPaddr
 	) external override {
 		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
-			"forceClaimSubAccountRewards(address,address,address)",
+			"forceClaimSubAccountRewards(bool,address,address,address)",
+			_claimRewards,
 			_distributionAccount,
 			_subAccount,
 			_FCPaddr

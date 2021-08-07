@@ -46,12 +46,14 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 	) external setRateModifier returns(uint YTbought, uint ZCBsold, uint newHeadID, uint newHeadAmount) {
 		newHeadID = internalHeadYTSellID;
 		LimitSellYT memory order;
-		uint ratio = internalWrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
+		address[3] memory vitals = [address(internalWrapper), address(internalFCP), address(internalIORC)];
+		claimContractSubAccountRewards(vitals[0], vitals[1]);
+		uint ratio = IWrapper(vitals[0]).WrappedAmtToUnitAmt_RoundDown(1 ether);
 		for (uint16 i = 0; i < _maxIterations && newHeadID != 0; i++) {
 			order = internalYTSells[newHeadID];
 			if (order.maturityConversionRate > _maxMaturityConversionRate) {
 				//account for fees
-				uint ZCBfee = ZCBsold.mul(internalIORC.getOrderbookFeeBips(address(internalFCP))) / TOTAL_BASIS_POINTS;
+				uint ZCBfee = ZCBsold.mul(IInfoOracle(vitals[2]).getOrderbookFeeBips(vitals[1])) / TOTAL_BASIS_POINTS;
 				ZCBsold = ZCBsold.add(ZCBfee);
 				require(impliedMaturityConversionRate(ZCBsold, YTbought, ratio) <= _maxCumulativeMaturityConversionRate);
 				//collect & distribute to taker
@@ -89,12 +91,15 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 				}
 
 				//account for fees
-				uint ZCBfee = ZCBsold.mul(internalIORC.getOrderbookFeeBips(address(internalFCP))) / TOTAL_BASIS_POINTS;
+				uint ZCBfee = ZCBsold.mul(internalIORC.getOrderbookFeeBips(vitals[1])) / TOTAL_BASIS_POINTS;
 				ZCBsold = ZCBsold.add(ZCBfee);
 				require(impliedMaturityConversionRate(ZCBsold, YTbought, ratio) <= _maxCumulativeMaturityConversionRate);
 				//collect & distribute to taker
 				manageCollateral_payFee(ZCBfee, 0);
-				manageCollateral_BuyYT_takeOrder(msg.sender, ZCBsold, YTbought, ratio, _useInternalBalances);
+				{
+					bool copyUseInternalBalances = _useInternalBalances;
+					manageCollateral_BuyYT_takeOrder(msg.sender, ZCBsold, YTbought, ratio, copyUseInternalBalances);
+				}
 				return (YTbought, ZCBsold, newHeadID, newHeadAmount);
 			}
 			else {
@@ -120,7 +125,7 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 	}
 
 	function marketSellYT(
-		uint _amountYT, //deflate div (1 + fee), after execution inflate YTsold mul (1 + fee)
+		uint _amountYTInitial, //deflate div (1 + fee), after execution inflate YTsold mul (1 + fee)
 		uint _minMaturityConversionRate,
 		uint _minCumulativeMaturityConversionRate,
 		uint16 _maxIterations,
@@ -129,8 +134,11 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 
 		newHeadID = internalHeadZCBSellID;
 		LimitSellZCB memory order;
-		uint ratio = internalWrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
-		uint i = uint(internalIORC.getOrderbookFeeBips(address(internalFCP))) << 16; //store fee multiplier in 17th to 24th bit of i, cast i to uint16 for iteration purpouses
+		address[3] memory vitals = [address(internalWrapper), address(internalFCP), address(internalIORC)];
+		claimContractSubAccountRewards(vitals[0], vitals[1]);
+		uint ratio = IWrapper(vitals[0]).WrappedAmtToUnitAmt_RoundDown(1 ether);
+		uint i = uint(IInfoOracle(vitals[2]).getOrderbookFeeBips(vitals[1])) << 16; //store fee multiplier in 17th to 24th bit of i, cast i to uint16 for iteration purpouses
+		uint _amountYT = _amountYTInitial; //prevent stack too deep
 		_amountYT = _amountYT.mul(TOTAL_BASIS_POINTS).div((i >> 16) + TOTAL_BASIS_POINTS);
 		for ( ; uint16(i) < _maxIterations && newHeadID != 0; i++) {
 			order = internalZCBSells[newHeadID];
@@ -175,7 +183,10 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 				require(impliedMaturityConversionRate(ZCBbought, YTsold, ratio) >= _minCumulativeMaturityConversionRate);
 				//collect & distribute to taker
 				manageCollateral_payFee(YTfee, ratio);
-				manageCollateral_BuyZCB_takeOrder(msg.sender, ZCBbought, YTsold, ratio, _useInternalBalances);
+				{
+					bool copyUseInternalBalances = _useInternalBalances;
+					manageCollateral_BuyZCB_takeOrder(msg.sender, ZCBbought, YTsold, ratio, copyUseInternalBalances);
+				}
 				return (ZCBbought, YTsold, newHeadID, newHeadAmount);
 			}
 			else {
@@ -211,11 +222,13 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 
 		newHeadID = internalHeadZCBSellID;
 		LimitSellZCB memory order;
-		uint ratio = internalWrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
+		address[3] memory vitals = [address(internalWrapper), address(internalFCP), address(internalIORC)];
+		claimContractSubAccountRewards(vitals[0], vitals[1]);
+		uint ratio = IWrapper(vitals[0]).WrappedAmtToUnitAmt_RoundDown(1 ether);
 		for (uint16 i = 0; i < _maxIterations && newHeadID != 0; i++) {
 			order = internalZCBSells[newHeadID];
 			if (order.maturityConversionRate < _minMaturityConversionRate) {
-				uint YTfee = YTsold.mul(internalIORC.getOrderbookFeeBips(address(internalFCP))) / TOTAL_BASIS_POINTS;
+				uint YTfee = YTsold.mul(IInfoOracle(vitals[2]).getOrderbookFeeBips(vitals[1])) / TOTAL_BASIS_POINTS;
 				YTsold = YTsold.add(YTfee);
 				require(impliedMaturityConversionRate(ZCBbought, YTsold, ratio) >= _minCumulativeMaturityConversionRate);
 				//collect & distribute to taker
@@ -252,12 +265,15 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 					internalHeadZCBSellID = newHeadID;
 				}
 
-				uint YTfee = YTsold.mul(internalIORC.getOrderbookFeeBips(address(internalFCP))) / TOTAL_BASIS_POINTS;
+				uint YTfee = YTsold.mul(IInfoOracle(vitals[2]).getOrderbookFeeBips(vitals[1])) / TOTAL_BASIS_POINTS;
 				YTsold = YTsold.add(YTfee);
 				require(impliedMaturityConversionRate(ZCBbought, YTsold, ratio) >= _minCumulativeMaturityConversionRate);
 				//collect & distribute to taker
 				manageCollateral_payFee(YTfee, ratio);
-				manageCollateral_BuyZCB_takeOrder(msg.sender, ZCBbought, YTsold, ratio, _useInternalBalances);
+				{
+					bool copyUseInternalBalances = _useInternalBalances;
+					manageCollateral_BuyZCB_takeOrder(msg.sender, ZCBbought, YTsold, ratio, copyUseInternalBalances);
+				}
 				return (ZCBbought, YTsold, newHeadID, newHeadAmount);
 			}
 			else {
@@ -271,7 +287,7 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 			}
 			newHeadID = order.nextID;
 		}
-		uint YTfee = YTsold.mul(internalIORC.getOrderbookFeeBips(address(internalFCP))) / TOTAL_BASIS_POINTS;
+		uint YTfee = YTsold.mul(IInfoOracle(vitals[2]).getOrderbookFeeBips(vitals[1])) / TOTAL_BASIS_POINTS;
 		YTsold = YTsold.add(YTfee);
 		require(impliedMaturityConversionRate(ZCBbought, YTsold, ratio) >= _minCumulativeMaturityConversionRate);
 		//collect & distribute to taker
@@ -282,7 +298,7 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 	}
 
 	function marketSellZCB(
-		uint _amountZCB,
+		uint _amountZCBInitial, //deflate div (1 + fee), after execution inflate YTsold mul (1 + fee)
 		uint _maxMaturityConversionRate,
 		uint _maxCumulativeMaturityConversionRate,
 		uint16 _maxIterations,
@@ -291,8 +307,11 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 
 		newHeadID = internalHeadYTSellID;
 		LimitSellYT memory order;
-		uint ratio = internalWrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
-		uint i = uint(internalIORC.getOrderbookFeeBips(address(internalFCP))) << 16; //store fee multiplier in 17th to 24th bit of i, cast i to uint16 for iteration purpouses
+		address[3] memory vitals = [address(internalWrapper), address(internalFCP), address(internalIORC)];
+		claimContractSubAccountRewards(vitals[0], vitals[1]);
+		uint ratio = IWrapper(vitals[0]).WrappedAmtToUnitAmt_RoundDown(1 ether);
+		uint i = uint(IInfoOracle(vitals[2]).getOrderbookFeeBips(vitals[1])) << 16; //store fee multiplier in 17th to 24th bit of i, cast i to uint16 for iteration purpouses
+		uint _amountZCB = _amountZCBInitial; // prevent stack too deep
 		_amountZCB = _amountZCB.mul(TOTAL_BASIS_POINTS).div((i >> 16) + TOTAL_BASIS_POINTS);
 		for ( ; uint16(i) < _maxIterations && newHeadID != 0; i++) {
 			order = internalYTSells[newHeadID];
@@ -335,7 +354,10 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 				require(impliedMaturityConversionRate(ZCBsold, YTbought, ratio) <= _maxCumulativeMaturityConversionRate);
 				//collect & distribute to taker
 				manageCollateral_payFee(ZCBfee, 0);
-				manageCollateral_BuyYT_takeOrder(msg.sender, ZCBsold, YTbought, ratio, _useInternalBalances);
+				{
+					bool copyUseInternalBalances = _useInternalBalances; //prevent stack too deep
+					manageCollateral_BuyYT_takeOrder(msg.sender, ZCBsold, YTbought, ratio, copyUseInternalBalances);
+				}
 				return (YTbought, ZCBsold, newHeadID, newHeadAmount);
 			}
 			else {
@@ -360,11 +382,11 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 	}
 
 	function marketSellZCBtoU(
-		uint _amountZCB,
-		uint _maxMaturityConversionRate,
-		uint _maxCumulativeMaturityConversionRate,
-		uint16 _maxIterations,
-		bool _useInternalBalances
+		uint _amountZCBInitial,
+		uint _maxMaturityConversionRateInitial,
+		uint _maxCumulativeMaturityConversionRateInitial,
+		uint16 _maxIterationsInitial,
+		bool _useInternalBalancesInitial
 	) external setRateModifier {
 		/*
 			lokey this function actually returns (uint YTbought, uint ZCBsold, uint newHeadID, uint newHeadAmount)
@@ -372,12 +394,19 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 			pretend that we aren't going to return anything then use assembly to avoid allocation
 			on the stack and write directly to memory then we return
 		*/
+		address[3] memory vitals = [address(internalWrapper), address(internalFCP), address(internalIORC)];
+		claimContractSubAccountRewards(vitals[0], vitals[1]);
+		uint _amountZCB = _amountZCBInitial;
+		uint _maxMaturityConversionRate = _maxMaturityConversionRateInitial;
+		uint _maxCumulativeMaturityConversionRate = _maxCumulativeMaturityConversionRateInitial;
+		uint16 _maxIterations = _maxIterationsInitial;
+		bool _useInternalBalances = _useInternalBalancesInitial;
 		uint YTbought;
 		uint ZCBsold;
 		uint newHeadID = internalHeadYTSellID;
 		LimitSellYT memory order;
-		uint ratio = internalWrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
-		uint i = uint(internalIORC.getOrderbookFeeBips(address(internalFCP))) << 16; //store fee multiplier in 17th to 24th bit of i, cast i to uint16 for iteration purpouses
+		uint ratio = IWrapper(vitals[0]).WrappedAmtToUnitAmt_RoundDown(1 ether);
+		uint i = uint(IInfoOracle(vitals[2]).getOrderbookFeeBips(vitals[1])) << 16; //store fee multiplier in 17th to 24th bit of i, cast i to uint16 for iteration purpouses
 		for ( ; uint16(i) < _maxIterations && newHeadID != 0; i++) {
 			order = internalYTSells[newHeadID];
 			if (order.maturityConversionRate > _maxMaturityConversionRate) {
@@ -393,11 +422,12 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 				manageCollateral_payFee(fee, 0);
 				uint newHeadAmount = order.amount; //copy to stack to prevent getting overwritten with later mstore opcodes
 				assembly {
-					mstore(0, YTbought)
-					mstore(0x20, ZCBsold)
-					mstore(0x40, newHeadID)
-					mstore(0x60, newHeadAmount)
-					return(order, 0x80)
+					let retPtr := mload(0x40)
+					mstore(retPtr, YTbought)
+					mstore(add(retPtr, 0x20), ZCBsold)
+					mstore(add(retPtr, 0x40), newHeadID)
+					mstore(add(retPtr, 0x60), newHeadAmount)
+					return(retPtr, 0x80)
 				}
 			}
 			uint unitAmtYTbought = YTbought.mul(ratio) / (1 ether);
@@ -454,11 +484,12 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 				manageCollateral_BuyYT_takeOrder(msg.sender, copyZCBsold, copyYTbought, ratio, copyUseInternalBalances);
 				uint newHeadAmount = order.amount; //copy to stack to prevent getting overwritten with later mstore opcodes
 				assembly {
-					mstore(0, copyYTbought)
-					mstore(0x20, copyZCBsold)
-					mstore(0x40, newHeadID)
-					mstore(0x60, newHeadAmount)
-					return(0, 0x80)
+					let retPtr := mload(0x40)
+					mstore(retPtr, copyYTbought)
+					mstore(add(retPtr, 0x20), copyZCBsold)
+					mstore(add(retPtr, 0x40), newHeadID)
+					mstore(add(retPtr, 0x60), newHeadAmount)
+					return(retPtr, 0x80)
 				}
 			}
 			else {
@@ -482,20 +513,21 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 		internalHeadYTSellID = newHeadID;
 		uint newHeadAmount = newHeadID == 0 ? 0 : internalYTSells[newHeadID].amount;
 		assembly {
-			mstore(0, YTbought)
-			mstore(0x20, ZCBsold)
-			mstore(0x40, newHeadID)
-			mstore(0x60, newHeadAmount)
-			return(0, 0x80)
+			let retPtr := mload(0x40)
+			mstore(retPtr, YTbought)
+			mstore(add(retPtr, 0x20), ZCBsold)
+			mstore(add(retPtr, 0x40), newHeadID)
+			mstore(add(retPtr, 0x60), newHeadAmount)
+			return(retPtr, 0x80)
 		}
 	}
 
 	function marketSellUnitYTtoU(
-		uint _unitAmountYT,
-		uint _minMaturityConversionRate,
-		uint _minCumulativeMaturityConversionRate,
-		uint16 _maxIterations,
-		bool _useInternalBalances
+		uint _unitAmountYTInitial,
+		uint _minMaturityConversionRateInitial,
+		uint _minCumulativeMaturityConversionRateInitial,
+		uint16 _maxIterationsInitial,
+		bool _useInternalBalancesInitial
 	) external setRateModifier {
 		/*
 			lokey this function actually returns (uint ZCBbought, uint YTsold, uint newHeadID, uint newHeadAmount)
@@ -503,6 +535,13 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 			pretend that we aren't going to return anything then use assembly to avoid allocation
 			on the stack and write directly to memory then we return
 		*/
+		address[3] memory vitals = [address(internalWrapper), address(internalFCP), address(internalIORC)];
+		claimContractSubAccountRewards(vitals[0], vitals[1]);
+		uint _unitAmountYT = _unitAmountYTInitial;
+		uint _minMaturityConversionRate = _minMaturityConversionRateInitial;
+		uint _minCumulativeMaturityConversionRate = _minCumulativeMaturityConversionRateInitial;
+		uint16 _maxIterations = _maxIterationsInitial;
+		bool _useInternalBalances = _useInternalBalancesInitial;
 		uint ZCBbought;
 		uint YTsold;
 		uint newHeadID = internalHeadZCBSellID;
@@ -524,11 +563,12 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 				manageCollateral_payFee(fee, ratio);
 				uint newHeadAmount = order.amount; //copy to stack to prevent getting overwritten with later mstore opcodes
 				assembly {
-					mstore(0, ZCBbought)
-					mstore(0x20, YTsold)
-					mstore(0x40, newHeadID)
-					mstore(0x60, newHeadAmount)
-					return(0, 0x80)
+					let retPtr := mload(0x40)
+					mstore(retPtr, ZCBbought)
+					mstore(add(retPtr, 0x20), YTsold)
+					mstore(add(retPtr, 0x40), newHeadID)
+					mstore(add(retPtr, 0x60), newHeadAmount)
+					return(retPtr, 0x80)
 				}
 			}
 			uint orderYTamt = impliedYTamount(order.amount, ratio, order.maturityConversionRate);
@@ -584,11 +624,12 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 				manageCollateral_BuyZCB_takeOrder(msg.sender, copyZCBbought, copyYTsold, ratio, copyUseInternalBalances);
 				uint newHeadAmount = order.amount; //copy to stack to prevent getting overwritten with later mstore opcodes
 				assembly {
-					mstore(0, copyZCBbought)
-					mstore(0x20, copyYTsold)
-					mstore(0x40, newHeadID)
-					mstore(0x60, newHeadAmount)
-					return(0, 0x80)
+					let retPtr := mload(0x40)
+					mstore(retPtr, copyZCBbought)
+					mstore(add(retPtr, 0x20), copyYTsold)
+					mstore(add(retPtr, 0x40), newHeadID)
+					mstore(add(retPtr, 0x60), newHeadAmount)
+					return(retPtr, 0x80)
 				}
 			}
 			else {
@@ -613,11 +654,12 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 		internalHeadZCBSellID = newHeadID;
 		uint newHeadAmount = newHeadID == 0 ? 0 : internalZCBSells[newHeadID].amount;
 		assembly {
-			mstore(0, ZCBbought)
-			mstore(0x20, YTsold)
-			mstore(0x40, newHeadID)
-			mstore(0x60, newHeadAmount)
-			return(0, 0x80)
+			let retPtr := mload(0x40)
+			mstore(retPtr, ZCBbought)
+			mstore(add(retPtr, 0x20), YTsold)
+			mstore(add(retPtr, 0x40), newHeadID)
+			mstore(add(retPtr, 0x60), newHeadAmount)
+			return(retPtr, 0x80)
 		}
 	}
 }

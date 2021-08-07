@@ -44,10 +44,11 @@ contract NGBwrapperDelegate2 is NGBwrapperDelegateParent {
     }
 
     function forceClaimSubAccountRewards(
+        bool _claimRewards,
         address _distributionAccount,
         address _subAccount,
         address _FCPaddr
-    ) external claimRewards(true, _distributionAccount) {
+    ) external claimRewards(_claimRewards, _distributionAccount) {
         require(msg.sender == _distributionAccount || msg.sender == _subAccount);
         claimSubAccountRewardsRetPos(_distributionAccount, _subAccount, _FCPaddr);
     }

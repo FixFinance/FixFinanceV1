@@ -21,11 +21,13 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 	using ABDKMath64x64 for int128;
 
 	constructor(
+		address _treasuryAddress,
 		address _internalFCPaddress,
 		address _infoOracleAddress,
 		address _delegate1Address,
 		address _delegate2Address
 	) public {
+		internalTreasuryAddress = _treasuryAddress;
 		internalFCP = IFixCapitalPool(_internalFCPaddress);
 		internalIORC = IInfoOracle(_infoOracleAddress);
 		IWrapper tempWrapper = IFixCapitalPool(_internalFCPaddress).wrapper();
@@ -298,12 +300,14 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 
 		bytes32 nameTopic = keccak256("MarketBuyYT(address,uint256,uint256)");
 		assembly {
-			let success := delegatecall(gas(), _delegateAddress, add(sig, 0x20), mload(sig), 0, 0x80)
+			let retPtr := mload(0x40)
+
+			let success := delegatecall(gas(), _delegateAddress, add(sig, 0x20), mload(sig), retPtr, 0x80)
 
 			if iszero(success) { revert(0,0) }
 
-			log2(0x40, 0x40, nameTopic, caller())
-			return(0, 0x40)
+			log2(add(retPtr, 0x40), 0x40, nameTopic, caller())
+			return(retPtr, 0x40)
 		}
 	}
 
@@ -326,13 +330,20 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 
 		bytes32 nameTopic = keccak256("MarketBuyZCB(address,uint256,uint256)");
 		assembly {
-			let success := delegatecall(gas(), _delegateAddress, add(sig, 0x20), mload(sig), 0, 0x80)
+			let retPtr := mload(0x40)
+
+			let success := delegatecall(gas(), _delegateAddress, add(sig, 0x20), mload(sig), retPtr, 0x80)
 
 			if iszero(success) { revert(0,0) }
 
-			log2(0x40, 0x40, nameTopic, caller())
-			return(0, 0x40)
+			log2(add(retPtr, 0x40), 0x40, nameTopic, caller())
+			return(retPtr, 0x40)
 		}
+	}
+
+	function forceClaimSubAccountRewards() external override {
+		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature("forceClaimSubAccountRewards()"));
+		require(success);
 	}
 
 	//-----------------rate-oracle---------------------

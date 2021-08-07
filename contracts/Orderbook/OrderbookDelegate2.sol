@@ -442,6 +442,13 @@ contract OrderbookDelegate2 is OrderbookDelegateParent {
 		}
 	}
 
+	function forceClaimSubAccountRewards() external {
+		IFixCapitalPool fcp = internalFCP;
+		IWrapper wrp = internalWrapper;
+		wrp.forceClaimSubAccountRewards(true, address(fcp), address(this), address(fcp));
+		wrp.forceClaimSubAccountRewards(false, address(this), msg.sender, address(fcp));
+	}
+
 	//---------------------------R-a-t-e---O-r-a-c-l-e---------------------------------
 
 	/*

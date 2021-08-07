@@ -138,8 +138,8 @@ contract('FixCapitalPool', async function(accounts){
 	});
 
 	it('FCP direct double claim, prior to payout phase from, transferPosition()', async () => {
-		await NGBwrapperInstance.forceClaimSubAccountRewards(fixCapitalPoolInstance.address, accounts[0], fixCapitalPoolInstance.address);
-		await NGBwrapperInstance.forceClaimSubAccountRewards(fixCapitalPoolInstance.address, accounts[1], fixCapitalPoolInstance.address, {from: accounts[1]});
+		await NGBwrapperInstance.forceClaimSubAccountRewards(true, fixCapitalPoolInstance.address, accounts[0], fixCapitalPoolInstance.address);
+		await NGBwrapperInstance.forceClaimSubAccountRewards(true, fixCapitalPoolInstance.address, accounts[1], fixCapitalPoolInstance.address, {from: accounts[1]});
 		let prevRewardsBal0 = await rewardsAsset0.balanceOf(accounts[0]);
 		let prevRewardsBal1 = await rewardsAsset0.balanceOf(accounts[1]);
 		let prevYield0 = await fixCapitalPoolInstance.balanceYield(accounts[0]);
@@ -171,8 +171,8 @@ contract('FixCapitalPool', async function(accounts){
 	});
 
 	it('FCP direct double claim, prior to payout phase from, transferPositionFrom()', async () => {
-		await NGBwrapperInstance.forceClaimSubAccountRewards(fixCapitalPoolInstance.address, accounts[0], fixCapitalPoolInstance.address);
-		await NGBwrapperInstance.forceClaimSubAccountRewards(fixCapitalPoolInstance.address, accounts[1], fixCapitalPoolInstance.address, {from: accounts[1]});
+		await NGBwrapperInstance.forceClaimSubAccountRewards(true, fixCapitalPoolInstance.address, accounts[0], fixCapitalPoolInstance.address);
+		await NGBwrapperInstance.forceClaimSubAccountRewards(true, fixCapitalPoolInstance.address, accounts[1], fixCapitalPoolInstance.address, {from: accounts[1]});
 		let prevRewardsBal0 = await rewardsAsset0.balanceOf(accounts[0]);
 		let prevRewardsBal1 = await rewardsAsset0.balanceOf(accounts[1]);
 		let prevYield0 = await fixCapitalPoolInstance.balanceYield(accounts[0]);
@@ -206,8 +206,8 @@ contract('FixCapitalPool', async function(accounts){
 
 	it('FCP direct double claim, prior to payout phase from, transferZCB()', async () => {
 		//before payout phase transferZCB should not claim sub account rewards
-		await NGBwrapperInstance.forceClaimSubAccountRewards(fixCapitalPoolInstance.address, accounts[0], fixCapitalPoolInstance.address);
-		await NGBwrapperInstance.forceClaimSubAccountRewards(fixCapitalPoolInstance.address, accounts[1], fixCapitalPoolInstance.address, {from: accounts[1]});
+		await NGBwrapperInstance.forceClaimSubAccountRewards(true, fixCapitalPoolInstance.address, accounts[0], fixCapitalPoolInstance.address);
+		await NGBwrapperInstance.forceClaimSubAccountRewards(true, fixCapitalPoolInstance.address, accounts[1], fixCapitalPoolInstance.address, {from: accounts[1]});
 		let prevRewardsBal0 = await rewardsAsset0.balanceOf(accounts[0]);
 		let prevRewardsBal1 = await rewardsAsset0.balanceOf(accounts[1]);
 
@@ -229,8 +229,8 @@ contract('FixCapitalPool', async function(accounts){
 	});
 
 	it('FCP direct double claim, prior to payout phase from, transferYT()', async () => {
-		await NGBwrapperInstance.forceClaimSubAccountRewards(fixCapitalPoolInstance.address, accounts[0], fixCapitalPoolInstance.address);
-		await NGBwrapperInstance.forceClaimSubAccountRewards(fixCapitalPoolInstance.address, accounts[1], fixCapitalPoolInstance.address, {from: accounts[1]});
+		await NGBwrapperInstance.forceClaimSubAccountRewards(true, fixCapitalPoolInstance.address, accounts[0], fixCapitalPoolInstance.address);
+		await NGBwrapperInstance.forceClaimSubAccountRewards(true, fixCapitalPoolInstance.address, accounts[1], fixCapitalPoolInstance.address, {from: accounts[1]});
 		let prevRewardsBal0 = await rewardsAsset0.balanceOf(accounts[0]);
 		let prevRewardsBal1 = await rewardsAsset0.balanceOf(accounts[1]);
 		let prevYield0 = await fixCapitalPoolInstance.balanceYield(accounts[0]);
@@ -265,8 +265,8 @@ contract('FixCapitalPool', async function(accounts){
 	it('enters payout phase', async () => {
 		assert.equal(await fixCapitalPoolInstance.inPayoutPhase(), false, "payout phase has not been entered yet");
 
-		await NGBwrapperInstance.forceClaimSubAccountRewards(fixCapitalPoolInstance.address, accounts[0], fixCapitalPoolInstance.address);
-		await NGBwrapperInstance.forceClaimSubAccountRewards(fixCapitalPoolInstance.address, accounts[1], fixCapitalPoolInstance.address, {from: accounts[1]});
+		await NGBwrapperInstance.forceClaimSubAccountRewards(true, fixCapitalPoolInstance.address, accounts[0], fixCapitalPoolInstance.address);
+		await NGBwrapperInstance.forceClaimSubAccountRewards(true, fixCapitalPoolInstance.address, accounts[1], fixCapitalPoolInstance.address, {from: accounts[1]});
 		priorRewardsAmt = _10To18.div(new BN('28735'));
 		let newCBal = priorRewardsAmt.add(await rewardsAsset0.balanceOf(NGBwrapperInstance.address));
 		await rewardsAsset0.mintTo(NGBwrapperInstance.address, newCBal);
@@ -341,8 +341,8 @@ contract('FixCapitalPool', async function(accounts){
 	});
 
 	it('FCP direct double claim, in payout phase from, transferPosition()', async () => {
-		await NGBwrapperInstance.forceClaimSubAccountRewards(fixCapitalPoolInstance.address, accounts[0], fixCapitalPoolInstance.address);
-		await NGBwrapperInstance.forceClaimSubAccountRewards(fixCapitalPoolInstance.address, accounts[1], fixCapitalPoolInstance.address, {from: accounts[1]});
+		await NGBwrapperInstance.forceClaimSubAccountRewards(true, fixCapitalPoolInstance.address, accounts[0], fixCapitalPoolInstance.address);
+		await NGBwrapperInstance.forceClaimSubAccountRewards(true, fixCapitalPoolInstance.address, accounts[1], fixCapitalPoolInstance.address, {from: accounts[1]});
 		let prevRewardsBal0 = await rewardsAsset0.balanceOf(accounts[0]);
 		let prevRewardsBal1 = await rewardsAsset0.balanceOf(accounts[1]);
 		let prevYield0 = await fixCapitalPoolInstance.balanceYield(accounts[0]);
@@ -378,8 +378,8 @@ contract('FixCapitalPool', async function(accounts){
 	});
 
 	it('FCP direct double claim, in payout phase from, transferZCB()', async () => {
-		await NGBwrapperInstance.forceClaimSubAccountRewards(fixCapitalPoolInstance.address, accounts[0], fixCapitalPoolInstance.address);
-		await NGBwrapperInstance.forceClaimSubAccountRewards(fixCapitalPoolInstance.address, accounts[1], fixCapitalPoolInstance.address, {from: accounts[1]});
+		await NGBwrapperInstance.forceClaimSubAccountRewards(true, fixCapitalPoolInstance.address, accounts[0], fixCapitalPoolInstance.address);
+		await NGBwrapperInstance.forceClaimSubAccountRewards(true, fixCapitalPoolInstance.address, accounts[1], fixCapitalPoolInstance.address, {from: accounts[1]});
 		let prevRewardsBal0 = await rewardsAsset0.balanceOf(accounts[0]);
 		let prevRewardsBal1 = await rewardsAsset0.balanceOf(accounts[1]);
 		let prevYield0 = await fixCapitalPoolInstance.balanceYield(accounts[0]);
@@ -414,8 +414,8 @@ contract('FixCapitalPool', async function(accounts){
 	});
 
 	it('FCP direct double claim, in payout phase from, transferYT()', async () => {
-		await NGBwrapperInstance.forceClaimSubAccountRewards(fixCapitalPoolInstance.address, accounts[0], fixCapitalPoolInstance.address);
-		await NGBwrapperInstance.forceClaimSubAccountRewards(fixCapitalPoolInstance.address, accounts[1], fixCapitalPoolInstance.address, {from: accounts[1]});
+		await NGBwrapperInstance.forceClaimSubAccountRewards(true, fixCapitalPoolInstance.address, accounts[0], fixCapitalPoolInstance.address);
+		await NGBwrapperInstance.forceClaimSubAccountRewards(true, fixCapitalPoolInstance.address, accounts[1], fixCapitalPoolInstance.address, {from: accounts[1]});
 		let prevRewardsBal0 = await rewardsAsset0.balanceOf(accounts[0]);
 		let prevRewardsBal1 = await rewardsAsset0.balanceOf(accounts[1]);
 		let prevYield0 = await fixCapitalPoolInstance.balanceYield(accounts[0]);

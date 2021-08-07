@@ -15,6 +15,7 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 
 	address immutable delegate1Address;
 	address immutable delegate2Address;
+	address immutable delegate3Address;
 
 	using SafeMath for uint256;
 	using SignedSafeMath for int256;
@@ -25,7 +26,8 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 		address _internalFCPaddress,
 		address _infoOracleAddress,
 		address _delegate1Address,
-		address _delegate2Address
+		address _delegate2Address,
+		address _delegate3Address
 	) public {
 		internalTreasuryAddress = _treasuryAddress;
 		internalFCP = IFixCapitalPool(_internalFCPaddress);
@@ -35,6 +37,7 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 		internalWrapper = tempWrapper;
 		delegate1Address = _delegate1Address;
 		delegate2Address = _delegate2Address;
+		delegate3Address = _delegate3Address;
 		tempWrapper.registerAsDistributionAccount();
 	}
 
@@ -48,7 +51,7 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 	}
 
 	function withdraw(uint _amountYield, int _amountBond) external override {
-		(bool success, ) = delegate1Address.delegatecall(abi.encodeWithSignature(
+		(bool success, ) = delegate3Address.delegatecall(abi.encodeWithSignature(
 			"withdraw(uint256,int256)",
 			_amountYield,
 			_amountBond
@@ -64,7 +67,7 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 		uint _hintID,
 		uint _maxSteps
 	) external override {
-		address _delegateAddress = delegate2Address;
+		address _delegateAddress = delegate3Address;
 		bytes memory sig = abi.encodeWithSignature(
 			"limitSellZCB(uint256,uint256,uint256,uint256)",
 			_amount,
@@ -91,7 +94,7 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 		uint _hintID,
 		uint _maxSteps
 	) external override {
-		address _delegateAddress = delegate2Address;
+		address _delegateAddress = delegate3Address;
 		bytes memory sig = abi.encodeWithSignature(
 			"limitSellYT(uint256,uint256,uint256,uint256)",
 			_amount,
@@ -119,7 +122,7 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 		uint _maxSteps,
 		bool _removeBelowMin
 	) external override returns(int change) {
-		address _delegateAddress = delegate2Address;
+		address _delegateAddress = delegate3Address;
 		bytes memory sig = abi.encodeWithSignature(
 			"modifyZCBLimitSell(int256,uint256,uint256,uint256,bool)",
 			_amount,
@@ -147,7 +150,7 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 		uint _maxSteps,
 		bool _removeBelowMin
 	) external override returns(int change) {
-		address _delegateAddress = delegate2Address;
+		address _delegateAddress = delegate3Address;
 		bytes memory sig = abi.encodeWithSignature(
 			"modifyYTLimitSell(int256,uint256,uint256,uint256,bool)",
 			_amount,
@@ -288,7 +291,7 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 		uint16 _maxIterations,
 		bool _useInternalBalances
 	) external override returns(uint /*YTbought*/, uint /*ZCBsold*/) {
-		address _delegateAddress = delegate1Address;
+		address _delegateAddress = delegate2Address;
 		bytes memory sig = abi.encodeWithSignature(
 			"marketSellZCBtoU(uint256,uint256,uint256,uint16,bool)",
 			_amountZCB,
@@ -318,7 +321,7 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 		uint16 _maxIterations,
 		bool _useInternalBalances
 	) external override returns(uint /*ZCBbought*/, uint /*YTsold*/) {
-		address _delegateAddress = delegate1Address;
+		address _delegateAddress = delegate2Address;
 		bytes memory sig = abi.encodeWithSignature(
 			"marketSellUnitYTtoU(uint256,uint256,uint256,uint16,bool)",
 			_unitAmountYT,
@@ -342,7 +345,7 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 	}
 
 	function forceClaimSubAccountRewards() external override {
-		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature("forceClaimSubAccountRewards()"));
+		(bool success, ) = delegate3Address.delegatecall(abi.encodeWithSignature("forceClaimSubAccountRewards()"));
 		require(success);
 	}
 
@@ -352,7 +355,7 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 		@Description: force the rate oracle to record a new datapoint
 	*/
 	function forceRateDataUpdate() external override {
-		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature("forceRateDataUpdate()"));
+		(bool success, ) = delegate3Address.delegatecall(abi.encodeWithSignature("forceRateDataUpdate()"));
 		require(success);
 	}
 
@@ -364,7 +367,7 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 		@param uint _MCR: the median of all MCR datapoints
 	*/
 	function setOracleMCR(uint _MCR) external override {
-		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
+		(bool success, ) = delegate3Address.delegatecall(abi.encodeWithSignature(
 			"setOracleMCR(uint256)",
 			_MCR
 		));

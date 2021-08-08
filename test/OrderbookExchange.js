@@ -211,7 +211,6 @@ contract('OrderbookExchange', async function(accounts) {
 		let prevLockedZCB = lockedZCB;
 		let rec;
 		if (isZCBLimitSell) {
-
 			rec = await exchange.limitSellZCB(amt, MCR, hintID, maxSteps);
 			let log = rec.receipt.logs[0];
 			let logArgs = log.args;
@@ -1486,7 +1485,7 @@ contract('OrderbookExchange', async function(accounts) {
 		assert.equal(bondOwner.sub(prevBondOwner).toString(), expectedBondToOwner.toString());
 	});
 
-	it('Can handle all sub account obligations', async () => {
+	it('Handle all sub account obligations', async () => {
 		let cumulativePositions = {yield: new BN(0), bond: new BN(0)};
 		for (let i = 0; i < accounts.length; i++) {
 			let subAcctPos = await NGBwrapperInstance.subAccountPositions(exchange.address, accounts[i], fixCapitalPoolInstance.address);
@@ -1503,5 +1502,43 @@ contract('OrderbookExchange', async function(accounts) {
 		assert.equal(bondErr.abs().cmp(new BN(100)), -1, "diff between cumulative bond of sub accts and total dist acct bond must be under 100");
 		let rewards = (await NGBwrapperInstance.distributionAccountRewards(0, exchange.address)).toNumber();
 		assert.isBelow(rewards, 100, "untouched rewards are within accpetable error range");
+	});
+
+	it('Withdraw locked funds after payout phase', async () => {
+		//make limit orders
+		let amt = _10To18.div(new BN(34287));
+		let MCR = _10To18.mul(new BN(4));
+		let hintID = "0";
+		let maxSteps = 10;
+		let rec0 = await exchange.limitSellYT(amt, MCR, hintID, maxSteps);
+		let rec1 = await exchange.limitSellZCB(amt, MCR, hintID, maxSteps);
+		YD = await exchange.YieldDeposited(accounts[0]);
+		BD = await exchange.BondDeposited(accounts[0]);
+		let lockedYT = await exchange.lockedYT(accounts[0]);
+		let lockedZBC = await exchange.lockedZCB(accounts[0]);
+		assert.equal(lockedYT.cmp(new BN(0)), 1);
+		assert.equal(lockedZCB.cmp(new BN(0)), 1);
+
+		//funds are now locked
+		//advance to payout phase
+		let timestamp = (await web3.eth.getBlock('latest')).timestamp;
+		let toAdvance = maturity - timestamp + 1;
+		await helper.advanceTime(toAdvance);
+		await fixCapitalPoolInstance.enterPayoutPhase();
+		let prevYieldA0 = await fixCapitalPoolInstance.balanceYield(accounts[0]);
+		let prevBondA0 = await fixCapitalPoolInstance.balanceBonds(accounts[0]);
+
+		await exchange.withdraw(YD, BD);
+
+		let prevYD = YD;
+		let prevBD = BD;
+		let yieldA0 = await fixCapitalPoolInstance.balanceYield(accounts[0]);
+		let bondA0 = await fixCapitalPoolInstance.balanceBonds(accounts[0]);
+		YD = await exchange.YieldDeposited(accounts[0]);
+		BD = await exchange.BondDeposited(accounts[0]);
+		assert.equal(YD.toString(), "0");
+		assert.equal(BD.toString(), "0");
+		assert.equal(yieldA0.sub(prevYieldA0).toString(), prevYD.toString());
+		assert.equal(bondA0.sub(prevBondA0).toString(), prevBD.toString());
 	});
 });

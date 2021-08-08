@@ -49,6 +49,7 @@ contract OrderbookDelegate2 is OrderbookDelegateParent {
 		vitals[0] = address(internalWrapper);
 		vitals[1] = address(internalFCP);
 		vitals[2] = address(internalIORC);
+		reqPriorToPayoutPhase(vitals[1]);
 		claimContractSubAccountRewards(vitals[0], vitals[1]);
 		uint _amountZCB = _amountZCBInitial;
 		uint _maxMaturityConversionRate = _maxMaturityConversionRateInitial;
@@ -159,8 +160,9 @@ contract OrderbookDelegate2 is OrderbookDelegateParent {
 					}
 					manageCollateral_BuyYT_takeOrder(copyVitals, msg.sender, copyZCBsold, copyYTbought, copyRatio, copyUseInternalBalances);
 				}
+				uint copyNewHeadID = newHeadID; //prevent stack too deep
 				uint newHeadAmount = order.amount; //copy to stack to prevent getting overwritten with later mstore opcodes
-				uint retPtr = prepare4WordReturn(copyYTbought, copyZCBsold, newHeadID, newHeadAmount);
+				uint retPtr = prepare4WordReturn(copyYTbought, copyZCBsold, copyNewHeadID, newHeadAmount);
 				assembly{return(retPtr, 0x80)}
 			}
 			else {
@@ -210,6 +212,7 @@ contract OrderbookDelegate2 is OrderbookDelegateParent {
 		vitals[0] = address(internalWrapper);
 		vitals[1] = address(internalFCP);
 		vitals[2] = address(internalIORC);
+		reqPriorToPayoutPhase(vitals[1]);
 		claimContractSubAccountRewards(vitals[0], vitals[1]);
 		uint _unitAmountYT = _unitAmountYTInitial;
 		uint _minMaturityConversionRate = _minMaturityConversionRateInitial;
@@ -316,8 +319,9 @@ contract OrderbookDelegate2 is OrderbookDelegateParent {
 					}
 					manageCollateral_BuyZCB_takeOrder(copyVitals, msg.sender, copyZCBbought, copyYTsold, copyRatio, copyUseInternalBalances);
 				}
+				uint copyNewHeadID = newHeadID; //prevent stack too deep
 				uint newHeadAmount = order.amount; //copy to stack to prevent getting overwritten with later mstore opcodes
-				uint retPtr = prepare4WordReturn(copyZCBbought, copyYTsold, newHeadID, newHeadAmount);
+				uint retPtr = prepare4WordReturn(copyZCBbought, copyYTsold, copyNewHeadID, newHeadAmount);
 				assembly {return(retPtr, 0x80)}
 			}
 			else {

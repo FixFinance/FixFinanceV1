@@ -42,12 +42,12 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 	}
 
 	function deposit(uint _amountYield, int _amountBond) external override {
-		require(_amountYield <= uint(type(int256).max));
-		IFixCapitalPool fcp = internalFCP; //gas savings
-		fcp.transferPositionFrom(msg.sender, address(this), _amountYield, _amountBond);
-		internalWrapper.editSubAccountPosition(false, msg.sender, address(fcp), int(_amountYield), _amountBond);
-		internalYieldDeposited[msg.sender] = internalYieldDeposited[msg.sender].add(_amountYield);
-		internalBondDeposited[msg.sender] = internalBondDeposited[msg.sender].add(_amountBond);
+		(bool success, ) = delegate3Address.delegatecall(abi.encodeWithSignature(
+			"deposit(uint256,int256)",
+			_amountYield,
+			_amountBond
+		));
+		require(success);
 	}
 
 	function withdraw(uint _amountYield, int _amountBond) external override {

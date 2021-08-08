@@ -25,6 +25,7 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 		newHeadID = internalHeadYTSellID;
 		LimitSellYT memory order;
 		address[3] memory vitals = [address(internalWrapper), address(internalFCP), address(internalIORC)];
+		reqPriorToPayoutPhase(vitals[1]);
 		claimContractSubAccountRewards(vitals[0], vitals[1]);
 		uint ratio = IWrapper(vitals[0]).WrappedAmtToUnitAmt_RoundDown(1 ether);
 		for (uint16 i = 0; i < _maxIterations && newHeadID != 0; i++) {
@@ -113,6 +114,7 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 		newHeadID = internalHeadZCBSellID;
 		LimitSellZCB memory order;
 		address[3] memory vitals = [address(internalWrapper), address(internalFCP), address(internalIORC)];
+		reqPriorToPayoutPhase(vitals[1]);
 		claimContractSubAccountRewards(vitals[0], vitals[1]);
 		uint ratio = IWrapper(vitals[0]).WrappedAmtToUnitAmt_RoundDown(1 ether);
 		uint i = uint(IInfoOracle(vitals[2]).getOrderbookFeeBips(vitals[1])) << 16; //store fee multiplier in 17th to 24th bit of i, cast i to uint16 for iteration purpouses
@@ -205,6 +207,7 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 		newHeadID = internalHeadZCBSellID;
 		LimitSellZCB memory order;
 		address[3] memory vitals = [address(internalWrapper), address(internalFCP), address(internalIORC)];
+		reqPriorToPayoutPhase(vitals[1]);
 		claimContractSubAccountRewards(vitals[0], vitals[1]);
 		uint ratio = IWrapper(vitals[0]).WrappedAmtToUnitAmt_RoundDown(1 ether);
 		for (uint16 i = 0; i < _maxIterations && newHeadID != 0; i++) {
@@ -290,6 +293,7 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 		newHeadID = internalHeadYTSellID;
 		LimitSellYT memory order;
 		address[3] memory vitals = [address(internalWrapper), address(internalFCP), address(internalIORC)];
+		reqPriorToPayoutPhase(vitals[1]);
 		claimContractSubAccountRewards(vitals[0], vitals[1]);
 		uint ratio = IWrapper(vitals[0]).WrappedAmtToUnitAmt_RoundDown(1 ether);
 		uint i = uint(IInfoOracle(vitals[2]).getOrderbookFeeBips(vitals[1])) << 16; //store fee multiplier in 17th to 24th bit of i, cast i to uint16 for iteration purpouses

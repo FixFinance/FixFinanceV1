@@ -291,6 +291,20 @@ contract OrderbookDelegateParent is OrderbookData {
 	}
 
 	/*
+		@Description: if the base FCP is in the payout phase revert
+	*/
+	function reqPriorToPayoutPhase(address _FCPaddress) internal view {
+		require(!IFixCapitalPool(_FCPaddress).inPayoutPhase());
+	}
+
+	/*
+		@Description: if the base FCP is not in the payout phase revert
+	*/
+	function reqInPayoutPhase(address _FCPaddress) internal view {
+		require(IFixCapitalPool(_FCPaddress).inPayoutPhase());
+	}
+
+	/*
 		@Description: if enough time has elapsed automatically update the rate data in the oracle
 	*/
 	modifier setRateModifier() {

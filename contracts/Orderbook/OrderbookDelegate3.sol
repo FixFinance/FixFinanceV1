@@ -17,17 +17,18 @@ contract OrderbookDelegate3 is OrderbookDelegateParent {
 
 	function withdraw(uint _amountYield, int _amountBond) external {
 		require(_amountYield <= uint(type(int256).max));
+		IFixCapitalPool fcp = internalFCP;
+		bool inPayoutPhase = fcp.inPayoutPhase();
 		uint YD = internalYieldDeposited[msg.sender];
 		int BD = internalBondDeposited[msg.sender];
-		uint wrappedAmtLockedYT = internalLockedYT[msg.sender];
-		uint _lockedZCB = internalLockedZCB[msg.sender];
+		uint wrappedAmtLockedYT = inPayoutPhase ? 0 : internalLockedYT[msg.sender];
+		uint _lockedZCB = inPayoutPhase ? 0 : internalLockedZCB[msg.sender];
 		uint ratio = internalWrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
 
 		uint resultantYD = YD.sub(_amountYield);
 		int resultantBD = BD.sub(_amountBond);
 
 		requireValidCollateral(resultantYD, resultantBD, wrappedAmtLockedYT, _lockedZCB, ratio);
-		IFixCapitalPool fcp = internalFCP;
 		fcp.transferPosition(msg.sender, _amountYield, _amountBond);
 		int yieldChange = -int(_amountYield);
 		int bondChange = _amountBond.mul(-1);
@@ -35,6 +36,16 @@ contract OrderbookDelegate3 is OrderbookDelegateParent {
 
 		internalYieldDeposited[msg.sender] = resultantYD;
 		internalBondDeposited[msg.sender] = resultantBD;
+	}
+
+	function deposit(uint _amountYield, int _amountBond) external {
+		require(_amountYield <= uint(type(int256).max));
+		IFixCapitalPool fcp = internalFCP; //gas savings
+		reqPriorToPayoutPhase(address(fcp));
+		fcp.transferPositionFrom(msg.sender, address(this), _amountYield, _amountBond);
+		internalWrapper.editSubAccountPosition(false, msg.sender, address(fcp), int(_amountYield), _amountBond);
+		internalYieldDeposited[msg.sender] = internalYieldDeposited[msg.sender].add(_amountYield);
+		internalBondDeposited[msg.sender] = internalBondDeposited[msg.sender].add(_amountBond);
 	}
 
 	function forceClaimSubAccountRewards() external {
@@ -391,6 +402,7 @@ contract OrderbookDelegate3 is OrderbookDelegateParent {
 		uint _hintID,
 		uint _maxSteps
 	) external ensureValidZCBSell(_amount, _maturityConversionRate) setRateModifier returns(uint prevID) {
+		reqPriorToPayoutPhase(address(internalFCP));
 		uint newID = totalNumOrders+1;
 		if (_hintID == 0) {
 			prevID = insertFromHead_SellZCB(_amount, _maturityConversionRate, newID, _maxSteps);
@@ -409,6 +421,7 @@ contract OrderbookDelegate3 is OrderbookDelegateParent {
 		uint _hintID,
 		uint _maxSteps
 	) external ensureValidYTSell(_amount, _maturityConversionRate) setRateModifier returns(uint prevID) {
+		reqPriorToPayoutPhase(address(internalFCP));
 		uint newID = totalNumOrders+1;
 		if (_hintID == 0) {
 			prevID = insertFromHead_SellYT(_amount, _maturityConversionRate, newID, _maxSteps);
@@ -430,6 +443,7 @@ contract OrderbookDelegate3 is OrderbookDelegateParent {
 	) external setRateModifier returns(int change) {
 		require(_amount != 0);
 		require(msg.sender == internalZCBSells[_targetID].maker);
+		reqPriorToPayoutPhase(address(internalFCP));
 		uint ratio = internalWrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
 		uint minimumAmount = minimumZCBLimitAmount(internalZCBSells[_targetID].maturityConversionRate, ratio);
 		if (_hintID == 0) {
@@ -456,6 +470,7 @@ contract OrderbookDelegate3 is OrderbookDelegateParent {
 	) external setRateModifier returns(int change) {
 		require(_amount != 0);
 		require(msg.sender == internalYTSells[_targetID].maker);
+		reqPriorToPayoutPhase(address(internalFCP));
 		uint ratio = internalWrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
 		uint minimumAmount = minimumYTlimitAmount(internalYTSells[_targetID].maturityConversionRate, ratio);
 		if (_hintID == 0) {
@@ -478,7 +493,7 @@ contract OrderbookDelegate3 is OrderbookDelegateParent {
 	/*
 		@Description: force this contract to store a data point in its rate oracle
 	*/
-	function forceRateDataUpdate() external setRateModifier {}
+	function forceRateDataUpdate() external setRateModifier {reqPriorToPayoutPhase(address(internalFCP));}
 
 	/*
 		@Description: set the median of all datapoints in the impliedRates array as the

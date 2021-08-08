@@ -23,17 +23,17 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 
 	constructor(
 		address _treasuryAddress,
-		address _internalFCPaddress,
+		address _FCPaddress,
 		address _infoOracleAddress,
 		address _delegate1Address,
 		address _delegate2Address,
 		address _delegate3Address
 	) public {
 		internalTreasuryAddress = _treasuryAddress;
-		internalFCP = IFixCapitalPool(_internalFCPaddress);
+		internalFCP = IFixCapitalPool(_FCPaddress);
 		internalIORC = IInfoOracle(_infoOracleAddress);
-		IWrapper tempWrapper = IFixCapitalPool(_internalFCPaddress).wrapper();
-		internalMaturity = IFixCapitalPool(_internalFCPaddress).maturity();
+		IWrapper tempWrapper = IFixCapitalPool(_FCPaddress).wrapper();
+		internalMaturity = IFixCapitalPool(_FCPaddress).maturity();
 		internalWrapper = tempWrapper;
 		delegate1Address = _delegate1Address;
 		delegate2Address = _delegate2Address;

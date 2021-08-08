@@ -24,7 +24,10 @@ contract OrderbookDelegate2 is OrderbookDelegateParent {
 			pretend that we aren't going to return anything then use assembly to avoid allocation
 			on the stack and write directly to memory then we return
 		*/
-		address[3] memory vitals = [address(internalWrapper), address(internalFCP), address(internalIORC)];
+		address[3] memory vitals;
+		vitals[0] = address(internalWrapper);
+		vitals[1] = address(internalFCP);
+		vitals[2] = address(internalIORC);
 		claimContractSubAccountRewards(vitals[0], vitals[1]);
 		uint _amountZCB = _amountZCBInitial;
 		uint _maxMaturityConversionRate = _maxMaturityConversionRateInitial;
@@ -36,20 +39,30 @@ contract OrderbookDelegate2 is OrderbookDelegateParent {
 		uint newHeadID = internalHeadYTSellID;
 		LimitSellYT memory order;
 		uint ratio = IWrapper(vitals[0]).WrappedAmtToUnitAmt_RoundDown(1 ether);
-		uint i = uint(IInfoOracle(vitals[2]).getOrderbookFeeBips(vitals[1])) << 16; //store fee multiplier in 17th to 24th bit of i, cast i to uint16 for iteration purpouses
+		/*
+			to conserve stack space we must put as much as we can into i,
+
+			least significant 2 bytes: current index
+			3rd least significant byte: orderbook fee bips
+			the most significant 29 bytes will store a copy of the memory address of the vitals array
+		*/
+		uint i = uint(IInfoOracle(vitals[2]).getOrderbookFeeBips(vitals[1])) << 16;
+		assembly {
+			i := or(i, shl(24, vitals))
+		}
 		for ( ; uint16(i) < _maxIterations && newHeadID != 0; i++) {
 			order = internalYTSells[newHeadID];
 			if (order.maturityConversionRate > _maxMaturityConversionRate) {
 				require(impliedMaturityConversionRate(ZCBsold, YTbought, ratio) <= _maxCumulativeMaturityConversionRate);
 				//collect & distribute to taker
-				manageCollateral_BuyYT_takeOrder(msg.sender, ZCBsold, YTbought, ratio, _useInternalBalances);
+				manageCollateral_BuyYT_takeOrder(vitals, msg.sender, ZCBsold, YTbought, ratio, _useInternalBalances);
 				if (uint16(i) != 0) {
 					internalHeadYTSellID = newHeadID;
 				}
-				uint normalizedZCB = ZCBsold.mul(TOTAL_BASIS_POINTS).div(TOTAL_BASIS_POINTS + (i >> 16));
+				uint normalizedZCB = ZCBsold.mul(TOTAL_BASIS_POINTS).div(TOTAL_BASIS_POINTS + ((i >> 16) & 0xff));
 				uint fee = ZCBsold - normalizedZCB;
 				fee = fee == 0 ? 0 : fee-1;
-				manageCollateral_payFee(fee, 0);
+				manageCollateral_payFee(vitals, fee, 0);
 				uint newHeadAmount = order.amount; //copy to stack to prevent getting overwritten with later mstore opcodes
 				assembly {
 					let retPtr := mload(0x40)
@@ -63,7 +76,7 @@ contract OrderbookDelegate2 is OrderbookDelegateParent {
 			uint unitAmtYTbought = YTbought.mul(ratio) / (1 ether);
 			//double name because this variable may be overwritten and have a different use depending on the control flow, prevent stack too deep
 			uint orderZCBamt_orderRatio = impliedZCBamount(order.amount, ratio, order.maturityConversionRate);
-			uint feeAdjOrderZCBamt = orderZCBamt_orderRatio.mul(TOTAL_BASIS_POINTS + (i >> 16)) / TOTAL_BASIS_POINTS; //fee adjust
+			uint feeAdjOrderZCBamt = orderZCBamt_orderRatio.mul(TOTAL_BASIS_POINTS + ((i >> 16) & 0xff)) / TOTAL_BASIS_POINTS; //fee adjust
 			uint orderUnitYTamt = order.amount.mul(ratio) / (1 ether);
 			if (
 				_amountZCB <= feeAdjOrderZCBamt || 
@@ -86,7 +99,13 @@ contract OrderbookDelegate2 is OrderbookDelegateParent {
 				YTbought += YTtoBuy;
 				ZCBsold += ZCBtoSell;
 
-				manageCollateral_fillYTSell(order.maker, ZCBtoSell.mul(TOTAL_BASIS_POINTS) / (TOTAL_BASIS_POINTS + (i >> 16)), YTtoBuy, ratio);
+				{
+					address[3] memory copyVitals;
+					assembly {
+						copyVitals := shr(24, i)
+					}
+					manageCollateral_fillYTSell(copyVitals, order.maker, ZCBtoSell.mul(TOTAL_BASIS_POINTS) / (TOTAL_BASIS_POINTS + ((i >> 16) & 0xff)), YTtoBuy, ratio);
+				}
 				if (order.amount == YTtoBuy) {
 					internalHeadYTSellID = order.nextID;
 					delete internalYTSells[newHeadID];
@@ -103,15 +122,26 @@ contract OrderbookDelegate2 is OrderbookDelegateParent {
 				//collect & distribute to taker
 				{
 					uint normalizedZCB = ZCBsold.mul(TOTAL_BASIS_POINTS);
-					normalizedZCB = normalizedZCB / ((i >> 16) + TOTAL_BASIS_POINTS);
+					normalizedZCB = normalizedZCB / (((i >> 16) & 0xff) + TOTAL_BASIS_POINTS);
 					uint fee = ZCBsold - normalizedZCB;
 					fee = fee == 0 ? 0 : fee - 1; //ensure no rounding errors
-					manageCollateral_payFee(fee, 0);
+					address[3] memory copyVitals;
+					assembly {
+						copyVitals := shr(24, i)
+					}
+					manageCollateral_payFee(copyVitals, fee, 0);
 				}
 				bool copyUseInternalBalances = _useInternalBalances; // prevent stack too deep
 				uint copyYTbought = YTbought; // prevent stack too deep;
 				uint copyZCBsold = ZCBsold; // prevent stack too deep;
-				manageCollateral_BuyYT_takeOrder(msg.sender, copyZCBsold, copyYTbought, ratio, copyUseInternalBalances);
+				{
+					uint copyRatio = ratio; //prevent stack too deep
+					address[3] memory copyVitals;
+					assembly {
+						copyVitals := shr(24, i)
+					}
+					manageCollateral_BuyYT_takeOrder(copyVitals, msg.sender, copyZCBsold, copyYTbought, copyRatio, copyUseInternalBalances);
+				}
 				uint newHeadAmount = order.amount; //copy to stack to prevent getting overwritten with later mstore opcodes
 				assembly {
 					let retPtr := mload(0x40)
@@ -123,8 +153,13 @@ contract OrderbookDelegate2 is OrderbookDelegateParent {
 				}
 			}
 			else {
-
-				manageCollateral_fillYTSell(order.maker, orderZCBamt_orderRatio, order.amount, ratio);
+				{
+					address[3] memory copyVitals;
+					assembly {
+						copyVitals := shr(24, i)
+					}
+					manageCollateral_fillYTSell(copyVitals, order.maker, orderZCBamt_orderRatio, order.amount, ratio);
+				}
 				delete internalYTSells[newHeadID];
 
 				ZCBsold += feeAdjOrderZCBamt;
@@ -135,11 +170,11 @@ contract OrderbookDelegate2 is OrderbookDelegateParent {
 		}
 		require(impliedMaturityConversionRate(ZCBsold, YTbought, ratio) <= _maxCumulativeMaturityConversionRate);
 		//collect & distribute to taker
-		uint normalizedZCB = ZCBsold.mul(TOTAL_BASIS_POINTS) / ((i >> 16) + TOTAL_BASIS_POINTS);
+		uint normalizedZCB = ZCBsold.mul(TOTAL_BASIS_POINTS) / (((i >> 16) & 0xff) + TOTAL_BASIS_POINTS);
 		uint fee = ZCBsold - normalizedZCB;
 		fee = fee == 0 ? 0 : fee - 1; //ensure no rounding errors
-		manageCollateral_payFee(fee, 0);
-		manageCollateral_BuyYT_takeOrder(msg.sender, ZCBsold, YTbought, ratio, _useInternalBalances);
+		manageCollateral_payFee(vitals, fee, 0);
+		manageCollateral_BuyYT_takeOrder(vitals, msg.sender, ZCBsold, YTbought, ratio, _useInternalBalances);
 		internalHeadYTSellID = newHeadID;
 		uint newHeadAmount = newHeadID == 0 ? 0 : internalYTSells[newHeadID].amount;
 		assembly {
@@ -165,32 +200,45 @@ contract OrderbookDelegate2 is OrderbookDelegateParent {
 			pretend that we aren't going to return anything then use assembly to avoid allocation
 			on the stack and write directly to memory then we return
 		*/
-		address[3] memory vitals = [address(internalWrapper), address(internalFCP), address(internalIORC)];
+		uint16 _maxIterations = _maxIterationsInitial;
+		address[3] memory vitals;
+		vitals[0] = address(internalWrapper);
+		vitals[1] = address(internalFCP);
+		vitals[2] = address(internalIORC);
 		claimContractSubAccountRewards(vitals[0], vitals[1]);
 		uint _unitAmountYT = _unitAmountYTInitial;
 		uint _minMaturityConversionRate = _minMaturityConversionRateInitial;
 		uint _minCumulativeMaturityConversionRate = _minCumulativeMaturityConversionRateInitial;
-		uint16 _maxIterations = _maxIterationsInitial;
 		bool _useInternalBalances = _useInternalBalancesInitial;
 		uint ZCBbought;
 		uint YTsold;
 		uint newHeadID = internalHeadZCBSellID;
 		LimitSellZCB memory order;
-		uint ratio = internalWrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
-		uint i = uint(internalIORC.getOrderbookFeeBips(address(internalFCP))) << 16; //store fee multiplier in 17th to 24th bit of i, cast i to uint16 for iteration purpouses
+		uint ratio = IWrapper(vitals[0]).WrappedAmtToUnitAmt_RoundDown(1 ether);
+		/*
+			to conserve stack space we must put as much as we can into i,
+
+			least significant 2 bytes: current index
+			3rd least significant byte: orderbook fee bips
+			the most significant 29 bytes will store a copy of the memory address of the vitals array
+		*/
+		uint i = uint(IInfoOracle(vitals[2]).getOrderbookFeeBips(vitals[1])) << 16;
+		assembly {
+			i := or(i, shl(24, vitals))
+		}
 		for ( ; uint16(i) < _maxIterations && newHeadID != 0; i++) {
 			order = internalZCBSells[newHeadID];
 			if (order.maturityConversionRate < _minMaturityConversionRate) {
 				require(impliedMaturityConversionRate(ZCBbought, YTsold, ratio) >= _minCumulativeMaturityConversionRate);
 				//collect & distribute to taker
-				manageCollateral_BuyZCB_takeOrder(msg.sender, ZCBbought, YTsold, ratio, _useInternalBalances);
+				manageCollateral_BuyZCB_takeOrder(vitals, msg.sender, ZCBbought, YTsold, ratio, _useInternalBalances);
 				if (uint16(i) != 0) {
 					internalHeadZCBSellID = newHeadID;
 				}
-				uint normalizedYT = YTsold.mul(TOTAL_BASIS_POINTS).div((i >> 16) + TOTAL_BASIS_POINTS);
+				uint normalizedYT = YTsold.mul(TOTAL_BASIS_POINTS).div(((i >> 16) & 0xff) + TOTAL_BASIS_POINTS);
 				uint fee = YTsold - normalizedYT;
 				fee = fee == 0 ? 0 : fee - 1; //ensure no rounding errors
-				manageCollateral_payFee(fee, ratio);
+				manageCollateral_payFee(vitals, fee, ratio);
 				uint newHeadAmount = order.amount; //copy to stack to prevent getting overwritten with later mstore opcodes
 				assembly {
 					let retPtr := mload(0x40)
@@ -202,7 +250,7 @@ contract OrderbookDelegate2 is OrderbookDelegateParent {
 				}
 			}
 			uint orderYTamt = impliedYTamount(order.amount, ratio, order.maturityConversionRate);
-			uint orderFeeAdjUnitYT = (orderYTamt.mul(ratio) / (1 ether)).mul((i >> 16) + TOTAL_BASIS_POINTS) / TOTAL_BASIS_POINTS;
+			uint orderFeeAdjUnitYT = (orderYTamt.mul(ratio) / (1 ether)).mul(((i >> 16) & 0xff) + TOTAL_BASIS_POINTS) / TOTAL_BASIS_POINTS;
 			if (
 				orderFeeAdjUnitYT >= _unitAmountYT ||
 				ZCBbought.add(order.amount) >= _unitAmountYT - orderFeeAdjUnitYT
@@ -226,7 +274,13 @@ contract OrderbookDelegate2 is OrderbookDelegateParent {
 				YTsold += YTtoSell;
 				ZCBbought += ZCBtoBuy;
 
-				manageCollateral_fillZCBSell(order.maker, YTtoSell.mul(TOTAL_BASIS_POINTS) / ((i >> 16) + TOTAL_BASIS_POINTS), ZCBtoBuy, ratio);
+				{
+					address[3] memory copyVitals;
+					assembly {
+						copyVitals := shr(24, i)
+					}
+					manageCollateral_fillZCBSell(copyVitals, order.maker, YTtoSell.mul(TOTAL_BASIS_POINTS) / (((i >> 16) & 0xff) + TOTAL_BASIS_POINTS), ZCBtoBuy, ratio);
+				}
 				if (order.amount == ZCBtoBuy) {
 					internalHeadZCBSellID = order.nextID;
 					delete internalZCBSells[newHeadID];
@@ -243,15 +297,26 @@ contract OrderbookDelegate2 is OrderbookDelegateParent {
 				//collect & distribute to taker
 				{
 					uint normalizedYT = YTsold.mul(TOTAL_BASIS_POINTS);
-					normalizedYT = normalizedYT / ((i >> 16) + TOTAL_BASIS_POINTS);
+					normalizedYT = normalizedYT / (((i >> 16) & 0xff) + TOTAL_BASIS_POINTS);
 					uint fee = YTsold - normalizedYT;
 					fee = fee == 0 ? 0 : fee - 1; //ensure no rounding errors
-					manageCollateral_payFee(fee, ratio);
+					address[3] memory copyVitals;
+					assembly {
+						copyVitals := shr(24, i)
+					}
+					manageCollateral_payFee(copyVitals, fee, ratio);
 				}
 				bool copyUseInternalBalances = _useInternalBalances; // prevent stack too deep
 				uint copyZCBbought = ZCBbought; // prevent stack too deep
 				uint copyYTsold = YTsold; // prevent stack too deep
-				manageCollateral_BuyZCB_takeOrder(msg.sender, copyZCBbought, copyYTsold, ratio, copyUseInternalBalances);
+				{
+					uint copyRatio = ratio; //prevent stack too deep
+					address[3] memory copyVitals;
+					assembly {
+						copyVitals := shr(24, i)
+					}
+					manageCollateral_BuyZCB_takeOrder(copyVitals, msg.sender, copyZCBbought, copyYTsold, copyRatio, copyUseInternalBalances);
+				}
 				uint newHeadAmount = order.amount; //copy to stack to prevent getting overwritten with later mstore opcodes
 				assembly {
 					let retPtr := mload(0x40)
@@ -263,10 +328,10 @@ contract OrderbookDelegate2 is OrderbookDelegateParent {
 				}
 			}
 			else {
-				manageCollateral_fillZCBSell(order.maker, orderYTamt, order.amount, ratio);
+				manageCollateral_fillZCBSell(vitals, order.maker, orderYTamt, order.amount, ratio);
 				delete internalZCBSells[newHeadID];
 
-				uint feeAdjOrderYTamt = orderYTamt.mul((i >> 16) + TOTAL_BASIS_POINTS) / TOTAL_BASIS_POINTS;
+				uint feeAdjOrderYTamt = orderYTamt.mul(((i >> 16) & 0xff) + TOTAL_BASIS_POINTS) / TOTAL_BASIS_POINTS;
 
 				ZCBbought += order.amount;
 				YTsold += feeAdjOrderYTamt;
@@ -276,11 +341,11 @@ contract OrderbookDelegate2 is OrderbookDelegateParent {
 		}
 		require(impliedMaturityConversionRate(ZCBbought, YTsold, ratio) >= _minCumulativeMaturityConversionRate);
 		//collect & distribute to taker
-		uint normalizedYT = YTsold.mul(TOTAL_BASIS_POINTS).div((i >> 16) + TOTAL_BASIS_POINTS);
+		uint normalizedYT = YTsold.mul(TOTAL_BASIS_POINTS).div(((i >> 16) & 0xff) + TOTAL_BASIS_POINTS);
 		uint fee = YTsold - normalizedYT;
 		fee = fee == 0 ? 0 : fee - 1; //ensure no rounding errors
-		manageCollateral_payFee(fee, ratio);
-		manageCollateral_BuyZCB_takeOrder(msg.sender, ZCBbought, YTsold, ratio, _useInternalBalances);
+		manageCollateral_payFee(vitals, fee, ratio);
+		manageCollateral_BuyZCB_takeOrder(vitals, msg.sender, ZCBbought, YTsold, ratio, _useInternalBalances);
 		internalHeadZCBSellID = newHeadID;
 		uint newHeadAmount = newHeadID == 0 ? 0 : internalZCBSells[newHeadID].amount;
 		assembly {

@@ -398,7 +398,8 @@ contract OrderbookDelegate3 is OrderbookDelegateParent {
 		else {
 			prevID = insertWithHint_SellZCB(_amount, _maturityConversionRate, _hintID, newID, _maxSteps);
 		}
-		manageCollateral_SellZCB_makeOrder(msg.sender, _amount);
+		uint ratio = internalWrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
+		manageCollateral_SellZCB_makeOrder(msg.sender, _amount, ratio);
 		totalNumOrders = newID;
 	}
 
@@ -415,7 +416,8 @@ contract OrderbookDelegate3 is OrderbookDelegateParent {
 		else {
 			prevID = insertWithHint_SellYT(_amount, _maturityConversionRate, _hintID, newID, _maxSteps);
 		}
-		manageCollateral_SellYT_makeOrder(msg.sender, _amount);
+		uint ratio = internalWrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
+		manageCollateral_SellYT_makeOrder(msg.sender, _amount, ratio);
 		totalNumOrders = newID;
 	}
 
@@ -438,7 +440,7 @@ contract OrderbookDelegate3 is OrderbookDelegateParent {
 			change = modifyWithHint_SellZCB(_amount, _targetID, _hintID, _maxSteps, minimumAmount, _removeBelowMin);
 		}
 		if (change > 0) {
-			manageCollateral_SellZCB_makeOrder(msg.sender, uint(change));
+			manageCollateral_SellZCB_makeOrder(msg.sender, uint(change), ratio);
 		}
 		else if (change < 0) {
 			manageCollateral_closeZCBSell(msg.sender, uint(-change));
@@ -464,7 +466,7 @@ contract OrderbookDelegate3 is OrderbookDelegateParent {
 			change = modifyWithHint_SellYT(_amount, _targetID, _hintID, _maxSteps, minimumAmount, _removeBelowMin);
 		}
 		if (change > 0) {
-			manageCollateral_SellYT_makeOrder(msg.sender, uint(change));
+			manageCollateral_SellYT_makeOrder(msg.sender, uint(change), ratio);
 		}
 		else if (change < 0) {
 			manageCollateral_closeYTSell(msg.sender, uint(-change));

@@ -35,8 +35,8 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 				ZCBsold = ZCBsold.add(ZCBfee);
 				require(impliedMaturityConversionRate(ZCBsold, YTbought, ratio) <= _maxCumulativeMaturityConversionRate);
 				//collect & distribute to taker
-				manageCollateral_payFee(ZCBfee, 0);
-				manageCollateral_BuyYT_takeOrder(msg.sender, ZCBsold, YTbought, ratio, _useInternalBalances);
+				manageCollateral_payFee(vitals, ZCBfee, 0);
+				manageCollateral_BuyYT_takeOrder(vitals, msg.sender, ZCBsold, YTbought, ratio, _useInternalBalances);
 				if (i != 0) {
 					internalHeadYTSellID = newHeadID;
 				}
@@ -53,7 +53,7 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 
 				{
 					uint copyAmtYT = _amountYT; //prevent stack too deep
-					manageCollateral_fillYTSell(order.maker, scaledZCBamt, copyAmtYT, ratio);
+					manageCollateral_fillYTSell(vitals, order.maker, scaledZCBamt, copyAmtYT, ratio);
 				}
 
 				if (order.amount == _amountYT) {
@@ -69,20 +69,20 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 				}
 
 				//account for fees
-				uint ZCBfee = ZCBsold.mul(internalIORC.getOrderbookFeeBips(vitals[1])) / TOTAL_BASIS_POINTS;
+				uint ZCBfee = ZCBsold.mul(IInfoOracle(vitals[2]).getOrderbookFeeBips(vitals[1])) / TOTAL_BASIS_POINTS;
 				ZCBsold = ZCBsold.add(ZCBfee);
 				require(impliedMaturityConversionRate(ZCBsold, YTbought, ratio) <= _maxCumulativeMaturityConversionRate);
 				//collect & distribute to taker
-				manageCollateral_payFee(ZCBfee, 0);
+				manageCollateral_payFee(vitals, ZCBfee, 0);
 				{
 					bool copyUseInternalBalances = _useInternalBalances;
-					manageCollateral_BuyYT_takeOrder(msg.sender, ZCBsold, YTbought, ratio, copyUseInternalBalances);
+					manageCollateral_BuyYT_takeOrder(vitals, msg.sender, ZCBsold, YTbought, ratio, copyUseInternalBalances);
 				}
 				return (YTbought, ZCBsold, newHeadID, newHeadAmount);
 			}
 			else {
 
-				manageCollateral_fillYTSell(order.maker, orderZCBamt, order.amount, ratio);
+				manageCollateral_fillYTSell(vitals, order.maker, orderZCBamt, order.amount, ratio);
 				delete internalYTSells[newHeadID];
 
 				ZCBsold += orderZCBamt;
@@ -92,12 +92,12 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 			newHeadID = order.nextID;
 		}
 		//account for fees
-		uint ZCBfee = ZCBsold.mul(internalIORC.getOrderbookFeeBips(address(internalFCP))) / TOTAL_BASIS_POINTS;
+		uint ZCBfee = ZCBsold.mul(IInfoOracle(vitals[2]).getOrderbookFeeBips(vitals[1])) / TOTAL_BASIS_POINTS;
 		ZCBsold = ZCBsold.add(ZCBfee);
 		require(impliedMaturityConversionRate(ZCBsold, YTbought, ratio) <= _maxCumulativeMaturityConversionRate);
 		//collect & distribute to taker
-		manageCollateral_payFee(ZCBfee, 0);
-		manageCollateral_BuyYT_takeOrder(msg.sender, ZCBsold, YTbought, ratio, _useInternalBalances);
+		manageCollateral_payFee(vitals, ZCBfee, 0);
+		manageCollateral_BuyYT_takeOrder(vitals, msg.sender, ZCBsold, YTbought, ratio, _useInternalBalances);
 		internalHeadYTSellID = newHeadID;
 		newHeadAmount = newHeadID == 0 ? 0 : internalYTSells[newHeadID].amount;
 	}
@@ -130,8 +130,11 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 				YTsold = YTsold.add(YTfee);
 				require(impliedMaturityConversionRate(ZCBbought, YTsold, ratio) >= _minCumulativeMaturityConversionRate);
 				//collect & distribute to taker
-				manageCollateral_payFee(YTfee, ratio);
-				manageCollateral_BuyZCB_takeOrder(msg.sender, ZCBbought, YTsold, ratio, _useInternalBalances);
+				manageCollateral_payFee(vitals, YTfee, ratio);
+				{
+					bool copyUseInternalBalances = _useInternalBalances;
+					manageCollateral_BuyZCB_takeOrder(vitals, msg.sender, ZCBbought, YTsold, ratio, copyUseInternalBalances);
+				}
 				return (ZCBbought, YTsold, newHeadID, newHeadAmount);
 			}
 			uint orderYTamt = impliedYTamount(order.amount, ratio, order.maturityConversionRate);
@@ -142,7 +145,7 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 				ZCBbought += scaledZCBamt;
 				YTsold += _amountYT;
 
-				manageCollateral_fillZCBSell(order.maker, _amountYT, scaledZCBamt, ratio);
+				manageCollateral_fillZCBSell(vitals, order.maker, _amountYT, scaledZCBamt, ratio);
 				if (order.amount == scaledZCBamt) {
 					internalHeadZCBSellID = order.nextID;
 					delete internalZCBSells[newHeadID];
@@ -160,16 +163,16 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 
 				require(impliedMaturityConversionRate(ZCBbought, YTsold, ratio) >= _minCumulativeMaturityConversionRate);
 				//collect & distribute to taker
-				manageCollateral_payFee(YTfee, ratio);
+				manageCollateral_payFee(vitals, YTfee, ratio);
 				{
 					bool copyUseInternalBalances = _useInternalBalances;
-					manageCollateral_BuyZCB_takeOrder(msg.sender, ZCBbought, YTsold, ratio, copyUseInternalBalances);
+					manageCollateral_BuyZCB_takeOrder(vitals, msg.sender, ZCBbought, YTsold, ratio, copyUseInternalBalances);
 				}
 				return (ZCBbought, YTsold, newHeadID, newHeadAmount);
 			}
 			else {
 
-				manageCollateral_fillZCBSell(order.maker, orderYTamt, order.amount, ratio);
+				manageCollateral_fillZCBSell(vitals, order.maker, orderYTamt, order.amount, ratio);
 				delete internalZCBSells[newHeadID];
 
 				ZCBbought += order.amount;
@@ -183,8 +186,9 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 
 		require(impliedMaturityConversionRate(ZCBbought, YTsold, ratio) >= _minCumulativeMaturityConversionRate);
 		//collect & distribute to taker
-		manageCollateral_payFee(YTfee, ratio);
-		manageCollateral_BuyZCB_takeOrder(msg.sender, ZCBbought, YTsold, ratio, _useInternalBalances);
+		manageCollateral_payFee(vitals, YTfee, ratio);
+		bool copyUseInternalBalances = _useInternalBalances;
+		manageCollateral_BuyZCB_takeOrder(vitals, msg.sender, ZCBbought, YTsold, ratio, copyUseInternalBalances);
 		internalHeadZCBSellID = newHeadID;
 		newHeadAmount = newHeadID == 0 ? 0 : internalZCBSells[newHeadID].amount;
 	}
@@ -210,8 +214,8 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 				YTsold = YTsold.add(YTfee);
 				require(impliedMaturityConversionRate(ZCBbought, YTsold, ratio) >= _minCumulativeMaturityConversionRate);
 				//collect & distribute to taker
-				manageCollateral_payFee(YTfee, ratio);
-				manageCollateral_BuyZCB_takeOrder(msg.sender, ZCBbought, YTsold, ratio, _useInternalBalances);
+				manageCollateral_payFee(vitals, YTfee, ratio);
+				manageCollateral_BuyZCB_takeOrder(vitals, msg.sender, ZCBbought, YTsold, ratio, _useInternalBalances);
 				if (i != 0) {
 					internalHeadZCBSellID = newHeadID;
 				}
@@ -228,7 +232,7 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 
 				{
 					uint copyAmtZCB = _amountZCB; //prevent stack too deep
-					manageCollateral_fillZCBSell(order.maker, scaledYTamt, copyAmtZCB, ratio);
+					manageCollateral_fillZCBSell(vitals, order.maker, scaledYTamt, copyAmtZCB, ratio);
 				}
 
 				if (order.amount == _amountZCB) {
@@ -247,16 +251,16 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 				YTsold = YTsold.add(YTfee);
 				require(impliedMaturityConversionRate(ZCBbought, YTsold, ratio) >= _minCumulativeMaturityConversionRate);
 				//collect & distribute to taker
-				manageCollateral_payFee(YTfee, ratio);
+				manageCollateral_payFee(vitals, YTfee, ratio);
 				{
 					bool copyUseInternalBalances = _useInternalBalances;
-					manageCollateral_BuyZCB_takeOrder(msg.sender, ZCBbought, YTsold, ratio, copyUseInternalBalances);
+					manageCollateral_BuyZCB_takeOrder(vitals, msg.sender, ZCBbought, YTsold, ratio, copyUseInternalBalances);
 				}
 				return (ZCBbought, YTsold, newHeadID, newHeadAmount);
 			}
 			else {
 
-				manageCollateral_fillZCBSell(order.maker, orderYTamt, order.amount, ratio);
+				manageCollateral_fillZCBSell(vitals, order.maker, orderYTamt, order.amount, ratio);
 				delete internalZCBSells[newHeadID];
 
 				ZCBbought += order.amount;
@@ -269,8 +273,8 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 		YTsold = YTsold.add(YTfee);
 		require(impliedMaturityConversionRate(ZCBbought, YTsold, ratio) >= _minCumulativeMaturityConversionRate);
 		//collect & distribute to taker
-		manageCollateral_payFee(YTfee, ratio);
-		manageCollateral_BuyZCB_takeOrder(msg.sender, ZCBbought, YTsold, ratio, _useInternalBalances);
+		manageCollateral_payFee(vitals, YTfee, ratio);
+		manageCollateral_BuyZCB_takeOrder(vitals, msg.sender, ZCBbought, YTsold, ratio, _useInternalBalances);
 		internalHeadZCBSellID = newHeadID;
 		newHeadAmount = newHeadID == 0 ? 0 : internalZCBSells[newHeadID].amount;
 	}
@@ -302,8 +306,11 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 				ZCBsold = ZCBsold.add(ZCBfee);
 				require(impliedMaturityConversionRate(ZCBsold, YTbought, ratio) <= _maxCumulativeMaturityConversionRate);
 				//collect & distribute to taker
-				manageCollateral_payFee(ZCBfee, 0);
-				manageCollateral_BuyYT_takeOrder(msg.sender, ZCBsold, YTbought, ratio, _useInternalBalances);
+				manageCollateral_payFee(vitals, ZCBfee, 0);
+				{
+					bool copyUseInternalBalances = _useInternalBalances;
+					manageCollateral_BuyYT_takeOrder(vitals, msg.sender, ZCBsold, YTbought, ratio, copyUseInternalBalances);
+				}
 				return (YTbought, ZCBsold, newHeadID, newHeadAmount);
 			}
 			uint orderZCBamt = impliedZCBamount(order.amount, ratio, order.maturityConversionRate);
@@ -314,7 +321,7 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 				ZCBsold += _amountZCB;
 				YTbought += scaledYTamt;
 
-				manageCollateral_fillYTSell(order.maker, _amountZCB, scaledYTamt, ratio);
+				manageCollateral_fillYTSell(vitals, order.maker, _amountZCB, scaledYTamt, ratio);
 				if (order.amount == scaledYTamt) {
 					internalHeadYTSellID = order.nextID;
 					delete internalYTSells[newHeadID];
@@ -331,16 +338,17 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 				ZCBsold = ZCBsold.add(ZCBfee);
 				require(impliedMaturityConversionRate(ZCBsold, YTbought, ratio) <= _maxCumulativeMaturityConversionRate);
 				//collect & distribute to taker
-				manageCollateral_payFee(ZCBfee, 0);
+				manageCollateral_payFee(vitals, ZCBfee, 0);
 				{
 					bool copyUseInternalBalances = _useInternalBalances; //prevent stack too deep
-					manageCollateral_BuyYT_takeOrder(msg.sender, ZCBsold, YTbought, ratio, copyUseInternalBalances);
+					uint copyYTbought = YTbought; //prevent stack too deep
+					manageCollateral_BuyYT_takeOrder(vitals, msg.sender, ZCBsold, copyYTbought, ratio, copyUseInternalBalances);
 				}
 				return (YTbought, ZCBsold, newHeadID, newHeadAmount);
 			}
 			else {
 
-				manageCollateral_fillYTSell(order.maker, orderZCBamt, order.amount, ratio);
+				manageCollateral_fillYTSell(vitals, order.maker, orderZCBamt, order.amount, ratio);
 				delete internalYTSells[newHeadID];
 
 				ZCBsold += orderZCBamt;
@@ -353,8 +361,9 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 		ZCBsold = ZCBsold.add(ZCBfee);
 		require(impliedMaturityConversionRate(ZCBsold, YTbought, ratio) <= _maxCumulativeMaturityConversionRate);
 		//collect & distribute to taker
-		manageCollateral_payFee(ZCBfee, 0);
-		manageCollateral_BuyYT_takeOrder(msg.sender, ZCBsold, YTbought, ratio, _useInternalBalances);
+		manageCollateral_payFee(vitals, ZCBfee, 0);
+		bool copyUseInternalBalances = _useInternalBalances; //prevent stack too deep
+		manageCollateral_BuyYT_takeOrder(vitals, msg.sender, ZCBsold, YTbought, ratio, copyUseInternalBalances);
 		internalHeadYTSellID = newHeadID;
 		newHeadAmount = newHeadID == 0 ? 0 : internalYTSells[newHeadID].amount;
 	}

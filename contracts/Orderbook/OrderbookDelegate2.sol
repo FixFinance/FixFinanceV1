@@ -11,6 +11,27 @@ import "./OrderbookDelegateParent.sol";
 
 contract OrderbookDelegate2 is OrderbookDelegateParent {
 
+/*
+	This contract cointains functions which attempt to do the impossible given the maximum stack depth allowed by the EVM
+	while still attempting to be relatively gas efficient
+	as a result the functions below will be tough to read, we have to do some assembly magic & such but do not be intimidated
+*/
+
+	function prepare4WordReturn(
+		uint word0,
+		uint word1,
+		uint word2,
+		uint word3
+	) internal pure returns(uint retPtr) {
+		assembly {
+			retPtr := mload(0x40)
+			mstore(retPtr, word0)
+			mstore(add(retPtr, 0x20), word1)
+			mstore(add(retPtr, 0x40), word2)
+			mstore(add(retPtr, 0x60), word3)
+		}
+	}
+
 	function marketSellZCBtoU(
 		uint _amountZCBInitial,
 		uint _maxMaturityConversionRateInitial,
@@ -19,7 +40,7 @@ contract OrderbookDelegate2 is OrderbookDelegateParent {
 		bool _useInternalBalancesInitial
 	) external setRateModifier {
 		/*
-			lokey this function actually returns (uint YTbought, uint ZCBsold, uint newHeadID, uint newHeadAmount)
+			this function actually returns (uint YTbought, uint ZCBsold, uint newHeadID, uint newHeadAmount)
 			but solidity poorly allocates stack space for return variables so to prevent stack too deep we must
 			pretend that we aren't going to return anything then use assembly to avoid allocation
 			on the stack and write directly to memory then we return
@@ -64,17 +85,12 @@ contract OrderbookDelegate2 is OrderbookDelegateParent {
 				fee = fee == 0 ? 0 : fee-1;
 				manageCollateral_payFee(vitals, fee, 0);
 				uint newHeadAmount = order.amount; //copy to stack to prevent getting overwritten with later mstore opcodes
-				assembly {
-					let retPtr := mload(0x40)
-					mstore(retPtr, YTbought)
-					mstore(add(retPtr, 0x20), ZCBsold)
-					mstore(add(retPtr, 0x40), newHeadID)
-					mstore(add(retPtr, 0x60), newHeadAmount)
-					return(retPtr, 0x80)
-				}
+				uint retPtr = prepare4WordReturn(YTbought, ZCBsold, newHeadID, newHeadAmount);
+				assembly{return(retPtr, 0x80)}
 			}
 			uint unitAmtYTbought = YTbought.mul(ratio) / (1 ether);
 			//double name because this variable may be overwritten and have a different use depending on the control flow, prevent stack too deep
+			//this variable starts life serving the purpouse of its first name 'orderZCBamt'
 			uint orderZCBamt_orderRatio = impliedZCBamount(order.amount, ratio, order.maturityConversionRate);
 			uint feeAdjOrderZCBamt = orderZCBamt_orderRatio.mul(TOTAL_BASIS_POINTS + ((i >> 16) & 0xff)) / TOTAL_BASIS_POINTS; //fee adjust
 			uint orderUnitYTamt = order.amount.mul(ratio) / (1 ether);
@@ -82,6 +98,7 @@ contract OrderbookDelegate2 is OrderbookDelegateParent {
 				_amountZCB <= feeAdjOrderZCBamt || 
 				orderUnitYTamt.add(unitAmtYTbought) >= _amountZCB - feeAdjOrderZCBamt
 			) {	
+				//variable takes purpouse of its second name 'orderRatio'
 				orderZCBamt_orderRatio = feeAdjOrderZCBamt.mul(1 ether).div(order.amount); //ratio of ZCB to YT for specific order
 				/*
 					unitAmtYTbought + unitYTtoBuy == _amountZCB - ZCBtoSell
@@ -143,14 +160,8 @@ contract OrderbookDelegate2 is OrderbookDelegateParent {
 					manageCollateral_BuyYT_takeOrder(copyVitals, msg.sender, copyZCBsold, copyYTbought, copyRatio, copyUseInternalBalances);
 				}
 				uint newHeadAmount = order.amount; //copy to stack to prevent getting overwritten with later mstore opcodes
-				assembly {
-					let retPtr := mload(0x40)
-					mstore(retPtr, copyYTbought)
-					mstore(add(retPtr, 0x20), copyZCBsold)
-					mstore(add(retPtr, 0x40), newHeadID)
-					mstore(add(retPtr, 0x60), newHeadAmount)
-					return(retPtr, 0x80)
-				}
+				uint retPtr = prepare4WordReturn(copyYTbought, copyZCBsold, newHeadID, newHeadAmount);
+				assembly{return(retPtr, 0x80)}
 			}
 			else {
 				{
@@ -177,14 +188,8 @@ contract OrderbookDelegate2 is OrderbookDelegateParent {
 		manageCollateral_BuyYT_takeOrder(vitals, msg.sender, ZCBsold, YTbought, ratio, _useInternalBalances);
 		internalHeadYTSellID = newHeadID;
 		uint newHeadAmount = newHeadID == 0 ? 0 : internalYTSells[newHeadID].amount;
-		assembly {
-			let retPtr := mload(0x40)
-			mstore(retPtr, YTbought)
-			mstore(add(retPtr, 0x20), ZCBsold)
-			mstore(add(retPtr, 0x40), newHeadID)
-			mstore(add(retPtr, 0x60), newHeadAmount)
-			return(retPtr, 0x80)
-		}
+		uint retPtr = prepare4WordReturn(YTbought, ZCBsold, newHeadID, newHeadAmount);
+		assembly {return(retPtr, 0x80)}
 	}
 
 	function marketSellUnitYTtoU(
@@ -195,7 +200,7 @@ contract OrderbookDelegate2 is OrderbookDelegateParent {
 		bool _useInternalBalancesInitial
 	) external setRateModifier {
 		/*
-			lokey this function actually returns (uint ZCBbought, uint YTsold, uint newHeadID, uint newHeadAmount)
+			this function actually returns (uint ZCBbought, uint YTsold, uint newHeadID, uint newHeadAmount)
 			but solidity poorly allocates stack space for return variables so to prevent stack too deep we must
 			pretend that we aren't going to return anything then use assembly to avoid allocation
 			on the stack and write directly to memory then we return
@@ -240,14 +245,8 @@ contract OrderbookDelegate2 is OrderbookDelegateParent {
 				fee = fee == 0 ? 0 : fee - 1; //ensure no rounding errors
 				manageCollateral_payFee(vitals, fee, ratio);
 				uint newHeadAmount = order.amount; //copy to stack to prevent getting overwritten with later mstore opcodes
-				assembly {
-					let retPtr := mload(0x40)
-					mstore(retPtr, ZCBbought)
-					mstore(add(retPtr, 0x20), YTsold)
-					mstore(add(retPtr, 0x40), newHeadID)
-					mstore(add(retPtr, 0x60), newHeadAmount)
-					return(retPtr, 0x80)
-				}
+				uint retPtr = prepare4WordReturn(ZCBbought, YTsold, newHeadID, newHeadAmount);
+				assembly {return(retPtr, 0x80)}
 			}
 			uint orderYTamt = impliedYTamount(order.amount, ratio, order.maturityConversionRate);
 			uint orderFeeAdjUnitYT = (orderYTamt.mul(ratio) / (1 ether)).mul(((i >> 16) & 0xff) + TOTAL_BASIS_POINTS) / TOTAL_BASIS_POINTS;
@@ -318,14 +317,8 @@ contract OrderbookDelegate2 is OrderbookDelegateParent {
 					manageCollateral_BuyZCB_takeOrder(copyVitals, msg.sender, copyZCBbought, copyYTsold, copyRatio, copyUseInternalBalances);
 				}
 				uint newHeadAmount = order.amount; //copy to stack to prevent getting overwritten with later mstore opcodes
-				assembly {
-					let retPtr := mload(0x40)
-					mstore(retPtr, copyZCBbought)
-					mstore(add(retPtr, 0x20), copyYTsold)
-					mstore(add(retPtr, 0x40), newHeadID)
-					mstore(add(retPtr, 0x60), newHeadAmount)
-					return(retPtr, 0x80)
-				}
+				uint retPtr = prepare4WordReturn(copyZCBbought, copyYTsold, newHeadID, newHeadAmount);
+				assembly {return(retPtr, 0x80)}
 			}
 			else {
 				manageCollateral_fillZCBSell(vitals, order.maker, orderYTamt, order.amount, ratio);
@@ -348,14 +341,8 @@ contract OrderbookDelegate2 is OrderbookDelegateParent {
 		manageCollateral_BuyZCB_takeOrder(vitals, msg.sender, ZCBbought, YTsold, ratio, _useInternalBalances);
 		internalHeadZCBSellID = newHeadID;
 		uint newHeadAmount = newHeadID == 0 ? 0 : internalZCBSells[newHeadID].amount;
-		assembly {
-			let retPtr := mload(0x40)
-			mstore(retPtr, ZCBbought)
-			mstore(add(retPtr, 0x20), YTsold)
-			mstore(add(retPtr, 0x40), newHeadID)
-			mstore(add(retPtr, 0x60), newHeadAmount)
-			return(retPtr, 0x80)
-		}
+		uint retPtr = prepare4WordReturn(ZCBbought, YTsold, newHeadID, newHeadAmount);
+		assembly {return(retPtr, 0x80)}
 	}
 
 }

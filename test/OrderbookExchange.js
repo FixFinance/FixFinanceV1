@@ -1505,6 +1505,7 @@ contract('OrderbookExchange', async function(accounts) {
 	});
 
 	it('Withdraw locked funds after payout phase', async () => {
+		await addRewards();
 		//make limit orders
 		let amt = _10To18.div(new BN(34287));
 		let MCR = _10To18.mul(new BN(4));
@@ -1540,5 +1541,17 @@ contract('OrderbookExchange', async function(accounts) {
 		assert.equal(BD.toString(), "0");
 		assert.equal(yieldA0.sub(prevYieldA0).toString(), prevYD.toString());
 		assert.equal(bondA0.sub(prevBondA0).toString(), prevBD.toString());
+		for (let i = 1; i < accounts.length; i++) {
+			await addRewards();
+			let y = await exchange.YieldDeposited(accounts[i]);
+			let b = await exchange.BondDeposited(accounts[i]);
+			await exchange.withdraw(y, b, {from: accounts[i]});
+		}
+		let subAcctPosContract = await NGBwrapperInstance.subAccountPositions(fixCapitalPoolInstance.address, exchange.address, fixCapitalPoolInstance.address);
+		assert.equal(subAcctPosContract.yield.cmp(new BN(100)), -1, "total dist acct yield must be under 100");
+		assert.equal(subAcctPosContract.bond.cmp(subAcctPosContract.yield.neg()), 1, "total dist acct bond must be greater than negative dist acct yield");
+		assert.equal(subAcctPosContract.bond.abs().cmp(new BN(100)), -1, "abs of total dist acct bond must be under 100");
+		let rewards = (await NGBwrapperInstance.distributionAccountRewards(0, exchange.address)).toNumber();
+		assert.isBelow(rewards, 100, "untouched rewards are within accpetable error range");
 	});
 });

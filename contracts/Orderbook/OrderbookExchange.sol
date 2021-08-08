@@ -78,11 +78,13 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 
 		uint prevID;
 		assembly {
-			let success := delegatecall(gas(), _delegateAddress, add(sig, 0x20), mload(sig), 0, 0x20)
+			let retPtr := mload(0x40)
+
+			let success := delegatecall(gas(), _delegateAddress, add(sig, 0x20), mload(sig), retPtr, 0x20)
 
 			if iszero(success) { revert(0,0) }
 
-			prevID := mload(0)
+			prevID := mload(retPtr)
 		}
 
 		emit MakeLimitSellZCB(msg.sender, prevID, _amount, _maturityConversionRate);
@@ -105,11 +107,13 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 
 		uint prevID;
 		assembly {
-			let success := delegatecall(gas(), _delegateAddress, add(sig, 0x20), mload(sig), 0, 0x20)
+			let retPtr := mload(0x40)
+
+			let success := delegatecall(gas(), _delegateAddress, add(sig, 0x20), mload(sig), retPtr, 0x20)
 
 			if iszero(success) { revert(0,0) }
 
-			prevID := mload(0)
+			prevID := mload(retPtr)
 		}
 
 		emit MakeLimitSellYT(msg.sender, prevID, _amount, _maturityConversionRate);
@@ -133,11 +137,13 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 		);
 
 		assembly {
-			let success := delegatecall(gas(), _delegateAddress, add(sig, 0x20), mload(sig), 0, 0x20)
+			let retPtr := mload(0x40)
+
+			let success := delegatecall(gas(), _delegateAddress, add(sig, 0x20), mload(sig), retPtr, 0x20)
 
 			if iszero(success) { revert(0,0) }
 
-			change := mload(0)
+			change := mload(retPtr)
 		}
 
 		emit ModifyOrder(_targetID, change);
@@ -161,11 +167,13 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 		);
 
 		assembly {
-			let success := delegatecall(gas(), _delegateAddress, add(sig, 0x20), mload(sig), 0, 0x20)
+			let retPtr := mload(0x40)
+
+			let success := delegatecall(gas(), _delegateAddress, add(sig, 0x20), mload(sig), retPtr, 0x20)
 
 			if iszero(success) { revert(0,0) }
 
-			change := mload(0)
+			change := mload(retPtr)
 		}
 
 		emit ModifyOrder(_targetID, change);
@@ -190,12 +198,14 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 
 		bytes32 nameTopic = keccak256("MarketBuyYT(address,uint256,uint256)");
 		assembly {
-			let success := delegatecall(gas(), _delegateAddress, add(sig, 0x20), mload(sig), 0, 0x80)
+			let retPtr := mload(0x40)
+
+			let success := delegatecall(gas(), _delegateAddress, add(sig, 0x20), mload(sig), retPtr, 0x80)
 
 			if iszero(success) { revert(0,0) }
 
-			log2(0x40, 0x40, nameTopic, caller())
-			return(0, 0x40)
+			log2(add(retPtr, 0x40), 0x40, nameTopic, caller())
+			return(retPtr, 0x40)
 		}
 
 	}
@@ -219,12 +229,14 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 
 		bytes32 nameTopic = keccak256("MarketBuyZCB(address,uint256,uint256)");
 		assembly {
-			let success := delegatecall(gas(), _delegateAddress, add(sig, 0x20), mload(sig), 0, 0x80)
+			let retPtr := mload(0x40)
+
+			let success := delegatecall(gas(), _delegateAddress, add(sig, 0x20), mload(sig), retPtr, 0x80)
 
 			if iszero(success) { revert(0,0) }
 
-			log2(0x40, 0x40, nameTopic, caller())
-			return(0, 0x40)
+			log2(add(retPtr, 0x40), 0x40, nameTopic, caller())
+			return(retPtr, 0x40)
 		}
 	}
 
@@ -247,12 +259,14 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 
 		bytes32 nameTopic = keccak256("MarketBuyZCB(address,uint256,uint256)");
 		assembly {
-			let success := delegatecall(gas(), _delegateAddress, add(sig, 0x20), mload(sig), 0, 0x80)
+			let retPtr := mload(0x40)
+
+			let success := delegatecall(gas(), _delegateAddress, add(sig, 0x20), mload(sig), retPtr, 0x80)
 
 			if iszero(success) { revert(0,0) }
 
-			log2(0x40, 0x40, nameTopic, caller())
-			return(0, 0x40)
+			log2(add(retPtr, 0x40), 0x40, nameTopic, caller())
+			return(retPtr, 0x40)
 		}
 	}
 
@@ -275,12 +289,14 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 
 		bytes32 nameTopic = keccak256("MarketBuyYT(address,uint256,uint256)");
 		assembly {
-			let success := delegatecall(gas(), _delegateAddress, add(sig, 0x20), mload(sig), 0, 0x80)
+			let retPtr := mload(0x40)
+
+			let success := delegatecall(gas(), _delegateAddress, add(sig, 0x20), mload(sig), retPtr, 0x80)
 
 			if iszero(success) { revert(0,0) }
 
-			log2(0x40, 0x40, nameTopic, caller())
-			return(0, 0x40)
+			log2(add(retPtr, 0x40), 0x40, nameTopic, caller())
+			return(retPtr, 0x40)
 		}
 	}
 

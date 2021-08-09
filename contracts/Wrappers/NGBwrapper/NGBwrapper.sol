@@ -60,11 +60,13 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 		bytes memory sig = abi.encodeWithSignature("depositUnitAmount(address,uint256)", _to, _amount);
 
 		assembly {
-			let success := delegatecall(gas(), _delegateAddress, add(sig, 0x20), mload(sig), 0, 0x20)
+			let retPtr := mload(0x40)
+
+			let success := delegatecall(gas(), _delegateAddress, add(sig, 0x20), mload(sig), retPtr, 0x20)
 
 			if iszero(success) { revert(0,0) }
 
-			_amountWrapped := mload(0)
+			_amountWrapped := mload(retPtr)
 		}
 	}
 
@@ -79,11 +81,13 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 		bytes memory sig = abi.encodeWithSignature("depositWrappedAmount(address,uint256)", _to, _amount);
 
 		assembly {
-			let success := delegatecall(gas(), _delegateAddress, add(sig, 0x20), mload(sig), 0, 0x20)
+			let retPtr := mload(0x40)
+
+			let success := delegatecall(gas(), _delegateAddress, add(sig, 0x20), mload(sig), retPtr, 0x20)
 
 			if iszero(success) { revert(0,0) }
 
-			_amountUnit := mload(0)
+			_amountUnit := mload(retPtr)
 		}
 	}
 
@@ -164,11 +168,13 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 		bytes memory sig = abi.encodeWithSignature("withdrawUnitAmount(address,uint256,bool)", _to, _amountUnit, _claimRewards);
 
 		assembly {
-			let success := delegatecall(gas(), _delegateAddress, add(sig, 0x20), mload(sig), 0, 0x20)
+			let retPtr := mload(0x40)
+
+			let success := delegatecall(gas(), _delegateAddress, add(sig, 0x20), mload(sig), retPtr, 0x20)
 
 			if iszero(success) { revert(0,0) }
 
-			_amountWrappedToken := mload(0)
+			_amountWrappedToken := mload(retPtr)
 		}
 	}
 
@@ -185,11 +191,13 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 		bytes memory sig = abi.encodeWithSignature("withdrawWrappedAmount(address,uint256,bool)", _to, _amountWrappedToken, _claimRewards);
 
 		assembly {
-			let success := delegatecall(gas(), _delegateAddress, add(sig, 0x20), mload(sig), 0, 0x20)
+			let retPtr := mload(0x40)
+
+			let success := delegatecall(gas(), _delegateAddress, add(sig, 0x20), mload(sig), retPtr, 0x20)
 
 			if iszero(success) { revert(0,0) }
 
-			_amountUnit := mload(0)
+			_amountUnit := mload(retPtr)
 		}
 	}
 

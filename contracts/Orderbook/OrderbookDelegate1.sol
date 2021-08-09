@@ -15,6 +15,16 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 	using SignedSafeMath for int256;
 	using ABDKMath64x64 for int128;
 
+	/*
+		@Description: buy a specific amount of YT off of the market
+
+		@param uint _amountYT: the amount of YT to buy
+		@param uint _maxMaturityConversionRate: the maximum MCR of the head order to continue purchasing more YT
+		@param uint _maxCumulativeMaturityConversionRate: if this is smaller than the effective MCR based on ZCB in and YT out at end of execution revert
+		@param uint16 _maxIterations: the maximum amount of limit orders to fully fill, important for gas considerations
+		@param bool _useInternalBalances: pass true to ue YieldDeposited and BondDeposited to cover costs and receive payment
+			otherwise use transferPositionFrom and transferPosition on the baseFCP to get required input and send required output
+	*/
 	function marketBuyYT(
 		uint _amountYT,
 		uint _maxMaturityConversionRate,
@@ -103,6 +113,16 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 		newHeadAmount = newHeadID == 0 ? 0 : internalYTSells[newHeadID].amount;
 	}
 
+	/*
+		@Description: sell a specific amount of YT off of the market
+
+		@param uint _amountYT: the amount of YT to sell
+		@param uint _minMaturityConversionRate: the minimum MCR of the head order to continue purchasing more YT
+		@param uint _minCumulativeMaturityConversionRate: if this is greater than the effective MCR based on ZCB in and YT out at end of execution revert
+		@param uint16 _maxIterations: the maximum amount of limit orders to fully fill, important for gas considerations
+		@param bool _useInternalBalances: pass true to ue YieldDeposited and BondDeposited to cover costs and receive payment
+			otherwise use transferPositionFrom and transferPosition on the baseFCP to get required input and send required output
+	*/
 	function marketSellYT(
 		uint _amountYTInitial, //deflate div (1 + fee), after execution inflate YTsold mul (1 + fee)
 		uint _minMaturityConversionRate,
@@ -196,6 +216,16 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 	}
 
 
+	/*
+		@Description: buy a specific amount of ZCB off of the market
+
+		@param uint _amountZCB: the amount of ZCB to buy
+		@param uint _minMaturityConversionRate: the minimum MCR of the head order to continue purchasing more ZCB
+		@param uint _minCumulativeMaturityConversionRate: if this is greater than the effective MCR based on ZCB in and YT out at end of execution revert
+		@param uint16 _maxIterations: the maximum amount of limit orders to fully fill, important for gas considerations
+		@param bool _useInternalBalances: pass true to ue YieldDeposited and BondDeposited to cover costs and receive payment
+			otherwise use transferPositionFrom and transferPosition on the baseFCP to get required input and send required output
+	*/
 	function marketBuyZCB(
 		uint _amountZCB,
 		uint _minMaturityConversionRate,
@@ -282,6 +312,16 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 		newHeadAmount = newHeadID == 0 ? 0 : internalZCBSells[newHeadID].amount;
 	}
 
+	/*
+		@Description: sell a specific amount of ZCB on the market
+
+		@param uint _amountZCB: the amount of ZCB to sell
+		@param uint _maxMaturityConversionRate: the maximum MCR of the head order to continue selling more ZCB
+		@param uint _maxCumulativeMaturityConversionRate: if this is smaller than the effective MCR based on ZCB in and YT out at end of execution revert
+		@param uint16 _maxIterations: the maximum amount of limit orders to fully fill, important for gas considerations
+		@param bool _useInternalBalances: pass true to ue YieldDeposited and BondDeposited to cover costs and receive payment
+			otherwise use transferPositionFrom and transferPosition on the baseFCP to get required input and send required output
+	*/
 	function marketSellZCB(
 		uint _amountZCBInitial, //deflate div (1 + fee), after execution inflate YTsold mul (1 + fee)
 		uint _maxMaturityConversionRate,

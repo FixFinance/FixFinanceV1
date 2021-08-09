@@ -15,6 +15,12 @@ contract OrderbookDelegate3 is OrderbookDelegateParent {
 	using SignedSafeMath for int256;
 	using ABDKMath64x64 for int128;
 
+	/*
+		@Description: withdraw ZCB & YT from the orderbook, pass a yiel and bond amount
+
+		@param uint _amountYield: the yield amount of the ZCB YT position to withdraw
+		@param int _amountBond: the bond amount of the ZCB YT position to withdraw
+	*/
 	function withdraw(uint _amountYield, int _amountBond) external {
 		require(_amountYield <= uint(type(int256).max));
 		IFixCapitalPool fcp = internalFCP;
@@ -38,6 +44,12 @@ contract OrderbookDelegate3 is OrderbookDelegateParent {
 		internalBondDeposited[msg.sender] = resultantBD;
 	}
 
+	/*
+		@Description: deposit ZCB & YT into the orderbook, pass a yield and bond amount
+
+		@param uint _amountYield: the yield amount of the ZCB YT position to deposit
+		@param int _amoutBond: the bond amount of the ZCB YT position to deposit
+	*/
 	function deposit(uint _amountYield, int _amountBond) external {
 		require(_amountYield <= uint(type(int256).max));
 		IFixCapitalPool fcp = internalFCP; //gas savings
@@ -48,6 +60,9 @@ contract OrderbookDelegate3 is OrderbookDelegateParent {
 		internalBondDeposited[msg.sender] = internalBondDeposited[msg.sender].add(_amountBond);
 	}
 
+	/*
+		@Description: force claim sub account rewards where distribution account is the orderbook and sub acct is msg.sender
+	*/
 	function forceClaimSubAccountRewards() external {
 		IFixCapitalPool fcp = internalFCP;
 		IWrapper wrp = internalWrapper;
@@ -57,6 +72,18 @@ contract OrderbookDelegate3 is OrderbookDelegateParent {
 
 	//---------------i-n-t-e-r-n-a-l---m-o-d-i-f-y---o-r-d-e-r-b-o-o-k--------------------
 
+	/*
+		@Description: add a ZCB limit sell order to the linked list
+
+		@param uint _amount: the amount of ZCB to sell in the order
+		@param uint _maturityConversionRate: the MCR of the limit sell
+		@param uint _newID: the ID of the new order
+		@param uint _maxSteps: the maximum iterations to find the correct insertion point
+			if _maxSteps is exceeded the tx will revert
+
+		@return uint prevID: the ID of the order directly previous to the new order,
+			if the new order is the head this value will return 0
+	*/
  	function insertFromHead_SellZCB(uint _amount, uint _maturityConversionRate, uint _newID, uint _maxSteps) internal returns(uint prevID) {
 		uint currentID = internalHeadZCBSellID;
 		if (currentID == 0) {
@@ -90,6 +117,18 @@ contract OrderbookDelegate3 is OrderbookDelegateParent {
 		return prevID;
 	}
 
+	/*
+		@Description: add a YT limit sell order to the linked list
+
+		@param uint _amount: the amount of YT to sell in the order
+		@param uint _maturityConversionRate: the MCR of the limit sell
+		@param uint _newID: the ID of the new order
+		@param uint _maxSteps: the maximum iterations to find the correct insertion point
+			if _maxSteps is exceeded the tx will revert
+
+		@return uint prevID: the ID of the order directly previous to the new order,
+			if the new order is the head this value will return 0
+	*/
 	function insertFromHead_SellYT(uint _amount, uint _maturityConversionRate, uint _newID, uint _maxSteps) internal returns(uint prevID) {
 		uint currentID = internalHeadYTSellID;
 		if (currentID == 0) {
@@ -123,6 +162,18 @@ contract OrderbookDelegate3 is OrderbookDelegateParent {
 		return prevID;
 	}
 
+	/*
+		@Description: add a ZCB limit sell to the linked list, start search for insertion point with hint
+
+		@param uint _amount: the amount of ZCB to sell in the order
+		@param uint _maturityConversionRate: the MCR of the limit sell
+		@param uint _hintID: ID of an order that is known to be previous to and near the target insertion point, helps gas efficiency
+		@param uint _newID: the ID of the new order
+		@param uint _maxSteps: the maximum iterations to find the correct insertion point
+			if _maxSteps is exceeded the tx will revert
+
+		@return uint prevID: the ID of the order directly previous to the new order,
+	*/
 	function insertWithHint_SellZCB(uint _amount, uint _maturityConversionRate, uint _hintID, uint _newID, uint _maxSteps) internal returns(uint prevID) {
 		uint currentID = _hintID;
 		LimitSellZCB storage currentOrder = internalZCBSells[currentID];
@@ -148,6 +199,19 @@ contract OrderbookDelegate3 is OrderbookDelegateParent {
 		return prevID;
 	}
 
+	/*
+		@Description: add a YT limit sell to the linked list, start search for insertion point with hint
+
+		@param uint _amount: the amount of YT to sell in the order
+		@param uint _maturityConversionRate: the MCR of the limit sell
+		@param uint _hintID: ID of an order that is known to be previous to and near the target insertion point, helps gas efficiency
+		@param uint _newID: the ID of the new order
+		@param uint _maxSteps: the maximum iterations to find the correct insertion point
+			if _maxSteps is exceeded the tx will revert
+
+		@return uint prevID: the ID of the order directly previous to the new order,
+			if the new order is the head this value will return 0
+	*/
 	function insertWithHint_SellYT(uint _amount, uint _maturityConversionRate, uint _hintID, uint _newID, uint _maxSteps) internal returns(uint prevID) {
 		uint currentID = _hintID;
 		LimitSellYT storage currentOrder = internalYTSells[currentID];
@@ -173,6 +237,18 @@ contract OrderbookDelegate3 is OrderbookDelegateParent {
 		return prevID;
 	}
 
+	/*
+		@Description: modify a ZCB limit sell order start searching for it from the head
+
+		@param int _amount: the amount by which to change the order amount
+		@param uint _targetID: the ID of the order to edit
+		@param uint _maxSteps: the maximum iterations to find the correct insertion point, if _maxSteps is exceeded the tx will revert
+		@param uint _minimumAmount: the minimum amount for a ZCB sell order
+		@param bool _removeBelowMin: if true is passed the order will be entirely cancelled if the resulting change
+			in order amount results in the order amount being below the minimum amount
+
+		@return int change: the resultant change in the order amount from prior to after execution of this function
+	*/
 	function modifyFromHead_SellZCB(int _amount, uint _targetID, uint _maxSteps, uint _minimumAmount, bool _removeBelowMin) internal returns (int change) {
 		uint currentID = internalHeadZCBSellID;
 		if (currentID == _targetID) {
@@ -243,6 +319,18 @@ contract OrderbookDelegate3 is OrderbookDelegateParent {
 		}
 	}
 
+	/*
+		@Description: modify a YT limit sell order start searching for it from the head
+
+		@param int _amount: the amount by which to change the order amount
+		@param uint _targetID: the ID of the order to edit
+		@param uint _maxSteps: the maximum iterations to find the correct insertion point, if _maxSteps is exceeded the tx will revert
+		@param uint _minimumAmount: the minimum amount for a YT sell order
+		@param bool _removeBelowMin: if true is passed the order will be entirely cancelled if the resulting change
+			in order amount results in the order amount being below the minimum amount
+
+		@return int change: the resultant change in the order amount from prior to after execution of this function
+	*/
 	function modifyFromHead_SellYT(int _amount, uint _targetID, uint _maxSteps, uint _minimumAmount, bool _removeBelowMin) internal returns (int change) {
 		uint currentID = internalHeadYTSellID;
 		if (currentID == _targetID) {
@@ -314,6 +402,19 @@ contract OrderbookDelegate3 is OrderbookDelegateParent {
 		}
 	}
 
+	/*
+		@Description: modify a ZCB limit sell order start searching for it from a hint ID
+
+		@param int _amount: the amount by which to change the order amount
+		@param uint _targetID: the ID of the order to edit
+		@praam uint _hintID: the ID that will act as a hint to find the order previous to the target order
+		@param uint _maxSteps: the maximum iterations to find the correct insertion point, if _maxSteps is exceeded the tx will revert
+		@param uint _minimumAmount: the minimum amount for a ZCB sell order
+		@param bool _removeBelowMin: if true is passed the order will be entirely cancelled if the resulting change
+			in order amount results in the order amount being below the minimum amount
+
+		@return int change: the resultant change in the order amount from prior to after execution of this function
+	*/
 	function modifyWithHint_SellZCB(int _amount, uint _targetID, uint _hintID, uint _maxSteps, uint _minimumAmount, bool _removeBelowMin) internal returns (int change) {
 		uint currentID = _hintID;
 		uint prevID;
@@ -354,6 +455,19 @@ contract OrderbookDelegate3 is OrderbookDelegateParent {
 		}
 	}
 
+	/*
+		@Description: modify a YT limit sell order start searching for it from a hint ID
+
+		@param int _amount: the amount by which to change the order amount
+		@param uint _targetID: the ID of the order to edit
+		@praam uint _hintID: the ID that will act as a hint to find the order previous to the target order
+		@param uint _maxSteps: the maximum iterations to find the correct insertion point, if _maxSteps is exceeded the tx will revert
+		@param uint _minimumAmount: the minimum amount for a YT sell order
+		@param bool _removeBelowMin: if true is passed the order will be entirely cancelled if the resulting change
+			in order amount results in the order amount being below the minimum amount
+
+		@return int change: the resultant change in the order amount from prior to after execution of this function
+	*/
 	function modifyWithHint_SellYT(int _amount, uint _targetID, uint _hintID, uint _maxSteps, uint _minimumAmount, bool _removeBelowMin) internal returns (int change) {
 		uint currentID = _hintID;
 		uint prevID;
@@ -396,6 +510,15 @@ contract OrderbookDelegate3 is OrderbookDelegateParent {
 
 	//---------------------external-------------------------------------
 
+	/*
+		@Description: post a limit order to sell a specific amount of ZCB at a specific MCR
+
+		@param uint _amount: the amount of ZCB to sell
+		@param uint _maturityConversionRate: the MCR at which to sell the ZCB
+		@param uint _hintID: the ID that will act as a hint for where to place the order, helps save gas
+		@param uint _maxSteps: the maximum iterations to find the correct insertion point
+			if _maxSteps is exceeded the tx will revert
+	*/
 	function limitSellZCB(
 		uint _amount,
 		uint _maturityConversionRate,
@@ -415,6 +538,15 @@ contract OrderbookDelegate3 is OrderbookDelegateParent {
 		totalNumOrders = newID;
 	}
 
+	/*
+		@Description: post a limit order to sell a specific amount of static YT at a specific MCR
+
+		@param uint _amount: the amount of YT to sell
+		@param uint _maturityConversionRate: the MCR at which to sell the YT
+		@param uint _hintID: the ID that will act as a hint for where to place the order, helps save gas
+		@param uint _maxSteps: the maximum iterations to find the correct insertion point
+			if _maxSteps is exceeded the tx will revert
+	*/
 	function limitSellYT(
 		uint _amount,
 		uint _maturityConversionRate,
@@ -434,6 +566,16 @@ contract OrderbookDelegate3 is OrderbookDelegateParent {
 		totalNumOrders = newID;
 	}
 
+	/*
+		@Description: modify the amount in a ZCB limit sell order, msg.sender must be order maker
+
+		@param int _amount: the amount by which to change the order amount
+		@param uint _targetID: the ID of the order to edit
+		@praam uint _hintID: the ID that will act as a hint to find the order previous to the target order
+		@param uint _maxSteps: the maximum iterations to find the order previous to target order
+		@param bool _removeBelowMin: if true is passed the order will be entirely cancelled if the resulting change
+			in order amount results in the order amount being below the minimum amount
+	*/
 	function modifyZCBLimitSell(
 		int _amount,
 		uint _targetID,
@@ -461,6 +603,16 @@ contract OrderbookDelegate3 is OrderbookDelegateParent {
 		}
 	}
 
+	/*
+		@Description: modify the amount in a YT limit sell order, msg.sender must be order maker
+
+		@param int _amount: the amount by which to change the order amount
+		@param uint _targetID: the ID of the order to edit
+		@praam uint _hintID: the ID that will act as a hint to find the order previous to the target order
+		@param uint _maxSteps: the maximum iterations to find the order previous to target order
+		@param bool _removeBelowMin: if true is passed the order will be entirely cancelled if the resulting change
+			in order amount results in the order amount being below the minimum amount
+	*/
 	function modifyYTLimitSell(
 		int _amount,
 		uint _targetID,

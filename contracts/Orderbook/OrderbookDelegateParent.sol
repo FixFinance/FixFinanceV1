@@ -17,6 +17,14 @@ contract OrderbookDelegateParent is OrderbookData {
 
 	uint internal constant TOTAL_BASIS_POINTS = 10_000;
 
+	/*
+		@Description: find the minimum amount for a ZCB limit order
+		
+		@param uint _maturityConversionRate: the MCR of the limit order
+		@param uint _ratio: the current static to dynamic amount ratio
+
+		@return uint minimum: the minimum amount for the ZCB limit order
+	*/
 	function minimumZCBLimitAmount(uint _maturityConversionRate, uint _ratio) internal view returns(uint minimum) {
 		uint yieldToMaturity = _maturityConversionRate.mul(1 ether).div(_ratio);
 		require(yieldToMaturity > 1 ether);
@@ -31,6 +39,14 @@ contract OrderbookDelegateParent is OrderbookData {
 		minimum = minimumOrderSize.mul(yieldToMaturity).div(1 ether);
 	}
 
+	/*
+		@Description: find the minimum amount for a YT limit order
+		
+		@param uint _maturityConversionRate: the MCR of the limit order
+		@param uint _ratio: the current static to dynamic amount ratio
+
+		@return uint minimum: the minimum amount for the YT limit order
+	*/
 	function minimumYTlimitAmount(uint _maturityConversionRate, uint _ratio) internal view returns(uint minimum) {
 		uint zcbDilutionToMatutity = _ratio.mul(1 ether).div(_maturityConversionRate);
 		require(zcbDilutionToMatutity < 1 ether);
@@ -46,6 +62,12 @@ contract OrderbookDelegateParent is OrderbookData {
 			.div(uint(1 ether).sub(zcbDilutionToMatutity).mul(_ratio) / (1 ether));
 	}
 
+	/*
+		@Description: ensure that a ZCB limit order amount is greater than or equal to the minimum acceptable amount
+
+		@param uint _amountZCB: the amount of ZCB in the limit order
+		@param uint _maturityConversionrate: the MCR of the limit order
+	*/
 	modifier ensureValidZCBSell(uint _amountZCB, uint _maturityConversionRate) {
 		uint ratio = internalWrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
 		uint minimumZCBamount = minimumZCBLimitAmount(_maturityConversionRate, ratio);
@@ -53,6 +75,12 @@ contract OrderbookDelegateParent is OrderbookData {
 		_;
 	}
 
+	/*
+		@Description: ensure that a YT limit order amount is greater than or equal to the minimum acceptable amount
+
+		@param uint _amountYT: the amount of YT in the limit order
+		@param uint _maturityConversionrate: the MCR of the limit order
+	*/
 	modifier ensureValidYTSell(uint _amountYT, uint _maturityConversionRate) {
 		uint ratio = internalWrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
 		uint minimumYTamount = minimumYTlimitAmount(_maturityConversionRate, ratio);
@@ -60,6 +88,15 @@ contract OrderbookDelegateParent is OrderbookData {
 		_;
 	}
 
+	/*
+		@Description: ensure that a set of collateral balances is valid
+
+		@param uint _YD: value for the YieldDeposited mapping
+		@param uint _BD: value for the BoneDeposited mapping
+		@param uint _wrappedAmtLockedYT: value for the lockedYT mapping
+		@param uint _lockedZCB: value for the lockedZCB mapping
+		@param uint _ratio: the current static to dynamic conversion multiplier
+	*/
 	function requireValidCollateral(uint _YD, int _BD, uint _wrappedAmtLockedYT, uint _lockedZCB, uint _ratio) internal pure {
 		require(_lockedZCB <= uint(type(int256).max));
 		uint unitAmtLockedYT = _wrappedAmtLockedYT.mul(_ratio)/(1 ether);
@@ -68,11 +105,28 @@ contract OrderbookDelegateParent is OrderbookData {
 		require(minimumBondCollateral >= 0 || minimumYieldCollateral.mul(_ratio)/(1 ether) >= uint(-minimumBondCollateral));
 	}
 
+	/*
+		@Description: find an implied MCR given amounts of ZCB & YT with assumed equal NPV
+
+		@param uint _ZCB: the amount of ZCB assumed equal in NPV to the amount of YT
+		@param uint _YT: the amount of YT assumed equal in NPV to the amount of ZCB
+
+		@return uint: the implied MCR
+	*/
 	function impliedMaturityConversionRate(uint _ZCB, uint _YT, uint _ratio) internal pure returns(uint) {
 		uint effYT = _YT.mul(_ratio) / (1 ether);
 		return (_ZCB.mul(1 ether) / effYT).add(1 ether).mul(_ratio) / (1 ether);
 	}
 
+	/*
+		@Desciption: find an amount of ZCB of equal NPV to a specific amount of YT assuming a certain MCR
+
+		@param uint _YT: the amount of YT for which to find an amount of ZCB of equal NPV
+		@param uint _ratio: the current static to dynamic conversion multiplier
+		@param uint _maturityConversionRate: the MCR for which to calculate NPV
+
+		@return uint: the ZCB amount of equal NPV to the YT amount based on MCR assumptions
+	*/
 	function impliedZCBamount(uint _YT, uint _ratio, uint _maturityConversionRate) internal pure returns(uint) {
 		uint yieldToMaturity = _maturityConversionRate.mul(1 ether).div(_ratio);
 		//ensure that for YTsell orders that yieldToMaturity is always positive
@@ -81,6 +135,15 @@ contract OrderbookDelegateParent is OrderbookData {
 		return effYT.mul(yieldToMaturity.sub(1 ether)) / (1 ether);
 	}
 
+	/*
+		@Desciption: find an amount of YT of equal NPV to a specific amount of ZCB assuming a certain MCR
+
+		@param uint _ZCB: the amount of ZCB for which to find an amount of YT of equal NPV
+		@param uint _ratio: the current static to dynamic conversion multiplier
+		@param uint _maturityConversionRate: the MCR for which to calculate NPV
+
+		@return uint: the YT amount of equal NPV to the ZCB amount based on MCR assumptions
+	*/
 	function impliedYTamount(uint _ZCB, uint _ratio, uint _maturityConversionRate) internal pure returns(uint) {
 		uint yieldToMaturity = _maturityConversionRate.mul(1 ether).div(_ratio);
 		uint effYT = _ZCB.mul(1 ether).div(yieldToMaturity.sub(1 ether));
@@ -89,6 +152,13 @@ contract OrderbookDelegateParent is OrderbookData {
 
 	//---------------i-n-t-e-r-n-a-l---m-o-d-i-f-y---o-r-d-e-r-b-o-o-k--------------------
 
+	/*
+		@Description: handle the collateral of an address after it has placed a ZCB limit sell
+
+		@param address _addr: the address that placed the limit sell
+		@param uint _amount: the amount of the limit sell
+		@param uint _ratio: the current static to dynamic conversion multiplier
+	*/
 	function manageCollateral_SellZCB_makeOrder(address _addr, uint _amount, uint _ratio) internal {
 		require(_amount < uint(type(int256).max));
 		uint YD = internalYieldDeposited[_addr];
@@ -101,8 +171,20 @@ contract OrderbookDelegateParent is OrderbookData {
 		internalLockedZCB[_addr] = resultantLockedZCB;
 	}
 
+	/*
+		@Description: handle the collateral of an address after it has market bought ZCB and sold YT
+
+		@param address[3] memory vitals: contains memory copies of address variables from storage
+			format: [address(internalWrapper), address(internalFCP), address(internalIORC)]
+		@param address _addr: the address that has bought ZCB and sold YT
+		@param uint _amountZCB: the amount of ZCB bought
+		@param uint _amountWrappedYT: the static amount of YT sold
+		@param uint _ratio: the current static to dynamic conversion multiplier
+		@param bool _useInternalBalances: pass true to ue YieldDeposited and BondDeposited to cover costs and receive payment
+			otherwise use transferPositionFrom and transferPosition on the baseFCP to get required input and send required output
+	*/
 	function manageCollateral_BuyZCB_takeOrder(
-		address[3] memory vitals, // [address(internalWrapper), address(internalFCP), address(internalIORC)]
+		address[3] memory vitals,
 		address _addr,
 		uint _amountZCB,
 		uint _amountWrappedYT,
@@ -137,6 +219,13 @@ contract OrderbookDelegateParent is OrderbookData {
 		}
 	}
 
+	/*
+		@Description: handle the collateral of an address after it has placed a YT limit sell
+
+		@param address _addr: the address that placed the limit sell
+		@param uint _amount: the amount of the limit sell
+		@param uint _ratio: the current static to dynamic conversion multiplier
+	*/
 	function manageCollateral_SellYT_makeOrder(address _addr, uint _amount, uint _ratio) internal {
 		require(_amount < uint(type(int256).max));
 		uint YD = internalYieldDeposited[_addr];
@@ -150,8 +239,20 @@ contract OrderbookDelegateParent is OrderbookData {
 	}
 
 
+	/*
+		@Description: handle the collateral of an address after it has market bought YT and sold ZCB
+
+		@param address[3] memory vitals: contains memory copies of address variables from storage
+			format: [address(internalWrapper), address(internalFCP), address(internalIORC)]
+		@param address _addr: the address that has bought YT and sold ZCB
+		@param uint _amountZCB: the amount of ZCB sold
+		@param uint _amountWrappedYT: the static amount of YT bought
+		@param uint _ratio: the current static to dynamic conversion multiplier
+		@param bool _useInternalBalances: pass true to ue YieldDeposited and BondDeposited to cover costs and receive payment
+			otherwise use transferPositionFrom and transferPosition on the baseFCP to get required input and send required output
+	*/
 	function manageCollateral_BuyYT_takeOrder(
-		address[3] memory vitals, // [address(internalWrapper), address(internalFCP), address(internalIORC)]
+		address[3] memory vitals,
 		address _addr,
 		uint _amountZCB,
 		uint _amountWrappedYT,
@@ -186,14 +287,30 @@ contract OrderbookDelegateParent is OrderbookData {
 		}
 	}
 
+	/*
+		@Description: handle the collateral of an address that has closed an amount of ZCB limit sells
+
+		@param address _addr: the address that has closed ZCB limit sells
+		@param uint _ZCBclosed: the amount of ZCB limit sell closed
+	*/
 	function manageCollateral_closeZCBSell(address _addr, uint _ZCBclosed) internal {
 		require(_ZCBclosed < uint(type(int256).max));
 		uint resultantLockedZCB = internalLockedZCB[_addr].sub(_ZCBclosed);
 		internalLockedZCB[_addr] = resultantLockedZCB;
 	}
 
+	/*
+		@Description: handle the collateral of an address that has had its YT limit sell filled
+
+		@param address[3] memory vitals: contains memory copies of address variables from storage
+			format: [address(internalWrapper), address(internalFCP), address(internalIORC)]
+		@param address _addr: the address that has had its YT limit sell filled
+		@param uint _ZCBreceived: the amount of ZCB received from the sell
+		@param uint _YTsold: the amount of static YT sold in the limit sell
+		@param uint _ratio: the current static to dynamic conversion multiplier
+	*/
 	function manageCollateral_fillYTSell(
-		address[3] memory vitals, // [address(internalWrapper), address(internalFCP), address(internalIORC)]
+		address[3] memory vitals,
 		address _addr,
 		uint _ZCBreceived,
 		uint _YTsold,
@@ -213,14 +330,30 @@ contract OrderbookDelegateParent is OrderbookData {
 		IWrapper(vitals[0]).editSubAccountPosition(false, _addr, vitals[1], changeYield, changeBond);
 	}
 
+	/*
+		@Description: handle the collateral of an address that has closed an amount of YT limit sells
+
+		@param address _addr: the address that has closed YT limit sells
+		@param uint _YTclosed: the amount of YT limit sell closed
+	*/
 	function manageCollateral_closeYTSell(address _addr, uint _YTclosed) internal {
 		require(_YTclosed < uint(type(int256).max));
 		uint prevLockedYT = internalLockedYT[_addr];
 		internalLockedYT[_addr] = prevLockedYT.sub(_YTclosed);
 	}
 
+	/*
+		@Description: handle the collateral of an address that has had its ZCB limit sell filled
+
+		@param address[3] memory vitals: contains memory copies of address variables from storage
+			format: [address(internalWrapper), address(internalFCP), address(internalIORC)]
+		@param address _addr: the address that has had its ZCB limit sell filled
+		@param uint _YTreceived: the amount of static YT received from the sell
+		@param uint _ZCBsold: the amount of ZCB sold in the limit sell
+		@param uint _ratio: the current static to dynamic conversion multiplier
+	*/
 	function manageCollateral_fillZCBSell(
-		address[3] memory vitals, // [address(internalWrapper), address(internalFCP), address(internalIORC)]
+		address[3] memory vitals,
 		address _addr,
 		uint _YTreceived,
 		uint _ZCBsold,
@@ -239,6 +372,15 @@ contract OrderbookDelegateParent is OrderbookData {
 		IWrapper(vitals[0]).editSubAccountPosition(false, _addr, vitals[1], int(_YTreceived), changeBond);
 	}
 
+	/*
+		@Description: handle revenue after a market order has earned fees for the orderbook owners
+
+		@param address[3] memory vitals: contains memory copies of address variables from storage
+			format: [address(internalWrapper), address(internalFCP), address(internalIORC)]
+		@param uint _amount: the amount of either ZCB or static YT that has been earned in fees
+		@param uint _ratio: if fee is in ZCB 0 should be passed
+			if fee is in static YT static to dynamic conversion multiplier should be passed
+	*/
 	function manageCollateral_payFee(
 		address[3] memory vitals, // [address(internalWrapper), address(internalFCP), address(internalIORC)]
 		uint _amount,
@@ -261,6 +403,12 @@ contract OrderbookDelegateParent is OrderbookData {
 		}
 	}
 
+	/*
+		@Description: claim sub account rewards for this contract
+			sub account to claim for is FCP => address(this) => FCP
+		@param address _wrapperAddress: address of the base IWrapper contract
+		@param address _fcpAddress: address of the base FCP contract
+	*/
 	function claimContractSubAccountRewards(address _wrapperAddress, address _fcpAddress) internal {
 		IWrapper(_wrapperAddress).forceClaimSubAccountRewards(true, _fcpAddress, address(this), _fcpAddress);
 	}

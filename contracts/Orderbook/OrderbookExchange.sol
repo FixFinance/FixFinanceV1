@@ -41,6 +41,12 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 		tempWrapper.registerAsDistributionAccount();
 	}
 
+	/*
+		@Description: deposit ZCB & YT into the orderbook, pass a yield and bond amount
+
+		@param uint _amountYield: the yield amount of the ZCB YT position to deposit
+		@param int _amoutBond: the bond amount of the ZCB YT position to deposit
+	*/
 	function deposit(uint _amountYield, int _amountBond) external override {
 		(bool success, ) = delegate3Address.delegatecall(abi.encodeWithSignature(
 			"deposit(uint256,int256)",
@@ -50,6 +56,12 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 		require(success);
 	}
 
+	/*
+		@Description: withdraw ZCB & YT from the orderbook, pass a yiel and bond amount
+
+		@param uint _amountYield: the yield amount of the ZCB YT position to withdraw
+		@param int _amountBond: the bond amount of the ZCB YT position to withdraw
+	*/
 	function withdraw(uint _amountYield, int _amountBond) external override {
 		(bool success, ) = delegate3Address.delegatecall(abi.encodeWithSignature(
 			"withdraw(uint256,int256)",
@@ -61,6 +73,15 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 
 	//-------------------externally-callable-------------------
 
+	/*
+		@Description: post a limit order to sell a specific amount of ZCB at a specific MCR
+
+		@param uint _amount: the amount of ZCB to sell
+		@param uint _maturityConversionRate: the MCR at which to sell the ZCB
+		@param uint _hintID: the ID that will act as a hint for where to place the order, helps save gas
+		@param uint _maxSteps: the maximum iterations to find the correct insertion point
+			if _maxSteps is exceeded the tx will revert
+	*/
 	function limitSellZCB(
 		uint _amount,
 		uint _maturityConversionRate,
@@ -90,6 +111,15 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 		emit MakeLimitSellZCB(msg.sender, prevID, _amount, _maturityConversionRate);
 	}
 
+	/*
+		@Description: post a limit order to sell a specific amount of static YT at a specific MCR
+
+		@param uint _amount: the amount of YT to sell
+		@param uint _maturityConversionRate: the MCR at which to sell the YT
+		@param uint _hintID: the ID that will act as a hint for where to place the order, helps save gas
+		@param uint _maxSteps: the maximum iterations to find the correct insertion point
+			if _maxSteps is exceeded the tx will revert
+	*/
 	function limitSellYT(
 		uint _amount,
 		uint _maturityConversionRate,
@@ -119,6 +149,16 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 		emit MakeLimitSellYT(msg.sender, prevID, _amount, _maturityConversionRate);
 	}
 
+	/*
+		@Description: modify the amount in a ZCB limit sell order, msg.sender must be order maker
+
+		@param int _amount: the amount by which to change the order amount
+		@param uint _targetID: the ID of the order to edit
+		@praam uint _hintID: the ID that will act as a hint to find the order previous to the target order
+		@param uint _maxSteps: the maximum iterations to find the order previous to target order
+		@param bool _removeBelowMin: if true is passed the order will be entirely cancelled if the resulting change
+			in order amount results in the order amount being below the minimum amount
+	*/
 	function modifyZCBLimitSell(
 		int _amount,
 		uint _targetID,
@@ -149,6 +189,16 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 		emit ModifyOrder(_targetID, change);
 	}
 
+	/*
+		@Description: modify the amount in a YT limit sell order, msg.sender must be order maker
+
+		@param int _amount: the amount by which to change the order amount
+		@param uint _targetID: the ID of the order to edit
+		@praam uint _hintID: the ID that will act as a hint to find the order previous to the target order
+		@param uint _maxSteps: the maximum iterations to find the order previous to target order
+		@param bool _removeBelowMin: if true is passed the order will be entirely cancelled if the resulting change
+			in order amount results in the order amount being below the minimum amount
+	*/
 	function modifyYTLimitSell(
 		int _amount,
 		uint _targetID,
@@ -179,6 +229,16 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 		emit ModifyOrder(_targetID, change);
 	}
 
+	/*
+		@Description: buy a specific amount of YT off of the market
+
+		@param uint _amountYT: the amount of YT to buy
+		@param uint _maxMaturityConversionRate: the maximum MCR of the head order to continue purchasing more YT
+		@param uint _maxCumulativeMaturityConversionRate: if this is smaller than the effective MCR based on ZCB in and YT out at end of execution revert
+		@param uint16 _maxIterations: the maximum amount of limit orders to fully fill, important for gas considerations
+		@param bool _useInternalBalances: pass true to ue YieldDeposited and BondDeposited to cover costs and receive payment
+			otherwise use transferPositionFrom and transferPosition on the baseFCP to get required input and send required output
+	*/
 	function marketBuyYT(
 		uint _amountYT,
 		uint _maxMaturityConversionRate,
@@ -210,6 +270,16 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 
 	}
 
+	/*
+		@Description: sell a specific amount of YT on the market
+
+		@param uint _amountYT: the amount of YT to sell
+		@param uint _minMaturityConversionRate: the minimum MCR of the head order to continue selling more YT
+		@param uint _minCumulativeMaturityConversionRate: if this is greater than the effective MCR based on YT in and ZCB out at end of execution revert
+		@param uint16 _maxIterations: the maximum amount of limit orders to fully fill, important for gas considerations
+		@param bool _useInternalBalances: pass true to ue YieldDeposited and BondDeposited to cover costs and receive payment
+			otherwise use transferPositionFrom and transferPosition on the baseFCP to get required input and send required output
+	*/
 	function marketSellYT(
 		uint _amountYT,
 		uint _minMaturityConversionRate,
@@ -240,6 +310,16 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 		}
 	}
 
+	/*
+		@Description: buy a specific amount of ZCB off of the market
+
+		@param uint _amountZCB: the amount of ZCB to buy
+		@param uint _minMaturityConversionRate: the minimum MCR of the head order to continue purchasing more ZCB
+		@param uint _minCumulativeMaturityConversionRate: if this is greater than the effective MCR based on YT in and ZCB out at end of execution revert
+		@param uint16 _maxIterations: the maximum amount of limit orders to fully fill, important for gas considerations
+		@param bool _useInternalBalances: pass true to ue YieldDeposited and BondDeposited to cover costs and receive payment
+			otherwise use transferPositionFrom and transferPosition on the baseFCP to get required input and send required output
+	*/
 	function marketBuyZCB(
 		uint _amountZCB,
 		uint _minMaturityConversionRate,
@@ -270,6 +350,16 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 		}
 	}
 
+	/*
+		@Description: sell a specific amount of ZCB on the market
+
+		@param uint _amountZCB: the amount of ZCB to sell
+		@param uint _maxMaturityConversionRate: the maximum MCR of the head order to continue selling more ZCB
+		@param uint _maxCumulativeMaturityConversionRate: if this is smaller than the effective MCR based on ZCB in and YT out at end of execution revert
+		@param uint16 _maxIterations: the maximum amount of limit orders to fully fill, important for gas considerations
+		@param bool _useInternalBalances: pass true to ue YieldDeposited and BondDeposited to cover costs and receive payment
+			otherwise use transferPositionFrom and transferPosition on the baseFCP to get required input and send required output
+	*/
 	function marketSellZCB(
 		uint _amountZCB,
 		uint _maxMaturityConversionRate,
@@ -300,6 +390,16 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 		}
 	}
 
+	/*
+		@Description: sell a specific amount of ZCB on the market in order to recive U (an equal amount of ZCB & YT)
+
+		@param uint _amountZCB: the amount of ZCB to sell
+		@param uint _maxMaturityConversionRate: the maximum MCR of the head order to continue selling more ZCB
+		@param uint _maxCumulativeMaturityConversionRate: if this is smaller than the effective MCR based on ZCB in and YT out at end of execution revert
+		@param uint16 _maxIterations: the maximum amount of limit orders to fully fill, important for gas considerations
+		@param bool _useInternalBalances: pass true to ue YieldDeposited and BondDeposited to cover costs and receive payment
+			otherwise use transferPositionFrom and transferPosition on the baseFCP to get required input and send required output
+	*/
 	function marketSellZCBtoU(
 		uint _amountZCB,
 		uint _maxMaturityConversionRate,
@@ -330,6 +430,16 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 		}
 	}
 
+	/*
+		@Description: sell a specific amount of YT on the market in order to receive U (an equal amount of ZCB & YT)
+
+		@param uint _amountYT: the amount of YT to sell
+		@param uint _minMaturityConversionRate: the minimum MCR of the head order to continue selling more YT
+		@param uint _minCumulativeMaturityConversionRate: if this is greater than the effective MCR based on YT in and ZCB out at end of execution revert
+		@param uint16 _maxIterations: the maximum amount of limit orders to fully fill, important for gas considerations
+		@param bool _useInternalBalances: pass true to ue YieldDeposited and BondDeposited to cover costs and receive payment
+			otherwise use transferPositionFrom and transferPosition on the baseFCP to get required input and send required output
+	*/
 	function marketSellUnitYTtoU(
 		uint _unitAmountYT,
 		uint _minMaturityConversionRate,
@@ -360,6 +470,9 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 		}
 	}
 
+	/*
+		@Description: force claim sub account rewards where distribution account is the orderbook and sub acct is msg.sender
+	*/
 	function forceClaimSubAccountRewards() external override {
 		(bool success, ) = delegate3Address.delegatecall(abi.encodeWithSignature("forceClaimSubAccountRewards()"));
 		require(success);

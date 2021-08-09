@@ -15,6 +15,17 @@ contract NGBwrapperDelegate3 is NGBwrapperDelegateParent {
 	using SignedSafeMath for int256;
 	using ABDKMath64x64 for int128;
 
+    /*
+        @Description: force rewards for an FCP direct sub account to be claimed
+            only callable by FCP contracts
+
+        @param bool _inPayoutPhase: true if the FCP is in the payout phase
+        @param bool _claimRewards: true if the FCP should claim its rewards
+        @param address[2] _subAccts: the owners of the FCP direct sub accounts for which to claim rewards
+        @param uint[2] _yieldArr: [yield balance of subAcct0, yield balance of subAcct1]
+        @param uint[2] _wrappedClaims: the effective amount of the wrapper asset used to calculate the
+            distribution for the sub accounts
+    */
     function FCPDirectDoubleClaimSubAccountRewards(
         bool _inPayoutPhase,
         bool _claimRewards,
@@ -36,12 +47,19 @@ contract NGBwrapperDelegate3 is NGBwrapperDelegateParent {
     }
 
     /*
-        i format:
-            i & (1 << 15) > 0 == inPayoutPhase
-            i & (1 << 14) > 0 == subAcct0 get YT & ZCB rewards
-            i & (1 << 13) > 0 == subAcct0 is distribution account
-            i & (1 << 12) > 0 == subAcct1 get YT & ZCB rewards
-            i & (1 << 11) > 0 == subAcct1 is distribution account
+        @Description: distribute rewards to two FCP direct sub accounts of the same FCP
+
+        @param uint8 _len: the number of rewards assets to distribute rewards for
+        @param address _FCPaddr: the address of the FCP contract which controls the two FCP direct sub accounts
+        @param address[2] memory subAccts: contains the two addresses that are the owners of the sub accounts for which rewards are to be distributed
+        @param uint[2] memory _yieldArr: contains the two yield amounts of the sub accounts at their respective indecies
+        @param uint[2] memory _balanceAddrs: contains the effective amounts of wrapped asset in rewards claim for the subaccounts at their respective indecies
+        @param uint i: format:
+            i & (1 << 15) == inPayoutPhase
+            i & (1 << 14) == subAcct0 get YT & ZCB rewards
+            i & (1 << 13) == subAcct0 is distribution account
+            i & (1 << 12) == subAcct1 get YT & ZCB rewards
+            i & (1 << 11) == subAcct1 is distribution account
             uint8(i) == current index in rewards assets array
     */
     function doubleSubaccountDistributeRewards(

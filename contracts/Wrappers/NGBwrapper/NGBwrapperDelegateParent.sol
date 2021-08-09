@@ -10,6 +10,13 @@ contract NGBwrapperDelegateParent is NGBwrapperData {
 	using SafeMath for uint256;
 	using ABDKMath64x64 for int128;
 
+	/*
+		@Description: claim rewards for an address holding the wrapped asset of the wrapper contract
+	
+		@param bool _claim: if false don't do not do any computation return immediately
+			if true go ahead and actually claim rewards
+		@param address _addr: the address for which to claim rewards
+	*/
 	modifier claimRewards(bool _claim, address _addr) {
 		if (!_claim) {
 			_;
@@ -64,6 +71,12 @@ contract NGBwrapperDelegateParent is NGBwrapperData {
 		_;
 	}
 
+	/*
+		@Description: claim rewards for two addresses holding the wrapped asset of the wrapper contract
+	
+		@param address _addr0: the first address for which to claim rewards
+		@param address _addr1: the second address for which to claim rewards
+	*/
 	modifier doubleClaimRewards(address _addr0, address _addr1) {
 		uint len = internalRewardsAssets.length;
 		if (len == 0) {

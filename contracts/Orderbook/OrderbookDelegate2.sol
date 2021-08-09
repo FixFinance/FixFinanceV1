@@ -17,6 +17,18 @@ contract OrderbookDelegate2 is OrderbookDelegateParent {
 	as a result the functions below will be tough to read, we have to do some assembly magic & such but do not be intimidated
 */
 
+	/*
+		@Description: write 4 words consecutively to memory starting at the free memory pointer
+			write to memory with the intent of later returning this 4 words memory slot
+
+		@param word0: the first word to write to memory
+		@param word1: the second word to write to memory
+		@param word2: the third word to write to memory
+		@param word3: the fourth word to write to memory
+
+		@return uint retPtr: return the pointer at which the first word was written
+			this is the free memory pointer at beginning of execution of this function
+	*/
 	function prepare4WordReturn(
 		uint word0,
 		uint word1,
@@ -53,7 +65,7 @@ contract OrderbookDelegate2 is OrderbookDelegateParent {
 			this function actually returns (uint YTbought, uint ZCBsold, uint newHeadID, uint newHeadAmount)
 			but solidity poorly allocates stack space for return variables so to prevent stack too deep we must
 			pretend that we aren't going to return anything then use assembly to avoid allocation
-			on the stack and write directly to memory then we return
+			on the stack and write directly to memory then return
 		*/
 		address[3] memory vitals;
 		vitals[0] = address(internalWrapper);
@@ -225,7 +237,7 @@ contract OrderbookDelegate2 is OrderbookDelegateParent {
 			this function actually returns (uint ZCBbought, uint YTsold, uint newHeadID, uint newHeadAmount)
 			but solidity poorly allocates stack space for return variables so to prevent stack too deep we must
 			pretend that we aren't going to return anything then use assembly to avoid allocation
-			on the stack and write directly to memory then we return
+			on the stack and write directly to memory then return
 		*/
 		uint16 _maxIterations = _maxIterationsInitial;
 		address[3] memory vitals;

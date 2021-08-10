@@ -301,6 +301,7 @@ contract OrderbookDelegate3 is OrderbookDelegateParent {
 				(_removeBelowMin && (prevAmt - uint(-_amount) <= _minimumAmount))
 			) {
 				//delete order
+				require(prevID != 0); //prevID must be found in order to delete order
 				internalZCBSells[prevID].nextID = internalZCBSells[currentID].nextID;
 				delete internalZCBSells[currentID];
 				return -int(prevAmt);
@@ -384,6 +385,7 @@ contract OrderbookDelegate3 is OrderbookDelegateParent {
 				(_removeBelowMin && (prevAmt - uint(-_amount) <= _minimumAmount))
 			) {
 				//delete order
+				require(prevID != 0); //prevID must be found in order to delete order
 				internalYTSells[prevID].nextID = internalYTSells[currentID].nextID;
 				delete internalYTSells[currentID];
 				return -int(prevAmt);
@@ -437,19 +439,22 @@ contract OrderbookDelegate3 is OrderbookDelegateParent {
 				(_removeBelowMin && (prevAmt - uint(-_amount) <= _minimumAmount))
 			) {
 				//delete order
+				require(prevID != 0); //prevID must be found in order to delete order
 				internalZCBSells[prevID].nextID = internalZCBSells[currentID].nextID;
 				delete internalZCBSells[currentID];
-				return -int(prevAmt);
+				return prevAmt.toInt().mul(-1);
 			}
 			else {
 				if (prevAmt <= _minimumAmount) {
 					return 0;
 				}
-				else if (prevAmt - uint(-_amount) <= _minimumAmount) {
+				//prevAmt - uint(-_amount) <= _minimumAmount
+				//prevAmt <= _minimumAmount + uint(-_amount)
+				else if (prevAmt <= _minimumAmount.add(_amount.mul(-1).toUint())) {
 					internalZCBSells[currentID].amount = _minimumAmount;
-					return int(_minimumAmount).sub(int(prevAmt));
+					return _minimumAmount.toInt().sub(prevAmt.toInt());
 				}
-				internalZCBSells[currentID].amount = prevAmt.sub(uint(-_amount));
+				internalZCBSells[currentID].amount = prevAmt.sub(_amount.mul(-1).toUint());
 				return _amount;
 			}
 		}
@@ -490,19 +495,20 @@ contract OrderbookDelegate3 is OrderbookDelegateParent {
 				(_removeBelowMin && (prevAmt - uint(-_amount) <= _minimumAmount))
 			) {
 				//delete order
+				require(prevID != 0); //prevID must be found in order to delete order
 				internalYTSells[prevID].nextID = internalYTSells[currentID].nextID;
 				delete internalYTSells[currentID];
-				return -int(prevAmt);
+				return prevAmt.toInt().mul(-1);
 			}
 			else {
 				if (prevAmt <= _minimumAmount) {
 					return 0;
 				}
-				else if (prevAmt - uint(-_amount) <= _minimumAmount) {
+				else if (prevAmt <= _minimumAmount.add(_amount.mul(-1).toUint())) {
 					internalYTSells[currentID].amount = _minimumAmount;
-					return int(_minimumAmount).sub(int(prevAmt));
+					return _minimumAmount.toInt().sub(prevAmt.toInt());
 				}
-				internalYTSells[currentID].amount = prevAmt.sub(uint(-_amount));
+				internalYTSells[currentID].amount = prevAmt.sub((-_amount).toUint());
 				return _amount;
 			}
 		}

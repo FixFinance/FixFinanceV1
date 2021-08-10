@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: MIT
 //https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/math/SignedSafeMath.sol
 // SPDX-License-Identifier: MIT
 

@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: MIT
 // SPDX-License-Identifier: BSD-4-Clause
 /*
  * ABDK Math 64.64 Smart Contract Library.  Copyright © 2019 by ABDK Consulting.

@@ -583,6 +583,7 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 		int bond
 	) {
 		if (_distributionAccount == _FCPaddr) {
+			require(address(IFixCapitalPool(_FCPaddr).wrapper()) == address(this));
 			yield = IFixCapitalPool(_FCPaddr).balanceYield(_subAccount);
 			bond = IFixCapitalPool(_FCPaddr).balanceBonds(_subAccount);
 		}
@@ -603,7 +604,7 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 			the pool. You can think of it as if totalSBPS - _SBPSRetained is the annual
 			asset management fee for a wrapper
     */
-    function setInterestFee(uint32 _SBPSRetained) external onlyOwner {
+    function setInterestFee(uint32 _SBPSRetained) external onlyOwner override {
     	require(_SBPSRetained > 0 && _SBPSRetained <= totalSBPS);
     	SBPSRetained = _SBPSRetained;
     }
@@ -613,7 +614,7 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 
 		@param uint _flashLoanFee: the new fee percentage denominated in superbips which is to be applied to flashloans
     */
-    function setFlashLoanFee(uint _flashLoanFee) external onlyOwner {
+    function setFlashLoanFee(uint _flashLoanFee) external onlyOwner override {
     	internalFlashLoanFee = _flashLoanFee;
     }
 
@@ -623,7 +624,7 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 		@param address _rewardsAsset: the new asset for which to start distribution of LM rewards
 		@param uint8 _index: the index within the rewardsAddr array where the new rewards asset will be
     */
-    function addRewardAsset(address _rewardsAsset) external onlyOwner {
+    function addRewardAsset(address _rewardsAsset) external onlyOwner override {
     	uint len = internalRewardsAssets.length;
     	for (uint8 i = 0; i < len; i++) {
 			require(internalImmutableRewardsAssets[i] != _rewardsAsset);
@@ -648,7 +649,7 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 
 		@param uint _index: the index within the rewards asset array of the asset to deactivate
     */
-    function deactivateRewardAsset(uint _index) external onlyOwner {
+    function deactivateRewardAsset(uint _index) external onlyOwner override {
     	uint len = internalRewardsAssets.length;
     	require(_index < len);
     	internalRewardsAssets[_index] = address(0);
@@ -661,7 +662,7 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 
 		@param uint _index: the index within the immutable rewards asset array of the asset to reactivate
     */
-    function reactivateRewardAsset(uint _index) external onlyOwner {
+    function reactivateRewardAsset(uint _index) external onlyOwner override {
     	uint len = internalRewardsAssets.length;
     	require(_index < len);
     	internalRewardsAssets[_index] = internalImmutableRewardsAssets[_index];
@@ -673,7 +674,7 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 
 		@param address _assetAddr: the address of the reward asset to harvest
     */
-    function harvestNonListedRewardAsset(address _assetAddr) external onlyOwner {
+    function harvestNonListedRewardAsset(address _assetAddr) external onlyOwner override {
     	uint len = internalRewardsAssets.length;
     	for (uint8 i = 0; i < len; i++) {
 			require(internalImmutableRewardsAssets[i] != _assetAddr);

@@ -49,7 +49,7 @@ contract NGBwrapperData is nonReentrant, Ownable {
 	mapping(address => uint)[] internalDistributionAccountRewards;
 	mapping(address => bool) internalIsDistributionAccount;
 
-	//FCP direct subaccounts don't belong here
+	//FCP direct subaccounts don't have entries in the internalSubAccountPositions mapping, those values are fetched from the FCP
 	//Distribution Account => Sub Account => FCP => total bond & yield amts
 	mapping(address => mapping(address => mapping(address => SubAccountPosition))) internalSubAccountPositions;
 	mapping(address => mapping(address => mapping(address => bool))) internalHasClaimedAllYTrewards;

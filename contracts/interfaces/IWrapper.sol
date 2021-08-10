@@ -53,4 +53,12 @@ interface IWrapper is IERC20, IERC3156FlashLender {
 		uint yield,
 		int bond
 	);
+
+	//-------o-n-l-y-O-w-n-e-r------------
+    function setInterestFee(uint32 _SBPSRetained) external;
+    function setFlashLoanFee(uint _flashLoanFee) external;
+    function addRewardAsset(address _rewardsAsset) external;
+    function deactivateRewardAsset(uint _index) external;
+    function reactivateRewardAsset(uint _index) external;
+    function harvestNonListedRewardAsset(address _assetAddr) external;
 }

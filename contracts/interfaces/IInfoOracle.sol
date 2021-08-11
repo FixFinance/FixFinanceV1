@@ -13,7 +13,7 @@ interface IInfoOracle {
 	function YTammFeeConstants(address _FCPaddress) external view returns(uint);
 	function treasuryFee(uint larger, uint smaller) external view returns (uint toTreasury, address _sendTo);
 	function WrapperOrderbookFeeBips(address _wrapperAddr) external view returns(uint8);
-	function FCPOrderbookFeeBips(address _wrapperAddr) external view returns(uint8);
+	function FCPOrderbookFeeBips(address _fixCapitalPoolAddress) external view returns(uint8);
 	function getOrderbookFeeBips(address _fixCapitalPoolAddress) external view returns(uint8);
 	function getZCBammFeeConstant(address _fixCapitalPoolAddress) external view returns (uint FeeConstant);
 	function getYTammFeeConstant(address _fixCapitalPoolAddress) external view returns (uint FeeConstant);

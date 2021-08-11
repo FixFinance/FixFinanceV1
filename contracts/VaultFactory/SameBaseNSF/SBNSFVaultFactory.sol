@@ -66,8 +66,8 @@ contract SBNSFVaultFactory is SBNSFVaultFactoryData, ISBNSFVaultFactory, nonReen
 		return _YTLiquidations.length;
 	}
 
-	function wrapperToUnderlyingAsset(address _wrapeprAddress) external view override returns (address) {
-		return _wrapperToUnderlyingAsset[_wrapeprAddress];
+	function wrapperToUnderlyingAsset(address _wrapperAddress) external view override returns (address) {
+		return _wrapperToUnderlyingAsset[_wrapperAddress];
 	}
 
 	function fixCapitalPoolToWrapper(address _fixCapitalPoolAddress) external view override returns (address) {
@@ -760,9 +760,9 @@ contract SBNSFVaultFactory is SBNSFVaultFactoryData, ISBNSFVaultFactory, nonReen
 
 		@param address _wrapperAddress: address of the wrapper asset to whitelist
 	*/
-	function whitelistWrapper(address _wrapeprAddress) external override onlyOwner {
-		IWrapper(_wrapeprAddress).registerAsDistributionAccount();
-		_wrapperToUnderlyingAsset[_wrapeprAddress] = IWrapper(_wrapeprAddress).underlyingAssetAddress();
+	function whitelistWrapper(address _wrapperAddress) external override onlyOwner {
+		IWrapper(_wrapperAddress).registerAsDistributionAccount();
+		_wrapperToUnderlyingAsset[_wrapperAddress] = IWrapper(_wrapperAddress).underlyingAssetAddress();
 	}
 
 	/*

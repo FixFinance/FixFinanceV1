@@ -83,11 +83,8 @@ interface IOrderbookExchange {
 	function maturity() external view returns(uint40);
 	function YieldRevenue() external view returns(uint);
 	function BondRevenue() external view returns(int);
+	function getMinimumOrderSize() external view returns(uint);
 
-
-	//------r-a-t-e---o-r-a-c-l-e------------
-	function forceRateDataUpdate() external;
-	function setOracleMCR(uint _MCR) external;
 	//------r-a-t-e---o-r-a-c-l-e---v-i-e-w-s------------
 	function impliedYieldToMaturity() external view returns (uint yieldToMaturity);
 	function getAPYFromOracle() external view returns (int128 APY);
@@ -99,8 +96,11 @@ interface IOrderbookExchange {
 		uint8 _toSet
 	);
 
+	//------r-a-t-e---o-r-a-c-l-e------------
+	function forceRateDataUpdate() external;
+	function setOracleMCR(uint _MCR) external;
+
 	//------a-d-m-i-n---------
 	function claimRevenue() external;
 	function setMinimumOrderSize(uint _minimumOrderSize) external;
-	function getMinimumOrderSize() external view returns(uint);
 }

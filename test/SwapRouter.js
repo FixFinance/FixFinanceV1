@@ -76,6 +76,7 @@ contract('SwapRouter', async function(accounts) {
 			fixCapitalPoolDeployerInstance.address,
 			ZCBammDeployerInstance.address,
 			YTammDeployerInstance.address,
+			nullAddress,
 			swapRouterDeployerInstance.address,
 			infoOracleInstance.address
 		);

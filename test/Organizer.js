@@ -9,6 +9,10 @@ const NGBwrapperDelegate1 = artifacts.require('NGBwrapperDelegate1');
 const NGBwrapperDelegate2 = artifacts.require('NGBwrapperDelegate2');
 const NGBwrapperDelegate3 = artifacts.require('NGBwrapperDelegate3');
 const NGBwrapperDeployer = artifacts.require('NGBwrapperDeployer');
+const OrderbookDelegate1 = artifacts.require("OrderbookDelegate1");
+const OrderbookDelegate2 = artifacts.require("OrderbookDelegate2");
+const OrderbookDelegate3 = artifacts.require("OrderbookDelegate3");
+const OrderbookDeployer = artifacts.require("OrderbookDeployer");
 const organizer = artifacts.require('Organizer');
 const IERC20 = artifacts.require("IERC20");
 const BigMath = artifacts.require("BigMath");
@@ -28,6 +32,7 @@ const helper = require("../helper/helper.js");
 
 const BN = web3.utils.BN;
 const nullAddress = "0x0000000000000000000000000000000000000000";
+const treasuryAddress = "0x0000000000000000000000000000000000000001";
 const _10To18BN = (new BN("10")).pow(new BN("18"));
 const LENGTH_RATE_SERIES = 31;
 
@@ -60,12 +65,23 @@ contract('Organizer', function(accounts) {
 			ngbwDelegate2Instance.address,
 			ngbwDelegate3Instance.address
 		);
+		orderbookDelegate1Instance = await OrderbookDelegate1.new();
+		orderbookDelegate2Instance = await OrderbookDelegate2.new();
+		orderbookDelegate3Instance = await OrderbookDelegate3.new();
+		orderbookDeployerInstance = await OrderbookDeployer.new(
+			treasuryAddress,
+			infoOracleInstance.address,
+			orderbookDelegate1Instance.address,
+			orderbookDelegate2Instance.address,
+			orderbookDelegate3Instance.address
+		);
 		organizerInstance = await organizer.new(
 			NGBwrapperDeployerInstance.address,
 			zcbYtDeployerInstance.address,
 			fixCapitalPoolDeployerInstance.address,
 			ZCBammDeployerInstance.address,
 			YTammDeployerInstance.address,
+			orderbookDeployerInstance.address,
 			swapRouterDeployerInstance.address,
 			infoOracleInstance.address
 		);

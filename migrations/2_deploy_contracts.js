@@ -1,6 +1,7 @@
 const NGBwrapper = artifacts.require('NGBwrapper');
 const FCPDelegate1 = artifacts.require('FCPDelegate1');
 const capitalHandler = artifacts.require('FixCapitalPool');
+const FixCapitalPoolDeployer = artifacts.require('FixCapitalPoolDeployer');
 const dummyAToken = artifacts.require('dummyAToken');
 const organizer = artifacts.require('Organizer');
 const NGBwrapperDelegate1 = artifacts.require('NGBwrapperDelegate1');
@@ -14,7 +15,10 @@ const NSFVaultFactoryDelegate3 = artifacts.require("NSFVaultFactoryDelegate3");
 const NSFVaultFactoryDelegate4 = artifacts.require("NSFVaultFactoryDelegate4");
 const NSFVaultFactoryDelegate5 = artifacts.require("NSFVaultFactoryDelegate5");
 const NSFVaultFactory = artifacts.require("NSFVaultFactory");
-const FixCapitalPoolDeployer = artifacts.require('FixCapitalPoolDeployer');
+const OrderbookDelegate1 = artifacts.require("OrderbookDelegate1");
+const OrderbookDelegate2 = artifacts.require("OrderbookDelegate2");
+const OrderbookDelegate3 = artifacts.require("OrderbookDelegate3");
+const OrderbookDeployer = artifacts.require("OrderbookDeployer");
 const ZCBammDeployer = artifacts.require('ZCBammDeployer');
 const YTammDelegate = artifacts.require('YTammDelegate');
 const YTammDeployer = artifacts.require('YTammDeployer');
@@ -30,7 +34,6 @@ const kovanAEthAddress = "0xD483B49F2d55D2c53D32bE6efF735cB001880F79";
 
 const nullAddress = "0x0000000000000000000000000000000000000000";
 
-
 const start2021 = "1609459200";
 const start2022 = "1640995200";
 const start2026 = "1767225600";
@@ -41,6 +44,7 @@ const _10to18 = (new BN(10)).pow(new BN(18));
 
 module.exports = async function(deployer) {
 	accounts = await web3.eth.getAccounts();
+	const treasuryAddress = accounts[0];
 	dummyATokenInstance = await deployer.deploy(dummyAToken, "aETH");
 	dummyATokenInstance = await deployer.deploy(dummyAToken, "aUSDC");
 	zcbYtDeployerInstance = await deployer.deploy(zcbYtDeployer);
@@ -81,6 +85,17 @@ module.exports = async function(deployer) {
 	ZCBammDeployerInstance = await deployer.deploy(ZCBammDeployer);
 	YTammDelegateInstance = await deployer.deploy(YTammDelegate);
 	YTammDeployerInstance = await deployer.deploy(YTammDeployer, YTammDelegateInstance.address);
+	orderbookDelegate1Instance = await deployer.deploy(OrderbookDelegate1);
+	orderbookDelegate2Instance = await deployer.deploy(OrderbookDelegate2);
+	orderbookDelegate3Instance = await deployer.deploy(OrderbookDelegate3);
+	orderbookDeployerInstance = await deployer.deploy(
+		OrderbookDeployer,
+		treasuryAddress,
+		infoOracle.address,
+		orderbookDelegate1Instance.address,
+		orderbookDelegate2Instance.address,
+		orderbookDelegate3Instance.address
+	);
 	organizerInstance = await deployer.deploy(
 		organizer,
 		NGBwrapperDeployerInstance.address,
@@ -88,6 +103,7 @@ module.exports = async function(deployer) {
 		fcpDelployerInstance.address,
 		ZCBammDeployerInstance.address,
 		YTammDeployerInstance.address,
+		orderbookDeployerInstance.address,
 		swapRouterDeployerInstance.address,
 		infoOracle.address
 	);

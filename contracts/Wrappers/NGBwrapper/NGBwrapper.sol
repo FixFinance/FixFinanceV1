@@ -550,6 +550,10 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 		return internalTotalRewardsPerWasset[_index];
 	}
 
+	function totalRewardsPerWassetUponActivation(uint _index) external view override returns(uint) {
+		return internalTRPWuponActivation[_index];
+	}
+
 	function prevTotalRewardsPerWasset(uint _index, address _wassetHolder) external view override returns(uint) {
 		return internalPrevTotalRewardsPerWasset[_index][_wassetHolder];
 	}
@@ -633,6 +637,7 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
     	internalImmutableRewardsAssets.push(_rewardsAsset);
     	internalPrevContractBalance.push(0);
     	internalTotalRewardsPerWasset.push(0);
+    	internalTRPWuponActivation.push(0);
     	internalPrevTotalRewardsPerWasset.push();
     	internalDistributionAccountRewards.push();
     	internalSAPTRPW.push();
@@ -649,10 +654,12 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 
 		@param uint _index: the index within the rewards asset array of the asset to deactivate
     */
-    function deactivateRewardAsset(uint _index) external onlyOwner override {
-    	uint len = internalRewardsAssets.length;
-    	require(_index < len);
-    	internalRewardsAssets[_index] = address(0);
+    function deactivateRewardAsset(uint _index) external override {
+    	(bool success, ) = delegate3Address.delegatecall(abi.encodeWithSignature(
+    		"deactivateRewardAsset(uint256)",
+    		_index
+    	));
+    	require(success);
     }
 
     /*
@@ -666,6 +673,7 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
     	uint len = internalRewardsAssets.length;
     	require(_index < len);
     	internalRewardsAssets[_index] = internalImmutableRewardsAssets[_index];
+    	internalTRPWuponActivation[_index] = internalTotalRewardsPerWasset[_index];
     }
 
     /*

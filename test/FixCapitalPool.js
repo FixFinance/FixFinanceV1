@@ -341,6 +341,14 @@ contract('FixCapitalPool', async function(accounts){
 	});
 
 	it('FCP direct double claim, in payout phase from, transferPosition()', async () => {
+		let rewardsAmt = _10To18.div(new BN('35434'));
+		let newCBal = rewardsAmt.add(await rewardsAsset0.balanceOf(NGBwrapperInstance.address));
+		await rewardsAsset0.mintTo(NGBwrapperInstance.address, newCBal);
+		await NGBwrapperInstance.forceRewardsCollection({from: accounts[0]});
+
+		await NGBwrapperInstance.deactivateRewardAsset(0);
+		await NGBwrapperInstance.reactivateRewardAsset(0); //rewards generated before deactivation and reactivation should not accrue
+
 		await NGBwrapperInstance.forceClaimSubAccountRewards(true, fixCapitalPoolInstance.address, accounts[0], fixCapitalPoolInstance.address);
 		await NGBwrapperInstance.forceClaimSubAccountRewards(true, fixCapitalPoolInstance.address, accounts[1], fixCapitalPoolInstance.address, {from: accounts[1]});
 		let prevRewardsBal0 = await rewardsAsset0.balanceOf(accounts[0]);
@@ -353,8 +361,8 @@ contract('FixCapitalPool', async function(accounts){
 		let wrappedClaim1 = prevBond1.mul(_10To18).div(maturityConversionRate).add(prevYield1);
 		let tsWrapper = await NGBwrapperInstance.totalSupply();
 
-		let rewardsAmt = _10To18.div(new BN('98723'));
-		let newCBal = rewardsAmt.add(await rewardsAsset0.balanceOf(NGBwrapperInstance.address));
+		rewardsAmt = _10To18.div(new BN('98723'));
+		newCBal = rewardsAmt.add(await rewardsAsset0.balanceOf(NGBwrapperInstance.address));
 		await rewardsAsset0.mintTo(NGBwrapperInstance.address, newCBal);
 
 		let expectedRewardsChange0 = rewardsAmt.mul(wrappedClaim0).div(tsWrapper);

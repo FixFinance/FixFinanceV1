@@ -194,13 +194,17 @@ contract NGBwrapperDelegate2 is NGBwrapperDelegateParent {
             uint newTRPC = internalTotalRewardsPerWasset[uint8(i)];
             uint dividend;
             uint prevTotalRewardsPerClaim = internalSAPTRPW[uint8(i)][_distributionAcct][_subAcct][_FCPaddr];
+            uint activationTRPW = internalTRPWuponActivation[uint8(i)];
+            prevTotalRewardsPerClaim = prevTotalRewardsPerClaim > activationTRPW ? prevTotalRewardsPerClaim : activationTRPW;
             if (i & (1 << 14) > 0) {
                 //collect all YT associated rewards
                 uint TRPY = IFixCapitalPool(_FCPaddr).TotalRewardsPerWassetAtMaturity(uint8(i));
-                if (prevTotalRewardsPerClaim < TRPY) {
-                    dividend = (TRPY - prevTotalRewardsPerClaim).mul(_yield) / (1 ether);
+                if (activationTRPW < TRPY) {
+                    if (prevTotalRewardsPerClaim < TRPY) {
+                        dividend = (TRPY - prevTotalRewardsPerClaim).mul(_yield) / (1 ether);
+                    }
+                    prevTotalRewardsPerClaim = TRPY;
                 }
-                prevTotalRewardsPerClaim = TRPY;
             }
 
             if (prevTotalRewardsPerClaim < newTRPC) {

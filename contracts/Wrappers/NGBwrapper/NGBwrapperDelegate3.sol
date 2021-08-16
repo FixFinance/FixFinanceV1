@@ -79,7 +79,9 @@ contract NGBwrapperDelegate3 is NGBwrapperDelegateParent {
             uint TRPY = (i & ((1 << 14) | (1 << 12))) > 0 ? IFixCapitalPool(_FCPaddr).TotalRewardsPerWassetAtMaturity(uint8(i)) : 0;
             uint dividend;
             uint prevTotalRewardsPerClaim = internalSAPTRPW[uint8(i)][_FCPaddr][_subAccts[0]][_FCPaddr];
-            if (i & (1 << 14) > 0) {
+            uint activationTRPW = internalTRPWuponActivation[uint8(i)];
+            prevTotalRewardsPerClaim = prevTotalRewardsPerClaim > activationTRPW ? prevTotalRewardsPerClaim : activationTRPW;
+            if (i & (1 << 14) > 0 && activationTRPW < TRPY) {
                 //collect all YT associated rewards
                 if (prevTotalRewardsPerClaim < TRPY) {
                     dividend = (TRPY - prevTotalRewardsPerClaim).mul(_yieldArr[0]) / (1 ether);
@@ -110,7 +112,8 @@ contract NGBwrapperDelegate3 is NGBwrapperDelegateParent {
 
             dividend = 0;
             prevTotalRewardsPerClaim = internalSAPTRPW[uint8(i)][_FCPaddr][_subAccts[1]][_FCPaddr];
-            if (i & (1 << 12) > 0) {
+            prevTotalRewardsPerClaim = prevTotalRewardsPerClaim > activationTRPW ? prevTotalRewardsPerClaim : activationTRPW;
+            if (i & (1 << 12) > 0 && activationTRPW < TRPY) {
                 //collect all YT associated rewards
                 if (prevTotalRewardsPerClaim < TRPY) {
                     dividend = (TRPY - prevTotalRewardsPerClaim).mul(_yieldArr[1]) / (1 ether);
@@ -165,5 +168,26 @@ contract NGBwrapperDelegate3 is NGBwrapperDelegateParent {
     	internalBalanceOf[_to] += _value;
 
         internalAllowance[_from][msg.sender] -= _value;
+    }
+
+    /*
+        @Description: deactivate a rewards asset
+            any amount of this asset recived by this contract will sit dormant until activated
+
+        @param uint _index: the index within the rewards asset array of the asset to deactivate
+    */
+    function deactivateRewardAsset(uint _index) external onlyOwner {
+        uint len = internalRewardsAssets.length;
+        require(_index < len);
+        internalRewardsAssets[_index] = address(0);
+        IERC20 rewardAsset = IERC20(internalImmutableRewardsAssets[_index]);
+        uint contractBalance = rewardAsset.balanceOf(address(this));
+        address sendTo = IInfoOracle(internalInfoOracleAddress).sendTo();
+        uint toOwner = contractBalance >> 1;
+        bool success = rewardAsset.transfer(msg.sender, toOwner);
+        require(success);
+        success = rewardAsset.transfer(sendTo, contractBalance - toOwner);
+        require(success);
+        internalPrevContractBalance[_index] = 0;
     }
 }

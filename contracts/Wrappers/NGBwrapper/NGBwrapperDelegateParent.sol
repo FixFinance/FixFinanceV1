@@ -44,13 +44,12 @@ contract NGBwrapperDelegateParent is NGBwrapperData {
 			uint CBRA = IERC20(_rewardsAddr).balanceOf(address(this)); //contract balance rewards asset
 			{
 				uint prevCBRA = internalPrevContractBalance[uint8(i)];
-				if (prevCBRA > CBRA) { //odd case, should never happen
-					continue;
-				}
-				uint newRewardsPerWasset = (CBRA - prevCBRA).mul(1 ether).div(_totalSupply);
+				uint newRewardsPerWasset = CBRA.sub(prevCBRA).mul(1 ether).div(_totalSupply);
 				newTRPW = internalTotalRewardsPerWasset[uint8(i)].add(newRewardsPerWasset);
 			}
 			uint prevTRPW = internalPrevTotalRewardsPerWasset[uint8(i)][_addr];
+			uint activationTRPW = internalTRPWuponActivation[uint8(i)];
+			prevTRPW = prevTRPW > activationTRPW ? prevTRPW : activationTRPW;
 			if (prevTRPW < newTRPW) {
 				uint dividend = (newTRPW - prevTRPW).mul(balanceAddr) / (1 ether);
 				internalPrevTotalRewardsPerWasset[uint8(i)][_addr] = newTRPW;
@@ -108,13 +107,12 @@ contract NGBwrapperDelegateParent is NGBwrapperData {
 			uint CBRA = IERC20(_rewardsAddr).balanceOf(address(this)); //contract balance rewards asset
 			{
 				uint prevCBRA = internalPrevContractBalance[uint8(i)];
-				if (prevCBRA > CBRA) { //odd case, should never happen
-					continue;
-				}
-				uint newRewardsPerWasset = (CBRA - prevCBRA).mul(1 ether).div(_totalSupply);
+				uint newRewardsPerWasset = CBRA.sub(prevCBRA).mul(1 ether).div(_totalSupply);
 				newTRPW = internalTotalRewardsPerWasset[uint8(i)].add(newRewardsPerWasset);
 			}
 			uint prevTRPW = internalPrevTotalRewardsPerWasset[uint8(i)][_addr0];
+			uint activationTRPW = internalTRPWuponActivation[uint8(i)];
+			prevTRPW = prevTRPW > activationTRPW ? prevTRPW : activationTRPW;
 			bool getContractBalanceAgain = false;
 			if (prevTRPW < newTRPW) {
 				uint dividend = (newTRPW - prevTRPW).mul(balanceAddr0) / (1 ether);
@@ -131,6 +129,7 @@ contract NGBwrapperDelegateParent is NGBwrapperData {
 				}
 			}
 			prevTRPW = internalPrevTotalRewardsPerWasset[uint8(i)][_addr1];
+			prevTRPW = prevTRPW > activationTRPW ? prevTRPW : activationTRPW;
 			if (prevTRPW < newTRPW) {
 				uint dividend = (newTRPW - prevTRPW).mul(balanceAddr1) / (1 ether);
 				getContractBalanceAgain = getContractBalanceAgain || dividend > 0;

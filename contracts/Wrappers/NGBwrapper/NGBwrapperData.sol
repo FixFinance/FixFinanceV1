@@ -38,6 +38,7 @@ contract NGBwrapperData is nonReentrant, Ownable {
 	address[] internalImmutableRewardsAssets;
 	uint[] internalPrevContractBalance;
 	uint[] internalTotalRewardsPerWasset;
+	uint[] internalTRPWuponActivation; //total rewards per wasset at the time of the most recent activation
 	mapping(address => uint)[] internalPrevTotalRewardsPerWasset;
 
 	//------s-u-b-a-c-c-o-u-n-t---r-e-w-a-r-d-s---m-e-c-h-a-n-i-s-m---------

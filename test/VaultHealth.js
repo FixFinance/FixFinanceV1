@@ -57,7 +57,7 @@ const SecondsPerYear = 31556926;
 const minUpperRateAdjustment = 0.01;
 const minLowerRateAdjustment = 0.005;
 
-const ErrorRange = Math.pow(10,-7);
+const ErrorRange = Math.pow(10,-6);
 
 function basisPointsToABDKString(bips) {
 	return (new BN(bips)).mul((new BN(2)).pow(new BN(64))).div(_10.pow(new BN(4))).toString();
@@ -76,6 +76,30 @@ function AmountError(actual, expected) {
 }
 
 const ABDK_1 = basisPointsToABDKString(TotalBasisPoints);
+
+async function setOracleMCR(orderbook, MCR) {
+	let headZCBID = await orderbook.headZCBSellID();
+	let headYTID = await orderbook.headYTSellID();
+	const modifyDownAmt = _10To18.neg();
+	const maxSteps = 10;
+	while (headZCBID.toString() !== "0") {
+		await orderbook.modifyZCBLimitSell(modifyDownAmt, headZCBID, "0", maxSteps, true);
+		headZCBID = await orderbook.headZCBSellID();
+	}
+	while (headYTID.toString() !== "0") {
+		await orderbook.modifyYTLimitSell(modifyDownAmt, headYTID, "0", maxSteps, true);
+		headYTID = await orderbook.headYTSellID();
+	}
+	const postLimitAmt = _10To18.div(new BN(10000));
+	await orderbook.limitSellZCB(postLimitAmt, MCR, "0", maxSteps);
+	await orderbook.limitSellYT(postLimitAmt, MCR, "0", maxSteps);
+	for (let i = 0; i < LENGTH_RATE_SERIES; i++) {
+		await orderbook.forceRateDataUpdate();
+		//advance 1 minuites
+		helper.advanceTime(61);
+	}
+	await orderbook.setOracleMCR(MCR);
+}
 
 contract('VaultHealth', async function(accounts) {
 	it('before each', async () => {
@@ -186,13 +210,13 @@ contract('VaultHealth', async function(accounts) {
 		ytAsset1 = await YieldToken.at(await fcp1.yieldTokenAddress());
 		ytAsset2 = await YieldToken.at(await fcp2.yieldTokenAddress());
 
-		await organizerInstance.deployZCBamm(fcp0.address);
-		await organizerInstance.deployZCBamm(fcp1.address);
-		await organizerInstance.deployZCBamm(fcp2.address);
+		await organizerInstance.deployOrderbook(fcp0.address);
+		await organizerInstance.deployOrderbook(fcp1.address);
+		await organizerInstance.deployOrderbook(fcp2.address);
 
-		amm0 = await ZCBamm.at(await organizerInstance.ZCBamms(fcp0.address));
-		amm1 = await ZCBamm.at(await organizerInstance.ZCBamms(fcp1.address));
-		amm2 = await ZCBamm.at(await organizerInstance.ZCBamms(fcp2.address));
+		orderbook0 = await OrderbookExchange.at(await organizerInstance.Orderbooks(fcp0.address));
+		orderbook1 = await OrderbookExchange.at(await organizerInstance.Orderbooks(fcp1.address));
+		orderbook2 = await OrderbookExchange.at(await organizerInstance.Orderbooks(fcp2.address));
 
 		//mint asset0 assets to account 0
 		await asset0.mintTo(accounts[0], _10To19.mul(_10));
@@ -202,8 +226,8 @@ contract('VaultHealth', async function(accounts) {
 		await fcp0.depositWrappedToken(accounts[0], _10To19);
 		await wAsset0.approve(vaultFactoryInstance.address, _10To19);
 		await zcbAsset0.approve(vaultFactoryInstance.address, _10To19);
-		await zcbAsset0.approve(amm0.address, _10To19);
-		await ytAsset0.approve(amm0.address, _10To19);
+		await zcbAsset0.approve(orderbook0.address, _10To19);
+		await ytAsset0.approve(orderbook0.address, _10To19);
 
 		//mint asset1 assets to account 0
 		await asset1.mintTo(accounts[0], _10To19.mul(_10));
@@ -213,15 +237,15 @@ contract('VaultHealth', async function(accounts) {
 		await fcp1.depositWrappedToken(accounts[0], _10To19);
 		await wAsset1.approve(vaultFactoryInstance.address, _10To19);
 		await zcbAsset1.approve(vaultFactoryInstance.address, _10To19);
-		await zcbAsset1.approve(amm1.address, _10To19);
-		await ytAsset1.approve(amm1.address, _10To19);
+		await zcbAsset1.approve(orderbook1.address, _10To19);
+		await ytAsset1.approve(orderbook1.address, _10To19);
 
 		await wAsset1.approve(fcp2.address, _10To19);
 		await fcp2.depositWrappedToken(accounts[0], _10To19);
 		await wAsset1.approve(vaultFactoryInstance.address, _10To19);
 		await zcbAsset2.approve(vaultFactoryInstance.address, _10To19);
-		await zcbAsset2.approve(amm2.address, _10To19);
-		await ytAsset2.approve(amm2.address, _10To19);
+		await zcbAsset2.approve(orderbook2.address, _10To19);
+		await ytAsset2.approve(orderbook2.address, _10To19);
 
 		//mint assets to account 1
 		await asset0.mintTo(accounts[1], _10To19.mul(_10));
@@ -233,27 +257,34 @@ contract('VaultHealth', async function(accounts) {
 		await wAsset0.approve(vaultFactoryInstance.address, _10To19, {from: accounts[1]});
 
 		//add liquidity to amms
-		let toSend = _10To18.div(_10).div(_10);
-		await amm0.firstMint(toSend, toSend.div(_10));
-		await amm1.firstMint(toSend, toSend.div(_10));
-		await amm2.firstMint(toSend, toSend.div(_10).div(_10).div(new BN(2)));
+		let toSendYield = _10To18.div(_10).div(_10);
+		let toSendBond = toSendYield.div(_10);
+		await orderbook0.deposit(toSendYield, toSendBond);
+		await orderbook1.deposit(toSendYield, toSendBond);
+		await orderbook2.deposit(toSendYield, toSendBond);
+
+		MCR0 = _10To18.mul(new BN(21)).div(_10);
+		MCR1 = _10To18.mul(new BN(22)).div(_10);
+		MCR2 = _10To18.mul(new BN(11)).div(_10);
+
+		let limitAmt = _10To18.div(new BN(1000));
+		await orderbook0.limitSellZCB(limitAmt, MCR0, 0, 10);
+		await orderbook0.limitSellYT(limitAmt, MCR0, 0, 10);
+		await orderbook1.limitSellZCB(limitAmt, MCR1, 0, 10);
+		await orderbook1.limitSellYT(limitAmt, MCR1, 0, 10);
+		await orderbook2.limitSellZCB(limitAmt, MCR2, 0, 10);
+		await orderbook2.limitSellYT(limitAmt, MCR2, 0, 10);
 
 		for (let i = 0; i < LENGTH_RATE_SERIES; i++) {
-			await amm0.forceRateDataUpdate();
-			await amm1.forceRateDataUpdate();
-			await amm2.forceRateDataUpdate();
-			//advance 2 minuites
-			helper.advanceTime(121);
+			await orderbook0.forceRateDataUpdate();
+			await orderbook1.forceRateDataUpdate();
+			await orderbook2.forceRateDataUpdate();
+			//advance 1 minuites
+			helper.advanceTime(61);
 		}
-
-		let OracleRate0String = (await amm0.getImpliedRateData())._impliedRates[0].toString();
-		await amm0.setOracleRate(OracleRate0String);
-
-		let OracleRate1String = (await amm1.getImpliedRateData())._impliedRates[0].toString();
-		await amm1.setOracleRate(OracleRate1String);
-
-		let OracleRate2String = (await amm2.getImpliedRateData())._impliedRates[0].toString();
-		await amm2.setOracleRate(OracleRate2String);
+		await orderbook0.setOracleMCR(MCR0);
+		await orderbook1.setOracleMCR(MCR1);
+		await orderbook2.setOracleMCR(MCR2);
 	});
 
 	//price inflated by _10Ti18
@@ -319,10 +350,12 @@ contract('VaultHealth', async function(accounts) {
 			asset0 is borrowed
 			asset1 is supplied
 		*/
-		apy0BN = await amm0.getAPYFromOracle();
-		apy1BN = await amm1.getAPYFromOracle();
+		apy0BN = await orderbook0.getAPYFromOracle();
+		apy1BN = await orderbook1.getAPYFromOracle();
+		apy2BN = await orderbook2.getAPYFromOracle();
 		APY0 = (parseInt(apy0BN.toString()) * 2**-64);
 		APY1 = (parseInt(apy1BN.toString()) * 2**-64);
+		APY2 = (parseInt(apy2BN.toString()) * 2**-64);
 
 		let adjAPY0 = (APY0-1)/upperThreshold0 + 1;
 		let adjAPY1 = (APY1-1)*upperThreshold1 + 1;
@@ -337,6 +370,7 @@ contract('VaultHealth', async function(accounts) {
 		adjAPY1 = Math.max(adjAPY1, 1);
 
 		let yearsRemaining = (maturity - (await web3.eth.getBlock('latest')).timestamp)/ SecondsPerYear;
+		let yearsRemaining2 = (shortMaturity - (await web3.eth.getBlock('latest')).timestamp)/ SecondsPerYear;
 
 		let rateMultiplier0 = adjAPY0**(-yearsRemaining);
 		let rateMultiplier1 = adjAPY1**(-yearsRemaining);
@@ -385,8 +419,8 @@ contract('VaultHealth', async function(accounts) {
 
 	it('amountSuppliedAtLowerLimit: zcb deposited', async () => {
 		await setPrice(_10To18.mul(new BN(3)));
-		apy0BN = await amm0.getAPYFromOracle();
-		apy1BN = await amm1.getAPYFromOracle();
+		apy0BN = await orderbook0.getAPYFromOracle();
+		apy1BN = await orderbook1.getAPYFromOracle();
 		APY0 = (parseInt(apy0BN.toString()) * 2**-64);
 		APY1 = (parseInt(apy1BN.toString()) * 2**-64);
 
@@ -452,8 +486,8 @@ contract('VaultHealth', async function(accounts) {
 
 	it('amountBorrowedAtUpperLimit: zcb deposited', async () => {
 		await setPrice(_10To18.mul(new BN(3)));
-		apy0BN = await amm0.getAPYFromOracle();
-		apy1BN = await amm1.getAPYFromOracle();
+		apy0BN = await orderbook0.getAPYFromOracle();
+		apy1BN = await orderbook1.getAPYFromOracle();
 		APY0 = (parseInt(apy0BN.toString()) * 2**-64);
 		APY1 = (parseInt(apy1BN.toString()) * 2**-64);
 
@@ -520,8 +554,8 @@ contract('VaultHealth', async function(accounts) {
 
 	it('amountBorrowedAtLowerLimit: zcb deposited', async () => {
 		await setPrice(_10To18.mul(new BN(3)));
-		apy0BN = await amm0.getAPYFromOracle();
-		apy1BN = await amm1.getAPYFromOracle();
+		apy0BN = await orderbook0.getAPYFromOracle();
+		apy1BN = await orderbook1.getAPYFromOracle();
 		APY0 = (parseInt(apy0BN.toString()) * 2**-64);
 		APY1 = (parseInt(apy1BN.toString()) * 2**-64);
 
@@ -613,8 +647,8 @@ contract('VaultHealth', async function(accounts) {
 	});
 
 	it('amountSuppliedAtUpperLimit: zcb time spread, borrow later maturity', async () => {
-		apy1BN = await amm1.getAPYFromOracle();
-		apy2BN = await amm2.getAPYFromOracle();
+		apy1BN = await orderbook1.getAPYFromOracle();
+		apy2BN = await orderbook2.getAPYFromOracle();
 		APY1 = (parseInt(apy1BN.toString()) * 2**-64);
 		APY2 = (parseInt(apy2BN.toString()) * 2**-64);
 
@@ -655,8 +689,8 @@ contract('VaultHealth', async function(accounts) {
 	});
 
 	it('amountSuppliedAtUpperLimit: zcb time spread, borrow earlier maturity', async () => {
-		apy1BN = await amm1.getAPYFromOracle();
-		apy2BN = await amm2.getAPYFromOracle();
+		apy1BN = await orderbook1.getAPYFromOracle();
+		apy2BN = await orderbook2.getAPYFromOracle();
 		APY1 = (parseInt(apy1BN.toString()) * 2**-64);
 		APY2 = (parseInt(apy2BN.toString()) * 2**-64);
 
@@ -730,8 +764,8 @@ contract('VaultHealth', async function(accounts) {
 	});
 
 	it('YTvaultSatisfiesUpperLimit(): time spread, borrow later maturity', async () => {
-		apy1BN = await amm1.getAPYFromOracle();
-		apy2BN = await amm2.getAPYFromOracle();
+		apy1BN = await orderbook1.getAPYFromOracle();
+		apy2BN = await orderbook2.getAPYFromOracle();
 		APY1 = (parseInt(apy1BN.toString()) * 2**-64);
 		APY2 = (parseInt(apy2BN.toString()) * 2**-64);
 
@@ -781,8 +815,8 @@ contract('VaultHealth', async function(accounts) {
 	});
 
 	it('YTvaultSatisfiesUpperLimit(): time spread, borrow earlier maturity', async () => {
-		apy1BN = await amm1.getAPYFromOracle();
-		apy2BN = await amm2.getAPYFromOracle();
+		apy1BN = await orderbook1.getAPYFromOracle();
+		apy2BN = await orderbook2.getAPYFromOracle();
 		APY1 = (parseInt(apy1BN.toString()) * 2**-64);
 		APY2 = (parseInt(apy2BN.toString()) * 2**-64);
 
@@ -835,14 +869,18 @@ contract('VaultHealth', async function(accounts) {
 	it('amountSuppliedAtUpperLimit: matured zcb (not in payout phase) deposited', async () => {
 		await helper.advanceTime(_8days+1);
 		await asset1.setInflation(_10To18.mul(new BN(2)));
+		MCR2 = _10To18.mul(new BN(21)).div(_10)
+		await setOracleMCR(orderbook2, MCR2);
 		await wAsset1.forceHarvest();
 		await setPrice(_10To18.mul(new BN(3)));
 		/*
 			asset0 is borrowed
 			asset1 is supplied
 		*/
-		apy0BN = await amm0.getAPYFromOracle();
+		apy0BN = await orderbook0.getAPYFromOracle();
 		APY0 = (parseInt(apy0BN.toString()) * 2**-64);
+		apy1BN = await orderbook1.getAPYFromOracle();
+		APY1 = (parseInt(apy1BN.toString()) * 2**-64);
 
 		let adjAPY0 = (APY0-1)/upperThreshold0 + 1;
 
@@ -905,13 +943,15 @@ contract('VaultHealth', async function(accounts) {
 	it('amountSuppliedAtUpperLimit: matured zcb (in payout phase) deposited', async () => {
 		await fcp2.enterPayoutPhase();
 		await asset1.setInflation(_10To18.mul(new BN(4)));
+		MCR1 = _10To18.mul(new BN(45)).div(_10);
+		await setOracleMCR(orderbook1, MCR1);
 		await wAsset1.forceHarvest();
 		await setPrice(_10To18.mul(new BN(3)));
 		/*
 			asset0 is borrowed
 			asset1 is supplied
 		*/
-		apy0BN = await amm0.getAPYFromOracle();
+		apy0BN = await orderbook0.getAPYFromOracle();
 		APY0 = (parseInt(apy0BN.toString()) * 2**-64);
 
 		let adjAPY0 = (APY0-1)/upperThreshold0 + 1;
@@ -1040,6 +1080,9 @@ contract('VaultHealth', async function(accounts) {
 
 	it('YTvaultSatisfiesUpperLimit(): ZCB > YT', async () => {
 		await setPrice(_10To18.mul(new BN(3)));
+		apy1BN = await orderbook1.getAPYFromOracle();
+		APY1 = (parseInt(apy1BN.toString()) * 2**-64);
+
 		let adjAPY0 = (APY0-1)/upperThreshold0 + 1;
 
 		let temp0 = APY0-minUpperRateAdjustment;
@@ -1192,7 +1235,7 @@ contract('VaultHealth', async function(accounts) {
 
 	it('vaultWithstandsChange: aToken deposited', async () => {
 		await setPrice(_10To18.mul(new BN(3)));
-		apy0BN = await amm0.getAPYFromOracle();
+		apy0BN = await orderbook0.getAPYFromOracle();
 		APY0 = (parseInt(apy0BN.toString()) * 2**-64);
 
 		let adjAPY0 = (APY0-1)/upperThreshold0 + 1;
@@ -1257,8 +1300,8 @@ contract('VaultHealth', async function(accounts) {
 
 	it('vaultWithstandsChange: zcb deposited', async () => {
 		await setPrice(_10To18.mul(new BN(3)));
-		apy0BN = await amm0.getAPYFromOracle();
-		apy1BN = await amm1.getAPYFromOracle();
+		apy0BN = await orderbook0.getAPYFromOracle();
+		apy1BN = await orderbook1.getAPYFromOracle();
 		APY0 = (parseInt(apy0BN.toString()) * 2**-64);
 		APY1 = (parseInt(apy1BN.toString()) * 2**-64);
 

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.6.8 <0.7.0;
 import "../helpers/Ownable.sol";
-import "../interfaces/IZCBamm.sol";
+import "../interfaces/IOrderbookExchange.sol";
 import "../interfaces/IWrapper.sol";
 import "../interfaces/IOrganizer.sol";
 import "../interfaces/IVaultHealth.sol";
@@ -196,10 +196,11 @@ contract VaultHealth is IVaultHealth, Ownable {
 
 		@return int128: the market implied total yield of the FCP up to maturity, fetched from oracle
 	*/
-	function getYieldToMaturityFromOracle(address _fixCapitalPoolAddress, int128 _yearsRemaining) internal view returns (int128) {
-		//we call impliedYieldOverYears rather than impliedYieldToMaturity
-		//because this prevents using another Sload to find maturity again
-		return IZCBamm(IOrganizer(organizerAddress).ZCBamms(_fixCapitalPoolAddress)).impliedYieldOverYears(_yearsRemaining);
+	function getYieldToMaturityFromOracle(address _fixCapitalPoolAddress) internal view returns (int128) {
+		uint ytm = IOrderbookExchange(IOrganizer(organizerAddress).Orderbooks(_fixCapitalPoolAddress)).impliedYieldToMaturity();
+		uint converted = ytm.mul(1**64).div(1 ether);
+		require(converted <= uint(type(int128).max));
+		return int128(converted);
 	}
 
 	/*
@@ -210,7 +211,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 		@return int128: the APY in ABDK64.64 format
 	*/
 	function getAPYFromOracle(address _fixCapitalPoolAddress) internal view returns (int128) {
-		return IZCBamm(IOrganizer(organizerAddress).ZCBamms(_fixCapitalPoolAddress)).getAPYFromOracle();
+		return IOrderbookExchange(IOrganizer(organizerAddress).Orderbooks(_fixCapitalPoolAddress)).getAPYFromOracle();
 	}
 
 	/*
@@ -328,8 +329,8 @@ contract VaultHealth is IVaultHealth, Ownable {
 		@return int128 spreadTime: the magnitude in years of the time between the two maturities, ABDK format
 	*/
 	function impliedAPYBetweenMaturities(address _supplied, address _borrowed, int128 _ytmSupplied, int128 _ytmBorrowed) internal view returns (int128 spreadAPY, int128 spreadTime) {
-		int128 totalYieldSupplied = getYieldToMaturityFromOracle(_supplied, _ytmSupplied);
-		int128 totalYieldBorrowed = getYieldToMaturityFromOracle(_borrowed, _ytmBorrowed);
+		int128 totalYieldSupplied = getYieldToMaturityFromOracle(_supplied);
+		int128 totalYieldBorrowed = getYieldToMaturityFromOracle(_borrowed);
 		int128 yieldSpread;
 		if (_ytmSupplied > _ytmBorrowed) {
 			spreadTime = _ytmSupplied.sub(_ytmBorrowed);

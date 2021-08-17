@@ -35,6 +35,11 @@ const medianBN = arr => {
   return arr.length % 2 !== 0 ? nums[mid] : (nums[mid - 1] + nums[mid]) / 2;
 };
 
+const MIN_ORDER_SIZE_MODE = {
+	NONE: 0,
+	NOMINAL: 1,
+	NPV: 2
+};
 
 contract('OrderbookExchange', async function(accounts) {
 
@@ -72,7 +77,7 @@ contract('OrderbookExchange', async function(accounts) {
 			orderbookDelegate2Instance.address,
 			orderbookDelegate3Instance.address
 		);
-		await exchange.setMinimumOrderSize(_10To18.div(new BN(400000)));
+		await exchange.setMinimumOrderSize(MIN_ORDER_SIZE_MODE.NPV, _10To18.div(new BN(400000)));
 		FeeBips = 25;
 		await infoOracleInstance.setMinimumOrderbookFee(FeeBips);
 

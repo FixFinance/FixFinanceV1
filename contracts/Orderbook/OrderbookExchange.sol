@@ -589,18 +589,16 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 		@Description: set the minimum size of an order on the orderbook
 			size is determined by the amount of U that the collateral for the order
 			would be valued at using the MCR of that order
-	*/
-	function setMinimumOrderSize(uint _minimumOrderSize) external override {
-		require(msg.sender == Ownable(address(internalFCP)).owner());
-		minimumOrderSize = _minimumOrderSize;
-	}
 
-	/*
-		@Description: get the minimum NPV of a limit order
-			where NPV is in U and is determined using the MCR of the limit order
+		@param MIN_ORDER_SIZE_MODE mode: the mode for which minimum order sized will be calculated
+		@param uint _minimumOrderSize: if NPV, the minimum NPV in dynamic amounts
+			if NOMINAL, this is the actual nominal amount of the minimum order size
+			if NONE, this param doesn't matter
 	*/
-	function getMinimumOrderSize() external view override returns(uint) {
-		return minimumOrderSize;
+	function setMinimumOrderSize(MIN_ORDER_SIZE_MODE mode, uint _minimumOrderSize) external override {
+		require(msg.sender == Ownable(address(internalFCP)).owner());
+		minimumOrderSize = mode == MIN_ORDER_SIZE_MODE.NONE ? 0 : _minimumOrderSize;
+		sizingMode = mode;
 	}
 
 	//-----------------VIEWS-----------------
@@ -679,4 +677,20 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 		return internalBondRevenue;
 	}
 
+	/*
+		@Description: if min order sizing mode is NPV, get the minimum NPV of a limit order
+			where NPV is in U and is determined using the MCR of the limit order
+			if min order sizing mode is NOMINAL return the nominal amount of ZCB and dynamic YT for limit orders
+			if min order sizing mode is NONE, return 0
+	*/
+	function getMinimumOrderSize() external view override returns(uint) {
+		return minimumOrderSize;
+	}
+
+	/*
+		@Description: get the current mode by which minimum limit order sizes are calculated
+	*/
+	function getMinimumOrderSizeMode() external view override returns(MIN_ORDER_SIZE_MODE) {
+		return sizingMode;
+	}
 }

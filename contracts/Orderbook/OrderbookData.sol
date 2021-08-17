@@ -99,5 +99,11 @@ contract OrderbookData {
 	uint8 toSet;
 
 	//-----------admin---------------
+	enum MIN_ORDER_SIZE_MODE {
+		NONE,
+		NOMINAL,
+		NPV
+	}
+	MIN_ORDER_SIZE_MODE sizingMode;
 	uint minimumOrderSize;
 }

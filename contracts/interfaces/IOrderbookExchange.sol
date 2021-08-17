@@ -4,6 +4,7 @@ pragma solidity >=0.6.8 <0.7.0;
 import "../interfaces/IWrapper.sol";
 import "../interfaces/IFixCapitalPool.sol";
 import "../interfaces/IInfoOracle.sol";
+import "../Orderbook/OrderbookData.sol";
 
 interface IOrderbookExchange {
 
@@ -84,6 +85,7 @@ interface IOrderbookExchange {
 	function YieldRevenue() external view returns(uint);
 	function BondRevenue() external view returns(int);
 	function getMinimumOrderSize() external view returns(uint);
+	function getMinimumOrderSizeMode() external view returns(OrderbookData.MIN_ORDER_SIZE_MODE);
 
 	//------r-a-t-e---o-r-a-c-l-e---v-i-e-w-s------------
 	function impliedYieldToMaturity() external view returns (uint yieldToMaturity);
@@ -102,5 +104,5 @@ interface IOrderbookExchange {
 
 	//------a-d-m-i-n---------
 	function claimRevenue() external;
-	function setMinimumOrderSize(uint _minimumOrderSize) external;
+	function setMinimumOrderSize(OrderbookData.MIN_ORDER_SIZE_MODE mode, uint _minimumOrderSize) external;
 }

@@ -26,17 +26,26 @@ contract OrderbookDelegateParent is OrderbookData {
 		@return uint minimum: the minimum amount for the ZCB limit order
 	*/
 	function minimumZCBLimitAmount(uint _maturityConversionRate, uint _ratio) internal view returns(uint minimum) {
-		uint yieldToMaturity = _maturityConversionRate.mul(1 ether).div(_ratio);
-		require(yieldToMaturity > 1 ether);
-		/*
-			U * NPVu == Z * NPVzcb0
-			NPVu == 1
-			NPVzcb == 1/yieldToMaturity
-			U == Z * NPVzcb
-			Z == U / NPVzcb
-			Z == U * yieldToMaturity
-		*/
-		minimum = minimumOrderSize.mul(yieldToMaturity).div(1 ether);
+		MIN_ORDER_SIZE_MODE _sizingMode = sizingMode;
+		if (_sizingMode == MIN_ORDER_SIZE_MODE.NONE) {
+			return 0;
+		}
+		else if (_sizingMode == MIN_ORDER_SIZE_MODE.NOMINAL) {
+			return minimumOrderSize;
+		}
+		else {
+			uint yieldToMaturity = _maturityConversionRate.mul(1 ether).div(_ratio);
+			require(yieldToMaturity > 1 ether);
+			/*
+				U * NPVu == Z * NPVzcb0
+				NPVu == 1
+				NPVzcb == 1/yieldToMaturity
+				U == Z * NPVzcb
+				Z == U / NPVzcb
+				Z == U * yieldToMaturity
+			*/
+			minimum = minimumOrderSize.mul(yieldToMaturity).div(1 ether);
+		}
 	}
 
 	/*
@@ -48,18 +57,27 @@ contract OrderbookDelegateParent is OrderbookData {
 		@return uint minimum: the minimum amount for the YT limit order
 	*/
 	function minimumYTlimitAmount(uint _maturityConversionRate, uint _ratio) internal view returns(uint minimum) {
-		uint zcbDilutionToMatutity = _ratio.mul(1 ether).div(_maturityConversionRate);
-		require(zcbDilutionToMatutity < 1 ether);
-		/*
-			U * NPVu == YT * NPVyt
-			NPVu == 1
-			NPVyt == (1 - zcbDilutiontoMatutity) * ratio
-			U == YT * NPVyt
-			YT == U / NPVyt
-			YT == U / ((1 - zcbDilutiontoMatutity) * ratio)
-		*/
-		minimum = minimumOrderSize.mul(1 ether)
-			.div(uint(1 ether).sub(zcbDilutionToMatutity).mul(_ratio) / (1 ether));
+		MIN_ORDER_SIZE_MODE _sizingMode = sizingMode;
+		if (_sizingMode == MIN_ORDER_SIZE_MODE.NONE) {
+			return 0;
+		}
+		else if (_sizingMode == MIN_ORDER_SIZE_MODE.NOMINAL) {
+			return minimumOrderSize.mul(1 ether).div(_ratio);
+		}
+		else {
+			uint zcbDilutionToMatutity = _ratio.mul(1 ether).div(_maturityConversionRate);
+			require(zcbDilutionToMatutity < 1 ether);
+			/*
+				U * NPVu == YT * NPVyt
+				NPVu == 1
+				NPVyt == (1 - zcbDilutiontoMatutity) * ratio
+				U == YT * NPVyt
+				YT == U / NPVyt
+				YT == U / ((1 - zcbDilutiontoMatutity) * ratio)
+			*/
+			minimum = minimumOrderSize.mul(1 ether)
+				.div(uint(1 ether).sub(zcbDilutionToMatutity).mul(_ratio) / (1 ether));
+		}
 	}
 
 	/*

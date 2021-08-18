@@ -35,6 +35,20 @@ const medianBN = arr => {
   return arr.length % 2 !== 0 ? nums[mid] : (nums[mid - 1] + nums[mid]) / 2;
 };
 
+const ErrorRange = Math.pow(10,-7);
+
+function AmountError(actual, expected) {
+	actual = parseInt(actual);
+	expected = parseInt(expected);
+	if (actual === expected) {
+		return 0;
+	}
+	else if (actual === 0 || expected === 0) {
+		return 1.0;
+	}
+	return Math.abs(actual-expected)/expected;
+}
+
 const MIN_ORDER_SIZE_MODE = {
 	NONE: 0,
 	NOMINAL: 1,
@@ -173,7 +187,10 @@ contract('OrderbookExchange', async function(accounts) {
 		let prevMCRzcbHead = (await exchange.ZCBSells(prevZCBsellHeadID)).maturityConversionRate;
 		let prevMCRytHead = (await exchange.YTSells(prevYTsellHeadID)).maturityConversionRate;
 		let willSet = prevMCRzcbHead.toString() !== "0" && prevMCRytHead.toString() !== "0";
-		let newMCRdatapoint = prevMCRzcbHead.add(prevMCRytHead).div(new BN(2));
+		let ratio = parseFloat((await NGBwrapperInstance.WrappedAmtToUnitAmt_RoundDown(_10To18)).toString());
+		let ratioAdjZCBMCR = parseFloat(prevMCRzcbHead.toString()) / ratio;
+		let ratioAdjYTMCR = parseFloat(prevMCRytHead.toString()) / ratio;
+		let newMCRdatapoint = Math.sqrt(ratioAdjZCBMCR * ratioAdjYTMCR) * ratio;
 		let prevOrcData = await exchange.getOracleData();
 
 		let rec = await test_function();
@@ -182,7 +199,8 @@ contract('OrderbookExchange', async function(accounts) {
 		let orcData = await exchange.getOracleData();
 		if (willSet) {
 			assert.equal(orcData._toSet.toString(), prevOrcData._toSet.add(new BN(1)).mod(LENGTH_RATE_SERIES_BN).toString());
-			assert.equal(orcData._impliedMCRs[prevOrcData._toSet.toNumber()].toString(), newMCRdatapoint.toString());
+			let numberActualMCR = parseFloat(orcData._impliedMCRs[prevOrcData._toSet.toNumber()].toString());
+			assert.isBelow(AmountError(numberActualMCR, newMCRdatapoint), ErrorRange);
 			assert.equal(orcData._lastDatapointCollection.toString(), timestamp.toString());
 		}
 		else {
@@ -208,7 +226,10 @@ contract('OrderbookExchange', async function(accounts) {
 		let prevMCRzcbHead = (await exchange.ZCBSells(prevZCBsellHeadID)).maturityConversionRate;
 		let prevMCRytHead = (await exchange.YTSells(prevYTsellHeadID)).maturityConversionRate;
 		let willSet = prevMCRzcbHead.toString() !== "0" && prevMCRytHead.toString() !== "0";
-		let newMCRdatapoint = prevMCRzcbHead.add(prevMCRytHead).div(new BN(2));
+		let ratio = parseFloat((await NGBwrapperInstance.WrappedAmtToUnitAmt_RoundDown(_10To18)).toString());
+		let ratioAdjZCBMCR = parseFloat(prevMCRzcbHead.toString()) / ratio;
+		let ratioAdjYTMCR = parseFloat(prevMCRytHead.toString()) / ratio;
+		let newMCRdatapoint = Math.sqrt(ratioAdjZCBMCR * ratioAdjYTMCR) * ratio;
 		let prevOrcData = await exchange.getOracleData();
 		let prevYD = YD;
 		let prevBD = BD;
@@ -302,7 +323,8 @@ contract('OrderbookExchange', async function(accounts) {
 		let orcData = await exchange.getOracleData();
 		if (willSet) {
 			assert.equal(orcData._toSet.toString(), prevOrcData._toSet.add(new BN(1)).mod(LENGTH_RATE_SERIES_BN).toString());
-			assert.equal(orcData._impliedMCRs[prevOrcData._toSet.toNumber()].toString(), newMCRdatapoint.toString());
+			let numberActualMCR = parseFloat(orcData._impliedMCRs[prevOrcData._toSet.toNumber()].toString());
+			assert.isBelow(AmountError(numberActualMCR, newMCRdatapoint), ErrorRange);
 			assert.equal(orcData._lastDatapointCollection.toString(), timestamp.toString());
 		}
 		else {
@@ -326,7 +348,10 @@ contract('OrderbookExchange', async function(accounts) {
 		let prevMCRzcbHead = (await exchange.ZCBSells(prevZCBsellHeadID)).maturityConversionRate;
 		let prevMCRytHead = (await exchange.YTSells(prevYTsellHeadID)).maturityConversionRate;
 		let willSet = prevMCRzcbHead.toString() !== "0" && prevMCRytHead.toString() !== "0";
-		let newMCRdatapoint = prevMCRzcbHead.add(prevMCRytHead).div(new BN(2));
+		let ratioNum = parseFloat(ratio.toString());
+		let ratioAdjZCBMCR = parseFloat(prevMCRzcbHead.toString()) / ratioNum;
+		let ratioAdjYTMCR = parseFloat(prevMCRytHead.toString()) / ratioNum;
+		let newMCRdatapoint = Math.sqrt(ratioAdjZCBMCR * ratioAdjYTMCR) * ratioNum;
 		let prevOrcData = await exchange.getOracleData();
 		let prevOrder = isZCBLimitSell ? await exchange.ZCBSells(ID) : await exchange.YTSells(ID);
 		let prevHeadID = (isZCBLimitSell ? prevZCBsellHeadID : prevYTsellHeadID).toString();
@@ -434,7 +459,8 @@ contract('OrderbookExchange', async function(accounts) {
 		let timestamp = (await web3.eth.getBlock(rec.receipt.blockNumber)).timestamp;
 		if (willSet) {
 			assert.equal(orcData._toSet.toString(), prevOrcData._toSet.add(new BN(1)).mod(LENGTH_RATE_SERIES_BN).toString());
-			assert.equal(orcData._impliedMCRs[prevOrcData._toSet.toNumber()].toString(), newMCRdatapoint.toString());
+			let numberActualMCR = parseFloat(orcData._impliedMCRs[prevOrcData._toSet.toNumber()].toString());
+			assert.isBelow(AmountError(numberActualMCR, newMCRdatapoint), ErrorRange);
 			assert.equal(orcData._lastDatapointCollection.toString(), timestamp.toString());
 		}
 		else {

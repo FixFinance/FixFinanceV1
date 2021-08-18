@@ -449,8 +449,14 @@ contract OrderbookDelegateParent is OrderbookData {
 		uint ratio = internalWrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
 		ytMCR = ytMCR < ratio ? ratio : ytMCR;
 		zcbMCR = zcbMCR < ratio ? ratio : zcbMCR;
+		//convert to abdk64.64 format, scaled with ratio = 1.0 to find geometric mean
+		uint ytMCR_ABDK = ytMCR.mul(1 << 64).div(ratio);
+		uint zcbMCR_ABDK = zcbMCR.mul(1 << 64).div(ratio);
+		require(ytMCR_ABDK < uint(type(int128).max));
+		require(zcbMCR_ABDK < uint(type(int128).max));
+		uint impliedMCR = uint(int128(ytMCR_ABDK).mul(int128(zcbMCR_ABDK)).sqrt()).mul(ratio) >> 64;
+
 		//take average, not as good as geometric mean scaled with ratio as 1.0, though this is more computationally efficient
-		uint impliedMCR = ytMCR.add(zcbMCR) >> 1;
 		impliedMCRs[_index] = impliedMCR;
 		lastDatapointCollection = uint40(block.timestamp);
 		toSet = (_index+1) % LENGTH_RATE_SERIES;

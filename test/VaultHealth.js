@@ -57,7 +57,7 @@ const SecondsPerYear = 31556926;
 const minUpperRateAdjustment = 0.01;
 const minLowerRateAdjustment = 0.005;
 
-const ErrorRange = Math.pow(10,-6);
+const ErrorRange = 2 * Math.pow(10,-6);
 
 function basisPointsToABDKString(bips) {
 	return (new BN(bips)).mul((new BN(2)).pow(new BN(64))).div(_10.pow(new BN(4))).toString();
@@ -98,7 +98,9 @@ async function setOracleMCR(orderbook, MCR) {
 		//advance 1 minuites
 		helper.advanceTime(61);
 	}
-	await orderbook.setOracleMCR(MCR);
+	let actualMCR = (await orderbook.getOracleData())._impliedMCRs[3];
+	await orderbook.setOracleMCR(actualMCR);
+	return actualMCR;
 }
 
 contract('VaultHealth', async function(accounts) {
@@ -282,6 +284,12 @@ contract('VaultHealth', async function(accounts) {
 			//advance 1 minuites
 			helper.advanceTime(61);
 		}
+		let data0 = await orderbook0.getOracleData();
+		let data1 = await orderbook1.getOracleData();
+		let data2 = await orderbook2.getOracleData();
+		MCR0 = data0._impliedMCRs[3];
+		MCR1 = data1._impliedMCRs[3];
+		MCR2 = data2._impliedMCRs[3];
 		await orderbook0.setOracleMCR(MCR0);
 		await orderbook1.setOracleMCR(MCR1);
 		await orderbook2.setOracleMCR(MCR2);
@@ -870,7 +878,7 @@ contract('VaultHealth', async function(accounts) {
 		await helper.advanceTime(_8days+1);
 		await asset1.setInflation(_10To18.mul(new BN(2)));
 		MCR2 = _10To18.mul(new BN(21)).div(_10)
-		await setOracleMCR(orderbook2, MCR2);
+		MCR2 = await setOracleMCR(orderbook2, MCR2);
 		await wAsset1.forceHarvest();
 		await setPrice(_10To18.mul(new BN(3)));
 		/*
@@ -944,7 +952,7 @@ contract('VaultHealth', async function(accounts) {
 		await fcp2.enterPayoutPhase();
 		await asset1.setInflation(_10To18.mul(new BN(4)));
 		MCR1 = _10To18.mul(new BN(45)).div(_10);
-		await setOracleMCR(orderbook1, MCR1);
+		MCR1 = await setOracleMCR(orderbook1, MCR1);
 		await wAsset1.forceHarvest();
 		await setPrice(_10To18.mul(new BN(3)));
 		/*

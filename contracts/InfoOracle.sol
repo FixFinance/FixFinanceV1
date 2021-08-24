@@ -20,12 +20,12 @@ contract InfoOracle is IInfoOracle, Ownable {
 	// 1.0 in 64.64 format
 	int128 private constant ABDK_1 = 1<<64;
 
-	// the treasury should receive no more than 40% of total fee revenue
+	// the treasury should receive no more than 40% of total AMM fee revenue
 	uint16 private constant MaxBipsToTreasury = 4_000;
 
 	uint16 public override bipsToTreasury;
 
-	uint8 public override MinimumOrderbookFee;
+	uint8 public override MinimumOrderbookFee; //denominated in bips
 
 	address public override sendTo;
 

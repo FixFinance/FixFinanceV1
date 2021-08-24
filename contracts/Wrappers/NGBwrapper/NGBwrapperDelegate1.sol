@@ -30,10 +30,10 @@ contract NGBwrapperDelegate1 is NGBwrapperDelegateParent {
 		uint _prevRatio = internalPrevRatio;
 		//time in years
 		/*
-			nextBalance = contractBalance * ((totalBips-bipsToTreasury)/totalBips)**t
-			prevTotalSupply*contractBalance/internalTotalSupply = contractBalance * ((totalBips-bipsToTreasury)/totalBips)**t
-			prevTotalSupply/internalTotalSupply = ((totalBips-bipsToTreasury)/totalBips)**t
-			internalTotalSupply = prevTotalSupply*((totalBips-bipsToTreasury)/totalBips)**(-t)
+			nextBalance == contractBalance * ((totalBips-bipsToTreasury)/totalBips)**t
+			prevTotalSupply*contractBalance/internalTotalSupply == contractBalance * ((totalBips-bipsToTreasury)/totalBips)**t
+			prevTotalSupply/internalTotalSupply == ((totalBips-bipsToTreasury)/totalBips)**t
+			internalTotalSupply == prevTotalSupply*((totalBips-bipsToTreasury)/totalBips)**(-t)
 		*/
 		uint effectiveRatio = uint(1 ether).mul(contractBalance);
 		uint nonFeeAdjustedRatio = effectiveRatio.div(prevTotalSupply);

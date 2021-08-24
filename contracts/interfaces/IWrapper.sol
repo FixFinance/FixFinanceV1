@@ -4,6 +4,16 @@ import "./IERC20.sol";
 import "./IERC3156FlashLender.sol";
 
 interface IWrapper is IERC20, IERC3156FlashLender {
+	event Deposit(
+		address indexed to,
+		uint wrappedAmount
+	);
+
+	event Withdraw(
+		address indexed from,
+		uint wrappedAmount
+	);
+
 	function underlyingAssetAddress() external view returns(address);
 	function underlyingIsStatic() external view returns(bool);
 	function infoOracleAddress() external view returns(address);

@@ -68,6 +68,8 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 
 			_amountWrapped := mload(retPtr)
 		}
+
+		emit Deposit(_to, _amountWrapped);
 	}
 
 	/*
@@ -89,6 +91,8 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 
 			_amountUnit := mload(retPtr)
 		}
+
+		emit Deposit(_to, _amount);
 	}
 
 	/*
@@ -176,6 +180,8 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 
 			_amountWrappedToken := mload(retPtr)
 		}
+
+		emit Withdraw(msg.sender, _amountWrappedToken);
 	}
 
 	/*
@@ -199,6 +205,8 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 
 			_amountUnit := mload(retPtr)
 		}
+
+		emit Withdraw(_to, _amountWrappedToken);
 	}
 
 

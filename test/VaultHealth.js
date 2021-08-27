@@ -9,6 +9,7 @@ const NGBwrapperDelegate1 = artifacts.require('NGBwrapperDelegate1');
 const NGBwrapperDelegate2 = artifacts.require('NGBwrapperDelegate2');
 const NGBwrapperDelegate3 = artifacts.require('NGBwrapperDelegate3');
 const NGBwrapperDeployer = artifacts.require('NGBwrapperDeployer');
+const QuickDepositorDeployer = artifacts.require('QuickDepositorDeployer');
 const organizer = artifacts.require('Organizer');
 const NSFVaultFactoryDelegate1 = artifacts.require('NSFVaultFactoryDelegate1');
 const NSFVaultFactoryDelegate2 = artifacts.require('NSFVaultFactoryDelegate2');
@@ -160,6 +161,7 @@ contract('VaultHealth', async function(accounts) {
 			orderbookDelegate2Instance.address,
 			orderbookDelegate3Instance.address
 		);
+		quickDepositorDeployerInstance = await QuickDepositorDeployer.new();
 		organizerInstance = await organizer.new(
 			NGBwrapperDeployerInstance.address,
 			zcbYtDeployerInstance.address,
@@ -167,6 +169,7 @@ contract('VaultHealth', async function(accounts) {
 			ZCBammDeployerInstance.address,
 			YTammDeployerInstance.address,
 			orderbookDeployerInstance.address,
+			quickDepositorDeployerInstance.address,
 			nullAddress,
 			infoOracleInstance.address
 		);

@@ -45,6 +45,7 @@ const OrderbookDeployer = artifacts.require("OrderbookDeployer");
 const ZCBammDeployer = artifacts.require('ZCBammDeployer');
 const YTammDelegate = artifacts.require('YTammDelegate');
 const YTammDeployer = artifacts.require('YTammDeployer');
+const QuickDepositorDeployer = artifacts.require('QuickDepositorDeployer');
 const SwapRouterDelegate = artifacts.require('SwapRouterDelegate');
 const SwapRouterDeployer = artifacts.require('SwapRouterDeployer');
 const InfoOracle = artifacts.require("InfoOracle");
@@ -128,6 +129,7 @@ module.exports = async function(deployer) {
 	nsfvfInstance = await NSFVaultFactory.at(rec.logs[0].args.addr);
 	fcpDelegate1Instance = await deployer.deploy(FCPDelegate1);
 	fcpDelployerInstance = await deployer.deploy(FixCapitalPoolDeployer, fcpDelegate1Instance.address);
+	quickDepositorDeployerInstance = await deployer.deploy(QuickDepositorDeployer);
 	swapRouterDelegateInstance = await deployer.deploy(SwapRouterDelegate);
 	swapRouterDeployerInstance = await deployer.deploy(SwapRouterDeployer, swapRouterDelegateInstance.address);
 	ngbwDelegate1Instance = await deployer.deploy(NGBwrapperDelegate1);
@@ -166,6 +168,7 @@ module.exports = async function(deployer) {
 		ZCBammDeployerInstance.address,
 		YTammDeployerInstance.address,
 		orderbookDeployerInstance.address,
+		quickDepositorDeployerInstance.address,
 		swapRouterDeployerInstance.address,
 		infoOracle.address
 	);

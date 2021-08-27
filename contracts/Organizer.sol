@@ -5,6 +5,7 @@ import "./Wrappers/NGBwrapper/NGBwrapperDeployer.sol";
 import "./amm/ZCBamm/ZCBammDeployer.sol";
 import "./amm/YTamm/YTammDeployer.sol";
 import "./FixCapitalPool/FixCapitalPoolDeployer.sol";
+import "./QuickDepositor/QuickDepositorDeployer.sol";
 import "./SwapRouter/SwapRouterDeployer.sol";
 import "./SwapRouter/SwapRouter.sol";
 import "./Orderbook/OrderbookDeployer.sol";
@@ -40,6 +41,7 @@ contract Organizer is Ownable, IOrganizer {
 	address public override ZCBammDeployerAddress;
 	address public override YTammDeployerAddress;
 	address public override OrderbookDeployerAddress;
+	address public override QuickDepositorAddress;
 	address public override SwapRouterAddress;
 	address public override InfoOracleAddress;
 
@@ -55,6 +57,7 @@ contract Organizer is Ownable, IOrganizer {
 		address _ZCBammDeployerAddress,
 		address _YTammDeployerAddress,
 		address _OrderbookDeployerAddress,
+		address _QuickDepositorDeployerAddress,
 		address _SwapRouterDeployerAddress,
 		address _InfoOracleAddress
 	) public {
@@ -64,6 +67,7 @@ contract Organizer is Ownable, IOrganizer {
 		ZCBammDeployerAddress = _ZCBammDeployerAddress;
 		YTammDeployerAddress = _YTammDeployerAddress;
 		OrderbookDeployerAddress = _OrderbookDeployerAddress;
+		QuickDepositorAddress = QuickDepositorDeployer(_QuickDepositorDeployerAddress).deploy(address(this));
 		SwapRouterDeployerAddress = _SwapRouterDeployerAddress;
 		InfoOracleAddress = _InfoOracleAddress;
 	}

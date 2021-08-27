@@ -23,6 +23,7 @@ const YTamm = artifacts.require('YTamm');
 const ZCBammDeployer = artifacts.require('ZCBammDeployer');
 const YTammDelegate = artifacts.require('YTammDelegate');
 const YTammDeployer = artifacts.require('YTammDeployer');
+const QuickDepositorDeployer = artifacts.require('QuickDepositorDeployer');
 const SwapRouterDeployer = artifacts.require('SwapRouterDeployer');
 const SwapRouterDelegate = artifacts.require('SwapRouterDelegate');
 const SwapRouter = artifacts.require("SwapRouter");
@@ -75,6 +76,7 @@ contract('Organizer', function(accounts) {
 			orderbookDelegate2Instance.address,
 			orderbookDelegate3Instance.address
 		);
+		quickDepositorDeployerInstance = await QuickDepositorDeployer.new();
 		organizerInstance = await organizer.new(
 			NGBwrapperDeployerInstance.address,
 			zcbYtDeployerInstance.address,
@@ -82,10 +84,12 @@ contract('Organizer', function(accounts) {
 			ZCBammDeployerInstance.address,
 			YTammDeployerInstance.address,
 			orderbookDeployerInstance.address,
+			quickDepositorDeployerInstance.address,
 			swapRouterDeployerInstance.address,
 			infoOracleInstance.address
 		);
 		assert.equal(await organizerInstance.InfoOracleAddress(), infoOracleInstance.address);
+		assert.notEqual(await organizerInstance.QuickDepositorAddress(), nullAddress);
 		await organizerInstance.DeploySwapRouter();
 		router = await SwapRouter.at(await organizerInstance.SwapRouterAddress());
 

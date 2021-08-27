@@ -14,6 +14,7 @@ interface IOrganizer {
 	function ZCBammDeployerAddress() external view returns(address);
 	function YTammDeployerAddress() external view returns(address);
 	function OrderbookDeployerAddress() external view returns(address);
+	function QuickDepositorAddress() external view returns(address);
 	function SwapRouterAddress() external view returns(address);
 	function InfoOracleAddress() external view returns(address);
 

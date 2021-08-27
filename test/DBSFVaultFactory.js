@@ -14,6 +14,7 @@ const OrderbookDelegate2 = artifacts.require("OrderbookDelegate2");
 const OrderbookDelegate3 = artifacts.require("OrderbookDelegate3");
 const OrderbookDeployer = artifacts.require("OrderbookDeployer");
 const OrderbookExchange = artifacts.require("OrderbookExchange");
+const QuickDepositorDeployer = artifacts.require('QuickDepositorDeployer');
 const organizer = artifacts.require('Organizer');
 const DBSFVaultFactoryDelegate1 = artifacts.require("DBSFVaultFactoryDelegate1");
 const DBSFVaultFactoryDelegate2 = artifacts.require("DBSFVaultFactoryDelegate2");
@@ -112,6 +113,7 @@ contract('DBSFVaultFactory', async function(accounts) {
 			orderbookDelegate2Instance.address,
 			orderbookDelegate3Instance.address
 		);
+		quickDepositorDeployerInstance = await QuickDepositorDeployer.new();
 		organizerInstance = await organizer.new(
 			NGBwrapperDeployerInstance.address,
 			zcbYtDeployerInstance.address,
@@ -119,6 +121,7 @@ contract('DBSFVaultFactory', async function(accounts) {
 			ZCBammDeployerInstance.address,
 			YTammDeployerInstance.address,
 			orderbookDeployerInstance.address,
+			quickDepositorDeployerInstance.address,
 			nullAddress,
 			infoOracleInstance.address
 		);

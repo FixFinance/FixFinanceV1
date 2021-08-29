@@ -15,4 +15,5 @@ interface IYieldToken is IERC20 {
 
     //only callable by corresponding FixCapitalPool
     function decrementAllowance(address _owner, address _spender, uint _amount) external;
+    function setAllowance(address _owner, address _spender, uint _allowance) external;
 }

@@ -296,6 +296,20 @@ contract FixCapitalPool is IFixCapitalPool, FCPDelegateParent, Ownable, nonReent
 		require(success);
 	}
 
+	/*
+		@Description: approve both ZCB & YT with one function call
+
+		@param address _owner: the owner of the funds to set approval for
+		@param address _spender: the spender of the funds to set approval for
+		@param uint _allowanceZCB: the new allowance of ZCB
+		@param uint _allowanceYT: the new allowance of static YT
+	*/
+	function dualApprove(address _owner, address _spender, uint _allowanceZCB, uint _allowanceYT) external override {
+		IZeroCouponBond(internalZeroCouponBondAddress).setAllowance(_owner, _spender, _allowanceZCB);
+		IYieldToken(internalYieldTokenAddress).setAllowance(_owner, _spender, _allowanceYT);
+	}
+
+
 	//---------------------------Z-e-r-o---C-o-u-p-o-n---B-o-n-d----------------
 
 	/*

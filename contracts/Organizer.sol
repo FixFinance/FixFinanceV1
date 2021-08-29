@@ -13,17 +13,6 @@ import "./helpers/Ownable.sol";
 import "./InfoOracle.sol";
 
 contract Organizer is Ownable, IOrganizer {
-
-	event WrapperDeployment(
-		address wrapperAddress,
-		address underlyingAddress,
-		uint8 wrapperType
-	);
-
-	event FixCapitalPoolDeployment(
-		address addr
-	);
-
 	//acts as a whitelist for fixCapitalPools that were deployed using this organiser
 	mapping(address => address) public override fixCapitalPoolToWrapper;
 	//FixCapitalPool => ZCBamm address

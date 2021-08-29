@@ -81,12 +81,26 @@ contract ZeroCouponBond is IZeroCouponBond {
 
         @param address _owner: the owner of the funds that are approved
         @param address _spender: the spender of the funds that are approved
-        @param uint _amount: the amount by whifcp to decrement the allowance
+        @param uint _amount: the amount by which to decrement the allowance
     */
     function decrementAllowance(address _owner, address _spender, uint _amount) external override {
         require(msg.sender == address(fcp));
         require(allowance[_owner][_spender] >= _amount);
         allowance[_owner][_spender] -= _amount;
+    }
+
+    /*
+        @Description: the FixCapitalPool contract can set allowances
+
+        @param address _owner: the owner of the funds that are approved
+        @param address _spender: the spender of the funds that are approved
+        @param uint _allowance: the new allowance amount
+    */
+    function setAllowance(address _owner, address _spender, uint _allowance) external override {
+        require(msg.sender == address(fcp));
+        allowance[_owner][_spender] = _allowance;
+
+        emit Approval(_owner, _spender, _allowance);
     }
 
     /*

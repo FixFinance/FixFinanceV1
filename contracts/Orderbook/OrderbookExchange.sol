@@ -22,14 +22,12 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 	using ABDKMath64x64 for int128;
 
 	constructor(
-		address _treasuryAddress,
 		address _FCPaddress,
 		address _infoOracleAddress,
 		address _delegate1Address,
 		address _delegate2Address,
 		address _delegate3Address
 	) public {
-		internalTreasuryAddress = _treasuryAddress;
 		internalFCP = IFixCapitalPool(_FCPaddress);
 		internalIORC = IInfoOracle(_infoOracleAddress);
 		IWrapper tempWrapper = IFixCapitalPool(_FCPaddress).wrapper();
@@ -567,7 +565,7 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 	*/
 	function claimRevenue() external override {
 		require(msg.sender == Ownable(address(internalFCP)).owner());
-		address treasury = internalTreasuryAddress;
+		address treasury = internalIORC.sendTo();
 		uint YR = internalYieldRevenue;
 		int BR = internalBondRevenue;
 		require(YR <= uint(type(int256).max));

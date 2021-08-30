@@ -409,7 +409,7 @@ contract OrderbookDelegateParent is OrderbookData {
 		if (_ratio == 0) {
 			//ratio of 0 means fee is in ZCB
 			internalBondRevenue = BR.add(int(_amount));
-			IWrapper(vitals[0]).editSubAccountPosition(false, internalTreasuryAddress, vitals[1], 0, int(_amount));
+			IWrapper(vitals[0]).editSubAccountPosition(false, internalIORC.sendTo(), vitals[1], 0, int(_amount));
 		}
 		else {
 			//the conversion below is always safe because / (1 ether) always deflates enough
@@ -417,7 +417,7 @@ contract OrderbookDelegateParent is OrderbookData {
 			uint YR = internalYieldRevenue;
 			internalYieldRevenue = YR.add(_amount);
 			internalBondRevenue = BR.add(bondAmount);
-			IWrapper(vitals[0]).editSubAccountPosition(false, internalTreasuryAddress, vitals[1], int(_amount), bondAmount);
+			IWrapper(vitals[0]).editSubAccountPosition(false, internalIORC.sendTo(), vitals[1], int(_amount), bondAmount);
 		}
 	}
 

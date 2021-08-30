@@ -107,7 +107,6 @@ contract('NSFVaultFactory', async function(accounts) {
 		orderbookDelegate2Instance = await OrderbookDelegate2.new();
 		orderbookDelegate3Instance = await OrderbookDelegate3.new();
 		orderbookDeployerInstance = await OrderbookDeployer.new(
-			nullAddress,
 			infoOracleInstance.address,
 			orderbookDelegate1Instance.address,
 			orderbookDelegate2Instance.address,

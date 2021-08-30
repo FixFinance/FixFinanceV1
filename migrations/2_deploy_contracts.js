@@ -153,7 +153,6 @@ module.exports = async function(deployer) {
 	orderbookDelegate3Instance = await deployer.deploy(OrderbookDelegate3);
 	orderbookDeployerInstance = await deployer.deploy(
 		OrderbookDeployer,
-		treasuryAddress,
 		infoOracle.address,
 		orderbookDelegate1Instance.address,
 		orderbookDelegate2Instance.address,

@@ -73,9 +73,10 @@ contract('NSFVaultFactory', async function(accounts) {
 		nsfVaultFactoryDelegate4Instance = await NSFVaultFactoryDelegate4.new();
 		nsfVaultFactoryDelegate5Instance = await NSFVaultFactoryDelegate5.new();
 		treasuryAccount = accounts[5];
+		infoOracleInstance = await InfoOracle.new("0", treasuryAccount);
 		vaultFactoryInstance = await NSFVaultFactory.new(
 			vaultHealthInstance.address,
-			treasuryAccount,
+			infoOracleInstance.address,
 			nsfVaultFactoryDelegate1Instance.address,
 			nsfVaultFactoryDelegate2Instance.address,
 			nsfVaultFactoryDelegate3Instance.address,
@@ -93,7 +94,6 @@ contract('NSFVaultFactory', async function(accounts) {
 		YTammDeployerInstance = await YTammDeployer.new(YTammDelegateInstance.address);
 		fcpDelegate1Instance = await FCPDelegate1.new();
 		fixCapitalPoolDeployerInstance = await FixCapitalPoolDeployer.new(fcpDelegate1Instance.address);
-		infoOracleInstance = await InfoOracle.new("0", nullAddress);
 		ngbwDelegate1Instance = await NGBwrapperDelegate1.new();
 		ngbwDelegate2Instance = await NGBwrapperDelegate2.new();
 		ngbwDelegate3Instance = await NGBwrapperDelegate3.new();

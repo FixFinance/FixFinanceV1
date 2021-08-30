@@ -10,6 +10,7 @@ import "../../interfaces/IZeroCouponBond.sol";
 import "../../interfaces/IVaultHealth.sol";
 import "../../interfaces/IWrapper.sol";
 import "../../interfaces/IERC20.sol";
+import "../../interfaces/IInfoOracle.sol";
 import "../../helpers/Ownable.sol";
 import "./SBNSFVaultFactoryData.sol";
 
@@ -69,7 +70,7 @@ contract SBNSFVaultFactoryDelegateParent is SBNSFVaultFactoryData {
 		require(toTreasury <= uint(type(int256).max));
 		editSubAccountStandardVault(_claimRewards, _vaultOwner, sType, baseFCP, baseWrapper, -int(toTreasury));
 		//passing claimRewards:true a second time would needlessly waste gas
-		editSubAccountStandardVault(false, _treasuryAddress, sType, baseFCP, baseWrapper, int(toTreasury));
+		editSubAccountStandardVault(false, IInfoOracle(_infoOracleAddress).sendTo(), sType, baseFCP, baseWrapper, int(toTreasury));
 	}
 
 	/*
@@ -381,7 +382,7 @@ contract SBNSFVaultFactoryDelegateParent is SBNSFVaultFactoryData {
 		revenue.amountYield += yieldRevenue;
 		revenue.amountBond += bondRevenue;
 		editSubAccountYTVault(true, _vaultOwner, _FCPaddr, _baseWrapper, -int(yieldRevenue), bondRevenue.mul(-1));
-		editSubAccountYTVault(false, _treasuryAddress, _FCPaddr, _baseWrapper, int(yieldRevenue), bondRevenue);
+		editSubAccountYTVault(false, IInfoOracle(_infoOracleAddress).sendTo(), _FCPaddr, _baseWrapper, int(yieldRevenue), bondRevenue);
 	}
 
 	/*

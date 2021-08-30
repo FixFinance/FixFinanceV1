@@ -93,8 +93,7 @@ contract NSFVaultFactoryData is Ownable {
 	//user => vault index => vault
 	mapping(address => YTVault[]) internal _YTvaults;
 
-	//receives half of all liquidation revenue
-	address internal _treasuryAddress;
+	address internal _infoOracleAddress;
 
 	/*
 		Basis points of surplus collateral over bid which is

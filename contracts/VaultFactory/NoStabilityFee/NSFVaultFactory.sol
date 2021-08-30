@@ -24,7 +24,7 @@ contract NSFVaultFactory is NSFVaultFactoryData, INSFVaultFactory, nonReentrant 
 
 	constructor(
 		address _vaultHealthContract,
-		address _treasuryAddr,
+		address _infoOracleAddr,
 		address _delegate1Address,
 		address _delegate2Address,
 		address _delegate3Address,
@@ -32,7 +32,7 @@ contract NSFVaultFactory is NSFVaultFactoryData, INSFVaultFactory, nonReentrant 
 		address _delegate5Address
 	) public {
 		vaultHealthContract = IVaultHealth(_vaultHealthContract);
-		_treasuryAddress = _treasuryAddr;
+		_infoOracleAddress = _infoOracleAddr;
 		delegate1Address = _delegate1Address;
 		delegate2Address = _delegate2Address;
 		delegate3Address = _delegate3Address;
@@ -41,10 +41,6 @@ contract NSFVaultFactory is NSFVaultFactoryData, INSFVaultFactory, nonReentrant 
 	}
 
 	//-----------------------------------views-------------------------------------
-
-	function treasuryAddress() external view override returns(address) {
-		return _treasuryAddress;
-	}
 
 	function vaultsLength(address _owner) external view override returns(uint) {
 		return _vaults[_owner].length;

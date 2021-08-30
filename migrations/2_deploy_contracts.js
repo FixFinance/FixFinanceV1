@@ -80,7 +80,7 @@ module.exports = async function(deployer) {
 	nsfVaultFactoryDelegate5Instance = await deployer.deploy(NSFVaultFactoryDelegate5);
 	nsfvfDeployerInstance = await deployer.deploy(
 		NSFVFDeployer,
-		treasuryAddress,
+		infoOracle.address,
 		nsfVaultFactoryDelegate1Instance.address,
 		nsfVaultFactoryDelegate2Instance.address,
 		nsfVaultFactoryDelegate3Instance.address,
@@ -95,7 +95,7 @@ module.exports = async function(deployer) {
 	sbnsfVaultFactoryDelegate5Instance = await deployer.deploy(SBNSFVaultFactoryDelegate5);
 	sbnsfvfDeployerInstance = await deployer.deploy(
 		SBNSFVFDeployer,
-		treasuryAddress,
+		infoOracle.address,
 		sbnsfVaultFactoryDelegate1Instance.address,
 		sbnsfVaultFactoryDelegate2Instance.address,
 		sbnsfVaultFactoryDelegate3Instance.address,

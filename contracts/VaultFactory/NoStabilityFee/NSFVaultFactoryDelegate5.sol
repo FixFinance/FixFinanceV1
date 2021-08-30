@@ -79,7 +79,8 @@ contract NSFVaultFactoryDelegate5 is NSFVaultFactoryDelegateParent {
 	function claimRevenue(address _asset) external onlyOwner {
 		uint rev = _revenue[_asset];
 		uint toTreasury = rev >> 1;
-		IERC20(_asset).transfer(_treasuryAddress, toTreasury);
+		address treasuryAddr = IInfoOracle(_infoOracleAddress).sendTo();
+		IERC20(_asset).transfer(treasuryAddr, toTreasury);
 		IERC20(_asset).transfer(msg.sender, rev - toTreasury);
 		delete _revenue[_asset];
 	}
@@ -97,7 +98,8 @@ contract NSFVaultFactoryDelegate5 is NSFVaultFactoryDelegateParent {
 		IFixCapitalPool(_FCP).burnZCBFrom(msg.sender, uint(_bondIn));
 		uint yieldToTreasury = pos.amountYield >> 1;
 		int bondToTreasury = pos.amountBond.add(_bondIn) / 2;
-		IFixCapitalPool(_FCP).transferPosition(_treasuryAddress, yieldToTreasury, bondToTreasury);
+		address treasuryAddr = IInfoOracle(_infoOracleAddress).sendTo();
+		IFixCapitalPool(_FCP).transferPosition(treasuryAddr, yieldToTreasury, bondToTreasury);
 		IFixCapitalPool(_FCP).transferPosition(msg.sender, pos.amountYield - yieldToTreasury, (pos.amountBond + _bondIn) - bondToTreasury);
 		delete _YTRevenue[_FCP];
 	}

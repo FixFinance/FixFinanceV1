@@ -4,7 +4,6 @@ pragma solidity >=0.6.8 <0.7.0;
 import "../VaultFactory/NoStabilityFee/NSFVaultFactoryData.sol";
 
 interface INSFVaultFactory {
-	function treasuryAddress() external view returns(address);
 	function vaultsLength(address _owner) external view returns(uint);
 	function YTvaultsLength(address _owner) external view returns(uint);
 	function allVaults(address _owner) external view returns(NSFVaultFactoryData.Vault[] memory _vaults);

@@ -181,7 +181,7 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 			_amountWrappedToken := mload(retPtr)
 		}
 
-		emit Withdraw(msg.sender, _amountWrappedToken);
+		emit Withdrawl(msg.sender, _amountWrappedToken);
 	}
 
 	/*
@@ -206,7 +206,7 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 			_amountUnit := mload(retPtr)
 		}
 
-		emit Withdraw(_to, _amountWrappedToken);
+		emit Withdrawl(_to, _amountWrappedToken);
 	}
 
 

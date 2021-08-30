@@ -78,7 +78,7 @@ contract Organizer is Ownable, IOrganizer {
 	function deployNGBWrapper(address _underlyingAssetAddress) external override {
 		address temp = NGBwrapperDeployer(NGBwrapperDeployerAddress).deploy(_underlyingAssetAddress, msg.sender);
 		wrapperIsVerified[temp] = true;
-		emit WrapperDeployment(temp, _underlyingAssetAddress, 0);
+		emit WrapperDeployment(temp, _underlyingAssetAddress, msg.sender, 0);
 	}
 
 	/*
@@ -96,7 +96,7 @@ contract Organizer is Ownable, IOrganizer {
 			msg.sender,
 			InfoOracleAddress
 		);
-		emit FixCapitalPoolDeployment(fixCapitalPoolAddress);
+		emit FixCapitalPoolDeployment(fixCapitalPoolAddress, msg.sender);
 		fixCapitalPoolToWrapper[fixCapitalPoolAddress] = _wrapperAddress;
 	}
 

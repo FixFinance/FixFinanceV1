@@ -5,11 +5,13 @@ interface IOrganizer {
 	event WrapperDeployment(
 		address wrapperAddress,
 		address underlyingAddress,
+		address owner,
 		uint8 wrapperType
 	);
 
 	event FixCapitalPoolDeployment(
-		address addr
+		address FCPaddress,
+		address owner
 	);
 	function fixCapitalPoolToWrapper(address _FCPaddress) external view returns (address wrapperAddress);
 	function ZCBamms(address _FCPaddress) external view returns (address ZCBammAddress);

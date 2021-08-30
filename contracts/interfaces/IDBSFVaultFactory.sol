@@ -4,7 +4,6 @@ pragma solidity >=0.6.8 <0.7.0;
 import "../VaultFactory/DifferentBaseSF/DBSFVaultFactoryData.sol";
 
 interface IDBSFVaultFactory {
-	function treasuryAddress() external view returns(address);
 	function vaultsLength(address _owner) external view returns(uint);
 	function YTvaultsLength(address _owner) external view returns(uint);
 	function allVaults(address _owner) external view returns(DBSFVaultFactoryData.Vault[] memory _vaults);

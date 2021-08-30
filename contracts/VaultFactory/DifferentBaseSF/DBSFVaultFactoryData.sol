@@ -95,9 +95,6 @@ contract DBSFVaultFactoryData is Ownable {
 
 	address internal _infoOracleAddress;
 
-	//receives half of all liquidation revenue
-	address internal _treasuryAddress;
-
 	/*
 		Basis points of surplus collateral over bid which is
 		retained by the owner of the liquidated vault

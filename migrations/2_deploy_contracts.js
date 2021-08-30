@@ -110,7 +110,6 @@ module.exports = async function(deployer) {
 	dbsfVaultFactoryDelegate5Instance = await deployer.deploy(DBSFVaultFactoryDelegate5);
 	dbsfvfDeployerInstance = await deployer.deploy(
 		DBSFVFDeployer,
-		treasuryAddress,
 		infoOracle.address,
 		dbsfVaultFactoryDelegate1Instance.address,
 		dbsfVaultFactoryDelegate2Instance.address,

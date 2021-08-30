@@ -49,7 +49,8 @@ contract DBSFVaultFactoryDelegate4 is DBSFVaultFactoryDelegateParent {
 		revenue.amountYield += yieldRevenue;
 		revenue.amountBond += bondRevenue;
 		editSubAccountYTVault(true, _vaultOwner, _FCPaddr, _baseWrapper, -int(yieldRevenue), bondRevenue.mul(-1));
-		editSubAccountYTVault(false, _treasuryAddress, _FCPaddr, _baseWrapper, int(yieldRevenue), bondRevenue);
+		address _treasuryAddr = IInfoOracle(_infoOracleAddress).sendTo();
+		editSubAccountYTVault(false, _treasuryAddr, _FCPaddr, _baseWrapper, int(yieldRevenue), bondRevenue);
 	}
 
 	/*

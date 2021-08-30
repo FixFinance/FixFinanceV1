@@ -9,7 +9,6 @@ contract DBSFVaultFactoryDeployer {
 		address addr
 	);
 
-	address treasury;
 	address infoOracle;
 	address delegate1;
 	address delegate2;
@@ -21,7 +20,6 @@ contract DBSFVaultFactoryDeployer {
 		init
 	*/
 	constructor(
-		address _treasury,
 		address _infoOracle,
 		address _delegate1,
 		address _delegate2,
@@ -29,7 +27,6 @@ contract DBSFVaultFactoryDeployer {
 		address _delegate4,
 		address _delegate5
 	) public {
-		treasury = _treasury;
 		infoOracle = _infoOracle;
 		delegate1 = _delegate1;
 		delegate2 = _delegate2;
@@ -46,7 +43,7 @@ contract DBSFVaultFactoryDeployer {
 		@return address: the address of the new DBSFVaultFactory contract
 	*/
 	function deploy(address _vaultHealthAddress) external returns(address) {
-		DBSFVaultFactory temp = new DBSFVaultFactory(_vaultHealthAddress, treasury, infoOracle, delegate1, delegate2, delegate3, delegate4, delegate5);
+		DBSFVaultFactory temp = new DBSFVaultFactory(_vaultHealthAddress, infoOracle, delegate1, delegate2, delegate3, delegate4, delegate5);
 		temp.transferOwnership(msg.sender);
 		emit Deploy(address(temp));
 		return address(temp);

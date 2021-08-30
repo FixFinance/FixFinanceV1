@@ -235,11 +235,12 @@ contract DBSFVaultFactoryDelegateParent is DBSFVaultFactoryData {
 		uint toTreasury = _amount - retainedSurplus;
 		_liquidationRebates[_vaultOwner][_asset] += retainedSurplus;
 		_revenue[_asset] += toTreasury;
-		(, SUPPLIED_ASSET_TYPE sType, address baseFCP, address baseWrapper) = suppliedAssetInfo(_asset, IInfoOracle(_infoOracleAddress));
+		IInfoOracle iorc = IInfoOracle(_infoOracleAddress);
+		(, SUPPLIED_ASSET_TYPE sType, address baseFCP, address baseWrapper) = suppliedAssetInfo(_asset, iorc);
 		require(toTreasury <= uint(type(int256).max));
 		editSubAccountStandardVault(_claimRewards, _vaultOwner, sType, baseFCP, baseWrapper, -int(toTreasury));
 		//passing claimRewards:true a second time would needlessly waste gas
-		editSubAccountStandardVault(false, _treasuryAddress, sType, baseFCP, baseWrapper, int(toTreasury));
+		editSubAccountStandardVault(false, iorc.sendTo(), sType, baseFCP, baseWrapper, int(toTreasury));
 	}
 
 	/*

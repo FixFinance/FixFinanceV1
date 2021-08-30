@@ -80,11 +80,11 @@ contract DBSFVaultFactoryDelegate5 is DBSFVaultFactoryDelegateParent {
 	function claimRevenue(address _asset) external {
 		uint rev = _revenue[_asset];
 		uint toTreasury = rev >> 1;
-		address treasuryAddr = _treasuryAddress;
+		address treasuryAddr = IInfoOracle(_infoOracleAddress).sendTo();
 		IERC20(_asset).transfer(treasuryAddr, toTreasury);
 		IERC20(_asset).transfer(msg.sender, rev - toTreasury);
 		(, SUPPLIED_ASSET_TYPE sType, address baseFCP, address baseWrapper) = suppliedAssetInfo(_asset, IInfoOracle(_infoOracleAddress));
-		editSubAccountStandardVault(true, _treasuryAddress, sType, baseFCP, baseWrapper, -int(rev));
+		editSubAccountStandardVault(true, treasuryAddr, sType, baseFCP, baseWrapper, -int(rev));
 		delete _revenue[_asset];
 	}
 
@@ -101,7 +101,7 @@ contract DBSFVaultFactoryDelegate5 is DBSFVaultFactoryDelegateParent {
 		IFixCapitalPool(_FCP).burnZCBFrom(msg.sender, uint(_bondIn));
 		uint yieldToTreasury = pos.amountYield >> 1;
 		int bondToTreasury = pos.amountBond.add(_bondIn) / 2;
-		IFixCapitalPool(_FCP).transferPosition(_treasuryAddress, yieldToTreasury, bondToTreasury);
+		IFixCapitalPool(_FCP).transferPosition(IInfoOracle(_infoOracleAddress).sendTo(), yieldToTreasury, bondToTreasury);
 		IFixCapitalPool(_FCP).transferPosition(msg.sender, pos.amountYield - yieldToTreasury, (pos.amountBond + _bondIn) - bondToTreasury);
 		delete _YTRevenue[_FCP];
 	}

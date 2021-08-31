@@ -44,7 +44,6 @@ interface IInfoOracle {
 
 	function setMinimumOrderbookFee(uint8 _orderbookFeeBips) external;
 	function setToTreasuryFee(uint16 _bipsToTreasury) external;
-	function setSendTo(address _sendTo) external;
 	function setTreasuryFeeIsCollected(bool _TreasuryFeeIsCollected) external;
 
 }

@@ -29,7 +29,7 @@ contract InfoOracle is IInfoOracle, Ownable {
 
 	bool public override TreasuryFeeIsCollected;
 
-	address public override sendTo;
+	address public immutable override sendTo;
 
 	mapping(address => uint) public override WrapperToYTSlippageConst;
 
@@ -334,16 +334,6 @@ contract InfoOracle is IInfoOracle, Ownable {
 		require(_bipsToTreasury <= MaxBipsToTreasury);
 		bipsToTreasury = _bipsToTreasury;
 	}
-
-	/*
-		@Description: admin may set the address that receives all treasury fees
-
-		@param address _sendTo: the address that shall receive all treasury fees
-	*/
-	function setSendTo(address _sendTo) external override onlyOwner {
-		sendTo = _sendTo;
-	}
-
 
 	/*
 		@Description: amin may set whether or not the treasury fee shall be collected

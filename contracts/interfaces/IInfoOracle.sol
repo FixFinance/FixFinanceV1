@@ -4,6 +4,7 @@ pragma solidity >=0.6.8 <0.7.0;
 interface IInfoOracle {
 	function bipsToTreasury() external view returns(uint16);
 	function MinimumOrderbookFee() external view returns(uint8);
+	function TreasuryFeeIsCollected() external view returns(bool);
 	function sendTo() external view returns(address);
 	function WrapperToYTSlippageConst(address _wrapperAddr) external view returns(uint);
 	function WrapperToZCBFeeConst(address _wrapperAddr) external view returns(uint);
@@ -44,5 +45,6 @@ interface IInfoOracle {
 	function setMinimumOrderbookFee(uint8 _orderbookFeeBips) external;
 	function setToTreasuryFee(uint16 _bipsToTreasury) external;
 	function setSendTo(address _sendTo) external;
+	function setTreasuryFeeIsCollected(bool _TreasuryFeeIsCollected) external;
 
 }

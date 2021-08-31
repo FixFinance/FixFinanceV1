@@ -20,7 +20,7 @@ const SBPSretained = 999_000;
 contract('FixCapitalPool', async function(accounts){
 	it('before each', async () => {
 		sendTo = accounts[3];
-		infoOracleInstance = await InfoOracle.new(0, sendTo);
+		infoOracleInstance = await InfoOracle.new(0, sendTo, true);
 		dummyATokenInstance = await dummyAToken.new("aCOIN");
 		rewardsAsset0 = await dummyAToken.new("RWD0");
 		rewardsAsset1 = await dummyAToken.new("RWD1");

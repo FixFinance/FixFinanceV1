@@ -27,6 +27,8 @@ contract InfoOracle is IInfoOracle, Ownable {
 
 	uint8 public override MinimumOrderbookFee; //denominated in bips
 
+	bool public override TreasuryFeeIsCollected;
+
 	address public override sendTo;
 
 	mapping(address => uint) public override WrapperToYTSlippageConst;
@@ -65,10 +67,12 @@ contract InfoOracle is IInfoOracle, Ownable {
 	*/
 	constructor(
 		uint16 _bipsToTreasury,
-		address _sendTo
+		address _sendTo,
+		bool _TreasuryFeeIsCollected
 	) public {
 		setToTreasuryFee(_bipsToTreasury);
 		sendTo = _sendTo;
+		TreasuryFeeIsCollected = _TreasuryFeeIsCollected;
 	}
 
 	/*
@@ -340,4 +344,13 @@ contract InfoOracle is IInfoOracle, Ownable {
 		sendTo = _sendTo;
 	}
 
+
+	/*
+		@Description: amin may set whether or not the treasury fee shall be collected
+
+		@param bool _TreasuryFeeIsCollected: the new value that TreasuryFeeIsCollected shall be set to
+	*/
+	function setTreasuryFeeIsCollected(bool _TreasuryFeeIsCollected) external override onlyOwner {
+		TreasuryFeeIsCollected = _TreasuryFeeIsCollected;
+	}
 }

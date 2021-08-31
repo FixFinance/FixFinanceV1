@@ -94,7 +94,7 @@ contract('DBSFVaultFactory', async function(accounts) {
 		fcpDelegate1Instance = await FCPDelegate1.new();
 		fixCapitalPoolDeployerInstance = await FixCapitalPoolDeployer.new(fcpDelegate1Instance.address);
 		treasuryAccount = accounts[5];
-		infoOracleInstance = await InfoOracle.new("0", treasuryAccount);
+		infoOracleInstance = await InfoOracle.new("0", treasuryAccount, true);
 		ngbwDelegate1Instance = await NGBwrapperDelegate1.new();
 		ngbwDelegate2Instance = await NGBwrapperDelegate2.new();
 		ngbwDelegate3Instance = await NGBwrapperDelegate3.new();

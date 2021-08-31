@@ -100,7 +100,8 @@ contract('YTamm', async function(accounts){
 		aTokenInstance = await aToken.new("aCOIN");
 		infoOracleInstance = await InfoOracle.new(
 			BipsToTreasury,
-			nullAddress
+			nullAddress,
+			true
 		);
 		ngbwDelegate1Instance = await NGBwrapperDelegate1.new();
 		ngbwDelegate2Instance = await NGBwrapperDelegate2.new();

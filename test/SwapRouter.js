@@ -60,7 +60,8 @@ contract('SwapRouter', async function(accounts) {
 		swapRouterDeployerInstance = await SwapRouterDeployer.new(swapRouterDelegateInstance.address);
 		infoOracleInstance = await InfoOracle.new(
 			BipsToTreasury,
-			nullAddress
+			nullAddress,
+			true
 		);
 		ngbwDelegate1Instance = await NGBwrapperDelegate1.new();
 		ngbwDelegate2Instance = await NGBwrapperDelegate2.new();

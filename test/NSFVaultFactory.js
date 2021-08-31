@@ -73,7 +73,7 @@ contract('NSFVaultFactory', async function(accounts) {
 		nsfVaultFactoryDelegate4Instance = await NSFVaultFactoryDelegate4.new();
 		nsfVaultFactoryDelegate5Instance = await NSFVaultFactoryDelegate5.new();
 		treasuryAccount = accounts[5];
-		infoOracleInstance = await InfoOracle.new("0", treasuryAccount);
+		infoOracleInstance = await InfoOracle.new("0", treasuryAccount, true);
 		vaultFactoryInstance = await NSFVaultFactory.new(
 			vaultHealthInstance.address,
 			infoOracleInstance.address,

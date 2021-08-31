@@ -49,7 +49,7 @@ function AmountError(actual, expected) {
 contract('ZCBamm', async function(accounts){
 	it('before each', async () => {
 		aTokenInstance = await aToken.new("aCOIN");
-		infoOracleInstance = await InfoOracle.new(BipsToTreasury, nullAddress);
+		infoOracleInstance = await InfoOracle.new(BipsToTreasury, nullAddress, true);
 		ngbwDelegate1Instance = await NGBwrapperDelegate1.new();
 		ngbwDelegate2Instance = await NGBwrapperDelegate2.new();
 		ngbwDelegate3Instance = await NGBwrapperDelegate3.new();

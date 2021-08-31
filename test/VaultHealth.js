@@ -141,7 +141,7 @@ contract('VaultHealth', async function(accounts) {
 		YTammDeployerInstance = await YTammDeployer.new(YTammDelegateInstance.address);
 		fcpDelegate1Instance = await FCPDelegate1.new();
 		FixCapitalPoolDeployerInstance = await FixCapitalPoolDeployer.new(fcpDelegate1Instance.address);
-		infoOracleInstance = await InfoOracle.new("0", nullAddress);
+		infoOracleInstance = await InfoOracle.new("0", nullAddress, true);
 		ngbwDelegate1Instance = await NGBwrapperDelegate1.new();
 		ngbwDelegate2Instance = await NGBwrapperDelegate2.new();
 		ngbwDelegate3Instance = await NGBwrapperDelegate3.new();

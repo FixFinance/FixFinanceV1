@@ -56,7 +56,7 @@ contract('Organizer', function(accounts) {
 		fixCapitalPoolDeployerInstance = await FixCapitalPoolDeployer.new(fcpDelegate1Instance.address);
 		swapRouterDelegateInstance = await SwapRouterDelegate.new();
 		swapRouterDeployerInstance = await SwapRouterDeployer.new(swapRouterDelegateInstance.address);
-		infoOracleInstance = await InfoOracle.new("0", treasuryAddress);
+		infoOracleInstance = await InfoOracle.new("0", treasuryAddress, true);
 		ngbwDelegate1Instance = await NGBwrapperDelegate1.new();
 		ngbwDelegate2Instance = await NGBwrapperDelegate2.new();
 		ngbwDelegate3Instance = await NGBwrapperDelegate3.new();

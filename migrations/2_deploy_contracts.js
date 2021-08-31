@@ -71,7 +71,7 @@ module.exports = async function(deployer) {
 	dummyATokenInstance = await deployer.deploy(dummyAToken, "aUSDC");
 	zcbYtDeployerInstance = await deployer.deploy(zcbYtDeployer);
 
-	infoOracle = await deployer.deploy(InfoOracle, "0", treasuryAddress);
+	infoOracle = await deployer.deploy(InfoOracle, "0", treasuryAddress, true);
 
 	nsfVaultFactoryDelegate1Instance = await deployer.deploy(NSFVaultFactoryDelegate1);
 	nsfVaultFactoryDelegate2Instance = await deployer.deploy(NSFVaultFactoryDelegate2);

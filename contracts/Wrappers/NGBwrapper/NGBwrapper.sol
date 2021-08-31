@@ -641,7 +641,7 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
     */
     function addRewardAsset(address _rewardsAsset) external override {
     	(bool success, ) = delegate3Address.delegatecall(abi.encodeWithSignature(
-    		"addRewardsAsset(address)",
+    		"addRewardAsset(address)",
     		_rewardsAsset
     	));
     	require(success);

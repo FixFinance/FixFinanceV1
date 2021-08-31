@@ -157,8 +157,8 @@ contract('DBSFVaultFactory', async function(accounts) {
 		await wAsset0.depositUnitAmount(accounts[0], _10To18.toString());
 		await wAsset1.depositUnitAmount(accounts[0], _10To18.toString());
 
-		fcp0 = await fixCapitalPool.at(rec0.receipt.logs[0].args.addr);
-		fcp1 = await fixCapitalPool.at(rec1.receipt.logs[0].args.addr);
+		fcp0 = await fixCapitalPool.at(rec0.receipt.logs[0].args.FCPaddress);
+		fcp1 = await fixCapitalPool.at(rec1.receipt.logs[0].args.FCPaddress);
 
 		zcbAsset0 = await IERC20.at(await fcp0.zeroCouponBondAddress());
 		zcbAsset1 = await IERC20.at(await fcp1.zeroCouponBondAddress());
@@ -1038,8 +1038,8 @@ contract('DBSFVaultFactory', async function(accounts) {
 		let rec1 = await organizerInstance.deployFixCapitalPoolInstance(wAsset1.address, maturity);
 
 		//reset chs, zcbAssets, ytAssets with new assets that are yet to reach maturity
-		fcp0 = await fixCapitalPool.at(rec0.receipt.logs[0].args.addr);
-		fcp1 = await fixCapitalPool.at(rec1.receipt.logs[0].args.addr);
+		fcp0 = await fixCapitalPool.at(rec0.receipt.logs[0].args.FCPaddress);
+		fcp1 = await fixCapitalPool.at(rec1.receipt.logs[0].args.FCPaddress);
 
 		zcbAsset0 = await IERC20.at(await fcp0.zeroCouponBondAddress());
 		zcbAsset1 = await IERC20.at(await fcp1.zeroCouponBondAddress());

@@ -94,7 +94,7 @@ contract('SwapRouter', async function(accounts) {
 		let rec = await organizerInstance.deployNGBWrapper(aTokenInstance.address);
 		NGBwrapperInstance = await NGBwrapper.at(rec.receipt.logs[0].args.wrapperAddress);
 		rec = await organizerInstance.deployFixCapitalPoolInstance(NGBwrapperInstance.address, maturity);
-		fixCapitalPoolInstance = await FixCapitalPool.at(rec.receipt.logs[0].args.addr);
+		fixCapitalPoolInstance = await FixCapitalPool.at(rec.receipt.logs[0].args.FCPaddress);
 
 		await infoOracleInstance.setSlippageConstant(fixCapitalPoolInstance.address, SlippageConstant);
 		await infoOracleInstance.setAmmFeeConstants(fixCapitalPoolInstance.address, ZCBammFeeConstant, YTammFeeConstant);

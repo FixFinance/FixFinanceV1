@@ -106,7 +106,7 @@ contract('Organizer', function(accounts) {
 
 	it('deploy FixCapitalPool', async () => {
 		let rec = await organizerInstance.deployFixCapitalPoolInstance(wAsset0.address, maturity);
-		fixCapitalPoolInstance = await FixCapitalPool.at(rec.receipt.logs[0].args.addr);
+		fixCapitalPoolInstance = await FixCapitalPool.at(rec.receipt.logs[0].args.FCPaddress);
 		yieldTokenInstance = await YieldToken.at(await fixCapitalPoolInstance.yieldTokenAddress());
 		zcbInstance = await IERC20.at(await fixCapitalPoolInstance.zeroCouponBondAddress());
 		assert.notEqual(fixCapitalPoolInstance.address, nullAddress, "organizer::fixCapitalPoolMapping[asset0] must be non-null");

@@ -7,7 +7,36 @@ import "../interfaces/IInfoOracle.sol";
 import "../Orderbook/OrderbookData.sol";
 
 interface IOrderbookExchange {
+	event MakeLimitSellZCB(
+		address indexed maker,
+		uint prevID,
+		uint amount,
+		uint maturityConversionRate
+	);
 
+	event MakeLimitSellYT(
+		address indexed maker,
+		uint prevID,
+		uint amount,
+		uint maturityConversionRate
+	);
+
+	event ModifyOrder(
+		uint orderID,
+		int change
+	);
+
+	event MarketBuyYT(
+		address indexed taker,
+		uint newYTSellHeadID,
+		uint headAmount
+	);
+
+	event MarketBuyZCB(
+		address indexed taker,
+		uint newZCBSellHeadID,
+		uint headAmount
+	);
 	function deposit(uint _amountYield, int _amountBond) external;
 	function withdraw(uint _amountYield, int _amountBond) external;
 	function limitSellZCB(uint _amount, uint _maturityConversionRate, uint _hintID, uint _maxSteps) external;

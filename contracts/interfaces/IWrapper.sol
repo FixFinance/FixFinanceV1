@@ -9,7 +9,17 @@ interface IWrapper is IERC20, IERC3156FlashLender {
 		uint wrappedAmount
 	);
 
-	event Withdrawl(
+	event Withdrawal(
+		address indexed from,
+		uint wrappedAmount
+	);
+
+	event FlashMint(
+		address indexed to,
+		uint wrappedAmount
+	);
+
+	event FlashBurn(
 		address indexed from,
 		uint wrappedAmount
 	);

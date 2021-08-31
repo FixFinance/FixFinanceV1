@@ -181,7 +181,7 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 			_amountWrappedToken := mload(retPtr)
 		}
 
-		emit Withdrawl(msg.sender, _amountWrappedToken);
+		emit Withdrawal(msg.sender, _amountWrappedToken);
 	}
 
 	/*
@@ -206,7 +206,7 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 			_amountUnit := mload(retPtr)
 		}
 
-		emit Withdrawl(_to, _amountWrappedToken);
+		emit Withdrawal(_to, _amountWrappedToken);
 	}
 
 
@@ -332,18 +332,21 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
     	uint _flashLoanFee = internalFlashLoanFee;
     	require(amount <= (uint256(-1) - internalTotalSupply) / (_flashLoanFee == 0 ? 1 : _flashLoanFee));
     	uint fee = amount.mul(_flashLoanFee) / totalSBPS;
-    	internalBalanceOf[msg.sender] += amount;
+    	internalBalanceOf[msg.sender] = internalBalanceOf[msg.sender].add(amount);
+    	emit FlashMint(msg.sender, amount);
         uint256 _allowance = internalAllowance[address(receiver)][address(this)];
         require(
-            _allowance >= (amount + fee),
+            _allowance >= amount.add(fee),
             "FlashMinter: Repay not approved"
         );
-        internalAllowance[address(receiver)][address(this)] = _allowance - (amount + fee);
+        uint toRepay = amount.add(fee);
+        internalAllowance[address(receiver)][address(this)] = _allowance.sub(toRepay);
     	bytes32 out = receiver.onFlashLoan(msg.sender, token, amount, fee, data);
     	require(CALLBACK_SUCCESS == out);
         uint balance = internalBalanceOf[address(receiver)];
-        require(balance >= (amount + fee));
-        internalBalanceOf[address(receiver)] = balance - (amount + fee);
+        require(balance >= toRepay);
+        internalBalanceOf[address(receiver)] = balance.sub(toRepay);
+		emit FlashBurn(address(receiver), toRepay);
         internalTotalSupply = internalTotalSupply.sub(fee);
         return true;
     }
@@ -636,24 +639,12 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 		@param address _rewardsAsset: the new asset for which to start distribution of LM rewards
 		@param uint8 _index: the index within the rewardsAddr array where the new rewards asset will be
     */
-    function addRewardAsset(address _rewardsAsset) external onlyOwner override {
-    	uint len = internalRewardsAssets.length;
-    	for (uint8 i = 0; i < len; i++) {
-			require(internalImmutableRewardsAssets[i] != _rewardsAsset);
-    	}
-    	internalRewardsAssets.push(_rewardsAsset);
-    	internalImmutableRewardsAssets.push(_rewardsAsset);
-    	internalPrevContractBalance.push(0);
-    	internalTotalRewardsPerWasset.push(0);
-    	internalTRPWuponActivation.push(0);
-    	internalPrevTotalRewardsPerWasset.push();
-    	internalDistributionAccountRewards.push();
-    	internalSAPTRPW.push();
-    	uint currentBal = IERC20(_rewardsAsset).balanceOf(address(this));
-    	address sendTo = IInfoOracle(internalInfoOracleAddress).sendTo();
-    	uint toOwner = currentBal >> 1;
-    	IERC20(_rewardsAsset).transfer(msg.sender, toOwner);
-    	IERC20(_rewardsAsset).transfer(sendTo, currentBal - toOwner);
+    function addRewardAsset(address _rewardsAsset) external override {
+    	(bool success, ) = delegate3Address.delegatecall(abi.encodeWithSignature(
+    		"addRewardsAsset(address)",
+    		_rewardsAsset
+    	));
+    	require(success);
     }
 
     /*

@@ -171,6 +171,32 @@ contract NGBwrapperDelegate3 is NGBwrapperDelegateParent {
     }
 
     /*
+        @Description: add an asset for which wrapped asset holders will earn LM rewards
+
+        @param address _rewardsAsset: the new asset for which to start distribution of LM rewards
+        @param uint8 _index: the index within the rewardsAddr array where the new rewards asset will be
+    */
+    function addRewardAsset(address _rewardsAsset) external onlyOwner {
+        uint len = internalRewardsAssets.length;
+        for (uint8 i = 0; i < len; i++) {
+            require(internalImmutableRewardsAssets[i] != _rewardsAsset);
+        }
+        internalRewardsAssets.push(_rewardsAsset);
+        internalImmutableRewardsAssets.push(_rewardsAsset);
+        internalPrevContractBalance.push(0);
+        internalTotalRewardsPerWasset.push(0);
+        internalTRPWuponActivation.push(0);
+        internalPrevTotalRewardsPerWasset.push();
+        internalDistributionAccountRewards.push();
+        internalSAPTRPW.push();
+        uint currentBal = IERC20(_rewardsAsset).balanceOf(address(this));
+        address sendTo = IInfoOracle(internalInfoOracleAddress).sendTo();
+        uint toOwner = currentBal >> 1;
+        IERC20(_rewardsAsset).transfer(msg.sender, toOwner);
+        IERC20(_rewardsAsset).transfer(sendTo, currentBal - toOwner);
+    }
+
+    /*
         @Description: deactivate a rewards asset
             any amount of this asset recived by this contract will sit dormant until activated
 

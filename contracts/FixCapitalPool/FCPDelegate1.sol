@@ -112,4 +112,40 @@ contract FCPDelegate1 is FCPDelegateParent {
 		}
 	}
 
+	/*
+		@Description: zero coupon bond contract must call this function to transfer zcb between addresses
+
+		@param address _from: the address to deduct ZCB from
+		@param address _to: the address to send 
+	*/
+	function transferZCB(address _from, address _to, uint _amount) external {
+		require(_amount <= uint(type(int256).max));
+		uint conversionRate;
+		int[2] memory prevBonds = [internalBalanceBonds[_from], internalBalanceBonds[_to]];
+		if (internalInPayoutPhase) {
+			conversionRate = internalMaturityConversionRate;
+			address[2] memory subAccts = [_from, _to];
+			uint[2] memory prevYields = [internalBalanceYield[_from], internalBalanceYield[_to]];
+			uint[2] memory wrappedClaims = [payoutAmount(prevYields[0], prevBonds[0], conversionRate), payoutAmount(prevYields[1], prevBonds[1], conversionRate)];
+			internalWrapper.FCPDirectDoubleClaimSubAccountRewards(true, true, subAccts, prevYields, wrappedClaims);
+		}
+		else {
+			conversionRate = internalWrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
+		}
+
+		if (msg.sender != _from && msg.sender != internalZeroCouponBondAddress) {
+			IZeroCouponBond(internalZeroCouponBondAddress).decrementAllowance(_from, msg.sender, _amount);
+		}
+		int intAmount = int(_amount);
+		require(intAmount >= 0);
+		int newFromBond = internalBalanceBonds[_from].sub(intAmount);
+
+		//ensure that _from address's position may be cashed out to a positive amount of wrappedToken
+		//if it cannot the following call will revert this tx
+		minimumUnitAmountAtMaturity(internalBalanceYield[_from], newFromBond, conversionRate);
+
+		internalBalanceBonds[_to] = internalBalanceBonds[_to].add(intAmount);
+		internalBalanceBonds[_from] = newFromBond;
+	}
+
 }

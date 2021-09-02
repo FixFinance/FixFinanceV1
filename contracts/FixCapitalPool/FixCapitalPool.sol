@@ -331,33 +331,13 @@ contract FixCapitalPool is IFixCapitalPool, FCPDelegateParent, Ownable, nonReent
 		@param address _to: the address to send 
 	*/
 	function transferZCB(address _from, address _to, uint _amount) external override {
-		require(_amount <= uint(type(int256).max));
-		uint conversionRate;
-		int[2] memory prevBonds = [internalBalanceBonds[_from], internalBalanceBonds[_to]];
-		if (internalInPayoutPhase) {
-			conversionRate = internalMaturityConversionRate;
-			address[2] memory subAccts = [_from, _to];
-			uint[2] memory prevYields = [internalBalanceYield[_from], internalBalanceYield[_to]];
-			uint[2] memory wrappedClaims = [payoutAmount(prevYields[0], prevBonds[0], conversionRate), payoutAmount(prevYields[1], prevBonds[1], conversionRate)];
-			internalWrapper.FCPDirectDoubleClaimSubAccountRewards(true, true, subAccts, prevYields, wrappedClaims);
-		}
-		else {
-			conversionRate = internalWrapper.WrappedAmtToUnitAmt_RoundDown(1 ether);
-		}
-
-		if (msg.sender != _from && msg.sender != internalZeroCouponBondAddress) {
-			IZeroCouponBond(internalZeroCouponBondAddress).decrementAllowance(_from, msg.sender, _amount);
-		}
-		int intAmount = int(_amount);
-		require(intAmount >= 0);
-		int newFromBond = internalBalanceBonds[_from].sub(intAmount);
-
-		//ensure that _from address's position may be cashed out to a positive amount of wrappedToken
-		//if it cannot the following call will revert this tx
-		minimumUnitAmountAtMaturity(internalBalanceYield[_from], newFromBond, conversionRate);
-
-		internalBalanceBonds[_to] = internalBalanceBonds[_to].add(intAmount);
-		internalBalanceBonds[_from] = newFromBond;
+		(bool success, ) = delegate1Address.delegatecall(abi.encodeWithSignature(
+			"transferZCB(address,address,uint256)",
+			_from,
+			_to,
+			_amount
+		));
+		require(success);
 	}
 
 	//---------------------------Y-i-e-l-d---T-o-k-e-n-----------------------
@@ -512,19 +492,43 @@ contract FixCapitalPool is IFixCapitalPool, FCPDelegateParent, Ownable, nonReent
 		bytes32 out = _receiver.onFlashLoan(msg.sender, _amountYield, _amountBond, yieldFee, bondFee, _data);
 		require(out == CALLBACK_SUCCESS);
 
-		address _owner = owner;
-		address sendTo = IInfoOracle(internalInfoOracleAddress).sendTo();
 		if (_amountYield > 0) {
 			internalBalanceYield[msg.sender] = internalBalanceYield[msg.sender].sub(_amountYield).sub(yieldFee);
-			uint dividend = yieldFee >> 1;
-			internalBalanceYield[sendTo] = internalBalanceYield[sendTo].add(dividend);
-			internalBalanceYield[_owner] = internalBalanceYield[_owner].add(yieldFee - dividend);
 		}
 		if (_amountBond != 0) {
 			internalBalanceBonds[msg.sender] = internalBalanceBonds[msg.sender].sub(_amountBond).sub(bondFee);
-			int dividend = bondFee / 2;
-			internalBalanceBonds[sendTo] = internalBalanceBonds[sendTo].add(dividend);
-			internalBalanceBonds[_owner] = internalBalanceBonds[_owner].add(bondFee - dividend);
+		}
+
+		address _owner = owner;
+		IInfoOracle iorc = IInfoOracle(internalInfoOracleAddress);
+		if (iorc.TreasuryFeeIsCollected()) {
+			address sendTo = iorc.sendTo();
+			if (_amountYield > 0) {
+				address[2] memory subAccts = [sendTo, _owner];
+				uint[2] memory yieldArr = [internalBalanceYield[sendTo], internalBalanceYield[_owner]];
+				//wrappedClaims is same as yield Arr, because this function may only be executed before the payout phase is entered
+				internalWrapper.FCPDirectDoubleClaimSubAccountRewards(false, true, subAccts, yieldArr, yieldArr);
+
+				uint dividend = yieldFee >> 1;
+				internalBalanceYield[subAccts[0]] = yieldArr[0].add(dividend);
+				internalBalanceYield[subAccts[1]] = yieldArr[1].add(yieldFee - dividend);
+			}
+			if (_amountBond != 0) {
+				int dividend = bondFee / 2;
+				internalBalanceBonds[sendTo] = internalBalanceBonds[sendTo].add(dividend);
+				internalBalanceBonds[_owner] = internalBalanceBonds[_owner].add(bondFee - dividend);
+			}
+		}
+		else {
+			if (_amountYield > 0) {
+				uint prevYieldOwner = internalBalanceYield[_owner];
+				internalWrapper.FCPDirectClaimSubAccountRewards(false, true, _owner, prevYieldOwner, prevYieldOwner);
+
+				internalBalanceYield[_owner] = prevYieldOwner.add(yieldFee);
+			}
+			if (_amountBond != 0) {
+				internalBalanceBonds[_owner] = internalBalanceBonds[_owner].add(bondFee);
+			}
 		}
 	    return true;
     }

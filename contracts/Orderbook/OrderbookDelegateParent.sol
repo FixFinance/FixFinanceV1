@@ -193,8 +193,8 @@ contract OrderbookDelegateParent is OrderbookData {
 	/*
 		@Description: handle the collateral of an address after it has market bought ZCB and sold YT
 
-		@param address[3] memory vitals: contains memory copies of address variables from storage
-			format: [address(internalWrapper), address(internalFCP), address(internalIORC)]
+		@param address[4] memory vitals: contains memory copies of address variables from storage
+			format: [address(internalWrapper), address(internalFCP), address(internalIORC), address(feeRecievingSubAcct)]
 		@param address _addr: the address that has bought ZCB and sold YT
 		@param uint _amountZCB: the amount of ZCB bought
 		@param uint _amountWrappedYT: the static amount of YT sold
@@ -203,7 +203,7 @@ contract OrderbookDelegateParent is OrderbookData {
 			otherwise use transferPositionFrom and transferPosition on the baseFCP to get required input and send required output
 	*/
 	function manageCollateral_BuyZCB_takeOrder(
-		address[3] memory vitals,
+		address[4] memory vitals,
 		address _addr,
 		uint _amountZCB,
 		uint _amountWrappedYT,
@@ -261,8 +261,8 @@ contract OrderbookDelegateParent is OrderbookData {
 	/*
 		@Description: handle the collateral of an address after it has market bought YT and sold ZCB
 
-		@param address[3] memory vitals: contains memory copies of address variables from storage
-			format: [address(internalWrapper), address(internalFCP), address(internalIORC)]
+		@param address[4] memory vitals: contains memory copies of address variables from storage
+			format: [address(internalWrapper), address(internalFCP), address(internalIORC), address(feeRecievingSubAcct)]
 		@param address _addr: the address that has bought YT and sold ZCB
 		@param uint _amountZCB: the amount of ZCB sold
 		@param uint _amountWrappedYT: the static amount of YT bought
@@ -271,7 +271,7 @@ contract OrderbookDelegateParent is OrderbookData {
 			otherwise use transferPositionFrom and transferPosition on the baseFCP to get required input and send required output
 	*/
 	function manageCollateral_BuyYT_takeOrder(
-		address[3] memory vitals,
+		address[4] memory vitals,
 		address _addr,
 		uint _amountZCB,
 		uint _amountWrappedYT,
@@ -321,15 +321,15 @@ contract OrderbookDelegateParent is OrderbookData {
 	/*
 		@Description: handle the collateral of an address that has had its YT limit sell filled
 
-		@param address[3] memory vitals: contains memory copies of address variables from storage
-			format: [address(internalWrapper), address(internalFCP), address(internalIORC)]
+		@param address[4] memory vitals: contains memory copies of address variables from storage
+			format: [address(internalWrapper), address(internalFCP), address(internalIORC), address(feeRecievingSubAcct)]
 		@param address _addr: the address that has had its YT limit sell filled
 		@param uint _ZCBreceived: the amount of ZCB received from the sell
 		@param uint _YTsold: the amount of static YT sold in the limit sell
 		@param uint _ratio: the current static to dynamic conversion multiplier
 	*/
 	function manageCollateral_fillYTSell(
-		address[3] memory vitals,
+		address[4] memory vitals,
 		address _addr,
 		uint _ZCBreceived,
 		uint _YTsold,
@@ -364,15 +364,15 @@ contract OrderbookDelegateParent is OrderbookData {
 	/*
 		@Description: handle the collateral of an address that has had its ZCB limit sell filled
 
-		@param address[3] memory vitals: contains memory copies of address variables from storage
-			format: [address(internalWrapper), address(internalFCP), address(internalIORC)]
+		@param address[4] memory vitals: contains memory copies of address variables from storage
+			format: [address(internalWrapper), address(internalFCP), address(internalIORC), address(feeRecievingSubAcct)]
 		@param address _addr: the address that has had its ZCB limit sell filled
 		@param uint _YTreceived: the amount of static YT received from the sell
 		@param uint _ZCBsold: the amount of ZCB sold in the limit sell
 		@param uint _ratio: the current static to dynamic conversion multiplier
 	*/
 	function manageCollateral_fillZCBSell(
-		address[3] memory vitals,
+		address[4] memory vitals,
 		address _addr,
 		uint _YTreceived,
 		uint _ZCBsold,
@@ -394,28 +394,26 @@ contract OrderbookDelegateParent is OrderbookData {
 	/*
 		@Description: handle revenue after a market order has earned fees for the orderbook owners
 
-		@param address[3] memory vitals: contains memory copies of address variables from storage
-			format: [address(internalWrapper), address(internalFCP), address(internalIORC)]
+		@param address[4] memory vitals: contains memory copies of address variables from storage
+			format: [address(internalWrapper), address(internalFCP), address(internalIORC), address(feeRecievingSubAcct)]
 		@param uint _amount: the amount of either ZCB or static YT that has been earned in fees
 		@param uint _ratio: if fee is in ZCB 0 should be passed
 			if fee is in static YT static to dynamic conversion multiplier should be passed
 	*/
 	function manageCollateral_payFee(
-		address[3] memory vitals, // [address(internalWrapper), address(internalFCP), address(internalIORC)]
+		address[4] memory vitals, // [address(internalWrapper), address(internalFCP), address(internalIORC), address(feeRecievingSubAcct)]
 		uint _amount,
 		uint _ratio
 	) internal {
 		require(_amount <= uint(type(int256).max));
-		IInfoOracle iorc = IInfoOracle(vitals[2]);
-		address feeRecievingSubAcct = iorc.TreasuryFeeIsCollected() ? iorc.sendTo() : Ownable(vitals[1]).owner();
 		if (_ratio == 0) {
 			//ratio of 0 means fee is in ZCB
-			IWrapper(vitals[0]).editSubAccountPosition(false, feeRecievingSubAcct, vitals[1], 0, int(_amount));
+			IWrapper(vitals[0]).editSubAccountPosition(false, vitals[3], vitals[1], 0, int(_amount));
 		}
 		else {
 			//the conversion below is always safe because / (1 ether) always deflates enough
 			int bondAmount = -int(_amount.mul(_ratio) / (1 ether));
-			IWrapper(vitals[0]).editSubAccountPosition(false, feeRecievingSubAcct, vitals[1], int(_amount), bondAmount);
+			IWrapper(vitals[0]).editSubAccountPosition(false, vitals[3], vitals[1], int(_amount), bondAmount);
 		}
 	}
 

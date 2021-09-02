@@ -7,6 +7,7 @@ import "../libraries/SafeMath.sol";
 import "../libraries/SignedSafeMath.sol";
 import "../libraries/ABDKMath64x64.sol";
 import "../libraries/BigMath.sol";
+import "../helpers/Ownable.sol";
 import "./OrderbookDelegateParent.sol";
 
 contract OrderbookDelegate1 is OrderbookDelegateParent {
@@ -34,7 +35,8 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 	) external setRateModifier returns(uint YTbought, uint ZCBsold, uint newHeadID, uint newHeadAmount) {
 		newHeadID = internalHeadYTSellID;
 		LimitSellYT memory order;
-		address[3] memory vitals = [address(internalWrapper), address(internalFCP), address(internalIORC)];
+		address[4] memory vitals = [address(internalWrapper), address(internalFCP), address(internalIORC), address(0)];
+		vitals[3] = IInfoOracle(vitals[2]).TreasuryFeeIsCollected() ? IInfoOracle(vitals[2]).sendTo() : Ownable(vitals[1]).owner();
 		reqPriorToPayoutPhase(vitals[1]);
 		claimContractSubAccountRewards(vitals[0], vitals[1]);
 		uint ratio = IWrapper(vitals[0]).WrappedAmtToUnitAmt_RoundDown(1 ether);
@@ -133,7 +135,8 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 
 		newHeadID = internalHeadZCBSellID;
 		LimitSellZCB memory order;
-		address[3] memory vitals = [address(internalWrapper), address(internalFCP), address(internalIORC)];
+		address[4] memory vitals = [address(internalWrapper), address(internalFCP), address(internalIORC), address(0)];
+		vitals[3] = IInfoOracle(vitals[2]).TreasuryFeeIsCollected() ? IInfoOracle(vitals[2]).sendTo() : Ownable(vitals[1]).owner();
 		reqPriorToPayoutPhase(vitals[1]);
 		claimContractSubAccountRewards(vitals[0], vitals[1]);
 		uint ratio = IWrapper(vitals[0]).WrappedAmtToUnitAmt_RoundDown(1 ether);
@@ -236,7 +239,8 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 
 		newHeadID = internalHeadZCBSellID;
 		LimitSellZCB memory order;
-		address[3] memory vitals = [address(internalWrapper), address(internalFCP), address(internalIORC)];
+		address[4] memory vitals = [address(internalWrapper), address(internalFCP), address(internalIORC), address(0)];
+		vitals[3] = IInfoOracle(vitals[2]).TreasuryFeeIsCollected() ? IInfoOracle(vitals[2]).sendTo() : Ownable(vitals[1]).owner();
 		reqPriorToPayoutPhase(vitals[1]);
 		claimContractSubAccountRewards(vitals[0], vitals[1]);
 		uint ratio = IWrapper(vitals[0]).WrappedAmtToUnitAmt_RoundDown(1 ether);
@@ -332,7 +336,8 @@ contract OrderbookDelegate1 is OrderbookDelegateParent {
 
 		newHeadID = internalHeadYTSellID;
 		LimitSellYT memory order;
-		address[3] memory vitals = [address(internalWrapper), address(internalFCP), address(internalIORC)];
+		address[4] memory vitals = [address(internalWrapper), address(internalFCP), address(internalIORC), address(0)];
+		vitals[3] = IInfoOracle(vitals[2]).TreasuryFeeIsCollected() ? IInfoOracle(vitals[2]).sendTo() : Ownable(vitals[1]).owner();
 		reqPriorToPayoutPhase(vitals[1]);
 		claimContractSubAccountRewards(vitals[0], vitals[1]);
 		uint ratio = IWrapper(vitals[0]).WrappedAmtToUnitAmt_RoundDown(1 ether);

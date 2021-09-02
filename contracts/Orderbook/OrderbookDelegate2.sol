@@ -67,10 +67,11 @@ contract OrderbookDelegate2 is OrderbookDelegateParent {
 			pretend that we aren't going to return anything then use assembly to avoid allocation
 			on the stack and write directly to memory then return
 		*/
-		address[3] memory vitals;
+		address[4] memory vitals;
 		vitals[0] = address(internalWrapper);
 		vitals[1] = address(internalFCP);
 		vitals[2] = address(internalIORC);
+		vitals[3] = IInfoOracle(vitals[2]).TreasuryFeeIsCollected() ? IInfoOracle(vitals[2]).sendTo() : Ownable(vitals[1]).owner();
 		reqPriorToPayoutPhase(vitals[1]);
 		claimContractSubAccountRewards(vitals[0], vitals[1]);
 		uint _amountZCB = _amountZCBInitial;
@@ -140,7 +141,7 @@ contract OrderbookDelegate2 is OrderbookDelegateParent {
 				ZCBsold += ZCBtoSell;
 
 				{
-					address[3] memory copyVitals;
+					address[4] memory copyVitals;
 					assembly {
 						copyVitals := shr(24, i)
 					}
@@ -165,7 +166,7 @@ contract OrderbookDelegate2 is OrderbookDelegateParent {
 					normalizedZCB = normalizedZCB / (((i >> 16) & 0xff) + TOTAL_BASIS_POINTS);
 					uint fee = ZCBsold - normalizedZCB;
 					fee = fee == 0 ? 0 : fee - 1; //ensure no rounding errors
-					address[3] memory copyVitals;
+					address[4] memory copyVitals;
 					assembly {
 						copyVitals := shr(24, i)
 					}
@@ -176,7 +177,7 @@ contract OrderbookDelegate2 is OrderbookDelegateParent {
 				uint copyZCBsold = ZCBsold; // prevent stack too deep;
 				{
 					uint copyRatio = ratio; //prevent stack too deep
-					address[3] memory copyVitals;
+					address[4] memory copyVitals;
 					assembly {
 						copyVitals := shr(24, i)
 					}
@@ -189,7 +190,7 @@ contract OrderbookDelegate2 is OrderbookDelegateParent {
 			}
 			else {
 				{
-					address[3] memory copyVitals;
+					address[4] memory copyVitals;
 					assembly {
 						copyVitals := shr(24, i)
 					}
@@ -240,10 +241,11 @@ contract OrderbookDelegate2 is OrderbookDelegateParent {
 			on the stack and write directly to memory then return
 		*/
 		uint16 _maxIterations = _maxIterationsInitial;
-		address[3] memory vitals;
+		address[4] memory vitals;
 		vitals[0] = address(internalWrapper);
 		vitals[1] = address(internalFCP);
 		vitals[2] = address(internalIORC);
+		vitals[3] = IInfoOracle(vitals[2]).TreasuryFeeIsCollected() ? IInfoOracle(vitals[2]).sendTo() : Ownable(vitals[1]).owner();
 		reqPriorToPayoutPhase(vitals[1]);
 		claimContractSubAccountRewards(vitals[0], vitals[1]);
 		uint _unitAmountYT = _unitAmountYTInitial;
@@ -309,7 +311,7 @@ contract OrderbookDelegate2 is OrderbookDelegateParent {
 				ZCBbought += ZCBtoBuy;
 
 				{
-					address[3] memory copyVitals;
+					address[4] memory copyVitals;
 					assembly {
 						copyVitals := shr(24, i)
 					}
@@ -334,7 +336,7 @@ contract OrderbookDelegate2 is OrderbookDelegateParent {
 					normalizedYT = normalizedYT / (((i >> 16) & 0xff) + TOTAL_BASIS_POINTS);
 					uint fee = YTsold - normalizedYT;
 					fee = fee == 0 ? 0 : fee - 1; //ensure no rounding errors
-					address[3] memory copyVitals;
+					address[4] memory copyVitals;
 					assembly {
 						copyVitals := shr(24, i)
 					}
@@ -345,7 +347,7 @@ contract OrderbookDelegate2 is OrderbookDelegateParent {
 				uint copyYTsold = YTsold; // prevent stack too deep
 				{
 					uint copyRatio = ratio; //prevent stack too deep
-					address[3] memory copyVitals;
+					address[4] memory copyVitals;
 					assembly {
 						copyVitals := shr(24, i)
 					}

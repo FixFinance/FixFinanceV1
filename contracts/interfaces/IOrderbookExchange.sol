@@ -111,8 +111,6 @@ interface IOrderbookExchange {
 	function wrapper() external view returns(IWrapper);
 	function IORC() external view returns(IInfoOracle);
 	function maturity() external view returns(uint40);
-	function YieldRevenue() external view returns(uint);
-	function BondRevenue() external view returns(int);
 	function getMinimumOrderSize() external view returns(uint);
 	function getMinimumOrderSizeMode() external view returns(OrderbookData.MIN_ORDER_SIZE_MODE);
 

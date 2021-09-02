@@ -789,16 +789,19 @@ contract('OrderbookExchange', async function(accounts) {
 		let prevBalBonds = await exchange.BondDeposited(accounts[1]);
 		let prevBalYield = await exchange.YieldDeposited(accounts[1]);
 
-		let prevBondRevenue = await exchange.BondRevenue();
-		let prevYieldRevenue = await exchange.YieldRevenue();
+
+		let prevSubAcctPosTreasury = await NGBwrapperInstance.subAccountPositions(exchange.address, treasuryAddress, fixCapitalPoolInstance.address);
+		let prevBondRevenue = prevSubAcctPosTreasury.bond;
+		let prevYieldRevenue = prevSubAcctPosTreasury.yield;
 
 		let rec = await exchange.marketBuyYT(amtToBuy, maxMCR, maxCumulativeMCR, maxSteps, true, {from: accounts[1]});
 		let log = rec.receipt.logs[0];
 		assert.equal(log.event, 'MarketBuyYT');
 		let logArgs = log.args;
 
-		let bondRevenue = await exchange.BondRevenue();
-		let yieldRevenue = await exchange.YieldRevenue();
+		let subAcctPosTreasury = await NGBwrapperInstance.subAccountPositions(exchange.address, treasuryAddress, fixCapitalPoolInstance.address);
+		let bondRevenue = subAcctPosTreasury.bond;
+		let yieldRevenue = subAcctPosTreasury.yield;
 
 		balBonds = await exchange.BondDeposited(accounts[1]);
 		balYield = await exchange.YieldDeposited(accounts[1]);
@@ -884,16 +887,18 @@ contract('OrderbookExchange', async function(accounts) {
 		let prevBalBonds = await exchange.BondDeposited(accounts[1]);
 		let prevBalYield = await exchange.YieldDeposited(accounts[1]);
 
-		let prevBondRevenue = await exchange.BondRevenue();
-		let prevYieldRevenue = await exchange.YieldRevenue();
+		let prevSubAcctPosTreasury = await NGBwrapperInstance.subAccountPositions(exchange.address, treasuryAddress, fixCapitalPoolInstance.address);
+		let prevBondRevenue = prevSubAcctPosTreasury.bond;
+		let prevYieldRevenue = prevSubAcctPosTreasury.yield;
 
 		let rec = await exchange.marketSellZCB(amtToSell, maxMCR, maxCumulativeMCR, maxSteps, true, {from: accounts[1]});
 		let log = rec.receipt.logs[0];
 		assert.equal(log.event, 'MarketBuyYT');
 		let logArgs = log.args;
 
-		let bondRevenue = await exchange.BondRevenue();
-		let yieldRevenue = await exchange.YieldRevenue();
+		let subAcctPosTreasury = await NGBwrapperInstance.subAccountPositions(exchange.address, treasuryAddress, fixCapitalPoolInstance.address);
+		let bondRevenue = subAcctPosTreasury.bond;
+		let yieldRevenue = subAcctPosTreasury.yield;
 
 		balBonds = await exchange.BondDeposited(accounts[1]);
 		balYield = await exchange.YieldDeposited(accounts[1]);
@@ -979,16 +984,18 @@ contract('OrderbookExchange', async function(accounts) {
 		let prevBalBonds = await exchange.BondDeposited(accounts[1]);
 		let prevBalYield = await exchange.YieldDeposited(accounts[1]);
 
-		let prevBondRevenue = await exchange.BondRevenue();
-		let prevYieldRevenue = await exchange.YieldRevenue();
+		let prevSubAcctPosTreasury = await NGBwrapperInstance.subAccountPositions(exchange.address, treasuryAddress, fixCapitalPoolInstance.address);
+		let prevBondRevenue = prevSubAcctPosTreasury.bond;
+		let prevYieldRevenue = prevSubAcctPosTreasury.yield;
 
 		let rec = await exchange.marketBuyZCB(amtToBuy, minMCR, minCumulativeMCR, maxSteps, true, {from: accounts[1]});
 		let log = rec.receipt.logs[0];
 		assert.equal(log.event, 'MarketBuyZCB');
 		let logArgs = log.args;
 
-		let bondRevenue = await exchange.BondRevenue();
-		let yieldRevenue = await exchange.YieldRevenue();
+		let subAcctPosTreasury = await NGBwrapperInstance.subAccountPositions(exchange.address, treasuryAddress, fixCapitalPoolInstance.address);
+		let bondRevenue = subAcctPosTreasury.bond;
+		let yieldRevenue = subAcctPosTreasury.yield;
 
 		balBonds = await exchange.BondDeposited(accounts[1]);
 		balYield = await exchange.YieldDeposited(accounts[1]);
@@ -1078,16 +1085,18 @@ contract('OrderbookExchange', async function(accounts) {
 		let prevBalBonds = await exchange.BondDeposited(accounts[1]);
 		let prevBalYield = await exchange.YieldDeposited(accounts[1]);
 
-		let prevBondRevenue = await exchange.BondRevenue();
-		let prevYieldRevenue = await exchange.YieldRevenue();
+		let prevSubAcctPosTreasury = await NGBwrapperInstance.subAccountPositions(exchange.address, treasuryAddress, fixCapitalPoolInstance.address);
+		let prevBondRevenue = prevSubAcctPosTreasury.bond;
+		let prevYieldRevenue = prevSubAcctPosTreasury.yield;
 
 		let rec = await exchange.marketSellYT(amtToSell, minMCR, minCumulativeMCR, maxSteps, true, {from: accounts[1]});
 		let log = rec.receipt.logs[0];
 		assert.equal(log.event, 'MarketBuyZCB');
 		let logArgs = log.args;
 
-		let bondRevenue = await exchange.BondRevenue();
-		let yieldRevenue = await exchange.YieldRevenue();
+		let subAcctPosTreasury = await NGBwrapperInstance.subAccountPositions(exchange.address, treasuryAddress, fixCapitalPoolInstance.address);
+		let bondRevenue = subAcctPosTreasury.bond;
+		let yieldRevenue = subAcctPosTreasury.yield;
 
 		balBonds = await exchange.BondDeposited(accounts[1]);
 		balYield = await exchange.YieldDeposited(accounts[1]);
@@ -1178,16 +1187,18 @@ contract('OrderbookExchange', async function(accounts) {
 		let prevBalBonds = await exchange.BondDeposited(accounts[1]);
 		let prevBalYield = await exchange.YieldDeposited(accounts[1]);
 
-		let prevBondRevenue = await exchange.BondRevenue();
-		let prevYieldRevenue = await exchange.YieldRevenue();
+		let prevSubAcctPosTreasury = await NGBwrapperInstance.subAccountPositions(exchange.address, treasuryAddress, fixCapitalPoolInstance.address);
+		let prevBondRevenue = prevSubAcctPosTreasury.bond;
+		let prevYieldRevenue = prevSubAcctPosTreasury.yield;
 
 		let rec = await exchange.marketSellZCBtoU(amtToSell, maxMCR, maxCumulativeMCR, maxSteps, true, {from: accounts[1]});
 		let log = rec.receipt.logs[0];
 		assert.equal(log.event, 'MarketBuyYT');
 		let logArgs = log.args;
 
-		let bondRevenue = await exchange.BondRevenue();
-		let yieldRevenue = await exchange.YieldRevenue();
+		let subAcctPosTreasury = await NGBwrapperInstance.subAccountPositions(exchange.address, treasuryAddress, fixCapitalPoolInstance.address);
+		let bondRevenue = subAcctPosTreasury.bond;
+		let yieldRevenue = subAcctPosTreasury.yield;
 
 		balBonds = await exchange.BondDeposited(accounts[1]);
 		balYield = await exchange.YieldDeposited(accounts[1]);
@@ -1286,16 +1297,18 @@ contract('OrderbookExchange', async function(accounts) {
 		let prevBalBonds = await exchange.BondDeposited(accounts[1]);
 		let prevBalYield = await exchange.YieldDeposited(accounts[1]);
 
-		let prevBondRevenue = await exchange.BondRevenue();
-		let prevYieldRevenue = await exchange.YieldRevenue();
+		let prevSubAcctPosTreasury = await NGBwrapperInstance.subAccountPositions(exchange.address, treasuryAddress, fixCapitalPoolInstance.address);
+		let prevBondRevenue = prevSubAcctPosTreasury.bond;
+		let prevYieldRevenue = prevSubAcctPosTreasury.yield;
 
 		let rec = await exchange.marketSellUnitYTtoU(amtToSell, minMCR, minCumulativeMCR, maxSteps, true, {from: accounts[1]});
 		let log = rec.receipt.logs[0];
 		assert.equal(log.event, 'MarketBuyZCB');
 		let logArgs = log.args;
 
-		let bondRevenue = await exchange.BondRevenue();
-		let yieldRevenue = await exchange.YieldRevenue();
+		let subAcctPosTreasury = await NGBwrapperInstance.subAccountPositions(exchange.address, treasuryAddress, fixCapitalPoolInstance.address);
+		let bondRevenue = subAcctPosTreasury.bond;
+		let yieldRevenue = subAcctPosTreasury.yield;
 
 		balBonds = await exchange.BondDeposited(accounts[1]);
 		balYield = await exchange.YieldDeposited(accounts[1]);
@@ -1479,12 +1492,11 @@ contract('OrderbookExchange', async function(accounts) {
 			assert.fail('managed to set the wrong median MCR as the MCR');
 		}
 	});
-
 	it('Claim Revenue', async () => {
 		let owner = accounts[0];
-		let YR = await exchange.YieldRevenue();
-		let BR = await exchange.BondRevenue();
 		let prevSubAcctPosTreasury = await NGBwrapperInstance.subAccountPositions(exchange.address, treasuryAddress, fixCapitalPoolInstance.address);
+		let YR = prevSubAcctPosTreasury.yield;
+		let BR = prevSubAcctPosTreasury.bond;
 		let prevYieldTreasury = await fixCapitalPoolInstance.balanceYield(treasuryAddress);
 		let prevBondTreasury = await fixCapitalPoolInstance.balanceBonds(treasuryAddress);
 		let prevYieldOwner = await fixCapitalPoolInstance.balanceYield(owner);
@@ -1501,10 +1513,6 @@ contract('OrderbookExchange', async function(accounts) {
 		let expectedBondToTreasury = BR.div(new BN(2));
 		let expectedYieldToOwner = YR.sub(expectedYieldToTreasury);
 		let expectedBondToOwner = BR.sub(expectedBondToTreasury);
-		let newYR = await exchange.YieldRevenue();
-		let newBR = await exchange.BondRevenue();
-		assert.equal(newYR.toString(), "0");
-		assert.equal(newBR.toString(), "0");
 		assert.equal(subAcctPosTreasury.yield.toString(), "0");
 		assert.equal(subAcctPosTreasury.bond.toString(), "0");
 		assert.equal(prevSubAcctPosTreasury.yield.toString(), YR.toString());

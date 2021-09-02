@@ -565,22 +565,42 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 	*/
 	function claimRevenue() external override {
 		require(msg.sender == Ownable(address(internalFCP)).owner());
-		address treasury = internalIORC.sendTo();
-		uint YR = internalYieldRevenue;
-		int BR = internalBondRevenue;
-		require(YR <= uint(type(int256).max));
-		uint yieldToTreasury = YR / 2;
-		int bondToTreasury = BR / 2;
+		IInfoOracle iorc = internalIORC;
+		IWrapper wrp = internalWrapper;
 		IFixCapitalPool fcp = internalFCP;
-		fcp.transferPosition(treasury, yieldToTreasury, bondToTreasury);
-		fcp.transferPosition(msg.sender, YR - yieldToTreasury, BR - bondToTreasury);
-		/*
-			all yield was owned by treasury none was owned by FCP owner,
-			thus take away all yield from the treasury
-		*/
-		internalWrapper.editSubAccountPosition(false, treasury, address(fcp), -int(YR), BR.mul(-1));
-		internalYieldRevenue = 0;
-		internalBondRevenue = 0;
+		address treasury = iorc.sendTo();
+		(uint yieldTreasury, int bondTreasury) = wrp.subAccountPositions(address(this), treasury, address(fcp));
+		(uint yieldOwner, int bondOwner) = wrp.subAccountPositions(address(this), msg.sender, address(fcp));
+
+		//if owner has funds deposited in the orderbook we need to disregard the effect that has on the owner's sub account with the orderbook
+		yieldOwner = yieldOwner.sub(internalYieldDeposited[msg.sender]);
+		bondOwner = bondOwner.sub(internalBondDeposited[msg.sender]);
+
+		if (iorc.TreasuryFeeIsCollected()) {
+			/*
+				Despite sub account yield going to treasury, half of that sub account position is actually paid out to the owner in fees
+				This is because 100% of all yield exposure is given to the treasury when TreasuryFeeIsCollected() returns true
+			*/
+			uint adjYieldTreasury = yieldTreasury/2;
+			int adjBondTreasury = bondTreasury/2;
+
+			uint adjYieldOwner = yieldOwner.add(yieldTreasury - adjYieldTreasury);
+			int adjBondOwner = bondOwner.add(bondTreasury - adjBondTreasury);
+
+			fcp.transferPosition(treasury, adjYieldTreasury, adjBondTreasury);
+			fcp.transferPosition(msg.sender, adjYieldOwner, adjBondOwner);
+		}
+		else {
+			fcp.transferPosition(treasury, yieldOwner.add(yieldTreasury), bondOwner.add(bondTreasury));
+		}
+
+		if (yieldTreasury != 0 || bondTreasury != 0) {
+			internalWrapper.editSubAccountPosition(false, treasury, address(fcp), yieldTreasury.toInt().mul(-1), bondTreasury.mul(-1));
+		}
+
+		if (yieldOwner != 0 || bondOwner != 0) {
+			internalWrapper.editSubAccountPosition(false, msg.sender, address(fcp), yieldOwner.toInt().mul(-1), bondOwner.mul(-1));
+		}
 	}
 
 	/*
@@ -665,14 +685,6 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 
 	function maturity() external view override returns(uint40) {
 		return internalMaturity;
-	}
-
-	function YieldRevenue() external view override returns(uint) {
-		return internalYieldRevenue;
-	}
-
-	function BondRevenue() external view override returns(int) {
-		return internalBondRevenue;
 	}
 
 	/*

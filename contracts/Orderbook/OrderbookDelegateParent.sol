@@ -7,6 +7,7 @@ import "../libraries/SafeMath.sol";
 import "../libraries/SignedSafeMath.sol";
 import "../libraries/ABDKMath64x64.sol";
 import "../libraries/BigMath.sol";
+import "../helpers/Ownable.sol";
 import "./OrderbookData.sol";
 
 contract OrderbookDelegateParent is OrderbookData {
@@ -405,19 +406,16 @@ contract OrderbookDelegateParent is OrderbookData {
 		uint _ratio
 	) internal {
 		require(_amount <= uint(type(int256).max));
-		int BR = internalBondRevenue;
+		IInfoOracle iorc = IInfoOracle(vitals[2]);
+		address feeRecievingSubAcct = iorc.TreasuryFeeIsCollected() ? iorc.sendTo() : Ownable(vitals[1]).owner();
 		if (_ratio == 0) {
 			//ratio of 0 means fee is in ZCB
-			internalBondRevenue = BR.add(int(_amount));
-			IWrapper(vitals[0]).editSubAccountPosition(false, internalIORC.sendTo(), vitals[1], 0, int(_amount));
+			IWrapper(vitals[0]).editSubAccountPosition(false, feeRecievingSubAcct, vitals[1], 0, int(_amount));
 		}
 		else {
 			//the conversion below is always safe because / (1 ether) always deflates enough
 			int bondAmount = -int(_amount.mul(_ratio) / (1 ether));
-			uint YR = internalYieldRevenue;
-			internalYieldRevenue = YR.add(_amount);
-			internalBondRevenue = BR.add(bondAmount);
-			IWrapper(vitals[0]).editSubAccountPosition(false, internalIORC.sendTo(), vitals[1], int(_amount), bondAmount);
+			IWrapper(vitals[0]).editSubAccountPosition(false, feeRecievingSubAcct, vitals[1], int(_amount), bondAmount);
 		}
 	}
 

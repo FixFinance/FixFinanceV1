@@ -52,9 +52,6 @@ contract OrderbookData {
 
 	uint40 public internalMaturity;
 
-	uint public internalYieldRevenue;
-	int public internalBondRevenue;
-
 	//--------------data for rate oracle---------------
 	uint8 constant LENGTH_RATE_SERIES = 31;
 	uint constant TIME_BETWEEN_DATAPOINTS = 1 minutes;

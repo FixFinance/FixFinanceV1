@@ -232,15 +232,23 @@ contract DBSFVaultFactoryDelegateParent is DBSFVaultFactoryData {
 	*/
 	function distributeSurplus(address _vaultOwner, address _asset, uint _amount, bool _claimRewards) internal {
 		uint retainedSurplus = _amount.mul(_liquidationRebateBips) / TOTAL_BASIS_POINTS;
-		uint toTreasury = _amount - retainedSurplus;
+		uint fee = _amount - retainedSurplus;
 		_liquidationRebates[_vaultOwner][_asset] += retainedSurplus;
-		_revenue[_asset] += toTreasury;
+		_revenue[_asset] = _revenue[_asset].add(fee);
 		IInfoOracle iorc = IInfoOracle(_infoOracleAddress);
 		(, SUPPLIED_ASSET_TYPE sType, address baseFCP, address baseWrapper) = suppliedAssetInfo(_asset, iorc);
-		require(toTreasury <= uint(type(int256).max));
-		editSubAccountStandardVault(_claimRewards, _vaultOwner, sType, baseFCP, baseWrapper, -int(toTreasury));
+		require(fee <= uint(type(int256).max));
+		editSubAccountStandardVault(_claimRewards, _vaultOwner, sType, baseFCP, baseWrapper, fee.toInt().mul(-1));
+		address feeRecipientSubAcct;
+		if (iorc.TreasuryFeeIsCollected()) {
+			feeRecipientSubAcct = iorc.sendTo();
+		}
+		else {
+			feeRecipientSubAcct = owner;
+			_revenueOwnerSubAcct[_asset] = _revenueOwnerSubAcct[_asset].add(fee);
+		}
 		//passing claimRewards:true a second time would needlessly waste gas
-		editSubAccountStandardVault(false, iorc.sendTo(), sType, baseFCP, baseWrapper, int(toTreasury));
+		editSubAccountStandardVault(false, feeRecipientSubAcct, sType, baseFCP, baseWrapper, fee.toInt());
 	}
 
 	/*
@@ -253,7 +261,19 @@ contract DBSFVaultFactoryDelegateParent is DBSFVaultFactoryData {
 	function claimStabilityFee(address _ZCBaddr, address _FCPaddr, uint _amount) internal {
 		if (_amount > 0) {
 			IFixCapitalPool(_FCPaddr).mintZCBTo(address(this), _amount);
-			_revenue[_ZCBaddr] += _amount;
+			_revenue[_ZCBaddr] = _revenue[_ZCBaddr].add(_amount);
+
+			IInfoOracle iorc = IInfoOracle(_infoOracleAddress);
+			address feeRecipientSubAcct;
+			if (iorc.TreasuryFeeIsCollected()) {
+				feeRecipientSubAcct = iorc.sendTo();
+			}
+			else {
+				feeRecipientSubAcct = owner;
+				_revenueOwnerSubAcct[_ZCBaddr] = _revenueOwnerSubAcct[_ZCBaddr].add(_amount);
+			}
+			address baseWrapper = address(IFixCapitalPool(_FCPaddr).wrapper());
+			editSubAccountStandardVault(true, feeRecipientSubAcct, SUPPLIED_ASSET_TYPE.ZCB, _FCPaddr, baseWrapper, _amount.toInt());
 		}
 	}
 

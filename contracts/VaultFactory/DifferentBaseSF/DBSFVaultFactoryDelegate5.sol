@@ -80,12 +80,32 @@ contract DBSFVaultFactoryDelegate5 is DBSFVaultFactoryDelegateParent {
 	function claimRevenue(address _asset) external {
 		uint rev = _revenue[_asset];
 		uint toTreasury = rev >> 1;
-		address treasuryAddr = IInfoOracle(_infoOracleAddress).sendTo();
-		IERC20(_asset).transfer(treasuryAddr, toTreasury);
-		IERC20(_asset).transfer(msg.sender, rev - toTreasury);
-		(, SUPPLIED_ASSET_TYPE sType, address baseFCP, address baseWrapper) = suppliedAssetInfo(_asset, IInfoOracle(_infoOracleAddress));
-		editSubAccountStandardVault(true, treasuryAddr, sType, baseFCP, baseWrapper, -int(rev));
+		IInfoOracle iorc = IInfoOracle(_infoOracleAddress);
+		address treasuryAddr = iorc.sendTo();
+		if (iorc.TreasuryFeeIsCollected()) {
+			IERC20(_asset).transfer(treasuryAddr, toTreasury);
+			IERC20(_asset).transfer(msg.sender, rev - toTreasury);
+		}
+		else {
+			IERC20(_asset).transfer(msg.sender, rev);
+		}
+		(, SUPPLIED_ASSET_TYPE sType, address baseFCP, address baseWrapper) = suppliedAssetInfo(_asset, iorc);
+
+		if (sType == SUPPLIED_ASSET_TYPE.WASSET || sType == SUPPLIED_ASSET_TYPE.ZCB) {
+
+			uint ownerSubAcctAmt = _revenueOwnerSubAcct[_asset];
+			uint treasurySubAcctAmt = rev.sub(ownerSubAcctAmt);
+
+			if (treasurySubAcctAmt > 0) {
+				editSubAccountStandardVault(true, treasuryAddr, sType, baseFCP, baseWrapper, treasurySubAcctAmt.toInt().mul(-1));
+			}
+			if (ownerSubAcctAmt > 0) {
+				editSubAccountStandardVault(false, msg.sender, sType, baseFCP, baseWrapper, ownerSubAcctAmt.toInt().mul(-1));
+			}
+		}
+
 		delete _revenue[_asset];
+		delete _revenueOwnerSubAcct[_asset];
 	}
 
 	/*
@@ -97,13 +117,40 @@ contract DBSFVaultFactoryDelegate5 is DBSFVaultFactoryDelegateParent {
 	*/
 	function claimYTRevenue(address _FCP, int _bondIn) external {
 		require(_bondIn > -1);
+		IInfoOracle iorc = IInfoOracle(_infoOracleAddress);
+		IWrapper wrp = IFixCapitalPool(_FCP).wrapper();
 		YTPosition memory pos = _YTRevenue[_FCP];
+		address sendTo = iorc.sendTo();
 		IFixCapitalPool(_FCP).burnZCBFrom(msg.sender, uint(_bondIn));
-		uint yieldToTreasury = pos.amountYield >> 1;
-		int bondToTreasury = pos.amountBond.add(_bondIn) / 2;
-		IFixCapitalPool(_FCP).transferPosition(IInfoOracle(_infoOracleAddress).sendTo(), yieldToTreasury, bondToTreasury);
-		IFixCapitalPool(_FCP).transferPosition(msg.sender, pos.amountYield - yieldToTreasury, (pos.amountBond + _bondIn) - bondToTreasury);
+		if (iorc.TreasuryFeeIsCollected()) {
+			uint yieldToTreasury = pos.amountYield >> 1;
+			int bondToTreasury = pos.amountBond.add(_bondIn) / 2;
+			IFixCapitalPool(_FCP).transferPosition(sendTo, yieldToTreasury, bondToTreasury);
+			IFixCapitalPool(_FCP).transferPosition(msg.sender, pos.amountYield - yieldToTreasury, pos.amountBond.add(_bondIn) - bondToTreasury);
+		}
+		else {
+			IFixCapitalPool(_FCP).transferPosition(msg.sender, pos.amountYield, pos.amountBond.add(_bondIn));
+		}
+
+		YTPosition memory ownerSubAcctPos = _YTRevenueOwnerSubAcct[_FCP];
+		YTPosition memory treasurySubAcctPos = YTPosition(
+			pos.amountYield.sub(ownerSubAcctPos.amountYield),
+			pos.amountBond.sub(ownerSubAcctPos.amountBond)
+		);
+
+		if (ownerSubAcctPos.amountYield != 0 || ownerSubAcctPos.amountBond != 0) {
+			int changeYield = ownerSubAcctPos.amountYield.toInt().mul(-1);
+			int changeBond = ownerSubAcctPos.amountBond.mul(-1);
+			editSubAccountYTVault(true, msg.sender, _FCP, address(wrp), changeYield, changeBond);
+		}
+		if (treasurySubAcctPos.amountYield != 0 || treasurySubAcctPos.amountBond != 0) {
+			int changeYield = treasurySubAcctPos.amountYield.toInt().mul(-1);
+			int changeBond = treasurySubAcctPos.amountBond.mul(-1);
+			editSubAccountYTVault(true, sendTo, _FCP, address(wrp), changeYield, changeBond);
+		}
+
 		delete _YTRevenue[_FCP];
+		delete _YTRevenueOwnerSubAcct[_FCP];
 	}
 
 

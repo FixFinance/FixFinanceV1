@@ -41,16 +41,26 @@ contract DBSFVaultFactoryDelegate4 is DBSFVaultFactoryDelegateParent {
 		uint _rebateBips = _liquidationRebateBips;
 		uint yieldRebate = _yieldAmount * _rebateBips / TOTAL_BASIS_POINTS;
 		int bondRebate = _bondAmount * int(_rebateBips) / int(TOTAL_BASIS_POINTS);
-		rebate.amountYield += yieldRebate;
-		rebate.amountBond += bondRebate;
+		rebate.amountYield = rebate.amountYield.add(yieldRebate);
+		rebate.amountBond = rebate.amountBond.add(bondRebate);
 		uint yieldRevenue = _yieldAmount - yieldRebate;
 		require(yieldRevenue <= uint(type(int256).max));
 		int bondRevenue = _bondAmount - bondRebate;
 		revenue.amountYield += yieldRevenue;
 		revenue.amountBond += bondRevenue;
-		editSubAccountYTVault(true, _vaultOwner, _FCPaddr, _baseWrapper, -int(yieldRevenue), bondRevenue.mul(-1));
-		address _treasuryAddr = IInfoOracle(_infoOracleAddress).sendTo();
-		editSubAccountYTVault(false, _treasuryAddr, _FCPaddr, _baseWrapper, int(yieldRevenue), bondRevenue);
+		editSubAccountYTVault(true, _vaultOwner, _FCPaddr, _baseWrapper, yieldRevenue.toInt().mul(-1), bondRevenue.mul(-1));
+		IInfoOracle iorc = IInfoOracle(_infoOracleAddress);
+		address feeRecipientSubAcct;
+		if (iorc.TreasuryFeeIsCollected()) {
+			feeRecipientSubAcct = iorc.sendTo();
+		}
+		else {
+			feeRecipientSubAcct = owner;
+			address copyFCPaddr = _FCPaddr;
+			_YTRevenueOwnerSubAcct[copyFCPaddr].amountYield = _YTRevenueOwnerSubAcct[copyFCPaddr].amountYield.add(yieldRevenue);
+			_YTRevenueOwnerSubAcct[copyFCPaddr].amountBond = _YTRevenueOwnerSubAcct[copyFCPaddr].amountBond.add(bondRevenue);
+		}
+		editSubAccountYTVault(false, feeRecipientSubAcct, _FCPaddr, _baseWrapper, yieldRevenue.toInt(), bondRevenue);
 	}
 
 	/*

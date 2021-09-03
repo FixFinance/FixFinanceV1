@@ -96,7 +96,7 @@ contract Organizer is Ownable, IOrganizer {
 			msg.sender,
 			InfoOracleAddress
 		);
-		emit FixCapitalPoolDeployment(fixCapitalPoolAddress, msg.sender);
+		emit FixCapitalPoolDeployment(fixCapitalPoolAddress, _wrapperAddress, msg.sender, _maturity);
 		fixCapitalPoolToWrapper[fixCapitalPoolAddress] = _wrapperAddress;
 	}
 
@@ -134,7 +134,9 @@ contract Organizer is Ownable, IOrganizer {
 	*/
 	function deployOrderbook(address _fixCapitalPoolAddress) external override {
 		require(Orderbooks[_fixCapitalPoolAddress] == address(0));
-		Orderbooks[_fixCapitalPoolAddress] = OrderbookDeployer(OrderbookDeployerAddress).deploy(_fixCapitalPoolAddress);
+		address orderbookAddr = OrderbookDeployer(OrderbookDeployerAddress).deploy(_fixCapitalPoolAddress);
+		Orderbooks[_fixCapitalPoolAddress] = orderbookAddr;
+		emit OrderbookDeployment(orderbookAddr, _fixCapitalPoolAddress);
 	}
 
 	/*

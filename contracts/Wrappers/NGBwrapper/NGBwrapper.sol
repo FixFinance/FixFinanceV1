@@ -327,7 +327,7 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
         uint256 amount,
         bytes calldata data
     ) external override noReentry returns (bool) {
-    	(bool success, ) = delegate3Address.delegatecall(abi.encodeWithSignature(
+    	(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
     		"flashLoan(address,address,uint256,bytes)",
     		address(receiver),
     		token,
@@ -335,31 +335,6 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
     		data
     	));
     	require(success);
-/*
-    	require(token == address(this));
-    	require(amount + internalTotalSupply <= uint256(-1));
-    	uint _flashLoanFee = internalFlashLoanFee;
-    	require(amount <= (uint256(-1) - internalTotalSupply) / (_flashLoanFee == 0 ? 1 : _flashLoanFee));
-    	uint fee = amount.mul(_flashLoanFee) / totalSBPS;
-    	internalBalanceOf[msg.sender] = internalBalanceOf[msg.sender].add(amount);
-    	emit FlashMint(msg.sender, amount);
-        uint256 _allowance = internalAllowance[address(receiver)][address(this)];
-        require(
-            _allowance >= amount.add(fee),
-            "FlashMinter: Repay not approved"
-        );
-        uint toRepay = amount.add(fee);
-        internalAllowance[address(receiver)][address(this)] = _allowance.sub(toRepay);
-    	bytes32 out = receiver.onFlashLoan(msg.sender, token, amount, fee, data);
-    	require(CALLBACK_SUCCESS == out);
-        uint balance = internalBalanceOf[address(receiver)];
-        require(balance >= toRepay);
-        internalBalanceOf[address(receiver)] = balance.sub(toRepay);
-		emit FlashBurn(address(receiver), toRepay, fee);
-		//the flashloan fee is burned, thus we must decrement the total supply by the fee amount
-        internalTotalSupply = internalTotalSupply.sub(fee);
-        return true;
-*/
     }
 
     //-----------r-e-w-a-r-d---a-s-s-e-t---d-i-s-t-r-i-b-u-t-i-o-n---m-e-c-h-a-n-i-s-m---------

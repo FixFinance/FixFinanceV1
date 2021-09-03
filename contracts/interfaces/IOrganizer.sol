@@ -3,16 +3,24 @@ pragma solidity >=0.6.8 <0.7.0;
 
 interface IOrganizer {
 	event WrapperDeployment(
-		address wrapperAddress,
-		address underlyingAddress,
-		address owner,
+		address indexed wrapperAddress,
+		address indexed underlyingAddress,
+		address indexed owner,
 		uint8 wrapperType
 	);
 
 	event FixCapitalPoolDeployment(
-		address FCPaddress,
-		address owner
+		address indexed FCPaddress,
+		address indexed BaseWrapperAddress,
+		address indexed owner,
+		uint40 maturity
 	);
+
+	event OrderbookDeployment(
+		address indexed OrderbookAddress,
+		address indexed BaseFCPaddress
+	);
+
 	function fixCapitalPoolToWrapper(address _FCPaddress) external view returns (address wrapperAddress);
 	function ZCBamms(address _FCPaddress) external view returns (address ZCBammAddress);
 	function YTamms(address _FCPaddress) external view returns (address YTammAddress);

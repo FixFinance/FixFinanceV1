@@ -233,4 +233,39 @@ contract NGBwrapperDelegate2 is NGBwrapperDelegateParent {
         }
     }
 
+    function flashLoan(
+        IERC3156FlashBorrower receiver,
+        address token,
+        uint256 amount,
+        bytes calldata data
+    ) external noReentry claimRewards(true, address(receiver)) returns (bool) {
+        require(token == address(this));
+        require(amount + internalTotalSupply <= uint256(-1));
+        uint _flashLoanFee = internalFlashLoanFee;
+        require(amount <= (uint256(-1) - internalTotalSupply) / (_flashLoanFee == 0 ? 1 : _flashLoanFee));
+        uint fee = amount.mul(_flashLoanFee) / totalSBPS;        
+        address recAddr = address(receiver);
+        internalBalanceOf[recAddr] = internalBalanceOf[recAddr].add(amount);
+        emit FlashMint(recAddr, amount);
+        uint256 _allowance = internalAllowance[recAddr][address(this)];
+        uint toRepay = amount.add(fee);
+        require(
+            _allowance >= toRepay,
+            "FlashMinter: Repay not approved"
+        );
+        internalAllowance[recAddr][address(this)] = _allowance.sub(toRepay);
+        address copyToken = token;
+        uint copyAmount = amount;
+        bytes memory copyData = data;
+        bytes32 out = IERC3156FlashBorrower(recAddr).onFlashLoan(msg.sender, copyToken, copyAmount, fee, copyData);
+        require(CALLBACK_SUCCESS == out);
+        uint balance = internalBalanceOf[recAddr];
+        require(balance >= toRepay);
+        internalBalanceOf[recAddr] = balance.sub(toRepay);
+        emit FlashBurn(recAddr, toRepay, fee);
+        //the flashloan fee is burned, thus we must decrement the total supply by the fee amount
+        internalTotalSupply = internalTotalSupply.sub(fee);
+        return true;
+    }
+
 }

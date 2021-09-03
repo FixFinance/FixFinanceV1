@@ -59,10 +59,17 @@ contract NGBwrapperDelegate1 is NGBwrapperDelegateParent {
 		}
 		internalLastHarvest = block.timestamp;
 		uint dividend = newTotalSupply.sub(prevTotalSupply);
-		address sendTo = IInfoOracle(internalInfoOracleAddress).sendTo();
-		internalBalanceOf[sendTo] += dividend >> 1;
-		internalBalanceOf[owner] += dividend - (dividend >> 1);
-		internalTotalSupply = newTotalSupply;
+		IInfoOracle iorc = IInfoOracle(internalInfoOracleAddress);
+		address _owner = owner;
+		if (iorc.TreasuryFeeIsCollected()) {
+			address sendTo = iorc.sendTo();
+			internalBalanceOf[sendTo] = internalBalanceOf[sendTo].add(dividend >> 1);
+			internalBalanceOf[_owner] = internalBalanceOf[_owner].add(dividend - (dividend >> 1));
+			internalTotalSupply = newTotalSupply;
+		}
+		else {
+			internalBalanceOf[_owner] = internalBalanceOf[_owner].add(dividend);
+		}
 	}
 
 	/*

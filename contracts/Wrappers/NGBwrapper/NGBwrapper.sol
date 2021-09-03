@@ -666,16 +666,25 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 			this reward asset must not be listed within the immutableRewardsAssets array
 
 		@param address _assetAddr: the address of the reward asset to harvest
-    */
-    function harvestNonListedRewardAsset(address _assetAddr) external onlyOwner override {
-    	uint len = internalRewardsAssets.length;
-    	for (uint8 i = 0; i < len; i++) {
+	*/
+	function harvestNonListedRewardAsset(address _assetAddr) external onlyOwner override {
+		uint len = internalRewardsAssets.length;
+		for (uint8 i = 0; i < len; i++) {
 			require(internalImmutableRewardsAssets[i] != _assetAddr);
-    	}
-    	uint currentBal = IERC20(_assetAddr).balanceOf(address(this));
-    	address sendTo = IInfoOracle(internalInfoOracleAddress).sendTo();
-    	uint toOwner = currentBal >> 1;
-    	IERC20(_assetAddr).transfer(msg.sender, toOwner);
-    	IERC20(_assetAddr).transfer(sendTo, currentBal - toOwner);
-    }
+		}
+		uint currentBal = IERC20(_assetAddr).balanceOf(address(this));
+		IInfoOracle iorc = IInfoOracle(internalInfoOracleAddress);
+		if (iorc.TreasuryFeeIsCollected()) {
+			address sendTo = iorc.sendTo();
+			uint toOwner = currentBal >> 1;
+			bool success = IERC20(_assetAddr).transfer(msg.sender, toOwner);
+			require(success);
+			success = IERC20(_assetAddr).transfer(sendTo, currentBal - toOwner);
+			require(success);
+		}
+		else {
+			bool success = IERC20(_assetAddr).transfer(msg.sender, currentBal);
+			require(success);
+		}
+	}
 }

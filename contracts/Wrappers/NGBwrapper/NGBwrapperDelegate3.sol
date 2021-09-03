@@ -191,10 +191,19 @@ contract NGBwrapperDelegate3 is NGBwrapperDelegateParent {
         internalDistributionAccountRewards.push();
         internalSAPTRPW.push();
         uint currentBal = IERC20(_rewardsAsset).balanceOf(address(this));
-        address sendTo = IInfoOracle(internalInfoOracleAddress).sendTo();
-        uint toOwner = currentBal >> 1;
-        IERC20(_rewardsAsset).transfer(msg.sender, toOwner);
-        IERC20(_rewardsAsset).transfer(sendTo, currentBal - toOwner);
+        IInfoOracle iorc = IInfoOracle(internalInfoOracleAddress);
+        if (iorc.TreasuryFeeIsCollected()) {
+            address sendTo = iorc.sendTo();
+            uint toOwner = currentBal >> 1;
+            bool success = IERC20(_rewardsAsset).transfer(msg.sender, toOwner);
+            require(success);
+            success = IERC20(_rewardsAsset).transfer(sendTo, currentBal - toOwner);
+            require(success);
+        }
+        else {
+            bool success = IERC20(_rewardsAsset).transfer(msg.sender, currentBal);
+            require(success);
+        }
     }
 
     /*
@@ -209,12 +218,19 @@ contract NGBwrapperDelegate3 is NGBwrapperDelegateParent {
         internalRewardsAssets[_index] = address(0);
         IERC20 rewardAsset = IERC20(internalImmutableRewardsAssets[_index]);
         uint contractBalance = rewardAsset.balanceOf(address(this));
-        address sendTo = IInfoOracle(internalInfoOracleAddress).sendTo();
-        uint toOwner = contractBalance >> 1;
-        bool success = rewardAsset.transfer(msg.sender, toOwner);
-        require(success);
-        success = rewardAsset.transfer(sendTo, contractBalance - toOwner);
-        require(success);
+        IInfoOracle iorc = IInfoOracle(internalInfoOracleAddress);
+        if (iorc.TreasuryFeeIsCollected()) {
+            address sendTo = IInfoOracle(internalInfoOracleAddress).sendTo();
+            uint toOwner = contractBalance >> 1;
+            bool success = rewardAsset.transfer(msg.sender, toOwner);
+            require(success);
+            success = rewardAsset.transfer(sendTo, contractBalance - toOwner);
+            require(success);
+        }
+        else {
+            bool success = rewardAsset.transfer(msg.sender, contractBalance);
+            require(success);
+        }
         internalPrevContractBalance[_index] = 0;
     }
 

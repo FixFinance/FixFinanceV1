@@ -4,6 +4,7 @@ pragma solidity >=0.6.8 <0.7.0;
 import "../../interfaces/IERC20.sol";
 import "../../interfaces/IInfoOracle.sol";
 import "../../interfaces/IFixCapitalPool.sol";
+import "../../interfaces/IWrapper.sol";
 import "../../libraries/SafeMath.sol";
 import "../../libraries/SignedSafeMath.sol";
 import "../../libraries/ABDKMath64x64.sol";
@@ -216,4 +217,37 @@ contract NGBwrapperDelegate3 is NGBwrapperDelegateParent {
         require(success);
         internalPrevContractBalance[_index] = 0;
     }
+
+
+    function flashLoan(
+        IERC3156FlashBorrower receiver,
+        address token,
+        uint256 amount,
+        bytes calldata data
+    ) external noReentry claimRewards(true, address(receiver)) returns (bool) {
+        require(token == address(this));
+        require(amount + internalTotalSupply <= uint256(-1));
+        uint _flashLoanFee = internalFlashLoanFee;
+        require(amount <= (uint256(-1) - internalTotalSupply) / (_flashLoanFee == 0 ? 1 : _flashLoanFee));
+        uint fee = amount.mul(_flashLoanFee) / totalSBPS;
+        internalBalanceOf[address(receiver)] = internalBalanceOf[address(receiver)].add(amount);
+        emit FlashMint(address(receiver), amount);
+        uint256 _allowance = internalAllowance[address(receiver)][address(this)];
+        uint toRepay = amount.add(fee);
+        require(
+            _allowance >= toRepay,
+            "FlashMinter: Repay not approved"
+        );
+        internalAllowance[address(receiver)][address(this)] = _allowance.sub(toRepay);
+        bytes32 out = receiver.onFlashLoan(msg.sender, token, amount, fee, data);
+        require(CALLBACK_SUCCESS == out);
+        uint balance = internalBalanceOf[address(receiver)];
+        require(balance >= toRepay);
+        internalBalanceOf[address(receiver)] = balance.sub(toRepay);
+        emit FlashBurn(address(receiver), toRepay, fee);
+        //the flashloan fee is burned, thus we must decrement the total supply by the fee amount
+        internalTotalSupply = internalTotalSupply.sub(fee);
+        return true;
+    }
+
 }

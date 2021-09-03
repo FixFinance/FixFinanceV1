@@ -10,8 +10,19 @@ contract NGBwrapperDelegateParent is NGBwrapperData {
 	using SafeMath for uint256;
 	using ABDKMath64x64 for int128;
 
+	event FlashMint(
+		address indexed to,
+		uint wrappedAmount
+	);
+
+	event FlashBurn(
+		address indexed from,
+		uint wrappedAmount,
+		uint feeAmount
+	);
+
 	/*
-		@Description: claim rewards for an address holding the wrapped asset of the wrapper contract
+		@Description: claim rewards for an address holding the wrapped asset of the wrapper contract, modifier form
 	
 		@param bool _claim: if false don't do not do any computation return immediately
 			if true go ahead and actually claim rewards
@@ -34,8 +45,21 @@ contract NGBwrapperDelegateParent is NGBwrapperData {
 			return;
 		}
 		uint balanceAddr = internalBalanceOf[_addr];
+		internalClaimRewards(_addr, len, _totalSupply, balanceAddr);
+		_;
+	}
+
+	/*
+		@Description: claim rewards for an address holding the wrapped asset of the wrapper contract, internal function
+
+		@param address _addr: the address for which to claim rewards
+		@param uint _len: the length of the rewards asset array
+		@param uint _totalSupply: copy of internalTotalSupply
+		@param uint _balanceAddr: the balance of the address for which to claim rewards
+	*/
+	function internalClaimRewards(address _addr, uint _len, uint _totalSupply, uint _balanceAddr) internal {
 		uint16 i = internalIsDistributionAccount[_addr] ? 1 << 15 : 0;
-		for ( ; uint8(i) < len; i++) {
+		for ( ; uint8(i) < _len; i++) {
 			address _rewardsAddr = internalRewardsAssets[uint8(i)];
 			if (_rewardsAddr == address(0)) {
 				continue;
@@ -51,7 +75,7 @@ contract NGBwrapperDelegateParent is NGBwrapperData {
 			uint activationTRPW = internalTRPWuponActivation[uint8(i)];
 			prevTRPW = prevTRPW > activationTRPW ? prevTRPW : activationTRPW;
 			if (prevTRPW < newTRPW) {
-				uint dividend = (newTRPW - prevTRPW).mul(balanceAddr) / (1 ether);
+				uint dividend = (newTRPW - prevTRPW).mul(_balanceAddr) / (1 ether);
 				internalPrevTotalRewardsPerWasset[uint8(i)][_addr] = newTRPW;
 				if (dividend > 0) {
 					if (i >> 15 > 0) {
@@ -67,7 +91,6 @@ contract NGBwrapperDelegateParent is NGBwrapperData {
 			internalPrevContractBalance[uint8(i)] = CBRA;
 			internalTotalRewardsPerWasset[uint8(i)] = newTRPW;
 		}
-		_;
 	}
 
 	/*
@@ -90,6 +113,18 @@ contract NGBwrapperDelegateParent is NGBwrapperData {
 		}
 		uint balanceAddr0 = internalBalanceOf[_addr0];
 		uint balanceAddr1 = internalBalanceOf[_addr1];
+		internalDoubleClaimRewards(_addr0, _addr1, len, _totalSupply, balanceAddr0, balanceAddr1);
+		_;
+	}
+
+	function internalDoubleClaimRewards(
+		address _addr0,
+		address _addr1,
+		uint len,
+		uint _totalSupply,
+		uint balanceAddr0,
+		uint balanceAddr1
+	) internal {
 		/*
 			to save stack space multiple vars will be stored within i
 			most significant bit = addr0 is distribution account
@@ -147,7 +182,6 @@ contract NGBwrapperDelegateParent is NGBwrapperData {
 			internalPrevContractBalance[uint8(i)] = CBRA;
 			internalTotalRewardsPerWasset[uint8(i)] = newTRPW;
 		}
-		_;
 	}
 
 }

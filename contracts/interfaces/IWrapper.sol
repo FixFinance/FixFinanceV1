@@ -21,7 +21,8 @@ interface IWrapper is IERC20, IERC3156FlashLender {
 
 	event FlashBurn(
 		address indexed from,
-		uint wrappedAmount
+		uint wrappedAmount,
+		uint feeAmount
 	);
 
 	function underlyingAssetAddress() external view returns(address);

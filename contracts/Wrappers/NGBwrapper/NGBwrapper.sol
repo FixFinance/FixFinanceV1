@@ -327,6 +327,15 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
         uint256 amount,
         bytes calldata data
     ) external override noReentry returns (bool) {
+    	(bool success, ) = delegate3Address.delegatecall(abi.encodeWithSignature(
+    		"flashLoan(address,address,uint256,bytes)",
+    		address(receiver),
+    		token,
+    		amount,
+    		data
+    	));
+    	require(success);
+/*
     	require(token == address(this));
     	require(amount + internalTotalSupply <= uint256(-1));
     	uint _flashLoanFee = internalFlashLoanFee;
@@ -346,9 +355,11 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
         uint balance = internalBalanceOf[address(receiver)];
         require(balance >= toRepay);
         internalBalanceOf[address(receiver)] = balance.sub(toRepay);
-		emit FlashBurn(address(receiver), toRepay);
+		emit FlashBurn(address(receiver), toRepay, fee);
+		//the flashloan fee is burned, thus we must decrement the total supply by the fee amount
         internalTotalSupply = internalTotalSupply.sub(fee);
         return true;
+*/
     }
 
     //-----------r-e-w-a-r-d---a-s-s-e-t---d-i-s-t-r-i-b-u-t-i-o-n---m-e-c-h-a-n-i-s-m---------

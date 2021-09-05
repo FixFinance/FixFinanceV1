@@ -95,18 +95,20 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 			_maxSteps
 		);
 
+		uint newID;
 		uint prevID;
 		assembly {
 			let retPtr := mload(0x40)
 
-			let success := delegatecall(gas(), _delegateAddress, add(sig, 0x20), mload(sig), retPtr, 0x20)
+			let success := delegatecall(gas(), _delegateAddress, add(sig, 0x20), mload(sig), retPtr, 0x40)
 
 			if iszero(success) { revert(0,0) }
 
-			prevID := mload(retPtr)
+			newID := mload(retPtr)
+			prevID := mload(add(retPtr, 0x20))
 		}
 
-		emit MakeLimitSellZCB(msg.sender, prevID, _amount, _maturityConversionRate);
+		emit MakeLimitSellZCB(msg.sender, prevID, newID, _amount, _maturityConversionRate);
 	}
 
 	/*
@@ -133,18 +135,20 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 			_maxSteps
 		);
 
+		uint newID;
 		uint prevID;
 		assembly {
 			let retPtr := mload(0x40)
 
-			let success := delegatecall(gas(), _delegateAddress, add(sig, 0x20), mload(sig), retPtr, 0x20)
+			let success := delegatecall(gas(), _delegateAddress, add(sig, 0x20), mload(sig), retPtr, 0x40)
 
 			if iszero(success) { revert(0,0) }
 
-			prevID := mload(retPtr)
+			newID := mload(retPtr)
+			prevID := mload(add(retPtr, 0x20))
 		}
 
-		emit MakeLimitSellYT(msg.sender, prevID, _amount, _maturityConversionRate);
+		emit MakeLimitSellYT(msg.sender, prevID, newID, _amount, _maturityConversionRate);
 	}
 
 	/*

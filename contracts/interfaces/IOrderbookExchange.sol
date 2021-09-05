@@ -10,6 +10,7 @@ interface IOrderbookExchange {
 	event MakeLimitSellZCB(
 		address indexed maker,
 		uint prevID,
+		uint newID,
 		uint amount,
 		uint maturityConversionRate
 	);
@@ -17,6 +18,7 @@ interface IOrderbookExchange {
 	event MakeLimitSellYT(
 		address indexed maker,
 		uint prevID,
+		uint newID,
 		uint amount,
 		uint maturityConversionRate
 	);

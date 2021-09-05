@@ -530,9 +530,9 @@ contract OrderbookDelegate3 is OrderbookDelegateParent {
 		uint _maturityConversionRate,
 		uint _hintID,
 		uint _maxSteps
-	) external ensureValidZCBSell(_amount, _maturityConversionRate) setRateModifier returns(uint prevID) {
+	) external ensureValidZCBSell(_amount, _maturityConversionRate) setRateModifier returns(uint newID, uint prevID) {
 		reqPriorToPayoutPhase(address(internalFCP));
-		uint newID = totalNumOrders+1;
+		newID = totalNumOrders+1;
 		if (_hintID == 0) {
 			prevID = insertFromHead_SellZCB(_amount, _maturityConversionRate, newID, _maxSteps);
 		}
@@ -558,9 +558,9 @@ contract OrderbookDelegate3 is OrderbookDelegateParent {
 		uint _maturityConversionRate,
 		uint _hintID,
 		uint _maxSteps
-	) external ensureValidYTSell(_amount, _maturityConversionRate) setRateModifier returns(uint prevID) {
+	) external ensureValidYTSell(_amount, _maturityConversionRate) setRateModifier returns(uint newID, uint prevID) {
 		reqPriorToPayoutPhase(address(internalFCP));
-		uint newID = totalNumOrders+1;
+		newID = totalNumOrders+1;
 		if (_hintID == 0) {
 			prevID = insertFromHead_SellYT(_amount, _maturityConversionRate, newID, _maxSteps);
 		}

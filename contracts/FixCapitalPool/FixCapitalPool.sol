@@ -365,38 +365,6 @@ contract FixCapitalPool is IFixCapitalPool, FCPDelegateParent, Ownable, nonReent
 			_amount
 		));
 		require(success);
-/*
-		IWrapper wrp = internalWrapper;
-		bool _inPayoutPhase = internalInPayoutPhase; //gas savings
-		if (msg.sender != _from && msg.sender != internalYieldTokenAddress) {
-			IYieldToken(internalYieldTokenAddress).decrementAllowance(_from, msg.sender, _amount);
-		}
-		uint conversionRate = _inPayoutPhase ? internalMaturityConversionRate : wrp.WrappedAmtToUnitAmt_RoundDown(1 ether);
-		int[2] memory bondArr = [internalBalanceBonds[_from], internalBalanceBonds[_to]];
-		address[2] memory subAccts = [_from, _to];
-		uint[2] memory yieldArr = [internalBalanceYield[_from], internalBalanceYield[_to]];
-		uint[2] memory wrappedClaims = _inPayoutPhase ? 
-			[payoutAmount(yieldArr[0], bondArr[0], conversionRate), payoutAmount(yieldArr[1], bondArr[1], conversionRate)]
-			: yieldArr;
-		wrp.FCPDirectDoubleClaimSubAccountRewards(_inPayoutPhase, true, subAccts, yieldArr, wrappedClaims);
-
-		int amountBondChange = int(_amount.mul(conversionRate) / (1 ether)); //can be casted to int without worry bc '/ (1 ether)' ensures it fits
-
-		//ensure that _from address's position may be cashed out to a positive amount of wrappedToken
-		//if it cannot the following call will revert this tx
-		minimumUnitAmountAtMaturity(yieldArr[0].sub(_amount), bondArr[0].add(amountBondChange), conversionRate);
-
-		yieldArr[0] = yieldArr[0].sub(_amount);
-		yieldArr[1] = yieldArr[1].add(_amount);
-		bondArr[0] = bondArr[0].add(amountBondChange);
-		bondArr[1] = bondArr[1].sub(amountBondChange);
-		emit BalanceUpdate(_from, yieldArr[0], bondArr[0]);
-		internalBalanceYield[_from] = yieldArr[0];
-		internalBalanceBonds[_from] = bondArr[0];
-		emit BalanceUpdate(_to, yieldArr[1], bondArr[1]);
-		internalBalanceYield[_to] = yieldArr[1];
-		internalBalanceBonds[_to] = bondArr[1];
-*/
 	}
 
 	//---------------------------------a-d-m-i-n------------------------------
@@ -484,50 +452,56 @@ contract FixCapitalPool is IFixCapitalPool, FCPDelegateParent, Ownable, nonReent
 		uint yieldFee;
 		int bondFee;
 		{
-			uint prevYield = internalBalanceYield[msg.sender];
+			address recAddr = address(_receiver);
+			uint copyAmtYield = _amountYield;
+			int copyAmtBond = _amountBond;
+			uint prevYield = internalBalanceYield[recAddr];
 			IWrapper wrp = internalWrapper;
-			wrp.FCPDirectClaimSubAccountRewards(false, true, msg.sender, prevYield, prevYield);
+			wrp.FCPDirectClaimSubAccountRewards(false, true, recAddr, prevYield, prevYield);
 			ratio = wrp.WrappedAmtToUnitAmt_RoundDown(1 ether);
 
-			uint newYield =  prevYield.add(_amountYield);
-			int newBond = internalBalanceBonds[msg.sender].add(_amountBond);
-			emit BalanceUpdate(msg.sender, newYield, newBond);
-			if (_amountYield > 0) {
-				yieldFee = _amountYield.mul(_flashLoanFee) / totalSBPS;
-				internalBalanceYield[msg.sender] = newYield;
+			uint newYield =  prevYield.add(copyAmtYield);
+			int newBond = internalBalanceBonds[recAddr].add(copyAmtBond);
+			emit BalanceUpdate(recAddr, newYield, newBond);
+			if (copyAmtYield > 0) {
+				yieldFee = copyAmtYield.mul(_flashLoanFee) / totalSBPS;
+				internalBalanceYield[recAddr] = newYield;
 			}
-			if (_amountBond != 0) {
-				bondFee = _amountBond.mul(int(_flashLoanFee)) / int(totalSBPS);
-				internalBalanceBonds[msg.sender] = newBond;
+			if (copyAmtBond != 0) {
+				bondFee = copyAmtBond.mul(_flashLoanFee.toInt()) / int(totalSBPS);
+				internalBalanceBonds[recAddr] = newBond;
 			}
 		}
 		uint effectiveZCB = _amountYield.mul(ratio) / (1 ether);
 		if (_amountBond >= 0) {
-			effectiveZCB = effectiveZCB.add(uint(_amountBond));
+			effectiveZCB = effectiveZCB.add(_amountBond.toUint());
 		}
 		else {
-			effectiveZCB = effectiveZCB.sub(uint(-_amountBond));
+			effectiveZCB = effectiveZCB.sub(_amountBond.mul(-1).toUint());
 		}
 
 		//decrement allowances
-		IZeroCouponBond(internalZeroCouponBondAddress).decrementAllowance(address(_receiver), msg.sender, effectiveZCB);
-		IYieldToken(internalYieldTokenAddress).decrementAllowance(address(_receiver), msg.sender, _amountYield);
+		IZeroCouponBond(internalZeroCouponBondAddress).decrementAllowance(address(_receiver), address(this), effectiveZCB);
+		IYieldToken(internalYieldTokenAddress).decrementAllowance(address(_receiver), address(this), _amountYield);
 
 		bytes32 out = _receiver.onFlashLoan(msg.sender, _amountYield, _amountBond, yieldFee, bondFee, _data);
 		require(out == CALLBACK_SUCCESS);
 
 		{
-			uint newYield = internalBalanceYield[msg.sender];
-			int newBond = internalBalanceBonds[msg.sender];
-			if (_amountYield > 0) {
-				newYield = newYield.sub(_amountYield).sub(yieldFee);
-				internalBalanceYield[msg.sender] = newYield;
+			address recAddr = address(_receiver);
+			uint copyAmtYield = _amountYield;
+			int copyAmtBond = _amountBond;
+			uint newYield = internalBalanceYield[recAddr];
+			int newBond = internalBalanceBonds[recAddr];
+			if (copyAmtYield > 0) {
+				newYield = newYield.sub(copyAmtYield).sub(yieldFee);
+				internalBalanceYield[recAddr] = newYield;
 			}
-			if (_amountBond != 0) {
-				newBond = newBond.sub(_amountBond).sub(bondFee);
-				internalBalanceBonds[msg.sender] = newBond;
+			if (copyAmtBond != 0) {
+				newBond = newBond.sub(copyAmtBond).sub(bondFee);
+				internalBalanceBonds[recAddr] = newBond;
 			}
-			emit BalanceUpdate(msg.sender, newYield, newBond);
+			emit BalanceUpdate(recAddr, newYield, newBond);
 		}
 
 		address _owner = owner;

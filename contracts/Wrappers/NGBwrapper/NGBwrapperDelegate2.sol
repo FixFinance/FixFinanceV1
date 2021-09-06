@@ -263,7 +263,10 @@ contract NGBwrapperDelegate2 is NGBwrapperDelegateParent {
         require(balance >= toRepay);
         internalBalanceOf[recAddr] = balance.sub(toRepay);
         emit FlashBurn(recAddr, toRepay, fee);
-        //the flashloan fee is burned, thus we must decrement the total supply by the fee amount
+        /*
+            the flashloan fee is burned, thus we must decrement the total supply by the fee amount
+            this distributes the fee among all wrapped asset holders
+        */
         internalTotalSupply = internalTotalSupply.sub(fee);
         return true;
     }

@@ -123,6 +123,7 @@ contract FixCapitalPool is IFixCapitalPool, FCPDelegateParent, Ownable, nonReent
 		wrp.transferFrom(msg.sender, address(this), _amountWrappedTkn);
 		wrp.FCPDirectClaimSubAccountRewards(false, false, _to, yield, yield);
 		internalBalanceYield[_to] = yield.add(_amountWrappedTkn);
+		emit Deposit(_to, _amountWrappedTkn);
 	}
 
 	/*
@@ -147,6 +148,7 @@ contract FixCapitalPool is IFixCapitalPool, FCPDelegateParent, Ownable, nonReent
 
 		wrp.FCPDirectClaimSubAccountRewards(false, false, msg.sender, yield, yield);
 		internalBalanceYield[msg.sender] = yield.sub(_amountWrappedTkn);
+		emit Withdrawal(msg.sender, _amountWrappedTkn);
 	}
 
 	/*
@@ -172,6 +174,7 @@ contract FixCapitalPool is IFixCapitalPool, FCPDelegateParent, Ownable, nonReent
 
 		wrp.FCPDirectClaimSubAccountRewards(false, false, msg.sender, yield, yield);
 		internalBalanceYield[msg.sender] = yield.sub(freeToMove);
+		emit Withdrawal(msg.sender, freeToMove);
 	}
 
 	/*
@@ -235,7 +238,9 @@ contract FixCapitalPool is IFixCapitalPool, FCPDelegateParent, Ownable, nonReent
 			uint payout = payoutAmount(yield, bond, internalMaturityConversionRate);
 			internalWrapper.FCPDirectClaimSubAccountRewards(true, true, _owner, yield, payout);
 		}
-		internalBalanceBonds[_owner] += int(_amount);
+		int newBond = internalBalanceBonds[_owner].add(_amount.toInt());
+		internalBalanceBonds[_owner] = newBond;
+		emit BondBalanceUpdate(_owner, newBond);
 	}
 
 	/*
@@ -257,7 +262,9 @@ contract FixCapitalPool is IFixCapitalPool, FCPDelegateParent, Ownable, nonReent
 			uint payout = payoutAmount(yield, bond, internalMaturityConversionRate);
 			internalWrapper.FCPDirectClaimSubAccountRewards(true, true, _owner, yield, payout);
 		}
-		internalBalanceBonds[_owner] -= int(_amount);
+		int newBond = internalBalanceBonds[_owner].sub(_amount.toInt());
+		internalBalanceBonds[_owner] = newBond;
+		emit BondBalanceUpdate(_owner, newBond);
 	}
 
 	/*
@@ -351,31 +358,45 @@ contract FixCapitalPool is IFixCapitalPool, FCPDelegateParent, Ownable, nonReent
 			*denominated in wrapped asset*
 	*/
 	function transferYT(address _from, address _to, uint _amount) external override {
+		(bool success, ) = delegate1Address.delegatecall(abi.encodeWithSignature(
+			"transferYT(address,address,uint256)",
+			_from,
+			_to,
+			_amount
+		));
+		require(success);
+/*
 		IWrapper wrp = internalWrapper;
 		bool _inPayoutPhase = internalInPayoutPhase; //gas savings
 		if (msg.sender != _from && msg.sender != internalYieldTokenAddress) {
 			IYieldToken(internalYieldTokenAddress).decrementAllowance(_from, msg.sender, _amount);
 		}
 		uint conversionRate = _inPayoutPhase ? internalMaturityConversionRate : wrp.WrappedAmtToUnitAmt_RoundDown(1 ether);
-		int[2] memory prevBonds = [internalBalanceBonds[_from], internalBalanceBonds[_to]];
+		int[2] memory bondArr = [internalBalanceBonds[_from], internalBalanceBonds[_to]];
 		address[2] memory subAccts = [_from, _to];
-		uint[2] memory prevYields = [internalBalanceYield[_from], internalBalanceYield[_to]];
+		uint[2] memory yieldArr = [internalBalanceYield[_from], internalBalanceYield[_to]];
 		uint[2] memory wrappedClaims = _inPayoutPhase ? 
-			[payoutAmount(prevYields[0], prevBonds[0], conversionRate), payoutAmount(prevYields[1], prevBonds[1], conversionRate)]
-			: prevYields;
-		wrp.FCPDirectDoubleClaimSubAccountRewards(_inPayoutPhase, true, subAccts, prevYields, wrappedClaims);
+			[payoutAmount(yieldArr[0], bondArr[0], conversionRate), payoutAmount(yieldArr[1], bondArr[1], conversionRate)]
+			: yieldArr;
+		wrp.FCPDirectDoubleClaimSubAccountRewards(_inPayoutPhase, true, subAccts, yieldArr, wrappedClaims);
 
 		int amountBondChange = int(_amount.mul(conversionRate) / (1 ether)); //can be casted to int without worry bc '/ (1 ether)' ensures it fits
 
 		//ensure that _from address's position may be cashed out to a positive amount of wrappedToken
 		//if it cannot the following call will revert this tx
-		minimumUnitAmountAtMaturity(prevYields[0].sub(_amount), prevBonds[0].add(amountBondChange), conversionRate);
+		minimumUnitAmountAtMaturity(yieldArr[0].sub(_amount), bondArr[0].add(amountBondChange), conversionRate);
 
-		internalBalanceYield[_from] = prevYields[0].sub(_amount);
-		internalBalanceBonds[_from] = prevBonds[0].add(amountBondChange);
-		internalBalanceYield[_to] = prevYields[1].add(_amount);
-		internalBalanceBonds[_to] = prevBonds[1].sub(amountBondChange);
-
+		yieldArr[0] = yieldArr[0].sub(_amount);
+		yieldArr[1] = yieldArr[1].add(_amount);
+		bondArr[0] = bondArr[0].add(amountBondChange);
+		bondArr[1] = bondArr[1].sub(amountBondChange);
+		emit BalanceUpdate(_from, yieldArr[0], bondArr[0]);
+		internalBalanceYield[_from] = yieldArr[0];
+		internalBalanceBonds[_from] = bondArr[0];
+		emit BalanceUpdate(_to, yieldArr[1], bondArr[1]);
+		internalBalanceYield[_to] = yieldArr[1];
+		internalBalanceBonds[_to] = bondArr[1];
+*/
 	}
 
 	//---------------------------------a-d-m-i-n------------------------------
@@ -468,13 +489,16 @@ contract FixCapitalPool is IFixCapitalPool, FCPDelegateParent, Ownable, nonReent
 			wrp.FCPDirectClaimSubAccountRewards(false, true, msg.sender, prevYield, prevYield);
 			ratio = wrp.WrappedAmtToUnitAmt_RoundDown(1 ether);
 
+			uint newYield =  prevYield.add(_amountYield);
+			int newBond = internalBalanceBonds[msg.sender].add(_amountBond);
+			emit BalanceUpdate(msg.sender, newYield, newBond);
 			if (_amountYield > 0) {
 				yieldFee = _amountYield.mul(_flashLoanFee) / totalSBPS;
-				internalBalanceYield[msg.sender] = prevYield.add(_amountYield);
+				internalBalanceYield[msg.sender] = newYield;
 			}
 			if (_amountBond != 0) {
 				bondFee = _amountBond.mul(int(_flashLoanFee)) / int(totalSBPS);
-				internalBalanceBonds[msg.sender] = internalBalanceBonds[msg.sender].add(_amountBond);
+				internalBalanceBonds[msg.sender] = newBond;
 			}
 		}
 		uint effectiveZCB = _amountYield.mul(ratio) / (1 ether);
@@ -492,32 +516,51 @@ contract FixCapitalPool is IFixCapitalPool, FCPDelegateParent, Ownable, nonReent
 		bytes32 out = _receiver.onFlashLoan(msg.sender, _amountYield, _amountBond, yieldFee, bondFee, _data);
 		require(out == CALLBACK_SUCCESS);
 
-		if (_amountYield > 0) {
-			internalBalanceYield[msg.sender] = internalBalanceYield[msg.sender].sub(_amountYield).sub(yieldFee);
-		}
-		if (_amountBond != 0) {
-			internalBalanceBonds[msg.sender] = internalBalanceBonds[msg.sender].sub(_amountBond).sub(bondFee);
+		{
+			uint newYield = internalBalanceYield[msg.sender];
+			int newBond = internalBalanceBonds[msg.sender];
+			if (_amountYield > 0) {
+				newYield = newYield.sub(_amountYield).sub(yieldFee);
+				internalBalanceYield[msg.sender] = newYield;
+			}
+			if (_amountBond != 0) {
+				newBond = newBond.sub(_amountBond).sub(bondFee);
+				internalBalanceBonds[msg.sender] = newBond;
+			}
+			emit BalanceUpdate(msg.sender, newYield, newBond);
 		}
 
 		address _owner = owner;
 		IInfoOracle iorc = IInfoOracle(internalInfoOracleAddress);
 		if (iorc.TreasuryFeeIsCollected()) {
 			address sendTo = iorc.sendTo();
-			if (_amountYield > 0) {
+
+			uint copyAmtYield = _amountYield;
+			int copyAmtBond = _amountBond;
+
+			uint[2] memory yieldArr = [internalBalanceYield[sendTo], internalBalanceYield[_owner]];
+			int[2] memory bondArr = [internalBalanceBonds[sendTo], internalBalanceBonds[_owner]];
+
+			if (copyAmtYield > 0) {
 				address[2] memory subAccts = [sendTo, _owner];
-				uint[2] memory yieldArr = [internalBalanceYield[sendTo], internalBalanceYield[_owner]];
 				//wrappedClaims is same as yield Arr, because this function may only be executed before the payout phase is entered
 				internalWrapper.FCPDirectDoubleClaimSubAccountRewards(false, true, subAccts, yieldArr, yieldArr);
 
 				uint dividend = yieldFee >> 1;
-				internalBalanceYield[subAccts[0]] = yieldArr[0].add(dividend);
-				internalBalanceYield[subAccts[1]] = yieldArr[1].add(yieldFee - dividend);
+				yieldArr[0] = yieldArr[0].add(dividend);
+				yieldArr[1] = yieldArr[1].add(yieldFee - dividend);
+				internalBalanceYield[subAccts[0]] = yieldArr[0];
+				internalBalanceYield[subAccts[1]] = yieldArr[1];
 			}
-			if (_amountBond != 0) {
+			if (copyAmtBond != 0) {
 				int dividend = bondFee / 2;
-				internalBalanceBonds[sendTo] = internalBalanceBonds[sendTo].add(dividend);
-				internalBalanceBonds[_owner] = internalBalanceBonds[_owner].add(bondFee - dividend);
+				bondArr[0] = internalBalanceBonds[sendTo].add(dividend);
+				bondArr[1] = internalBalanceBonds[_owner].add(bondFee - dividend);
+				internalBalanceBonds[sendTo] = internalBalanceBonds[sendTo];
+				internalBalanceBonds[_owner] = internalBalanceBonds[_owner];
 			}
+			emit BalanceUpdate(sendTo, yieldArr[0], bondArr[0]);
+			emit BalanceUpdate(_owner, yieldArr[1], bondArr[1]);
 		}
 		else {
 			if (_amountYield > 0) {

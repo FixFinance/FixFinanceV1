@@ -11,6 +11,28 @@ import "../libraries/SignedSafeMath.sol";
 import "./FCPDelegateParent.sol";
 
 contract FCPDelegate1 is FCPDelegateParent {
+
+	event BalanceUpdate(
+		address indexed owner,
+		uint newYield,
+		int newBond
+	);
+	event BondBalanceUpdate(
+		address indexed owner,
+		int newBond
+	);
+	event ClaimPayout(
+		address indexed owner
+	);
+	event Deposit(
+		address indexed to,
+		uint wrappedAmountDeposited
+	);
+	event Withdrawal(
+		address indexed from,
+		uint wrappedAmountWithdrawn
+	);
+
 	using SafeMath for uint;
 	using SignedSafeMath for int;
 
@@ -32,6 +54,9 @@ contract FCPDelegate1 is FCPDelegateParent {
 			wrp.withdrawWrappedAmount(_to, payout, false);
 		else
 			wrp.transfer(_to, payout);
+
+		emit ClaimPayout(msg.sender);
+
 		delete internalBalanceYield[msg.sender];
 		delete internalBalanceBonds[msg.sender];
 	}
@@ -66,10 +91,17 @@ contract FCPDelegate1 is FCPDelegateParent {
 		address[2] memory subAccts = [msg.sender, _to];
 		wrp.FCPDirectDoubleClaimSubAccountRewards(_inPayoutPhase, true, subAccts, prevYields, wrappedClaims);
 		require(bondSender >= _bond || prevYields[0].sub(_yield).mul(ratio)/(1 ether) >= uint(bondSender.sub(_bond).abs()));
-		internalBalanceYield[msg.sender] = prevYields[0] - _yield;
-		internalBalanceBonds[msg.sender] = bondSender - _bond;
-		internalBalanceYield[_to] = prevYields[1].add(_yield);
-		internalBalanceBonds[_to] = bondRec.add(_bond);
+
+		uint newYield = prevYields[0].sub(_yield);
+		int newBond = bondSender.sub(_bond);
+		emit BalanceUpdate(msg.sender, newYield, newBond);
+		internalBalanceYield[msg.sender] = newYield;
+		internalBalanceBonds[msg.sender] = newBond;
+		newYield = prevYields[1].add(_yield);
+		newBond = bondRec.add(_bond);
+		emit BalanceUpdate(_to, newYield, newBond);
+		internalBalanceYield[_to] = newYield;
+		internalBalanceBonds[_to] = newBond;
 	}
 
 	/*
@@ -83,22 +115,24 @@ contract FCPDelegate1 is FCPDelegateParent {
 	function transferPositionFrom(address _from, address _to, uint _yield, int _bond) external {
 		IWrapper wrp = internalWrapper;
 		bool _inPayoutPhase = internalInPayoutPhase;//gas savings
-		uint[2] memory prevYields = [internalBalanceYield[_from], internalBalanceYield[_to]];
-		int[2] memory prevBonds = [internalBalanceBonds[_from], internalBalanceBonds[_to]];
+		uint[2] memory yieldArr = [internalBalanceYield[_from], internalBalanceYield[_to]];
+		int[2] memory bondArr = [internalBalanceBonds[_from], internalBalanceBonds[_to]];
 		uint ratio = _inPayoutPhase ? internalMaturityConversionRate : wrp.WrappedAmtToUnitAmt_RoundDown(1 ether);
 		uint[2] memory wrappedClaims = _inPayoutPhase ? 
-			[payoutAmount(prevYields[0], prevBonds[0], ratio), payoutAmount(prevYields[1], prevBonds[1], ratio)]
-			: prevYields;
+			[payoutAmount(yieldArr[0], bondArr[0], ratio), payoutAmount(yieldArr[1], bondArr[1], ratio)]
+			: yieldArr;
 		address[2] memory subAccts = [_from, _to];
-		wrp.FCPDirectDoubleClaimSubAccountRewards(_inPayoutPhase, true, subAccts, prevYields, wrappedClaims);
+		wrp.FCPDirectDoubleClaimSubAccountRewards(_inPayoutPhase, true, subAccts, yieldArr, wrappedClaims);
 
-		require(prevBonds[0] >= _bond || prevYields[0].sub(_yield).mul(ratio)/(1 ether) >= uint(prevBonds[0].sub(_bond).abs()));
+		require(bondArr[0] >= _bond || yieldArr[0].sub(_yield).mul(ratio)/(1 ether) >= uint(bondArr[0].sub(_bond).abs()));
 
 		if (_yield > 0) {
 			//decrement approval of YT
 			IYieldToken(internalYieldTokenAddress).decrementAllowance(_from, msg.sender, _yield);
-			internalBalanceYield[_from] = prevYields[0].sub(_yield);
-			internalBalanceYield[_to] = prevYields[1].add(_yield);
+			yieldArr[0] = yieldArr[0].sub(_yield);
+			yieldArr[1] = yieldArr[1].add(_yield);
+			internalBalanceYield[_from] = yieldArr[0];
+			internalBalanceYield[_to] = yieldArr[1];
 		}
 
 		uint unitAmtYield = _yield.mul(ratio)/(1 ether);
@@ -107,8 +141,14 @@ contract FCPDelegate1 is FCPDelegateParent {
 		uint unitAmtZCB = _bond > 0 ? unitAmtYield.add(uint(_bond)) : unitAmtYield.sub(uint(_bond.abs()));
 		IZeroCouponBond(internalZeroCouponBondAddress).decrementAllowance(_from, msg.sender, unitAmtZCB);
 		if (_bond != 0) {
-			internalBalanceBonds[_from] = prevBonds[0].sub(_bond);
-			internalBalanceBonds[_to] = prevBonds[1].add(_bond);
+			bondArr[0] = bondArr[0].sub(_bond);
+			bondArr[1] = bondArr[1].add(_bond);
+			internalBalanceBonds[_from] = bondArr[0];
+			internalBalanceBonds[_to] = bondArr[1];
+		}
+		if (_yield != 0 || _bond != 0) {
+			emit BalanceUpdate(_from, yieldArr[0], bondArr[0]);
+			emit BalanceUpdate(_to, yieldArr[1], bondArr[1]);
 		}
 	}
 
@@ -119,7 +159,6 @@ contract FCPDelegate1 is FCPDelegateParent {
 		@param address _to: the address to send 
 	*/
 	function transferZCB(address _from, address _to, uint _amount) external {
-		require(_amount <= uint(type(int256).max));
 		uint conversionRate;
 		int[2] memory prevBonds = [internalBalanceBonds[_from], internalBalanceBonds[_to]];
 		if (internalInPayoutPhase) {
@@ -136,7 +175,7 @@ contract FCPDelegate1 is FCPDelegateParent {
 		if (msg.sender != _from && msg.sender != internalZeroCouponBondAddress) {
 			IZeroCouponBond(internalZeroCouponBondAddress).decrementAllowance(_from, msg.sender, _amount);
 		}
-		int intAmount = int(_amount);
+		int intAmount = _amount.toInt();
 		require(intAmount >= 0);
 		int newFromBond = internalBalanceBonds[_from].sub(intAmount);
 
@@ -144,8 +183,52 @@ contract FCPDelegate1 is FCPDelegateParent {
 		//if it cannot the following call will revert this tx
 		minimumUnitAmountAtMaturity(internalBalanceYield[_from], newFromBond, conversionRate);
 
-		internalBalanceBonds[_to] = internalBalanceBonds[_to].add(intAmount);
+		emit BondBalanceUpdate(_from, newFromBond);
 		internalBalanceBonds[_from] = newFromBond;
+		int newBondTo = internalBalanceBonds[_to].add(intAmount);
+		emit BondBalanceUpdate(_to, newBondTo);
+		internalBalanceBonds[_to] = newBondTo;
+	}
+
+	/*
+		@Description: yield token contract must call this function to move yield token between addresses
+
+		@param address _from: the address to deduct YT from
+		@param address _to: the address to credit YT to
+		@param uint _amount: the amount of YT to move between _from and _to
+			*denominated in wrapped asset*
+	*/
+	function transferYT(address _from, address _to, uint _amount) external {
+		IWrapper wrp = internalWrapper;
+		bool _inPayoutPhase = internalInPayoutPhase; //gas savings
+		if (msg.sender != _from && msg.sender != internalYieldTokenAddress) {
+			IYieldToken(internalYieldTokenAddress).decrementAllowance(_from, msg.sender, _amount);
+		}
+		uint conversionRate = _inPayoutPhase ? internalMaturityConversionRate : wrp.WrappedAmtToUnitAmt_RoundDown(1 ether);
+		int[2] memory bondArr = [internalBalanceBonds[_from], internalBalanceBonds[_to]];
+		address[2] memory subAccts = [_from, _to];
+		uint[2] memory yieldArr = [internalBalanceYield[_from], internalBalanceYield[_to]];
+		uint[2] memory wrappedClaims = _inPayoutPhase ? 
+			[payoutAmount(yieldArr[0], bondArr[0], conversionRate), payoutAmount(yieldArr[1], bondArr[1], conversionRate)]
+			: yieldArr;
+		wrp.FCPDirectDoubleClaimSubAccountRewards(_inPayoutPhase, true, subAccts, yieldArr, wrappedClaims);
+
+		int amountBondChange = int(_amount.mul(conversionRate) / (1 ether)); //can be casted to int without worry bc '/ (1 ether)' ensures it fits
+
+		//ensure that _from address's position may be cashed out to a positive amount of wrappedToken
+		//if it cannot the following call will revert this tx
+		minimumUnitAmountAtMaturity(yieldArr[0].sub(_amount), bondArr[0].add(amountBondChange), conversionRate);
+
+		yieldArr[0] = yieldArr[0].sub(_amount);
+		yieldArr[1] = yieldArr[1].add(_amount);
+		bondArr[0] = bondArr[0].add(amountBondChange);
+		bondArr[1] = bondArr[1].sub(amountBondChange);
+		emit BalanceUpdate(_from, yieldArr[0], bondArr[0]);
+		internalBalanceYield[_from] = yieldArr[0];
+		internalBalanceBonds[_from] = bondArr[0];
+		emit BalanceUpdate(_to, yieldArr[1], bondArr[1]);
+		internalBalanceYield[_to] = yieldArr[1];
+		internalBalanceBonds[_to] = bondArr[1];
 	}
 
 }

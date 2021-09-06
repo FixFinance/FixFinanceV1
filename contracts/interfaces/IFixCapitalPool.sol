@@ -5,6 +5,26 @@ import "./IWrapper.sol";
 import "./IERC20.sol";
 
 interface IFixCapitalPool is IFCPFlashLender {
+	event BalanceUpdate(
+		address indexed owner,
+		uint newYield,
+		int newBond
+	);
+	event BondBalanceUpdate(
+		address indexed owner,
+		int newBond
+	);
+	event ClaimPayout(
+		address indexed owner
+	);
+	event Deposit(
+		address indexed to,
+		uint wrappedAmountDeposited
+	);
+	event Withdrawal(
+		address indexed from,
+		uint wrappedAmountWithdrawn
+	);
 	function depositWrappedToken(address _to, uint _amountWrappedTkn) external;
 	function withdraw(address _to, uint _amountWrappedTkn, bool _unwrap) external;
 	function withdrawAll(address _to, bool _unwrap) external;

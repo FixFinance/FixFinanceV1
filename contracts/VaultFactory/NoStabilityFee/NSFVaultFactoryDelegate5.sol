@@ -79,10 +79,31 @@ contract NSFVaultFactoryDelegate5 is NSFVaultFactoryDelegateParent {
 	function claimRevenue(address _asset) external onlyOwner {
 		uint rev = _revenue[_asset];
 		uint toTreasury = rev >> 1;
-		address treasuryAddr = IInfoOracle(_infoOracleAddress).sendTo();
-		IERC20(_asset).transfer(treasuryAddr, toTreasury);
-		IERC20(_asset).transfer(msg.sender, rev - toTreasury);
+		IInfoOracle iorc = IInfoOracle(_infoOracleAddress);
+		address treasuryAddr = iorc.sendTo();
+		if (iorc.TreasuryFeeIsCollected()) {
+			IERC20(_asset).transfer(treasuryAddr, toTreasury);
+			IERC20(_asset).transfer(msg.sender, rev - toTreasury);
+		}
+		else {
+			IERC20(_asset).transfer(msg.sender, rev);
+		}
+		(, SUPPLIED_ASSET_TYPE sType, address baseFCP, address baseWrapper) = suppliedAssetInfo(_asset);
+
+		if (sType == SUPPLIED_ASSET_TYPE.WASSET || sType == SUPPLIED_ASSET_TYPE.ZCB) {
+
+			uint ownerSubAcctAmt = _revenueOwnerSubAcct[_asset];
+			uint treasurySubAcctAmt = rev.sub(ownerSubAcctAmt);
+
+			if (treasurySubAcctAmt > 0) {
+				editSubAccountStandardVault(true, treasuryAddr, sType, baseFCP, baseWrapper, treasurySubAcctAmt.toInt().mul(-1));
+			}
+			if (ownerSubAcctAmt > 0) {
+				editSubAccountStandardVault(false, msg.sender, sType, baseFCP, baseWrapper, ownerSubAcctAmt.toInt().mul(-1));
+			}
+		}
 		delete _revenue[_asset];
+		delete _revenueOwnerSubAcct[_asset];
 	}
 
 	/*

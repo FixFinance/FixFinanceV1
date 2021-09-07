@@ -83,9 +83,11 @@ contract NSFVaultFactoryData is Ownable {
 
 	//FCP => YTPosition
 	mapping(address => YTPosition) internal _YTRevenue;
+	mapping(address => YTPosition) internal _YTRevenueOwnerSubAcct;
 
 	//asset => amount
 	mapping(address => uint) internal _revenue;
+	mapping(address => uint) internal _revenueOwnerSubAcct;
 
 	//user => vault index => vault
 	mapping(address => Vault[]) internal _vaults;

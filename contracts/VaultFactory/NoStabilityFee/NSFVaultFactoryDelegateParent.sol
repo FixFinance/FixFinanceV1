@@ -385,10 +385,9 @@ contract NSFVaultFactoryDelegateParent is NSFVaultFactoryData {
 		rebate.amountYield = rebate.amountYield.add(yieldRebate);
 		rebate.amountBond = rebate.amountBond.add(bondRebate);
 		uint yieldRevenue = _yieldAmount - yieldRebate;
-		require(yieldRevenue <= uint(type(int256).max));
 		int bondRevenue = _bondAmount - bondRebate;
-		revenue.amountYield += yieldRevenue;
-		revenue.amountBond += bondRevenue;
+		revenue.amountYield = revenue.amountYield.add(yieldRevenue);
+		revenue.amountBond = revenue.amountBond.add(bondRevenue);
 		editSubAccountYTVault(true, _vaultOwner, _FCPaddr, _baseWrapper, yieldRevenue.toInt().mul(-1), bondRevenue.mul(-1));
 		IInfoOracle iorc = IInfoOracle(_infoOracleAddress);
 		address feeRecipientSubAcct;

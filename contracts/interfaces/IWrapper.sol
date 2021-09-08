@@ -60,13 +60,13 @@ interface IWrapper is IERC20, IERC3156FlashLender {
 	function editSubAccountPosition(bool _claimRewards, address _subAccount, address _FCPaddr, int changeYield, int changeBond) external;
 	function forceClaimSubAccountRewards(bool _claimRewards, address _distributionAccount, address _subAccount, address _FCPaddr) external;
     function FCPDirectClaimSubAccountRewards(bool _inPayoutPhase, bool _claimRewards, address _subAcct, uint _yield, uint _wrappedClaim) external;
-    function FCPDirectDoubleClaimSubAccountRewards(
-        bool _inPayoutPhase,
-        bool _claimRewards,
-        address[2] calldata _subAccts,
-        uint[2] calldata _yieldArr,
-        uint[2] calldata _wrappedClaims
-    ) external;
+	function FCPDirectDoubleClaimSubAccountRewards(
+		bool _inPayoutPhase,
+		bool _claimRewards,
+		address[2] calldata _subAccts,
+		uint[2] calldata _yieldArr,
+		uint[2] calldata _wrappedClaims
+	) external;
 	function isDistributionAccount(address _addr) external view returns(bool);
 	function distributionAccountRewards(uint _index, address _distributionAccount) external view returns(uint);
 	function hasClaimedAllYTRewards(address _distributionAccount, address _subAccount, address _FCPaddr) external view returns(bool);
@@ -77,10 +77,10 @@ interface IWrapper is IERC20, IERC3156FlashLender {
 	);
 
 	//-------o-n-l-y-O-w-n-e-r------------
-    function setInterestFee(uint32 _SBPSRetained) external;
-    function setFlashLoanFee(uint _flashLoanFee) external;
-    function addRewardAsset(address _rewardsAsset) external;
-    function deactivateRewardAsset(uint _index) external;
-    function reactivateRewardAsset(uint _index) external;
-    function harvestNonListedRewardAsset(address _assetAddr) external;
+	function setInterestFee(uint32 _SBPSRetained) external;
+	function setFlashLoanFee(uint _flashLoanFee) external;
+	function addRewardAsset(address _rewardsAsset) external;
+	function deactivateRewardAsset(uint _index) external;
+	function reactivateRewardAsset(uint _index) external;
+	function harvestNonListedRewardAsset(address _assetAddr) external;
 }

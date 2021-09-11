@@ -16,6 +16,15 @@ contract SBNSFVaultFactoryData is Ownable {
 		INVALID
 	}
 
+	enum MANAGE_METHOD {
+		WHITELIST_WRAPPER,
+		WHITELIST_ASSET,
+		WHITELIST_FCP,
+		SET_LIQ_REBATE,
+		CLAIM_REVENUE,
+		CLAIM_YT_REVENUE
+	}
+
 	struct Vault {
 		address assetSupplied;
 		address assetBorrowed;
@@ -108,57 +117,4 @@ contract SBNSFVaultFactoryData is Ownable {
 	YTLiquidation[] internal _YTLiquidations;
 
 	IVaultHealth internal vaultHealthContract;
-
-	event OpenVault(
-		address indexed owner,
-		address indexed assetSupplied,
-		address indexed assetBorrowed,
-		uint amountSupplied,
-		uint amountBorrowed		
-	);
-
-	event CloseVault(
-		address indexed owner,
-		uint index
-	);
-
-	event AdjustVault(
-		address indexed owner,
-		uint index,
-		address indexed newAssetSupplied,
-		address indexed newAssetBorrowed,
-		uint newAmountSupplied,
-		uint newAmountBorrowed
-	);
-
-	event OpenYTVault(
-		address indexed owner,
-		address indexed FCPsupplied,
-		address indexed FCPborrowed,
-		uint yieldSupplied,
-		int bondSupplied,
-		uint amountBorrowed		
-	);
-
-	event CloseYTVault(
-		address indexed owner,
-		uint index
-	);
-
-	event AdjustYTVault(
-		address indexed owner,
-		uint index,
-		address indexed newFCPsupplied,
-		address indexed newFCPborrowed,
-		uint newYieldSupplied,
-		int newBondSupplied,
-		uint newAmountBorrowed		
-	);
-
-	event TransferVault(
-		address indexed prevOwner,
-		uint prevIndex,
-		address indexed newOwner,
-		bool isYTVault
-	);
 }

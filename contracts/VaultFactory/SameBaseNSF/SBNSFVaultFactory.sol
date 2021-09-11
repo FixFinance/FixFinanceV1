@@ -210,7 +210,7 @@ contract SBNSFVaultFactory is SBNSFVaultFactoryData, ISBNSFVaultFactory, nonReen
 			_borrowRateChange
 		));
 		require(success);
-		emit OpenVault(msg.sender, _assetSupplied, _assetBorrowed, _amountSupplied, _amountBorrowed);
+		emit OpenVault(msg.sender, _vaults[msg.sender].length-1);
 	}
 
 	/*
@@ -277,7 +277,7 @@ contract SBNSFVaultFactory is SBNSFVaultFactoryData, ISBNSFVaultFactory, nonReen
 			_receiverAddr
 		));
 		require(success);
-		emit AdjustVault(_owner, _index, _assetSupplied, _assetBorrowed, _amountSupplied, _amountBorrowed);
+		emit AdjustVault(_owner, _index);
 	}
 
 	//--------------------------------------YT vault management-----------------------------------
@@ -327,7 +327,7 @@ contract SBNSFVaultFactory is SBNSFVaultFactoryData, ISBNSFVaultFactory, nonReen
 			_borrowRateChange
 		));
 		require(success);
-		emit OpenYTVault(msg.sender, _FCPsupplied, _FCPborrowed, _yieldSupplied, _bondSupplied, _amountBorrowed);
+		emit OpenYTVault(msg.sender, _YTvaults[msg.sender].length-1);
 	}
 
 	/*
@@ -399,7 +399,7 @@ contract SBNSFVaultFactory is SBNSFVaultFactoryData, ISBNSFVaultFactory, nonReen
 			_receiverAddr
 		));
 		require(success);
-		emit AdjustYTVault(_owner, _index, _FCPsupplied, _FCPborrowed, _yieldSupplied, _bondSupplied, _amountBorrowed);
+		emit AdjustYTVault(_owner, _index);
 	}
 
 	//--------------------------------f-o-r---b-o-t-h---s-t-a-n-d-a-r-d---v-a-u-l-t-s---a-n-d---Y-T-v-a-u-l-t-s---------------
@@ -445,6 +445,7 @@ contract SBNSFVaultFactory is SBNSFVaultFactoryData, ISBNSFVaultFactory, nonReen
 			_maxIn
 		));
 		require(success);
+		emit AuctionLiquidation(_owner, _index, _Liquidations.length-1);
 	}
 
 	/*
@@ -463,6 +464,7 @@ contract SBNSFVaultFactory is SBNSFVaultFactoryData, ISBNSFVaultFactory, nonReen
 			_amtIn
 		));
 		require(success);
+		emit BidOnLiquidation(_index);
 	}
 
 	/*
@@ -478,6 +480,7 @@ contract SBNSFVaultFactory is SBNSFVaultFactoryData, ISBNSFVaultFactory, nonReen
 			_to
 		));
 		require(success);
+		emit ClaimLiquidation(_index);
 	}
 
 	/*
@@ -505,6 +508,7 @@ contract SBNSFVaultFactory is SBNSFVaultFactoryData, ISBNSFVaultFactory, nonReen
 			_to
 		));
 		require(success);
+		emit InstantLiquidation(_owner, _index);
 	}
 
 	/*
@@ -533,6 +537,7 @@ contract SBNSFVaultFactory is SBNSFVaultFactoryData, ISBNSFVaultFactory, nonReen
 			_to
 		));
 		require(success);
+		emit InstantLiquidation(_owner, _index);
 	}
 
 	/*
@@ -561,6 +566,7 @@ contract SBNSFVaultFactory is SBNSFVaultFactoryData, ISBNSFVaultFactory, nonReen
 			_to
 		));
 		require(success);
+		emit InstantLiquidation(_owner, _index);
 	}
 
 
@@ -576,6 +582,7 @@ contract SBNSFVaultFactory is SBNSFVaultFactoryData, ISBNSFVaultFactory, nonReen
 			_asset
 		));
 		require(success);
+		emit ClaimRebate(msg.sender, _asset);
 	}
 
 	//------------------------------------Y-T---v-a-u-l-t---L-i-q-u-i-d-a-t-i-o-n-s-------------------------------------
@@ -593,6 +600,7 @@ contract SBNSFVaultFactory is SBNSFVaultFactoryData, ISBNSFVaultFactory, nonReen
 			_FCP
 		));
 		require(success);
+		emit ClaimYTRebate(msg.sender, _FCP);
 	}
 
 
@@ -621,6 +629,7 @@ contract SBNSFVaultFactory is SBNSFVaultFactoryData, ISBNSFVaultFactory, nonReen
 			_amtIn
 		));
 		require(success);
+		emit AuctionYTLiquidation(_owner, _index, _YTLiquidations.length-1);
 	}
 
 	/*
@@ -639,6 +648,7 @@ contract SBNSFVaultFactory is SBNSFVaultFactoryData, ISBNSFVaultFactory, nonReen
 			_amtIn
 		));
 		require(success);
+		emit BidOnYTLiquidation(_index);
 	}
 
 	/*
@@ -654,6 +664,7 @@ contract SBNSFVaultFactory is SBNSFVaultFactoryData, ISBNSFVaultFactory, nonReen
 			_to
 		));
 		require(success);
+		emit ClaimYTLiquidation(_index);
 	}
 
 	/*
@@ -684,6 +695,7 @@ contract SBNSFVaultFactory is SBNSFVaultFactoryData, ISBNSFVaultFactory, nonReen
 			_to
 		));
 		require(success);
+		emit InstantLiquidation(_owner, _index);
 	}
 
 	/*
@@ -715,6 +727,7 @@ contract SBNSFVaultFactory is SBNSFVaultFactoryData, ISBNSFVaultFactory, nonReen
 			_to
 		));
 		require(success);
+		emit InstantLiquidation(_owner, _index);
 	}
 
 	/*
@@ -746,76 +759,18 @@ contract SBNSFVaultFactory is SBNSFVaultFactoryData, ISBNSFVaultFactory, nonReen
 			_to
 		));
 		require(success);
+		emit InstantLiquidation(_owner, _index);
 	}
 
 
 	//-------------------------------------a-d-m-i-n---m-a-n-a-g-e-m-e-n-t----------------------------------------------
 
-	/*
-		@Description: admin may call this function to allow a specific wrapped asset to be provided as collateral
-
-		@param address _wrapperAddress: address of the wrapper asset to whitelist
-	*/
-	function whitelistWrapper(address _wrapperAddress) external override onlyOwner {
-		IWrapper(_wrapperAddress).registerAsDistributionAccount();
-		_wrapperToUnderlyingAsset[_wrapperAddress] = IWrapper(_wrapperAddress).underlyingAssetAddress();
-	}
-
-	/*
-		@Description: admin may call this function to allow a non wrapped asset to be provided as collateral
-
-		@param address _asset: address of the asset that will be allows to be provided as collateral
-	*/
-	function whitelistAsset(address _assetAddress) external override onlyOwner {
-		//all non wrapped assets have a pair value of address(1) in the _wrapperToUnderlyingAsset mapping
-		_wrapperToUnderlyingAsset[_assetAddress] = address(1);
-	}
-
-	/*
-		@Description: admin may call this function to allow a specific ZCB to be provided as collateral
-
-		@param address _fixCapitalPoolAddress: address of the ZCB to whitelist
-	*/
-	function whitelistFixCapitalPool(address _fixCapitalPoolAddress) external override onlyOwner {
-		IWrapper wrapper = IFixCapitalPool(_fixCapitalPoolAddress).wrapper();
-		wrapper.registerAsDistributionAccount();
-		_fixCapitalPoolToWrapper[_fixCapitalPoolAddress] = address(wrapper);
-	}
-
-	/*
-		@Description: admin may call this function to set the percentage of excess collateral that is retained
-			by vault owners in the event of a liquidation
-
-		@param uint _rebateBips: the percentage (in basis points) of excess collateral that is retained
-			by vault owners in the event of a liquidation
-	*/
-	function setLiquidationRebate(uint _rebateBips) external override onlyOwner {
-		require(_rebateBips <= TOTAL_BASIS_POINTS);
-		_liquidationRebateBips = _rebateBips;
-	}
-
-	/*
-		@Description: admin may call this function to claim liquidation revenue
-
-		@address _asset: the address of the asset for which to claim revenue
-	*/
-	function claimRevenue(address _asset) external override {
-		(bool success, ) = delegate5Address.delegatecall(abi.encodeWithSignature("claimRevenue(address)", _asset));
-		require(success);
-	}
-
-	/*
-		@Description: admin may call this function to claim YT liquidation revenue
-
-		@param address _FCP: the address of the FCP contract for which to claim revenue
-		@param int _bondIn: the amount of bond to send in to make the transfer position have a
-			positive minimum value at maturity
-	*/
-	function claimYTRevenue(address _FCP, int _bondIn) external override {
+	function manage(address _addr, int _num, MANAGE_METHOD _manageMethod) external override {
 		(bool success, ) = delegate5Address.delegatecall(abi.encodeWithSignature(
-			"claimYTRevenue(address,int256)",
-			_FCP,
-			_bondIn
+			"manage(address,int256,uint8)",
+			_addr,
+			_num,
+			_manageMethod
 		));
 		require(success);
 	}

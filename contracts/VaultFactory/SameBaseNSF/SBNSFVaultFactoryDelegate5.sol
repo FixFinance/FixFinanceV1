@@ -72,11 +72,84 @@ contract SBNSFVaultFactoryDelegate5 is SBNSFVaultFactoryDelegateParent {
 	}
 
 	/*
+		@Description: allows a user to claim the excess collateral that was received as a rebate
+			when their vault(s) were liquidated
+
+		@param address _asset: the address of the asset for which to claim rebated collateral
+	*/
+	function claimRebate(address _asset) external {
+		uint amt = _liquidationRebates[msg.sender][_asset];
+		require(amt <= uint(type(int256).max));
+		(, SUPPLIED_ASSET_TYPE sType, address baseFCP, address baseWrapper) = suppliedAssetInfo(_asset);
+		IERC20(_asset).transfer(msg.sender, amt);
+		editSubAccountStandardVault(false, msg.sender, sType, baseFCP, baseWrapper, -int(amt));
+		delete _liquidationRebates[msg.sender][_asset];
+	}
+
+	/*
+		@Description: allows a user to claim the excess collateral that was received as a rebate
+			when their YT vault(s) were liquidated
+	
+		@param address _FCP: the address of the FCP contract for which to claim the rebate
+	*/
+	function claimYTRebate(address _FCP) external {
+		YTPosition memory position = _YTLiquidationRebates[msg.sender][_FCP];
+		require(position.amountYield <= uint(type(int256).max));
+		IFixCapitalPool(_FCP).transferPosition(msg.sender, position.amountYield, position.amountBond);
+		address baseWrapper = address(IFixCapitalPool(_FCP).wrapper());
+		editSubAccountYTVault(false, msg.sender, _FCP, baseWrapper, -int(position.amountYield), position.amountBond.mul(-1));
+		delete _YTLiquidationRebates[msg.sender][_FCP];
+	}
+
+	/*
+		@Description: admin may call this function to allow a specific wrapped asset to be provided as collateral
+
+		@param address _wrapperAddress: address of the wrapper asset to whitelist
+	*/
+	function whitelistWrapper(address _wrapperAddress) internal {
+		IWrapper(_wrapperAddress).registerAsDistributionAccount();
+		_wrapperToUnderlyingAsset[_wrapperAddress] = IWrapper(_wrapperAddress).underlyingAssetAddress();
+	}
+
+	/*
+		@Description: admin may call this function to allow a non wrapped asset to be provided as collateral
+
+		@param address _asset: address of the asset that will be allows to be provided as collateral
+	*/
+	function whitelistAsset(address _assetAddress) internal {
+		//all non wrapped assets have a pair value of address(1) in the _wrapperToUnderlyingAsset mapping
+		_wrapperToUnderlyingAsset[_assetAddress] = address(1);
+	}
+
+	/*
+		@Description: admin may call this function to allow a specific ZCB to be provided as collateral
+
+		@param address _fixCapitalPoolAddress: address of the ZCB to whitelist
+	*/
+	function whitelistFixCapitalPool(address _fixCapitalPoolAddress) internal {
+		IWrapper wrapper = IFixCapitalPool(_fixCapitalPoolAddress).wrapper();
+		wrapper.registerAsDistributionAccount();
+		_fixCapitalPoolToWrapper[_fixCapitalPoolAddress] = address(wrapper);
+	}
+
+	/*
+		@Description: admin may call this function to set the percentage of excess collateral that is retained
+			by vault owners in the event of a liquidation
+
+		@param uint _rebateBips: the percentage (in basis points) of excess collateral that is retained
+			by vault owners in the event of a liquidation
+	*/
+	function setLiquidationRebate(uint _rebateBips) internal {
+		require(_rebateBips <= TOTAL_BASIS_POINTS);
+		_liquidationRebateBips = _rebateBips;
+	}
+
+	/*
 		@Description: admin may call this function to claim liquidation revenue
 
 		@address _asset: the address of the asset for which to claim revenue
 	*/
-	function claimRevenue(address _asset) external onlyOwner {
+	function claimRevenue(address _asset) internal {
 		uint rev = _revenue[_asset];
 		uint toTreasury = rev >> 1;
 		IInfoOracle iorc = IInfoOracle(_infoOracleAddress);
@@ -113,7 +186,7 @@ contract SBNSFVaultFactoryDelegate5 is SBNSFVaultFactoryDelegateParent {
 		@param int _bondIn: the amount of bond to send in to make the transfer position have a
 			positive minimum value at maturity
 	*/
-	function claimYTRevenue(address _FCP, int _bondIn) external onlyOwner {
+	function claimYTRevenue(address _FCP, int _bondIn) internal {
 		require(_bondIn > -1);
 		YTPosition memory pos = _YTRevenue[_FCP];
 		IFixCapitalPool(_FCP).burnZCBFrom(msg.sender, uint(_bondIn));
@@ -125,33 +198,25 @@ contract SBNSFVaultFactoryDelegate5 is SBNSFVaultFactoryDelegateParent {
 		delete _YTRevenue[_FCP];
 	}
 
-	/*
-		@Description: allows a user to claim the excess collateral that was received as a rebate
-			when their vault(s) were liquidated
-
-		@param address _asset: the address of the asset for which to claim rebated collateral
-	*/
-	function claimRebate(address _asset) external {
-		uint amt = _liquidationRebates[msg.sender][_asset];
-		require(amt <= uint(type(int256).max));
-		(, SUPPLIED_ASSET_TYPE sType, address baseFCP, address baseWrapper) = suppliedAssetInfo(_asset);
-		IERC20(_asset).transfer(msg.sender, amt);
-		editSubAccountStandardVault(false, msg.sender, sType, baseFCP, baseWrapper, -int(amt));
-		delete _liquidationRebates[msg.sender][_asset];
+	function manage(address _addr, int _num, MANAGE_METHOD _mm) external onlyOwner {
+		if (_mm == MANAGE_METHOD.WHITELIST_WRAPPER) {
+			whitelistWrapper(_addr);
+		}
+		else if (_mm == MANAGE_METHOD.WHITELIST_ASSET) {
+			whitelistAsset(_addr);
+		}
+		else if (_mm == MANAGE_METHOD.WHITELIST_FCP) {
+			whitelistFixCapitalPool(_addr);
+		}
+		else if (_mm == MANAGE_METHOD.SET_LIQ_REBATE) {
+			setLiquidationRebate(_num.toUint());
+		}
+		else if (_mm == MANAGE_METHOD.CLAIM_REVENUE) {
+			claimRevenue(_addr);
+		}
+		else if (_mm == MANAGE_METHOD.CLAIM_YT_REVENUE) {
+			claimYTRevenue(_addr, _num);
+		}
 	}
 
-	/*
-		@Description: allows a user to claim the excess collateral that was received as a rebate
-			when their YT vault(s) were liquidated
-	
-		@param address _FCP: the address of the FCP contract for which to claim the rebate
-	*/
-	function claimYTRebate(address _FCP) external {
-		YTPosition memory position = _YTLiquidationRebates[msg.sender][_FCP];
-		require(position.amountYield <= uint(type(int256).max));
-		IFixCapitalPool(_FCP).transferPosition(msg.sender, position.amountYield, position.amountBond);
-		address baseWrapper = address(IFixCapitalPool(_FCP).wrapper());
-		editSubAccountYTVault(false, msg.sender, _FCP, baseWrapper, -int(position.amountYield), position.amountBond.mul(-1));
-		delete _YTLiquidationRebates[msg.sender][_FCP];
-	}
 }

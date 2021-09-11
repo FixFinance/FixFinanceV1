@@ -4,6 +4,53 @@ pragma solidity >=0.6.8 <0.7.0;
 import "../VaultFactory/NoStabilityFee/NSFVaultFactoryData.sol";
 
 interface INSFVaultFactory {
+	event OpenVault(address indexed owner, uint index);
+
+	event CloseVault(address indexed owner, uint index);
+
+	event AdjustVault(address indexed owner, uint index);
+
+	event AuctionLiquidation(
+		address indexed vaultOwner,
+		uint vaultIndex,
+		uint liquidationIndex
+	);
+
+	event BidOnLiquidation(uint liquidationIndex);
+
+	event ClaimLiquidation(uint liquidationIndex);
+
+	event InstantLiquidation(address indexed owner, uint index);
+
+	event ClaimRebate(address indexed owner, address asset);
+
+	event OpenYTVault(address indexed owner, uint index);
+
+	event CloseYTVault(address indexed owner, uint index);
+
+	event AdjustYTVault(address indexed owner, uint index);
+
+	event AuctionYTLiquidation(
+		address indexed YTvaultOwner,
+		uint YTvaultIndex,
+		uint YTliquidationIndex
+	);
+
+	event InstantYTLiquidation(address indexed owner, uint index);
+
+	event BidOnYTLiquidation(uint YTliquidationIndex);
+
+	event ClaimYTLiquidation(uint YTliquidationIndex);
+
+	event ClaimYTRebate(address indexed owner, address FCPaddress);
+
+	event TransferVault(
+		address indexed prevOwner,
+		uint prevIndex,
+		address indexed newOwner,
+		bool isYTVault
+	);
+
 	function vaultsLength(address _owner) external view returns(uint);
 	function YTvaultsLength(address _owner) external view returns(uint);
 	function allVaults(address _owner) external view returns(NSFVaultFactoryData.Vault[] memory _vaults);
@@ -118,10 +165,5 @@ interface INSFVaultFactory {
 	function partialYTLiquidationSpecificIn(address _owner, uint _index, address _FCPborrowed, address _FCPsupplied, uint _in, uint _minOut, int _minBondRatio, address _to) external;
 	function partialYTLiquidationSpecificOut(address _owner, uint _index, address _FCPborrowed, address _FCPsupplied, uint _out, int _minBondRatio, uint _maxIn, address _to) external;
 	//--------------------------------------------a-d-m-i-n---------------------------------------------
-	function setLiquidationRebate(uint _rebateBips) external;
-	function whitelistWrapper(address _wrapperAddress) external;
-	function whitelistAsset(address _assetAddress) external;
-	function whitelistFixCapitalPool(address _fixCapitalPoolAddress) external;
-	function claimRevenue(address _asset) external;
-	function claimYTRevenue(address _FCP, int _bondIn) external;
+	function manage(address _addr, int _num, NSFVaultFactoryData.MANAGE_METHOD _mm) external;
 }

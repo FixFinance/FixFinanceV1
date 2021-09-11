@@ -38,6 +38,16 @@ const BN = web3.utils.BN;
 const _10 = new BN(10);
 const _10To18 = _10.pow(new BN('18'));
 
+const MANAGE_METHOD = {
+	WHITELIST_WRAPPER: 0,
+	WHITELIST_ASSET: 1,
+	WHITELIST_FCP: 2,
+	SET_LIQ_REBATE: 3,
+	CLAIM_REVENUE: 4,
+	CLAIM_YT_REVENUE: 5
+};
+
+
 const _8days = 8*24*60*60;
 
 const TOTAL_BASIS_POINTS = 10000;
@@ -154,8 +164,8 @@ contract('NSFVaultFactory', async function(accounts) {
 		await fcp0.setVaultFactoryAddress(vaultFactoryInstance.address);
 		await fcp1.setVaultFactoryAddress(vaultFactoryInstance.address);
 
-		await vaultFactoryInstance.whitelistWrapper(wAsset1.address);
-		await vaultFactoryInstance.setLiquidationRebate(rebate_bips);
+		await vaultFactoryInstance.manage(wAsset1.address, 0, MANAGE_METHOD.WHITELIST_WRAPPER);
+		await vaultFactoryInstance.manage(nullAddress, rebate_bips, MANAGE_METHOD.SET_LIQ_REBATE);
 
 		//mint assets to account 0
 		await asset1.mintTo(accounts[0], _10To18.mul(new BN("10")).toString());
@@ -891,7 +901,8 @@ contract('NSFVaultFactory', async function(accounts) {
 		let prevBalanceOwner = await wAsset1.balanceOf(accounts[0]);
 		let prevBalanceTreasury = await wAsset1.balanceOf(treasuryAccount);
 
-		await vaultFactoryInstance.claimRevenue(wAsset1.address);
+		await vaultFactoryInstance.manage(wAsset1.address, 0, MANAGE_METHOD.CLAIM_REVENUE);
+//		await vaultFactoryInstance.claimRevenue(wAsset1.address);
 
 		let newRevenue = await vaultFactoryInstance.revenue(wAsset1.address);
 
@@ -1008,7 +1019,7 @@ contract('NSFVaultFactory', async function(accounts) {
 			caught = true;
 		}
 		if (!caught) assert.fail('only whitelisted assets may be supplied');
-		await vaultFactoryInstance.whitelistFixCapitalPool(fcp1.address);
+		await vaultFactoryInstance.manage(fcp1.address, 0, MANAGE_METHOD.WHITELIST_FCP);
 	});
 
 	it('opens YT vault', async () => {
@@ -1929,7 +1940,7 @@ contract('NSFVaultFactory', async function(accounts) {
 		let caught = false;
 		let bondIn = "2";
 		try {
-			await vaultFactoryInstance.claimYTRevenue(fcp1.address, bondIn, {from: accounts[1]});
+			await vaultFactoryInstance.manage(fcp1.address, bondIn, MANAGE_METHOD.CLAIM_YT_REVENUE, {from: accounts[1]});
 		} catch (err) {
 			caught = true;
 		}
@@ -1945,7 +1956,7 @@ contract('NSFVaultFactory', async function(accounts) {
 		let prevTreasuryBalanceYield = await fcp1.balanceYield(treasuryAccount);
 		let prevTreasuryBalanceBond = await fcp1.balanceBonds(treasuryAccount);
 
-		await vaultFactoryInstance.claimYTRevenue(fcp1.address, bondIn);
+		await vaultFactoryInstance.manage(fcp1.address, bondIn, MANAGE_METHOD.CLAIM_YT_REVENUE);
 
 		let newRevenue = await vaultFactoryInstance.YTrevenue(fcp1.address);
 

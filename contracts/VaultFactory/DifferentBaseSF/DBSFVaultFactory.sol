@@ -332,7 +332,7 @@ contract DBSFVaultFactory is DBSFVaultFactoryData, IDBSFVaultFactory, nonReentra
 			_borrowRateChange
 		));
 		require(success);
-		emit OpenYTVault(msg.sender, _YTvaults[msg.sender].length);
+		emit OpenYTVault(msg.sender, _YTvaults[msg.sender].length-1);
 	}
 
 	/*
@@ -450,7 +450,7 @@ contract DBSFVaultFactory is DBSFVaultFactoryData, IDBSFVaultFactory, nonReentra
 			_maxIn
 		));
 		require(success);
-		emit AuctionLiquidation(_owner, _index, _Liquidations.length);
+		emit AuctionLiquidation(_owner, _index, _Liquidations.length-1);
 	}
 
 	/*
@@ -634,7 +634,7 @@ contract DBSFVaultFactory is DBSFVaultFactoryData, IDBSFVaultFactory, nonReentra
 			_amtIn
 		));
 		require(success);
-		emit AuctionYTLiquidation(_owner, _index, _YTLiquidations.length);
+		emit AuctionYTLiquidation(_owner, _index, _YTLiquidations.length-1);
 	}
 
 	/*

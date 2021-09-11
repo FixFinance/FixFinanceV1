@@ -110,55 +110,55 @@ contract SBNSFVaultFactoryData is Ownable {
 	IVaultHealth internal vaultHealthContract;
 
 	event OpenVault(
-		address owner,
-		address assetSupplied,
-		address assetBorrowed,
+		address indexed owner,
+		address indexed assetSupplied,
+		address indexed assetBorrowed,
 		uint amountSupplied,
 		uint amountBorrowed		
 	);
 
 	event CloseVault(
-		address owner,
+		address indexed owner,
 		uint index
 	);
 
 	event AdjustVault(
-		address owner,
+		address indexed owner,
 		uint index,
-		address newAssetSupplied,
-		address newAssetBorrowed,
+		address indexed newAssetSupplied,
+		address indexed newAssetBorrowed,
 		uint newAmountSupplied,
 		uint newAmountBorrowed
 	);
 
 	event OpenYTVault(
-		address owner,
-		address FCPsupplied,
-		address FCPborrowed,
+		address indexed owner,
+		address indexed FCPsupplied,
+		address indexed FCPborrowed,
 		uint yieldSupplied,
 		int bondSupplied,
 		uint amountBorrowed		
 	);
 
 	event CloseYTVault(
-		address owner,
+		address indexed owner,
 		uint index
 	);
 
 	event AdjustYTVault(
-		address owner,
+		address indexed owner,
 		uint index,
-		address newFCPsupplied,
-		address newFCPborrowed,
+		address indexed newFCPsupplied,
+		address indexed newFCPborrowed,
 		uint newYieldSupplied,
 		int newBondSupplied,
 		uint newAmountBorrowed		
 	);
 
 	event TransferVault(
-		address prevOwner,
+		address indexed prevOwner,
 		uint prevIndex,
-		address newOwner,
+		address indexed newOwner,
 		bool isYTVault
 	);
 }

@@ -215,7 +215,7 @@ contract DBSFVaultFactory is DBSFVaultFactoryData, IDBSFVaultFactory, nonReentra
 			_borrowRateChange
 		));
 		require(success);
-		emit OpenVault(msg.sender, _assetSupplied, _assetBorrowed, _amountSupplied, _amountBorrowed);
+		emit OpenVault(msg.sender, _vaults[msg.sender].length-1);
 	}
 
 	/*
@@ -282,7 +282,7 @@ contract DBSFVaultFactory is DBSFVaultFactoryData, IDBSFVaultFactory, nonReentra
 			_receiverAddr
 		));
 		require(success);
-		emit AdjustVault(_owner, _index, _assetSupplied, _assetBorrowed, _amountSupplied, _amountBorrowed);
+		emit AdjustVault(_owner, _index);
 	}
 
 	//--------------------------------------YT vault management-----------------------------------
@@ -332,7 +332,7 @@ contract DBSFVaultFactory is DBSFVaultFactoryData, IDBSFVaultFactory, nonReentra
 			_borrowRateChange
 		));
 		require(success);
-		emit OpenYTVault(msg.sender, _FCPsupplied, _FCPborrowed, _yieldSupplied, _bondSupplied, _amountBorrowed);
+		emit OpenYTVault(msg.sender, _YTvaults[msg.sender].length);
 	}
 
 	/*
@@ -404,7 +404,7 @@ contract DBSFVaultFactory is DBSFVaultFactoryData, IDBSFVaultFactory, nonReentra
 			_receiverAddr
 		));
 		require(success);
-		emit AdjustYTVault(_owner, _index, _FCPsupplied, _FCPborrowed, _yieldSupplied, _bondSupplied, _amountBorrowed);
+		emit AdjustYTVault(_owner, _index);
 	}
 
 	//--------------------------------f-o-r---b-o-t-h---s-t-a-n-d-a-r-d---v-a-u-l-t-s---a-n-d---Y-T-v-a-u-l-t-s---------------
@@ -450,6 +450,7 @@ contract DBSFVaultFactory is DBSFVaultFactoryData, IDBSFVaultFactory, nonReentra
 			_maxIn
 		));
 		require(success);
+		emit AuctionLiquidation(_owner, _index, _Liquidations.length);
 	}
 
 	/*
@@ -468,6 +469,7 @@ contract DBSFVaultFactory is DBSFVaultFactoryData, IDBSFVaultFactory, nonReentra
 			_amtIn
 		));
 		require(success);
+		emit BidOnLiquidation(_index);
 	}
 
 	/*
@@ -483,6 +485,7 @@ contract DBSFVaultFactory is DBSFVaultFactoryData, IDBSFVaultFactory, nonReentra
 			_to
 		));
 		require(success);
+		emit ClaimLiquidation(_index);
 	}
 
 	/*
@@ -510,6 +513,7 @@ contract DBSFVaultFactory is DBSFVaultFactoryData, IDBSFVaultFactory, nonReentra
 			_to
 		));
 		require(success);
+		emit InstantLiquidation(_owner, _index);
 	}
 
 	/*
@@ -538,6 +542,7 @@ contract DBSFVaultFactory is DBSFVaultFactoryData, IDBSFVaultFactory, nonReentra
 			_to
 		));
 		require(success);
+		emit InstantLiquidation(_owner, _index);
 	}
 
 	/*
@@ -566,6 +571,7 @@ contract DBSFVaultFactory is DBSFVaultFactoryData, IDBSFVaultFactory, nonReentra
 			_to
 		));
 		require(success);
+		emit InstantLiquidation(_owner, _index);
 	}
 
 
@@ -581,6 +587,7 @@ contract DBSFVaultFactory is DBSFVaultFactoryData, IDBSFVaultFactory, nonReentra
 			_asset
 		));
 		require(success);
+		emit ClaimRebate(msg.sender, _asset);
 	}
 
 	//------------------------------------Y-T---v-a-u-l-t---L-i-q-u-i-d-a-t-i-o-n-s-------------------------------------
@@ -598,6 +605,7 @@ contract DBSFVaultFactory is DBSFVaultFactoryData, IDBSFVaultFactory, nonReentra
 			_FCP
 		));
 		require(success);
+		emit ClaimYTRebate(msg.sender, _FCP);
 	}
 
 
@@ -626,6 +634,7 @@ contract DBSFVaultFactory is DBSFVaultFactoryData, IDBSFVaultFactory, nonReentra
 			_amtIn
 		));
 		require(success);
+		emit AuctionYTLiquidation(_owner, _index, _YTLiquidations.length);
 	}
 
 	/*
@@ -644,6 +653,7 @@ contract DBSFVaultFactory is DBSFVaultFactoryData, IDBSFVaultFactory, nonReentra
 			_amtIn
 		));
 		require(success);
+		emit BidOnYTLiquidation(_index);
 	}
 
 	/*
@@ -659,6 +669,7 @@ contract DBSFVaultFactory is DBSFVaultFactoryData, IDBSFVaultFactory, nonReentra
 			_to
 		));
 		require(success);
+		emit ClaimYTLiquidation(_index);
 	}
 
 	/*
@@ -689,6 +700,7 @@ contract DBSFVaultFactory is DBSFVaultFactoryData, IDBSFVaultFactory, nonReentra
 			_to
 		));
 		require(success);
+		emit InstantYTLiquidation(_owner, _index);
 	}
 
 	/*
@@ -720,6 +732,7 @@ contract DBSFVaultFactory is DBSFVaultFactoryData, IDBSFVaultFactory, nonReentra
 			_to
 		));
 		require(success);
+		emit InstantYTLiquidation(_owner, _index);
 	}
 
 	/*
@@ -751,6 +764,7 @@ contract DBSFVaultFactory is DBSFVaultFactoryData, IDBSFVaultFactory, nonReentra
 			_to
 		));
 		require(success);
+		emit InstantYTLiquidation(_owner, _index);
 	}
 
 

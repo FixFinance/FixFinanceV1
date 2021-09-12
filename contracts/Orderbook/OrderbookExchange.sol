@@ -52,6 +52,7 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 			_amountBond
 		));
 		require(success);
+		emit Deposit(msg.sender, _amountYield, _amountBond);
 	}
 
 	/*
@@ -67,6 +68,7 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 			_amountBond
 		));
 		require(success);
+		emit Withdrawal(msg.sender, _amountYield, _amountBond);
 	}
 
 	//-------------------externally-callable-------------------

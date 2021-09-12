@@ -39,6 +39,19 @@ interface IOrderbookExchange {
 		uint newZCBSellHeadID,
 		uint headAmount
 	);
+
+	event Deposit(
+		address indexed to,
+		uint yieldDeposit,
+		int bondDeposit
+	);
+
+	event Withdrawal(
+		address indexed from,
+		uint yieldWithdrawn,
+		int bondWithdrawn
+	);
+
 	function deposit(uint _amountYield, int _amountBond) external;
 	function withdraw(uint _amountYield, int _amountBond) external;
 	function limitSellZCB(uint _amount, uint _maturityConversionRate, uint _hintID, uint _maxSteps) external;

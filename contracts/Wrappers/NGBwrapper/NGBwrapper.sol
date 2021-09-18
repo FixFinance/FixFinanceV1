@@ -9,7 +9,7 @@ import "../../libraries/ABDKMath64x64.sol";
 import "../../libraries/BigMath.sol";
 import "../../helpers/nonReentrant.sol";
 import "../../helpers/Ownable.sol";
-import "./NGBwrapperData.sol";
+import "./NGBwrapperInternals.sol";
 
 /*
 	Native Growing Balance Wrapper
@@ -18,7 +18,7 @@ import "./NGBwrapperData.sol";
 
 	The balances of the underlying asset automatically grow as yield is generated
 */
-contract NGBwrapper is INGBWrapper, NGBwrapperData {
+contract NGBwrapper is INGBWrapper, NGBwrapperInternals {
 	using SafeMath for uint256;
 	using ABDKMath64x64 for int128;
 
@@ -106,24 +106,6 @@ contract NGBwrapper is INGBWrapper, NGBwrapperData {
 		return block.timestamp;
 	}
 
-	/*
-		@Description: get the ratio of underlyingAsset / wrappedAsset
-	*/
-	function getRatio() internal view returns (uint) {
-		uint _totalSupply = internalTotalSupply;	
-		uint _prevRatio = internalPrevRatio;
-		uint contractBalance = IERC20(internalUnderlyingAssetAddress).balanceOf(address(this));
-		uint nonFeeAdjustedRatio = uint(1 ether).mul(contractBalance).div(_totalSupply);
-		//handle odd case, most likely only caused by rounding error (off by 1)
-		if (nonFeeAdjustedRatio <= _prevRatio) {
-			return _prevRatio;
-		}
-		uint minNewRatio = (nonFeeAdjustedRatio-_prevRatio)
-			.mul(minHarvestRetention)
-			.div(totalSBPS)
-			.add(_prevRatio);
-		return minNewRatio;
-	}
 
 	/*
 		@Description: this function is called by amms to ensure the state of the wrapper has not changed

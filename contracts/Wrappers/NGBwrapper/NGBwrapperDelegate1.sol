@@ -81,8 +81,8 @@ contract NGBwrapperDelegate1 is NGBwrapperDelegateParent {
 		@return uint _amountWrappedToken: the amount of wrapped tokens that were minted
 	*/
 	function firstDeposit(address _to, uint _amountUnit) internal returns (uint _amountWrappedToken) {
-		IERC20 _aToken = IERC20(internalUnderlyingAssetAddress);
-		bool success = _aToken.transferFrom(msg.sender, address(this), _amountUnit);
+		IERC20 underlying = IERC20(internalUnderlyingAssetAddress);
+		bool success = underlying.transferFrom(msg.sender, address(this), _amountUnit);
 		require(success);
 		internalBalanceOf[_to] = _amountUnit;
 		internalTotalSupply = _amountUnit;
@@ -105,9 +105,9 @@ contract NGBwrapperDelegate1 is NGBwrapperDelegateParent {
 			return firstDeposit(_to, _amountUnit);
 		}
 		harvestToTreasury();
-		IERC20 _aToken = IERC20(internalUnderlyingAssetAddress);
-		uint contractBalance = _aToken.balanceOf(address(this));
-		bool success = _aToken.transferFrom(msg.sender, address(this), _amountUnit);
+		IERC20 underlying = IERC20(internalUnderlyingAssetAddress);
+		uint contractBalance = underlying.balanceOf(address(this));
+		bool success = underlying.transferFrom(msg.sender, address(this), _amountUnit);
 		require(success);
 		_amountWrappedToken = internalTotalSupply*_amountUnit/contractBalance;
 		internalBalanceOf[_to] += _amountWrappedToken;
@@ -145,15 +145,15 @@ contract NGBwrapperDelegate1 is NGBwrapperDelegateParent {
 	*/
 	function withdrawUnitAmount(address _to, uint _amountUnit, bool _claimRewards) external claimRewards(_claimRewards, msg.sender) returns (uint _amountWrappedToken) {
 		harvestToTreasury();
-		IERC20 _aToken = IERC20(internalUnderlyingAssetAddress);
-		uint contractBalance = _aToken.balanceOf(address(this));
+		IERC20 underlying = IERC20(internalUnderlyingAssetAddress);
+		uint contractBalance = underlying.balanceOf(address(this));
 		//_amountWrappedToken == ceil(internalTotalSupply*_amountUnit/contractBalance)
 		_amountWrappedToken = internalTotalSupply*_amountUnit;
 		_amountWrappedToken = (_amountWrappedToken%contractBalance == 0 ? 0 : 1) + (_amountWrappedToken/contractBalance);
 		require(internalBalanceOf[msg.sender] >= _amountWrappedToken);
 		internalBalanceOf[msg.sender] -= _amountWrappedToken;
 		internalTotalSupply -= _amountWrappedToken;
-		_aToken.transfer(_to, _amountUnit);
+		underlying.transfer(_to, _amountUnit);
 	}
 
 	/*
@@ -167,35 +167,15 @@ contract NGBwrapperDelegate1 is NGBwrapperDelegateParent {
 	function withdrawWrappedAmount(address _to, uint _amountWrappedToken, bool _claimRewards) external claimRewards(_claimRewards, msg.sender) returns (uint _amountUnit) {
 		require(internalBalanceOf[msg.sender] >= _amountWrappedToken);
 		harvestToTreasury();
-		IERC20 _aToken = IERC20(internalUnderlyingAssetAddress);
-		uint contractBalance = _aToken.balanceOf(address(this));
+		IERC20 underlying = IERC20(internalUnderlyingAssetAddress);
+		uint contractBalance = underlying.balanceOf(address(this));
 		_amountUnit = contractBalance*_amountWrappedToken/internalTotalSupply;
 		internalBalanceOf[msg.sender] -= _amountWrappedToken;
 		internalTotalSupply -= _amountWrappedToken;
-		_aToken.transfer(_to, _amountUnit);
+		underlying.transfer(_to, _amountUnit);
 	}
 
 	function forceRewardsCollection() external claimRewards(true, msg.sender) {}
-
-	/*
-		@Description: get the ratio of underlyingAsset / wrappedAsset
-	*/
-	function getRatio() internal view returns (uint) {
-		uint _totalSupply = internalTotalSupply;	
-		uint _prevRatio = internalPrevRatio;
-		uint contractBalance = IERC20(internalUnderlyingAssetAddress).balanceOf(address(this));
-		uint nonFeeAdjustedRatio = uint(1 ether).mul(contractBalance).div(_totalSupply);
-		//handle odd case, most likely only caused by rounding error (off by 1)
-		if (nonFeeAdjustedRatio <= _prevRatio) {
-			return _prevRatio;
-		}
-		uint minNewRatio = (nonFeeAdjustedRatio-_prevRatio)
-			.mul(minHarvestRetention)
-			.div(totalSBPS)
-			.add(_prevRatio);
-		return minNewRatio;
-	}
-
 
 	/*
 		@Description: convert an amount of underlying asset to its corresponding amount of wrapped asset, round down

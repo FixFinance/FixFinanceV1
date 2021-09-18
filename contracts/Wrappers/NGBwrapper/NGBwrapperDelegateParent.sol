@@ -4,9 +4,9 @@ pragma solidity >=0.6.8 <0.7.0;
 import "../../interfaces/IERC20.sol";
 import "../../libraries/SafeMath.sol";
 import "../../libraries/ABDKMath64x64.sol";
-import "./NGBwrapperData.sol";
+import "./NGBwrapperInternals.sol";
 
-contract NGBwrapperDelegateParent is NGBwrapperData {
+contract NGBwrapperDelegateParent is NGBwrapperInternals {
 	using SafeMath for uint256;
 	using ABDKMath64x64 for int128;
 

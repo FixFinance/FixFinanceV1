@@ -65,11 +65,11 @@ contract NGBwrapperDelegate1 is NGBwrapperDelegateParent {
 			address sendTo = iorc.sendTo();
 			internalBalanceOf[sendTo] = internalBalanceOf[sendTo].add(dividend >> 1);
 			internalBalanceOf[_owner] = internalBalanceOf[_owner].add(dividend - (dividend >> 1));
-			internalTotalSupply = newTotalSupply;
 		}
 		else {
 			internalBalanceOf[_owner] = internalBalanceOf[_owner].add(dividend);
 		}
+		internalTotalSupply = newTotalSupply;
 	}
 
 	/*
@@ -111,6 +111,7 @@ contract NGBwrapperDelegate1 is NGBwrapperDelegateParent {
 		require(success);
 		_amountWrappedToken = internalTotalSupply*_amountUnit/contractBalance;
 		internalBalanceOf[_to] += _amountWrappedToken;
+		//we cannot use _totalSupply as the value of internalTotalSupply may have been changed in harvestToTreasury()
 		internalTotalSupply += _amountWrappedToken;
 	}
 
@@ -169,9 +170,9 @@ contract NGBwrapperDelegate1 is NGBwrapperDelegateParent {
 		harvestToTreasury();
 		IERC20 underlying = IERC20(internalUnderlyingAssetAddress);
 		uint contractBalance = underlying.balanceOf(address(this));
-		_amountUnit = contractBalance*_amountWrappedToken/internalTotalSupply;
-		internalBalanceOf[msg.sender] -= _amountWrappedToken;
-		internalTotalSupply -= _amountWrappedToken;
+		_amountUnit = contractBalance.mul(_amountWrappedToken).div(internalTotalSupply);
+		internalBalanceOf[msg.sender] = internalBalanceOf[msg.sender].sub(_amountWrappedToken);
+		internalTotalSupply = internalTotalSupply.sub(_amountWrappedToken);
 		underlying.transfer(_to, _amountUnit);
 	}
 

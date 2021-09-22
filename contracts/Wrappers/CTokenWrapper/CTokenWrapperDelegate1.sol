@@ -13,6 +13,15 @@ contract CTokenWrapperDelegate1 is CTokenWrapperDelegateParent {
 	using SafeMath for uint256;
 	using ABDKMath64x64 for int128;
 
+	function harvestToTreasury() external {
+		internalHarvestToTreasury(ICToken(internalUnderlyingAssetAddress));
+	}
+
+	function extractRetsHarvestToTreasury(ICToken _cToken) internal returns(uint, uint, uint) {
+		uint[3] memory rets = internalHarvestToTreasury(_cToken);
+		return (rets[0], rets[1], rets[2]);
+	}
+
 	/*
 		@Description: collect fee, send 50% to owner and 50% to treasury address
 			after the fee is collected the funds that are retained for wrapped asset holders will
@@ -20,20 +29,31 @@ contract CTokenWrapperDelegate1 is CTokenWrapperDelegateParent {
 			though it should be noted that if the fee is greater than 20% of the total interest
 			generated since the last harvest the fee will be set to 20% of the total interest
 			generated since the last harvest
+
+		@param ICToken _cToken: the underlying c token
+
+		@return uint[3]:
+			arr[0]: total supply at end of execution
+			arr[1]: value returned by cToken.exchangeRateStored()
+			arr[2]: this contract's balance of cTokens
 	*/
-	function harvestToTreasury() public {
+	function internalHarvestToTreasury(ICToken _cToken) internal returns(uint[3] memory) {
 		uint _lastHarvest = internalLastHarvest;
-		if (block.timestamp == _lastHarvest) {
-			return;
-		}
+		uint prevTotalSupply = internalTotalSupply;
 		uint contractControlled;
+		uint exchangeRate;
+		uint contractBalance;
 		{
-			ICToken cToken = ICToken(internalUnderlyingAssetAddress);
-			uint contractBalance = cToken.balanceOf(address(this));
-			uint exchangeRate = cToken.exchangeRateStored();
+			exchangeRate = _cToken.exchangeRateStored();			
+			if (prevTotalSupply == 0) {
+				return [0, exchangeRate, 0];
+			}
+			contractBalance = _cToken.balanceOf(address(this));
+			if (block.timestamp == _lastHarvest) {
+				return [prevTotalSupply, exchangeRate, contractBalance];
+			}
 			contractControlled = contractBalance.mul(exchangeRate) / (1 ether);
 		}
-		uint prevTotalSupply = internalTotalSupply;
 		uint _prevRatio = internalPrevRatio;
 		//time in years
 		/*
@@ -46,7 +66,7 @@ contract CTokenWrapperDelegate1 is CTokenWrapperDelegateParent {
 		uint nonFeeAdjustedRatio = effectiveRatio.div(prevTotalSupply);
 		if (nonFeeAdjustedRatio <= _prevRatio) {
 			//only continue if yield has been generated
-			return;
+			return [prevTotalSupply, exchangeRate, contractBalance];
 		}
 		uint minNewRatio = (nonFeeAdjustedRatio - _prevRatio).mul(minHarvestRetention).div(totalSBPS).add(_prevRatio);
 		int128 time = int128(((block.timestamp - _lastHarvest) << 64)/ BigMath.SecondsPerYear);
@@ -72,11 +92,12 @@ contract CTokenWrapperDelegate1 is CTokenWrapperDelegateParent {
 			address sendTo = iorc.sendTo();
 			internalBalanceOf[sendTo] = internalBalanceOf[sendTo].add(dividend >> 1);
 			internalBalanceOf[_owner] = internalBalanceOf[_owner].add(dividend - (dividend >> 1));
-			internalTotalSupply = newTotalSupply;
 		}
 		else {
 			internalBalanceOf[_owner] = internalBalanceOf[_owner].add(dividend);
 		}
+		internalTotalSupply = newTotalSupply;
+		return [newTotalSupply, exchangeRate, contractBalance];
 	}
 
 	/*
@@ -106,19 +127,16 @@ contract CTokenWrapperDelegate1 is CTokenWrapperDelegateParent {
 	*/
 	function depositUnitAmount(address _to, uint _amount) external claimRewards(true, _to) returns (uint _amountWrapped) {
 		ICToken cToken = ICToken(internalUnderlyingAssetAddress);
-		uint exchangeRate = cToken.exchangeRateStored();
-		uint _totalSupply = internalTotalSupply;
+		(uint _totalSupply, uint exchangeRate, uint contractBalance) = extractRetsHarvestToTreasury(cToken);
 		uint cTokenIn = _amount.mul(1 ether).div(exchangeRate);
 		if (_totalSupply == 0) {
 			return firstDeposit(_to, cTokenIn, cToken);
 		}
-		harvestToTreasury();
-		uint contractBalance = cToken.balanceOf(address(this));
 		_amountWrapped = cTokenIn.mul(_totalSupply).div(contractBalance);
-
 		address toCopy = _to; //prevent stack too deep
 		internalBalanceOf[toCopy] = internalBalanceOf[toCopy].add(_amountWrapped);
-		internalTotalSupply = _totalSupply.add(_amountWrapped);
+		//we cannot use _totalSupply as internalTotalSupply was set in harvestToTreasury
+		internalTotalSupply = internalTotalSupply.add(_amountWrapped);
 		bool success = cToken.transferFrom(msg.sender, address(this), cTokenIn);
 		require(success);
 	}
@@ -131,22 +149,22 @@ contract CTokenWrapperDelegate1 is CTokenWrapperDelegateParent {
 	*/
 	function depositWrappedAmount(address _to, uint _amount) external claimRewards(true, _to) returns (uint _amountUnit) {
 		ICToken cToken = ICToken(internalUnderlyingAssetAddress);
-		uint _totalSupply = internalTotalSupply;
+		(uint _totalSupply, uint exchangeRate, uint contractBalance) = extractRetsHarvestToTreasury(cToken);
+		uint cTokenIn = contractBalance.mul(_amount);
+			cTokenIn = cTokenIn.div(_totalSupply).add(1);
 		if (_totalSupply == 0) {
 			return firstDeposit(_to, _amount, cToken);
 		}
-		harvestToTreasury();
-		uint contractBalance = cToken.balanceOf(address(this));
-		uint cTokenIn = contractBalance.mul(_amount).div(_totalSupply).add(1);
-		uint exchangeRate = cToken.exchangeRateStored();
 		_amountUnit = cTokenIn.mul(1 ether).div(exchangeRate);
-
 		address toCopy = _to; //prevent stack too deep
 		internalBalanceOf[toCopy] = internalBalanceOf[toCopy].add(_amount);
-		internalTotalSupply = _totalSupply.add(_amount);
+		//we cannot use _totalSupply as internalTotalSupply was set in harvestToTreasury
+		internalTotalSupply = internalTotalSupply.add(_amount);
 		bool success = cToken.transferFrom(msg.sender, address(this), cTokenIn);
 		require(success);
 	}
+
+	event EVNT(uint its);
 
 	/*
 		@Description: burn wrapped asset to receive an amount of underlying asset of _amountUnit
@@ -157,16 +175,17 @@ contract CTokenWrapperDelegate1 is CTokenWrapperDelegateParent {
 		@return uint _amountWrappedToken: the amount of units of wrapped asset that were burned
 	*/
 	function withdrawUnitAmount(address _to, uint _amountUnit, bool _claimRewards) external claimRewards(_claimRewards, msg.sender) returns (uint _amountWrappedToken) {
-		harvestToTreasury();
-		IERC20 _aToken = IERC20(internalUnderlyingAssetAddress);
-		uint contractBalance = _aToken.balanceOf(address(this));
+		ICToken cToken = ICToken(internalUnderlyingAssetAddress);
+		(uint _totalSupply, uint exchangeRate, uint contractBalance) = extractRetsHarvestToTreasury(cToken);
 		//_amountWrappedToken == ceil(internalTotalSupply*_amountUnit/contractBalance)
-		_amountWrappedToken = internalTotalSupply*_amountUnit;
-		_amountWrappedToken = (_amountWrappedToken%contractBalance == 0 ? 0 : 1) + (_amountWrappedToken/contractBalance);
-		require(internalBalanceOf[msg.sender] >= _amountWrappedToken);
-		internalBalanceOf[msg.sender] -= _amountWrappedToken;
-		internalTotalSupply -= _amountWrappedToken;
-		_aToken.transfer(_to, _amountUnit);
+		uint amountCToken = _amountUnit;
+			amountCToken = amountCToken.mul(1 ether).div(exchangeRate); //prevent stack too deep
+		_amountWrappedToken = amountCToken.mul(_totalSupply).div(contractBalance);
+		uint bal = internalBalanceOf[msg.sender];
+		internalBalanceOf[msg.sender] = bal.sub(_amountWrappedToken);
+		internalTotalSupply = internalTotalSupply.sub(_amountWrappedToken);
+		address copyTo = _to; //prevent stack too deep
+		cToken.transfer(copyTo, amountCToken.sub(1)); //subtract 1 to offset any rounding errors
 	}
 
 	/*
@@ -179,13 +198,13 @@ contract CTokenWrapperDelegate1 is CTokenWrapperDelegateParent {
 	*/
 	function withdrawWrappedAmount(address _to, uint _amountWrappedToken, bool _claimRewards) external claimRewards(_claimRewards, msg.sender) returns (uint _amountUnit) {
 		require(internalBalanceOf[msg.sender] >= _amountWrappedToken);
-		harvestToTreasury();
-		IERC20 _aToken = IERC20(internalUnderlyingAssetAddress);
-		uint contractBalance = _aToken.balanceOf(address(this));
-		_amountUnit = contractBalance*_amountWrappedToken/internalTotalSupply;
-		internalBalanceOf[msg.sender] -= _amountWrappedToken;
-		internalTotalSupply -= _amountWrappedToken;
-		_aToken.transfer(_to, _amountUnit);
+		ICToken cToken = ICToken(internalUnderlyingAssetAddress);
+		internalHarvestToTreasury(cToken);
+		uint contractBalance = cToken.balanceOf(address(this));
+		_amountUnit = contractBalance.mul(_amountWrappedToken).div(internalTotalSupply);
+		internalBalanceOf[msg.sender] = internalBalanceOf[msg.sender].sub(_amountWrappedToken);
+		internalTotalSupply = internalTotalSupply.sub(_amountWrappedToken);
+		cToken.transfer(_to, _amountUnit);
 	}
 
 	function forceRewardsCollection() external claimRewards(true, msg.sender) {}

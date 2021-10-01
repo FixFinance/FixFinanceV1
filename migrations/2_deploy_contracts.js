@@ -1,6 +1,6 @@
 const NGBwrapper = artifacts.require('NGBwrapper');
 const FCPDelegate1 = artifacts.require('FCPDelegate1');
-const capitalHandler = artifacts.require('FixCapitalPool');
+const FixCapitalPool = artifacts.require('FixCapitalPool');
 const FixCapitalPoolDeployer = artifacts.require('FixCapitalPoolDeployer');
 const dummyAToken = artifacts.require('dummyAToken');
 const organizer = artifacts.require('Organizer');
@@ -42,6 +42,7 @@ const OrderbookDelegate1 = artifacts.require("OrderbookDelegate1");
 const OrderbookDelegate2 = artifacts.require("OrderbookDelegate2");
 const OrderbookDelegate3 = artifacts.require("OrderbookDelegate3");
 const OrderbookDeployer = artifacts.require("OrderbookDeployer");
+const OrderbookExchange = artifacts.require("OrderbookExchange");
 const ZCBammDeployer = artifacts.require('ZCBammDeployer');
 const YTammDelegate = artifacts.require('YTammDelegate');
 const YTammDeployer = artifacts.require('YTammDeployer');
@@ -62,7 +63,7 @@ const WETH = nullAddress;
 
 const BN = web3.utils.BN;
 
-const _10to18 = (new BN(10)).pow(new BN(18));
+const _10To18 = (new BN(10)).pow(new BN(18));
 
 module.exports = async function(deployer) {
 	accounts = await web3.eth.getAccounts();
@@ -174,5 +175,18 @@ module.exports = async function(deployer) {
 	rec = await organizerInstance.deployNGBWrapper(dummyATokenInstance.address);
 	wAsset = await NGBwrapper.at(rec.receipt.logs[0].args.wrapperAddress);
 	let timestamp = (await web3.eth.getBlock('latest')).timestamp + 10*24*60*60;
-	await organizerInstance.deployFixCapitalPoolInstance(wAsset.address, timestamp);
+	rec = await organizerInstance.deployFixCapitalPoolInstance(wAsset.address, timestamp);
+	fcpInstance = await FixCapitalPool.at(rec.receipt.logs[0].args.FCPaddress);
+	rec = await organizerInstance.deployOrderbook(fcpInstance.address);
+	let exchange = await OrderbookExchange.at(rec.receipt.logs[0].args.OrderbookAddress);
+	console.log("NGBwrapper:", wAsset.address);
+	console.log("FixCapitalPool:", fcpInstance.address);
+	console.log("Orderbook Exchange:", exchange.address);
+	await dummyATokenInstance.approve(wAsset.address, _10To18);
+	await wAsset.depositUnitAmount(accounts[0], _10To18);
+	await wAsset.approve(fcpInstance.address, _10To18);
+	await fcpInstance.depositWrappedToken(accounts[0], _10To18);
+	await fcpInstance.dualApprove(exchange.address, _10To18, _10To18);
+	await exchange.deposit(_10To18, 0);
+	console.log("Orderbook Deposit Complete");
 };

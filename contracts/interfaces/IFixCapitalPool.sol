@@ -34,7 +34,7 @@ interface IFixCapitalPool is IFCPFlashLender {
 	function transferPositionFrom(address _from, address _to, uint _yield, int _bond) external;
 	function transferYT(address _from, address _to, uint _amount) external;
 	function transferZCB(address _from, address _to, uint _amount) external;
-	function dualApprove(address _owner, address _spender, uint _allowanceZCB, uint _allowanceYT) external;
+	function dualApprove(address _spender, uint _allowanceZCB, uint _allowanceYT) external;
 
 	function wrappedTokenFree(address _owner) external view returns (uint wrappedTknFree);
 	function inPayoutPhase() external view returns (bool);

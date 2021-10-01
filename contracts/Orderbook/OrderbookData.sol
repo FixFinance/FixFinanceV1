@@ -46,11 +46,11 @@ contract OrderbookData {
 	//value of totalNumOrders at the time an order is created is its key in the order mapping
 	uint totalNumOrders;
 
-	IFixCapitalPool public internalFCP;
-	IWrapper public internalWrapper;
-	IInfoOracle public internalIORC;
+	IFixCapitalPool internal internalFCP;
+	IWrapper internal internalWrapper;
+	IInfoOracle internal internalIORC;
 
-	uint40 public internalMaturity;
+	uint40 internal internalMaturity;
 
 	//--------------data for rate oracle---------------
 	uint8 constant LENGTH_RATE_SERIES = 31;

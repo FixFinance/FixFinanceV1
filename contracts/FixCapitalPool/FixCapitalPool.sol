@@ -306,14 +306,13 @@ contract FixCapitalPool is IFixCapitalPool, FCPDelegateParent, Ownable, nonReent
 	/*
 		@Description: approve both ZCB & YT with one function call
 
-		@param address _owner: the owner of the funds to set approval for
 		@param address _spender: the spender of the funds to set approval for
 		@param uint _allowanceZCB: the new allowance of ZCB
 		@param uint _allowanceYT: the new allowance of static YT
 	*/
-	function dualApprove(address _owner, address _spender, uint _allowanceZCB, uint _allowanceYT) external override {
-		IZeroCouponBond(internalZeroCouponBondAddress).setAllowance(_owner, _spender, _allowanceZCB);
-		IYieldToken(internalYieldTokenAddress).setAllowance(_owner, _spender, _allowanceYT);
+	function dualApprove(address _spender, uint _allowanceZCB, uint _allowanceYT) external override {
+		IZeroCouponBond(internalZeroCouponBondAddress).setAllowance(msg.sender, _spender, _allowanceZCB);
+		IYieldToken(internalYieldTokenAddress).setAllowance(msg.sender, _spender, _allowanceYT);
 	}
 
 

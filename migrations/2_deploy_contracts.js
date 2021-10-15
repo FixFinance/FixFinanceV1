@@ -188,5 +188,13 @@ module.exports = async function(deployer) {
 	await fcpInstance.depositWrappedToken(accounts[0], _10To18);
 	await fcpInstance.dualApprove(exchange.address, _10To18, _10To18);
 	await exchange.deposit(_10To18, 0);
-	console.log("Orderbook Deposit Complete");
+	console.log("First Orderbook Deposit Completed")
+	await dummyATokenInstance.mintTo(accounts[1], _10To18, {from: accounts[1]});
+	await dummyATokenInstance.approve(wAsset.address, _10To18, {from: accounts[1]});
+	await wAsset.depositUnitAmount(accounts[1], _10To18, {from: accounts[1]});
+	await wAsset.approve(fcpInstance.address, _10To18, {from: accounts[1]});
+	await fcpInstance.depositWrappedToken(accounts[1], _10To18, {from: accounts[1]});
+	await fcpInstance.dualApprove(exchange.address, _10To18, _10To18, {from: accounts[1]});
+	await exchange.deposit(_10To18, 0, {from: accounts[1]});
+	console.log("Second Orderbook Deposit Completed");
 };

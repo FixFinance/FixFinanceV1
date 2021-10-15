@@ -201,10 +201,11 @@ contract CTokenWrapperDelegate1 is CTokenWrapperDelegateParent {
 		ICToken cToken = ICToken(internalUnderlyingAssetAddress);
 		internalHarvestToTreasury(cToken);
 		uint contractBalance = cToken.balanceOf(address(this));
-		_amountUnit = contractBalance.mul(_amountWrappedToken).div(internalTotalSupply);
+		uint cTokenOut = contractBalance.mul(_amountWrappedToken).div(internalTotalSupply);
 		internalBalanceOf[msg.sender] = internalBalanceOf[msg.sender].sub(_amountWrappedToken);
 		internalTotalSupply = internalTotalSupply.sub(_amountWrappedToken);
-		cToken.transfer(_to, _amountUnit);
+		cToken.transfer(_to, cTokenOut);
+		_amountUnit = cTokenOut.mul(cToken.exchangeRateStored()).div(1 ether);
 	}
 
 	function forceRewardsCollection() external claimRewards(true, msg.sender) {}

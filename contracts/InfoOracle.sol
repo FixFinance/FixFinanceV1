@@ -84,7 +84,7 @@ contract InfoOracle is IInfoOracle, Ownable {
 	modifier maySetContractParameters(address _contractAddr) {
 		address contractOwner = Ownable(_contractAddr).owner();
 		if (msg.sender != contractOwner) {
-			address delegatedController = DelegatedControllers[msg.sender];
+			address delegatedController = DelegatedControllers[_contractAddr];
 			require(msg.sender == delegatedController);
 		}
 		_;
@@ -94,10 +94,12 @@ contract InfoOracle is IInfoOracle, Ownable {
 	/*
 		@Description: delegate ability to customise parameters for wrappers and FCPs to another address
 
-		@param address _manager: the address that shall customise parameters for msg.sender
+		@param address _contract: the contract for which custom parameters may be set
+		@param address _manager: the address that shall customise parameters for the contract
 	*/
-	function setDelegatedController(address _manager) external override {
-		DelegatedControllers[msg.sender] = _manager;
+	function setDelegatedController(address _contract, address _manager) external override {
+		require(Ownable(_contract).owner() == msg.sender);
+		DelegatedControllers[_contract] = _manager;
 	}
 
 	/*

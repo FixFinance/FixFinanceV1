@@ -19,7 +19,7 @@ interface IInfoOracle {
 	function getZCBammFeeConstant(address _fixCapitalPoolAddress) external view returns (uint FeeConstant);
 	function getYTammFeeConstant(address _fixCapitalPoolAddress) external view returns (uint FeeConstant);
 	function getSlippageConstant(address _fixCapitalPoolAddress) external view returns (uint SlippageConstant);
-	function DelegatedControllers(address _owner) external view returns (address delegate);
+	function DelegatedControllers(address _contract) external view returns (address delegate);
 	//for use by DBSFVaultFactory
 	function StabilityFeeAPR(address _vaultFactoryAddress, address _wrapperAddress) external view returns (uint64 stabilityFeeAPR);
 	function collateralWhitelist(address _vaultFactoryAddress, address _assetAddress) external view returns (address underlyingAsset);
@@ -27,7 +27,7 @@ interface IInfoOracle {
 
 	//---------management--------------
 
-	function setDelegatedController(address _manager) external;
+	function setDelegatedController(address _contract, address _manager) external;
 	function wrapperSetAmmFeeConstants(address _wrapper, uint _ZCBammFeeConstant, uint _YTammFeeConstant) external;
 	function wrapperSetOrderbookFeeConstant(address _wrapper, uint8 _orderbookFeeBips) external;
 	function wrapperSetSlippageConst(address _wrapper, uint _SlippageConstant) external;

@@ -150,12 +150,12 @@ contract CTokenWrapperDelegate1 is CTokenWrapperDelegateParent {
 	function depositWrappedAmount(address _to, uint _amount) external claimRewards(true, _to) returns (uint _amountUnit) {
 		ICToken cToken = ICToken(internalUnderlyingAssetAddress);
 		(uint _totalSupply, uint exchangeRate, uint contractBalance) = extractRetsHarvestToTreasury(cToken);
-		uint cTokenIn = contractBalance.mul(_amount);
-			cTokenIn = cTokenIn.div(_totalSupply).add(1);
 		if (_totalSupply == 0) {
 			return firstDeposit(_to, _amount, cToken);
 		}
-		_amountUnit = cTokenIn.mul(1 ether).div(exchangeRate);
+		uint cTokenIn = contractBalance.mul(_amount);
+			cTokenIn = cTokenIn.div(_totalSupply).add(1);
+		_amountUnit = cTokenIn.mul(exchangeRate).div(1 ether);
 		address toCopy = _to; //prevent stack too deep
 		internalBalanceOf[toCopy] = internalBalanceOf[toCopy].add(_amount);
 		//we cannot use _totalSupply as internalTotalSupply was set in harvestToTreasury

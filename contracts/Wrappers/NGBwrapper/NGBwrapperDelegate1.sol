@@ -12,6 +12,15 @@ contract NGBwrapperDelegate1 is NGBwrapperDelegateParent {
 	using SafeMath for uint256;
 	using ABDKMath64x64 for int128;
 
+	function harvestToTreasury() external {
+		internalHarvestToTreasury(IERC20(internalUnderlyingAssetAddress));
+	}
+
+	function extractRetsHarvestToTreasury(IERC20 _underlyingAsset) internal returns(uint, uint) {
+		uint[2] memory rets = internalHarvestToTreasury(_underlyingAsset);
+		return (rets[0], rets[1]);
+	}
+
 	/*
 		@Description: collect fee, send 50% to owner and 50% to treasury address
 			after the fee is collected the funds that are retained for wrapped asset holders will
@@ -19,14 +28,23 @@ contract NGBwrapperDelegate1 is NGBwrapperDelegateParent {
 			though it should be noted that if the fee is greater than 20% of the total interest
 			generated since the last harvest the fee will be set to 20% of the total interest
 			generated since the last harvest
+
+		@param IERC20 _underlyingAsset: ERC20 representation of the underlying asset
+
+		@return uint[2]:
+			arr[0]: total supply at end of execution
+			arr[1]: this contract's balance of the underlying
 	*/
-	function harvestToTreasury() public {
+	function internalHarvestToTreasury(IERC20 _underlyingAsset) internal returns(uint[2] memory) {
 		uint _lastHarvest = internalLastHarvest;
-		if (block.timestamp == _lastHarvest) {
-			return;
-		}
-		uint contractBalance = IERC20(internalUnderlyingAssetAddress).balanceOf(address(this));
 		uint prevTotalSupply = internalTotalSupply;
+		if (prevTotalSupply == 0) {
+			return [uint(0), uint(0)];
+		}
+		uint contractBalance = _underlyingAsset.balanceOf(address(this));
+		if (block.timestamp == _lastHarvest) {
+			return [prevTotalSupply, contractBalance];
+		}
 		uint _prevRatio = internalPrevRatio;
 		//time in years
 		/*
@@ -39,7 +57,7 @@ contract NGBwrapperDelegate1 is NGBwrapperDelegateParent {
 		uint nonFeeAdjustedRatio = effectiveRatio.div(prevTotalSupply);
 		if (nonFeeAdjustedRatio <= _prevRatio) {
 			//only continue if yield has been generated
-			return;
+			return [prevTotalSupply, contractBalance];
 		}
 		uint minNewRatio = (nonFeeAdjustedRatio - _prevRatio).mul(minHarvestRetention).div(totalSBPS).add(_prevRatio);
 		int128 time = int128(((block.timestamp - _lastHarvest) << 64)/ BigMath.SecondsPerYear);
@@ -70,6 +88,7 @@ contract NGBwrapperDelegate1 is NGBwrapperDelegateParent {
 			internalBalanceOf[_owner] = internalBalanceOf[_owner].add(dividend);
 		}
 		internalTotalSupply = newTotalSupply;
+		return [newTotalSupply, contractBalance];
 	}
 
 	/*
@@ -77,12 +96,12 @@ contract NGBwrapperDelegate1 is NGBwrapperDelegateParent {
 		
 		@param address _to: the address that shall receive the newly minted wrapped tokens
 		@param uint _amountUnit: the amount of underlying asset units to deposit
+		@param IERC20 _underlyingAsset: the underlying asset which the NGBwrapper contract is based on
 
 		@return uint _amountWrappedToken: the amount of wrapped tokens that were minted
 	*/
-	function firstDeposit(address _to, uint _amountUnit) internal returns (uint _amountWrappedToken) {
-		IERC20 underlying = IERC20(internalUnderlyingAssetAddress);
-		bool success = underlying.transferFrom(msg.sender, address(this), _amountUnit);
+	function firstDeposit(address _to, uint _amountUnit, IERC20 _underlyingAsset) internal returns (uint _amountWrappedToken) {
+		bool success = _underlyingAsset.transferFrom(msg.sender, address(this), _amountUnit);
 		require(success);
 		internalBalanceOf[_to] = _amountUnit;
 		internalTotalSupply = _amountUnit;
@@ -100,19 +119,17 @@ contract NGBwrapperDelegate1 is NGBwrapperDelegateParent {
 		@return uint _amountWrappedToken: the amount of wrapped tokens that were minted
 	*/
 	function deposit(address _to, uint _amountUnit) internal returns (uint _amountWrappedToken) {
-		uint _totalSupply = internalTotalSupply;
-		if (_totalSupply == 0) {
-			return firstDeposit(_to, _amountUnit);
-		}
-		harvestToTreasury();
 		IERC20 underlying = IERC20(internalUnderlyingAssetAddress);
-		uint contractBalance = underlying.balanceOf(address(this));
+		(uint _totalSupply, uint contractBalance) = extractRetsHarvestToTreasury(underlying);
+		if (_totalSupply == 0) {
+			return firstDeposit(_to, _amountUnit, underlying);
+		}
 		bool success = underlying.transferFrom(msg.sender, address(this), _amountUnit);
 		require(success);
-		_amountWrappedToken = internalTotalSupply*_amountUnit/contractBalance;
-		internalBalanceOf[_to] += _amountWrappedToken;
-		//we cannot use _totalSupply as the value of internalTotalSupply may have been changed in harvestToTreasury()
-		internalTotalSupply += _amountWrappedToken;
+		_amountWrappedToken = internalTotalSupply.mul(_amountUnit).div(contractBalance);
+		internalBalanceOf[_to] = internalBalanceOf[_to].add(_amountWrappedToken);
+		//we cannot use _totalSupply as the value of internalTotalSupply may have been changed in internalHarvestToTreasury()
+		internalTotalSupply = internalTotalSupply.add(_amountWrappedToken);
 	}
 
 	/*
@@ -145,15 +162,14 @@ contract NGBwrapperDelegate1 is NGBwrapperDelegateParent {
 		@return uint _amountWrappedToken: the amount of units of wrapped asset that were burned
 	*/
 	function withdrawUnitAmount(address _to, uint _amountUnit, bool _claimRewards) external claimRewards(_claimRewards, msg.sender) returns (uint _amountWrappedToken) {
-		harvestToTreasury();
 		IERC20 underlying = IERC20(internalUnderlyingAssetAddress);
-		uint contractBalance = underlying.balanceOf(address(this));
+		(uint _totalSupply, uint contractBalance) = extractRetsHarvestToTreasury(underlying);
 		//_amountWrappedToken == ceil(internalTotalSupply*_amountUnit/contractBalance)
-		_amountWrappedToken = internalTotalSupply*_amountUnit;
-		_amountWrappedToken = (_amountWrappedToken%contractBalance == 0 ? 0 : 1) + (_amountWrappedToken/contractBalance);
+		_amountWrappedToken = _totalSupply.mul(_amountUnit);
+		_amountWrappedToken = uint256(_amountWrappedToken%contractBalance == 0 ? 0 : 1).add(_amountWrappedToken.div(contractBalance));
 		require(internalBalanceOf[msg.sender] >= _amountWrappedToken);
-		internalBalanceOf[msg.sender] -= _amountWrappedToken;
-		internalTotalSupply -= _amountWrappedToken;
+		internalBalanceOf[msg.sender] = internalBalanceOf[msg.sender].sub(_amountWrappedToken);
+		internalTotalSupply = _totalSupply.sub(_amountWrappedToken);
 		underlying.transfer(_to, _amountUnit);
 	}
 
@@ -167,12 +183,11 @@ contract NGBwrapperDelegate1 is NGBwrapperDelegateParent {
 	*/
 	function withdrawWrappedAmount(address _to, uint _amountWrappedToken, bool _claimRewards) external claimRewards(_claimRewards, msg.sender) returns (uint _amountUnit) {
 		require(internalBalanceOf[msg.sender] >= _amountWrappedToken);
-		harvestToTreasury();
 		IERC20 underlying = IERC20(internalUnderlyingAssetAddress);
-		uint contractBalance = underlying.balanceOf(address(this));
-		_amountUnit = contractBalance.mul(_amountWrappedToken).div(internalTotalSupply);
+		(uint _totalSupply, uint contractBalance) = extractRetsHarvestToTreasury(underlying);
+		_amountUnit = contractBalance.mul(_amountWrappedToken).div(_totalSupply);
 		internalBalanceOf[msg.sender] = internalBalanceOf[msg.sender].sub(_amountWrappedToken);
-		internalTotalSupply = internalTotalSupply.sub(_amountWrappedToken);
+		internalTotalSupply = _totalSupply.sub(_amountWrappedToken);
 		underlying.transfer(_to, _amountUnit);
 	}
 
@@ -208,7 +223,7 @@ contract NGBwrapperDelegate1 is NGBwrapperDelegateParent {
 			amountWrapped == amountUnit/ratio
 		*/
 		_amountWrappedToken = _amountUnit.mul(1 ether);
-		_amountWrappedToken = _amountWrappedToken/ratio + (_amountWrappedToken%ratio == 0 ? 0 : 1);
+		_amountWrappedToken = _amountWrappedToken.div(ratio).add(_amountWrappedToken%ratio == 0 ? 0 : 1);
 	}
 
 	/*
@@ -241,7 +256,7 @@ contract NGBwrapperDelegate1 is NGBwrapperDelegateParent {
 			amountUnit == amountWrapped * ratio
 		*/
 		_amountUnit = _amountWrappedToken.mul(ratio);
-		_amountUnit = _amountUnit/(1 ether) + (_amountUnit%(1 ether) == 0 ? 0 : 1);
+		_amountUnit = _amountUnit.div(1 ether).add(_amountUnit%(1 ether) == 0 ? 0 : 1);
 	}
 
 }

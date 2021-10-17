@@ -18,11 +18,19 @@
  *
  */
 
-// const HDWalletProvider = require('@truffle/hdwallet-provider');
+const HDWalletProvider = require('@truffle/hdwallet-provider');
 // const infuraKey = "fj4jll3k.....";
 //
 // const fs = require('fs');
 // const mnemonic = fs.readFileSync(".secret").toString().trim();
+//unsecure pks for testnet use only
+const UNSECURE_PKs = [
+  `0xb188eca00c9a931eeb31dc0855bb8a8d051e513271ffea3ac3c8a080b34d27c3`,
+  `0x640da2b249b24c424c7aa155085b4707e338783643b1e02de45334f78411e283`,
+  `0x63366ef1bcca1f6ed61eb8628606f762226472f60d500ab057d5677df28f2489`,
+  `0x5ee4e190ad83b16e6861b848daf76ad6a7dc39f89ce1589b38e10304cae3c118`,
+  `0xbef24829cd8f3f60ef5a19be366b3b0311f1a23879949a270cae90b4b0e16abe`
+];
 
 module.exports = {
   /**
@@ -46,8 +54,15 @@ module.exports = {
       host: "127.0.0.1",     // Localhost (default: none)
       port: 8545,            // Standard Ethereum port (default: none)
       network_id: "*",       // Any network (default: none)
-      gas: 10000000
-    }//,
+      gas: 6000000
+    },
+    matic: {
+      provider: () => new HDWalletProvider(UNSECURE_PKs, `https://rpc-mumbai.maticvigil.com`),
+      network_id: 80001,
+      confirmations: 2,
+      timeoutBlocks: 200,
+      skipDryRun: true
+    }//,*/
     // Another network with more advanced options...
     // advanced: {
     // port: 8777,             // Custom port

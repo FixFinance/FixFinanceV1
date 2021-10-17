@@ -5,9 +5,11 @@ import "./FixCapitalPool.sol";
 contract FixCapitalPoolDeployer {
 
 	address delegate1Address;
+	address delegate2Address;
 
-	constructor(address _delegate1Address) public {
+	constructor(address _delegate1Address, address _delegate2Address) public {
 		delegate1Address = _delegate1Address;
+		delegate2Address = _delegate2Address;
 	}
 
 	/*
@@ -30,7 +32,7 @@ contract FixCapitalPoolDeployer {
 		address _infoOracleAddress
 	) public returns (address addr) {
 
-		FixCapitalPool cap = new FixCapitalPool(_aw, _maturity, _yieldTokenDeployer, _infoOracleAddress, delegate1Address);
+		FixCapitalPool cap = new FixCapitalPool(_aw, _maturity, _yieldTokenDeployer, _infoOracleAddress, delegate1Address, delegate2Address);
 		cap.transferOwnership(_owner);
 		addr = address(cap);
 	}

@@ -4,6 +4,7 @@ const NGBwrapperDelegate2 = artifacts.require('NGBwrapperDelegate2');
 const NGBwrapperDelegate3 = artifacts.require('NGBwrapperDelegate3');
 const NGBwrapper = artifacts.require('NGBwrapper');
 const FCPDelegate1 = artifacts.require('FCPDelegate1');
+const FCPDelegate2 = artifacts.require('FCPDelegate2');
 const fixCapitalPool = artifacts.require('FixCapitalPool');
 const zcbYtDeployer = artifacts.require('ZCB_YT_Deployer');
 const InfoOracle = artifacts.require('InfoOracle');
@@ -38,7 +39,15 @@ contract('FixCapitalPool', async function(accounts){
 		zcbYtDeployerInstance = await zcbYtDeployer.new();
 		timeNow = (await web3.eth.getBlock('latest')).timestamp;
 		fcpDelegate1Instance = await FCPDelegate1.new();
-		fixCapitalPoolInstance = await fixCapitalPool.new(NGBwrapperInstance.address, timeNow+86400, zcbYtDeployerInstance.address, infoOracleInstance.address, fcpDelegate1Instance.address);
+		fcpDelegate2Instance = await FCPDelegate2.new();
+		fixCapitalPoolInstance = await fixCapitalPool.new(
+			NGBwrapperInstance.address,
+			timeNow+86400,
+			zcbYtDeployerInstance.address,
+			infoOracleInstance.address,
+			fcpDelegate1Instance.address,
+			fcpDelegate2Instance.address
+		);
 		inflation = await dummyATokenInstance.inflation();
 		yieldTokenInstance = await IERC20.at(await fixCapitalPoolInstance.yieldTokenAddress());
 		zcbInstance = await IERC20.at(await fixCapitalPoolInstance.zeroCouponBondAddress());

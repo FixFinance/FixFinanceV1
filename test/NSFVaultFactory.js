@@ -2,6 +2,7 @@ const dummyAToken = artifacts.require('dummyAToken');
 const dummyVaultHealth = artifacts.require('DummyVaultHealth');
 const NGBwrapper = artifacts.require('NGBwrapper');
 const FCPDelegate1 = artifacts.require('FCPDelegate1');
+const FCPDelegate2 = artifacts.require('FCPDelegate2');
 const fixCapitalPool = artifacts.require('FixCapitalPool');
 const IYieldToken = artifacts.require("IYieldToken");
 const zcbYtDeployer = artifacts.require('ZCB_YT_Deployer');
@@ -103,7 +104,8 @@ contract('NSFVaultFactory', async function(accounts) {
 		YTammDelegateInstance = await YTammDelegate.new();
 		YTammDeployerInstance = await YTammDeployer.new(YTammDelegateInstance.address);
 		fcpDelegate1Instance = await FCPDelegate1.new();
-		fixCapitalPoolDeployerInstance = await FixCapitalPoolDeployer.new(fcpDelegate1Instance.address);
+		fcpDelegate2Instance = await FCPDelegate2.new();
+		fixCapitalPoolDeployerInstance = await FixCapitalPoolDeployer.new(fcpDelegate1Instance.address, fcpDelegate2Instance.address);
 		ngbwDelegate1Instance = await NGBwrapperDelegate1.new();
 		ngbwDelegate2Instance = await NGBwrapperDelegate2.new();
 		ngbwDelegate3Instance = await NGBwrapperDelegate3.new();

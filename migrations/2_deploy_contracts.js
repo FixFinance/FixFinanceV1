@@ -1,5 +1,6 @@
 const NGBwrapper = artifacts.require('NGBwrapper');
 const FCPDelegate1 = artifacts.require('FCPDelegate1');
+const FCPDelegate2 = artifacts.require('FCPDelegate2');
 const FixCapitalPool = artifacts.require('FixCapitalPool');
 const FixCapitalPoolDeployer = artifacts.require('FixCapitalPoolDeployer');
 const dummyAToken = artifacts.require('dummyAToken');
@@ -88,7 +89,7 @@ module.exports = async function(deployer) {
 		nsfVaultFactoryDelegate4Instance.address,
 		nsfVaultFactoryDelegate5Instance.address
 	);
-
+/*
 	sbnsfVaultFactoryDelegate1Instance = await deployer.deploy(SBNSFVaultFactoryDelegate1);
 	sbnsfVaultFactoryDelegate2Instance = await deployer.deploy(SBNSFVaultFactoryDelegate2);
 	sbnsfVaultFactoryDelegate3Instance = await deployer.deploy(SBNSFVaultFactoryDelegate3);
@@ -118,7 +119,7 @@ module.exports = async function(deployer) {
 		dbsfVaultFactoryDelegate4Instance.address,
 		dbsfVaultFactoryDelegate5Instance.address
 	);
-
+*/
 	oracleDeployerInstance = await deployer.deploy(OracleDeployer);
 	let rec = await oracleDeployerInstance.deploy(WETH);
 	oracleContainerInstance = await OracleContainer.at(rec.logs[0].args.addr);
@@ -128,7 +129,8 @@ module.exports = async function(deployer) {
 	rec = await nsfvfDeployerInstance.deploy(vhInstance.address);
 	nsfvfInstance = await NSFVaultFactory.at(rec.logs[0].args.addr);
 	fcpDelegate1Instance = await deployer.deploy(FCPDelegate1);
-	fcpDelployerInstance = await deployer.deploy(FixCapitalPoolDeployer, fcpDelegate1Instance.address);
+	fcpDelegate2Instance = await deployer.deploy(FCPDelegate2);
+	fcpDelployerInstance = await deployer.deploy(FixCapitalPoolDeployer, fcpDelegate1Instance.address, fcpDelegate2Instance.address);
 	quickDepositorDeployerInstance = await deployer.deploy(QuickDepositorDeployer);
 	swapRouterDelegateInstance = await deployer.deploy(SwapRouterDelegate);
 	swapRouterDeployerInstance = await deployer.deploy(SwapRouterDeployer, swapRouterDelegateInstance.address);

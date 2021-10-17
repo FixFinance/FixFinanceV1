@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.6.8 <0.7.0;
 import "../interfaces/IWrapper.sol";
+import "../helpers/Ownable.sol";
+import "../helpers/nonReentrant.sol";
 
-contract FCPData {
+contract FCPData is nonReentrant, Ownable {
 	//set to true after internalMaturity
 	//once true users may redeem ZCBs for underlying
 	bool internalInPayoutPhase;

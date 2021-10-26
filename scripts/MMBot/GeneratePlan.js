@@ -10,7 +10,7 @@ const _1 = new BN(1);
 const _2 = new BN(2);
 const _10To18 = (new BN(10)).pow(new BN(18));
 
-const OrderbookAddress = "0x9df217c3c76b194b131e2dD004e2FCda653A2Ab0";
+const OrderbookAddress = "0xc4ACaAc6B7F6cA1245F0a70F13C7C0836Dd82494";
 
 const USE_CURRENT_RATIO_BALANCE_RATIO = false;
 
@@ -38,7 +38,7 @@ const dir = process.cwd();
 let split = dir.split('/');
 let indexRootDir = split.indexOf(ROOT_DIR_NAME);
 while(split.length > indexRootDir+1) split.pop();
-const outFilename = split.join('/') + '/scripts/MMBot/GeneratedPlan.json';
+const outFilename = split.join('/') + '/scripts/MMBot/JSON/GeneratedPlan.json';
 
 async function fileExists(filename) {
 	return await new Promise((res, rej) => {

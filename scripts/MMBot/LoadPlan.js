@@ -18,8 +18,8 @@ let split = dir.split('/');
 let indexRootDir = split.indexOf(ROOT_DIR_NAME);
 while(split.length > indexRootDir+1) split.pop();
 let ROOT_DIR_ABS_PATH = split.join('/');
-const inFilename = ROOT_DIR_ABS_PATH + '/scripts/MMBot/GeneratedPlan.json';
-const outFilename = ROOT_DIR_ABS_PATH + '/scripts/MMBot/LoadedPlan.json';
+const inFilename = ROOT_DIR_ABS_PATH + '/scripts/MMBot/JSON/GeneratedPlan.json';
+const outFilename = ROOT_DIR_ABS_PATH + '/scripts/MMBot/JSON/LoadedPlan.json';
 
 async function fileExists(filename) {
 	return await new Promise((res, rej) => {
@@ -243,6 +243,18 @@ module.exports = async function(callback) {
 		}
 	}
 
+	currentRatio = await baseWrapper.WrappedAmtToUnitAmt_RoundDown(_10To18);
+	yieldBalance = await exchange.YieldDeposited(accounts[0]);
+	bondBalance = await exchange.BondDeposited(accounts[0]);
+	ytBalance = yieldBalance;
+	zcbBalance = yieldBalance.mul(currentRatio).div(_10To18).add(bondBalance);
+
+	lockedZCB = await exchange.lockedZCB(accounts[0]);
+	lockedYT = await exchange.lockedYT(accounts[0]);
+	let unlockedZCB = zcbBalance.sub(lockedZCB);
+	let unlockedYT = ytBalance.sub(lockedYT);
+	console.log("Total ZCB:YT balances after loading ", zcbBalance.toString(), ytBalance.toString());
+	console.log("Unlocked ZCB:YT balances after loading", unlockedZCB.toString(), unlockedYT.toString());
 
 	for (let i = 0; i < zones.length; i++) {
 		console.log("ZONE", i);

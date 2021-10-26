@@ -12,7 +12,7 @@ const _10To18 = (new BN(10)).pow(new BN(18));
 
 const NUM_ORACLE_DATAPOINTS = 31;
 
-const OrderbookAddress = "0x9df217c3c76b194b131e2dD004e2FCda653A2Ab0";
+const OrderbookAddress = "0xc4ACaAc6B7F6cA1245F0a70F13C7C0836Dd82494";
 const MAX_STEPS = 50;
 /*
 

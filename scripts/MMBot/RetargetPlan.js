@@ -22,8 +22,8 @@ let split = dir.split('/');
 let indexRootDir = split.indexOf(ROOT_DIR_NAME);
 while(split.length > indexRootDir+1) split.pop();
 let ROOT_DIR_ABS_PATH = split.join('/');
-const inFilename = ROOT_DIR_ABS_PATH + '/scripts/MMBot/LoadedPlan.json';
-const outFilename = ROOT_DIR_ABS_PATH + '/scripts/MMBot/LoadedPlan.json';
+const inFilename = ROOT_DIR_ABS_PATH + '/scripts/MMBot/JSON/LoadedPlan.json';
+const outFilename = inFilename;
 
 async function fileExists(filename) {
 	return await new Promise((res, rej) => {
@@ -83,6 +83,13 @@ module.exports = async function(callback) {
 	let ytBalance = yieldBalance;
 	let zcbBalance = yieldBalance.mul(currentRatio).div(_10To18).add(bondBalance);
 
+	let lockedZCB = await exchange.lockedZCB(accounts[0]);
+	let lockedYT = await exchange.lockedYT(accounts[0]);
+	let unlockedZCB = zcbBalance.sub(lockedZCB);
+	let unlockedYT = ytBalance.sub(lockedYT);
+	console.log("Total ZCB:YT balances before retargeting", zcbBalance.toString(), ytBalance.toString());
+	console.log("Unlocked ZCB:YT balances before retargeting", unlockedZCB.toString(), unlockedYT.toString());
+
 	let oracleMCR = await exchange.getImpliedMCRFromOracle();
 
 	if (oracleMCR.eq(_0)) {
@@ -96,8 +103,10 @@ module.exports = async function(callback) {
 	let ytSellHeadMCR = (await exchange.YTSells(ytSellHeadID)).maturityConversionRate;
 	ytSellHeadMCR = ytSellHeadMCR.eq(_0) ? oracleMCR : ytSellHeadMCR;
 
-	let ytBoundMCRLiquidityProvision = BN.max(ytSellHeadMCR, oracleMCR.add(_1));
+	let highestZCBMCRAllocated = BN.min(ytSellHeadMCR, oracleMCR).sub(_1);
+	let lowestYTMCRAllocated = BN.max(zcbSellHeadMCR, oracleMCR).add(_1);
 	let zcbBoundMCRLiquidityProvision = BN.min(zcbSellHeadMCR, oracleMCR.sub(_1));
+	let ytBoundMCRLiquidityProvision = BN.max(ytSellHeadMCR, oracleMCR.add(_1));
 
 	console.log("YT lower bound MCR", ytBoundMCRLiquidityProvision.toString());
 	console.log("ZCB higher bound MCR", zcbBoundMCRLiquidityProvision.toString());
@@ -112,7 +121,7 @@ module.exports = async function(callback) {
 
 	for (let i = zones.length-1; i >= 0; i--) {
 		let lowestOrderMCR = zones[i].orders[0].MCR;
-		if (ytBoundMCRLiquidityProvision.gte(lowestOrderMCR) && highestActiveZone == -1) {
+		if (highestZCBMCRAllocated.gte(lowestOrderMCR) && highestActiveZone == -1) {
 			highestActiveZone = i;
 		}
 		if (highestActiveZone != -1) {
@@ -123,7 +132,7 @@ module.exports = async function(callback) {
 	for (let i = 0; i < zones.length; i++) {
 		let orders = zones[i].orders;
 		let highestOrderMCR = orders[orders.length-1].MCR;
-		if (ytBoundMCRLiquidityProvision.lte(highestOrderMCR) && lowestActiveZone == -1) {
+		if (lowestYTMCRAllocated.lte(highestOrderMCR) && lowestActiveZone == -1) {
 			lowestActiveZone = i;
 		}
 		if (lowestActiveZone != -1) {
@@ -190,6 +199,7 @@ module.exports = async function(callback) {
 	console.log("YT Sell Liquidity Supplied up to Zone", lowestActiveZone, "with super bip pct supplied at", pctWeightSuppliedLowestActiveZone.toString(), "PCR INC ELSEWHERE", ytInc);
 
 	console.log("\n\nSetting Target Amounts for ZCB Sells");
+	let totalZCBTarget = _0;
 	for(let i = 0; i <= highestActiveZone; i++) {
 		console.log("ZONE",i);
 		let orders = zones[i].orders;
@@ -207,11 +217,14 @@ module.exports = async function(callback) {
 			if (isHighestZone) {
 				totalZCBWeightActive = totalZCBWeightActive.add(orders[j].ZCBweight);
 			}
+			totalZCBTarget = totalZCBTarget.add(amount);
 		}
 		zones[i].totalZCBWeightActive = totalZCBWeightActive;
 	}
+	console.log(totalZCBTarget.toString(), zcbBalance.toString());
 
 	console.log("\n\nSetting Target Amounts for YT Sells");
+	let totalYTTarget = _0;
 	for(let i = zones.length-1; i >= lowestActiveZone; i--) {
 		console.log("ZONE",i);
 		let orders = zones[i].orders;
@@ -229,10 +242,11 @@ module.exports = async function(callback) {
 			if (isLowestZone) {
 				totalYTWeightActive = totalYTWeightActive.add(orders[j].YTweight);
 			}
+			totalYTTarget = totalYTTarget.add(amount)
 		}
 		zones[i].totalYTWeightActive = totalYTWeightActive;
 	}
-
+	console.log(totalYTTarget.toString(), ytBalance.toString());
 
 	console.log("Deleting Necessary Orders");
 	let ordersDeleted = 0;
@@ -244,7 +258,7 @@ module.exports = async function(callback) {
 				if (order.status === ZCBSELL_ORDER_STATUS) {
 					let orderObj = await exchange.ZCBSells(order.ID);
 					if (!orderObj.amount.eq(0)) {
-						console.log("DELETING ORDER OF ID: "+order.ID);
+						console.log("DELETING ZCBSell ORDER OF ID: "+order.ID);
 						await exchange.modifyZCBLimitSell(orderObj.amount.neg(), order.ID, 0, MAX_STEPS, true);
 						console.log("Order of ID "+order.ID+" has been successfully deleted");
 						ordersDeleted++;
@@ -253,7 +267,7 @@ module.exports = async function(callback) {
 				else if (order.status === YTSELL_ORDER_STATUS) {
 					let orderObj = await exchange.YTSells(order.ID);
 					if (!orderObj.amount.eq(0)) {
-						console.log("DELETING ORDER OF ID: "+order.ID);
+						console.log("DELETING YTSell ORDER OF ID: "+order.ID);
 						await exchange.modifyYTLimitSell(orderObj.amount.neg(), order.ID, 0, MAX_STEPS, true);
 						console.log("Order of ID "+order.ID+" has been successfully deleted");
 						ordersDeleted++;
@@ -274,7 +288,7 @@ module.exports = async function(callback) {
 	}
 	console.log("Successfully deleted "+ordersDeleted+" orders in need of removal");
 
-	console.log("Decrementing order amounts in need of decrementing");
+	console.log("Decrementing order amounts in need of decrementation");
 	let totalDecremented = 0;
 	for (let i = 0; i < zones.length; i++) {
 		let orders = zones[i].orders;
@@ -288,7 +302,7 @@ module.exports = async function(callback) {
 				let orderObj = await exchange.ZCBSells(order.ID);
 				if (orderObj.amount.gt(order.targetAmount)) {
 					let change = order.targetAmount.sub(orderObj.amount);
-					console.log("decrementing ZCBSell order of ID "+order.ID);
+					console.log("decrementing ZCBSell order of ID "+order.ID+" and MCR "+order.MCR.toString());
 					await exchange.modifyZCBLimitSell(change, order.ID, 0, MAX_STEPS, true);
 					console.log("Successfully decremented order of ID "+order.ID);
 					order.hasBeenHandled = true;
@@ -302,7 +316,7 @@ module.exports = async function(callback) {
 				let orderObj = await exchange.YTSells(order.ID);
 				if (orderObj.amount.gt(order.targetAmount)) {
 					let change = order.targetAmount.sub(orderObj.amount);
-					console.log("decrementing YTSell order of ID "+order.ID);
+					console.log("decrementing YTSell order of ID "+order.ID+" and MCR "+order.MCR.toString());
 					await exchange.modifyYTLimitSell(change, order.ID, 0, MAX_STEPS, true);
 					console.log("Successfully decremented order of ID "+order.ID);
 					order.hasBeenHandled = true;
@@ -324,8 +338,12 @@ module.exports = async function(callback) {
 	ytBalance = yieldBalance;
 	zcbBalance = yieldBalance.mul(currentRatio).div(_10To18).add(bondBalance);
 
-	let lockedZCB = await exchange.lockedZCB(accounts[0]);
-	let lockedYT = await exchange.lockedYT(accounts[0]);
+	lockedZCB = await exchange.lockedZCB(accounts[0]);
+	lockedYT = await exchange.lockedYT(accounts[0]);
+	unlockedZCB = zcbBalance.sub(lockedZCB);
+	unlockedYT = ytBalance.sub(lockedYT);
+	console.log("Total ZCB:YT balances before retargeting", zcbBalance.toString(), ytBalance.toString());
+	console.log("Unlocked ZCB:YT balances before retargeting", unlockedZCB.toString(), unlockedYT.toString());
 
 	let zcbWeightUnhandled = _0;
 	let ytWeightUnhandled = _0;
@@ -340,14 +358,14 @@ module.exports = async function(callback) {
 			if (order.hasBeenHandled || order.targetStatus === NULL_ORDER_STATUS) continue;
 			//determine order amount based on currentRatio
 			if (order.targetStatus === ZCBSELL_ORDER_STATUS) {
-				let orderWeight = order.ZCBweight.mul(zone.weightScalar).div(zone.totalZCBWeight);
+				let orderWeight = order.ZCBweight.mul(zone.weightScalar).mul(_10To18).div(zone.totalZCBWeight);
 				zcbWeightUnhandled = zcbWeightUnhandled.add(orderWeight);
 				order.specificWeight = orderWeight;
 				order.amount = (await exchange.ZCBSells(order.ID)).amount;
 				zcbLockedInUnhandled = zcbLockedInUnhandled.add(order.amount);
 			}
 			else if (order.targetStatus === YTSELL_ORDER_STATUS) {
-				let orderWeight = order.YTweight.mul(zone.weightScalar).div(zone.totalYTWeight);
+				let orderWeight = order.YTweight.mul(zone.weightScalar).mul(_10To18).div(zone.totalYTWeight);
 				ytWeightUnhandled = ytWeightUnhandled.add(orderWeight);
 				order.specificWeight = orderWeight;
 				order.amount = (await exchange.YTSells(order.ID)).amount;
@@ -361,11 +379,11 @@ module.exports = async function(callback) {
 	let totalPlaced = 0;
 	let totalIncremented = 0;
 	let placeOrderFnc = async (order, amount) => {
-		console.log("ATTEMPTING TO PLACE "+order.targetStatus+" ORDER ...");
+		console.log("ATTEMPTING TO PLACE "+order.targetStatus+" ORDER AT MCR "+order.MCR.toString()+" ...");
 		let toCall = order.targetStatus === ZCBSELL_ORDER_STATUS ? exchange.limitSellZCB : exchange.limitSellYT;
 		let rec = await toCall(amount, order.MCR, 0, MAX_STEPS);
 		order.ID = rec.receipt.logs[0].args.newID.toString();
-		order.amount = rec.reciept.logs[0].args.amount;
+		order.amount = rec.receipt.logs[0].args.amount;
 		order.hasBeenHandled = true;
 		order.status = order.targetStatus;
 		totalPlaced++;
@@ -375,12 +393,8 @@ module.exports = async function(callback) {
 		if (order.targetStatus !== order.status) {
 			throw new Error("FAILED TO CHANGE ORDER STATUS TO TARGET STATUS");
 		}
-		console.log("ATTEMPTING TO INCREACE ALLOCATION TO "+order.targetStatus+" ORDER");
+		console.log("ATTEMPTING TO INCREASE ALLOCATION TO "+order.targetStatus+" ORDER OF ID "+order.ID+" WITH MCR "+order.MCR);
 		try {
-
-			console.log(zcbBalance.toString(), lockedZCB.toString());
-			console.log(ytBalance.toString(), lockedYT.toString());
-
 			let toCall = order.targetStatus === ZCBSELL_ORDER_STATUS ? exchange.modifyZCBLimitSell : exchange.modifyYTLimitSell;
 			let rec = await toCall(change, order.ID, 0, MAX_STEPS, false);
 			order.amount = order.targetAmount;
@@ -401,7 +415,11 @@ module.exports = async function(callback) {
 		}
 	}
 	let allocateToOrder = async (order, allocation) => {
-		if (allocation.isZero() || allocation.isNeg() || order.targetStatus === NULL_ORDER_STATUS) {
+		if (order.hasBeenHandled || allocation.isZero() || allocation.isNeg() || order.targetStatus === NULL_ORDER_STATUS) {
+			if (allocation.isNeg() && !order.hasBeenHandled) {
+				throw new Error("Vro U had a negative allocation");
+			}
+			order.hasBeenHandled = true;
 			return;
 		}
 		let orderObj = await (order.targetStatus === ZCBSELL_ORDER_STATUS ? exchange.ZCBSells : exchange.YTSells)(order.ID);
@@ -413,22 +431,30 @@ module.exports = async function(callback) {
 		}
 	}
 
-
-	console.log("Allocating untilised capital to order incrementation and placement");
+	let reZCBweighttTotal = _0;
+	let reYTweightTotal = _0;
+	console.log("Allocating unutilised capital to order incrementation and placement");
 	for (let i = 0; i < zones.length; i++) {
 		let zone = zones[i];
 		let orders = zone.orders;
 		for (let j = 0; j < orders.length; j++) {
 			let order = orders[j];
-			if (order.hasBeenHandled || order.targetStatus === NULL_ORDER_STATUS) continue;
+			if (order.hasBeenHandled) continue;
 			//determine order amount based on currentRatio
 			let isZCBSell = order.targetStatus === ZCBSELL_ORDER_STATUS;
-			order.targetAmount = order.specificWeight.mul(isZCBSell ? zcbAllocationUnhandled : ytAllocationUnhandled).div(isZCBSell ? zcbWeightUnhandled : ytWeightUnhandled);
+			let newTargetAmount = order.specificWeight.mul(isZCBSell ? zcbAllocationUnhandled : ytAllocationUnhandled).div(isZCBSell ? zcbWeightUnhandled : ytWeightUnhandled);
+
+			if (isZCBSell) reZCBweighttTotal = reZCBweighttTotal.add(order.specificWeight);
+			else reYTweightTotal = reYTweightTotal.add(order.specificWeight);
+
+			order.targetAmount = newTargetAmount;
 			let toAllocate = order.targetAmount.sub(order.amount);
+			console.log("\n\nAllocating to ZONE "+i+" ORDER "+j+" target status "+order.targetStatus+" status "+order.status+" ID "+order.ID+" isZCB "+isZCBSell);
 			await allocateToOrder(order, toAllocate);
 		}
 	}
 	console.log("Successfully placed "+totalPlaced+" orders and incremented "+totalIncremented+" orders");
+
 
 	for (let i = 0; i < zones.length; i++) {
 		let orders = zones[i].orders;
@@ -463,6 +489,20 @@ module.exports = async function(callback) {
 			delete zones[i].orders[j].hasBeenHandled;
 		}
 	}
+
+
+	currentRatio = await baseWrapper.WrappedAmtToUnitAmt_RoundDown(_10To18);
+	yieldBalance = await exchange.YieldDeposited(accounts[0]);
+	bondBalance = await exchange.BondDeposited(accounts[0]);
+	ytBalance = yieldBalance;
+	zcbBalance = yieldBalance.mul(currentRatio).div(_10To18).add(bondBalance);
+
+	lockedZCB = await exchange.lockedZCB(accounts[0]);
+	lockedYT = await exchange.lockedYT(accounts[0]);
+	unlockedZCB = zcbBalance.sub(lockedZCB);
+	unlockedYT = ytBalance.sub(lockedYT);
+	console.log("Total ZCB:YT balances after retargeting", zcbBalance.toString(), ytBalance.toString());
+	console.log("Unlocked ZCB:YT balances after retargeting", unlockedZCB.toString(), unlockedYT.toString());
 
 	}
 	catch (err) {

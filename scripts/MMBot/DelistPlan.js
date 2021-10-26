@@ -15,7 +15,7 @@ let split = dir.split('/');
 let indexRootDir = split.indexOf(ROOT_DIR_NAME);
 while(split.length > indexRootDir+1) split.pop();
 let ROOT_DIR_ABS_PATH = split.join('/');
-const inFilename = ROOT_DIR_ABS_PATH + '/scripts/MMBot/LoadedPlan.json';
+const inFilename = ROOT_DIR_ABS_PATH + '/scripts/MMBot/JSON/LoadedPlan.json';
 
 module.exports = async function(callback) {
 	try {

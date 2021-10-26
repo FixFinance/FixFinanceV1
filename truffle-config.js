@@ -57,12 +57,45 @@ module.exports = {
       gas: 6000000
     },
     matic: {
-      provider: () => new HDWalletProvider(UNSECURE_PKs, `https://rpc-mumbai.maticvigil.com`),
+      provider: () => new HDWalletProvider(UNSECURE_PKs, 'https://polygon-mumbai.infura.io/v3/130607aa3e804a5a9feab69f92045243'),
       network_id: 80001,
       confirmations: 2,
       timeoutBlocks: 200,
-      skipDryRun: true
-    }//,*/
+      skipDryRun: true,
+      gas: 6000000
+    },
+    arbitrum: {
+      provider: () => new HDWalletProvider(UNSECURE_PKs, 'https://arbitrum-rinkeby.infura.io/v3/130607aa3e804a5a9feab69f92045243'),
+      network_id: 421611,
+      confirmations: 2,
+      timeoutBlocks: 200,
+      skipDryRun: true,
+      gas: 6000000
+    },
+    rinkeby: {
+      provider: () => new HDWalletProvider(UNSECURE_PKs, 'https://rinkeby.infura.io/v3/130607aa3e804a5a9feab69f92045243'),
+      network_id: 4,
+      confirmations: 2,
+      timeoutBlocks: 200,
+      skipDryRun: true,
+      gas: 6000000
+    },
+    kovan: {
+      provider: () => new HDWalletProvider(UNSECURE_PKs, 'https://kovan.infura.io/v3/130607aa3e804a5a9feab69f92045243'),
+      network_id: 42,
+      confirmations: 2,
+      timeoutBlocks: 200,
+      skipDryRun: true,
+      gas: 6000000
+    },
+    optimism: {
+      provider: () => new HDWalletProvider(UNSECURE_PKs, 'https://kovan.optimism.io'),
+//      provider: () => new HDWalletProvider(UNSECURE_PKs, 'https://optimism-kovan.infura.io/v3/3675fefa54e649fb8b7b21b9544eb6dd'),
+      network_id: 69,
+      confirmations: 1,
+      timeoutBlocks: 200,
+      skipDryRun: true,
+    }
     // Another network with more advanced options...
     // advanced: {
     // port: 8777,             // Custom port

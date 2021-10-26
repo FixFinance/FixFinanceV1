@@ -84,11 +84,10 @@ contract('DBSFVaultFactory', async function(accounts) {
 		zcbYtDeployerInstance = await zcbYtDeployer.new();
 		vaultHealthInstance = await dummyVaultHealth.new();
 		EiInstance = await Ei.new();
-		await BigMath.link("Ei", EiInstance.address);
+		await BigMath.link(EiInstance);
 		BigMathInstance = await BigMath.new();
-		await ZCBammDeployer.link("BigMath", BigMathInstance.address);
-		await YTammDeployer.link("BigMath", BigMathInstance.address);
-		await YTammDelegate.link("BigMath", BigMathInstance.address);
+		await ZCBammDeployer.link(BigMathInstance);
+		await YTammDeployer.link(BigMathInstance);
 		ZCBammDeployerInstance = await ZCBammDeployer.new();
 		YTammDelegateInstance = await YTammDelegate.new();
 		YTammDeployerInstance = await YTammDeployer.new(YTammDelegateInstance.address);
@@ -1950,6 +1949,7 @@ contract('DBSFVaultFactory', async function(accounts) {
 		await vaultFactoryInstance.openYTVault(fcp1.address, fcp0.address, yieldSupplied, bondSupplied, amountBorrowed, TOTAL_BASIS_POINTS, ABDK_1, ABDK_1);
 
 		vaultIndex = (await vaultFactoryInstance.YTvaultsLength(accounts[0])).toNumber() - 2;
+		vault = await vaultFactoryInstance.YTvaults(accounts[0], vaultIndex);
 
 		bid = amountSupplied;
 

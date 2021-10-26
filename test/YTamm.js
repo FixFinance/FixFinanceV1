@@ -116,7 +116,7 @@ contract('YTamm', async function(accounts){
 			SBPSretained
 		);
 		EiInstance = await Ei.new();
-		await BigMath.link("Ei", EiInstance.address);
+		await BigMath.link(EiInstance);
 		BigMathInstance = await BigMath.new();
 		zcbYtDeployerInstance = await zcbYtDeployer.new();
 		let timestamp = (await web3.eth.getBlock('latest')).timestamp;
@@ -134,9 +134,8 @@ contract('YTamm', async function(accounts){
 		);
 		zcbInstance = await zeroCouponBond.at(await fixCapitalPoolInstance.zeroCouponBondAddress());
 		yieldTokenInstance = await yieldToken.at(await fixCapitalPoolInstance.yieldTokenAddress());
-		await ZCBamm.link("BigMath", BigMathInstance.address);
-		await YTamm.link("BigMath", BigMathInstance.address);
-		await YTammDelegate.link("BigMath", BigMathInstance.address);
+		await ZCBamm.link(BigMathInstance);
+		await YTamm.link(BigMathInstance);
 		await infoOracleInstance.setSlippageConstant(fixCapitalPoolInstance.address, SlippageConstant);
 		await infoOracleInstance.setAmmFeeConstants(fixCapitalPoolInstance.address, ZCBammFeeConstant, YTammFeeConstant);
 		amm0 = await ZCBamm.new(fixCapitalPoolInstance.address, infoOracleInstance.address);

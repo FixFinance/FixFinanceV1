@@ -45,11 +45,10 @@ contract('Organizer', function(accounts) {
 		zcbYtDeployerInstance = await zcbYtDeployer.new();
 		vaultHealthInstance = await dummyVaultHealth.new();
 		EiInstance = await Ei.new();
-		await BigMath.link("Ei", EiInstance.address);
+		await BigMath.link(EiInstance);
 		BigMathInstance = await BigMath.new();
-		await ZCBammDeployer.link("BigMath", BigMathInstance.address);
-		await YTammDeployer.link("BigMath", BigMathInstance.address);
-		await YTammDelegate.link("BigMath", BigMathInstance.address);
+		await ZCBammDeployer.link(BigMathInstance);
+		await YTammDeployer.link(BigMathInstance);
 		ZCBammDeployerInstance = await ZCBammDeployer.new();
 		YTammDelegateInstance = await YTammDelegate.new();
 		YTammDeployerInstance = await YTammDeployer.new(YTammDelegateInstance.address);

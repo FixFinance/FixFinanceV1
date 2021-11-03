@@ -1,18 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.6.8 <0.7.0;
 
+import "../../interfaces/IWrapperDeployer.sol";
 import "./NGBwrapper.sol";
 
-contract NGBwrapperDeployer {
+contract NGBwrapperDeployer is IWrapperDeployer {
 
 	constructor(address _infoOracleAddress, address _delegate1Address, address _delegate2Address, address _delegate3Address) public {
-		internalInfoOracleAddress = _infoOracleAddress;
+		InfoOracleAddress = _infoOracleAddress;
 		delegate1Address = _delegate1Address;
 		delegate2Address = _delegate2Address;
 		delegate3Address = _delegate3Address;
 	}
 
-	address internalInfoOracleAddress;
+	address public override InfoOracleAddress;
 	address delegate1Address;
 	address delegate2Address;
 	address delegate3Address;
@@ -26,16 +27,16 @@ contract NGBwrapperDeployer {
 	*/
 	uint32 private constant DEFAULT_SBPS_RETAINED = 999_000;
 
-	function deploy(address _underlyingAssetAddress, address _owner) external returns(address ret) {
-		ret = address(new NGBwrapper(
+	function deploy(address _underlyingAssetAddress, address _owner) external override returns(address wrapperAddress) {
+		wrapperAddress = address(new NGBwrapper(
 			_underlyingAssetAddress,
-			internalInfoOracleAddress,
+			InfoOracleAddress,
 			delegate1Address,
 			delegate2Address,
 			delegate3Address,
 			DEFAULT_SBPS_RETAINED
 		));
-		Ownable(ret).transferOwnership(_owner);
+		Ownable(wrapperAddress).transferOwnership(_owner);
 	}
 
 }

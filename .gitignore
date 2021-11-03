@@ -1,5 +1,7 @@
 cache/
 artifacts/
+typechain/
 node_modules/
 build/
 scripts/MMBot/JSON/
+scripts/LiqBot/JSON/

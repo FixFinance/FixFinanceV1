@@ -1,12 +1,12 @@
 import React from 'react';
-import Navbar from './components/Navbar/index';
+import Navbar from '../components/Navbar/index';
 import { BrowserRouter as Router, Switch, Route } from 'react-router-dom';
-import UIKit from './views/allComponents';
-import About from './views/about.js';
-import Landing from './views/landing';
-import Community from './views/community';
-import Wallet from './views/wallet';
-import Margin from './views/margin';
+import UIKit from './allComponents';
+import About from './about.js';
+import Landing from './landing';
+import Community from './community';
+import Wallet from './wallet';
+import Margin from './margin';
 
 function App() {
   return (

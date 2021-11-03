@@ -83,7 +83,10 @@ When looked at in aggregate the components of Fix Finance create a trustless and
 
 ## Running locally
 
+Below will run the react app and generate any new typechains
+
 ```
 npm install
 npx hardhat compile
+npm start
 ```

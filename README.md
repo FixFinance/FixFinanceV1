@@ -1,3 +1,26 @@
+##Project Setup
+To use this project with truffle install truffle & ganache-cli with the following commands
+
+$ npm i -g truffle
+
+$ npm i -g ganache-cli
+
+to utilise ganache it is usually best to have a folder somewhere outside the project named ganachelauncher, in this folder run the following command
+
+$ echo "ganache-cli -s 0 -q" > ganachelauncher.sh && chmod +x ganachelauncher.sh
+
+you can now run ganahcelauncher.sh to start ganache-cli with the same arguments used every time
+
+once ganache is running you can run truffle commands from within the project such as
+
+$ truffle test
+
+or
+
+$ truffle exec <insert path to script file>
+
+hardhat is much more simple, with hardhat you don't need to run any external local instance of an ETH node.
+
 # Fix Finance 
 0.1.0 
 

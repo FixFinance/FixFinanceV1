@@ -32,6 +32,9 @@ const Navbar = () => {
           <NavLink to='/community' activeStyle>
             Community
           </NavLink>
+          <NavLink to='/web3_tests' activeStyle>
+            Testing
+          </NavLink>
         </NavMenu>
         <NavBtn>
           <NavBtnLink to='/wallet'>Connect Wallet</NavBtnLink>

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Container, H1Text } from '../components/Components';
   
-const About = () => {
+const Bonds = () => {
   return (
     <Container>
       <H1Text white>
@@ -11,4 +11,4 @@ const About = () => {
   );
 };
   
-export default About;
+export default Bonds;

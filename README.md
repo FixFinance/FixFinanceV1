@@ -17,7 +17,7 @@ $ truffle test
 
 or
 
-$ truffle exec <insert path to script file>
+$ truffle exec \<insert path to script file\>
 
 hardhat is much more simple, with hardhat you don't need to run any external local instance of an ETH node.
 

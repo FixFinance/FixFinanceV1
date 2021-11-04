@@ -9,21 +9,23 @@ const Bonds = () => {
   const { NGBwrapperAddr, FixCapitalPoolAddr } = useContext(GlobalContext);
 
   const deposit = async () => {
-    // @ts-ignore
-    if (typeof (window).ethereum !== 'undefined') {
-      // @ts-ignore
-      const provider = new ethers.providers.Web3Provider(window.ethereum)
-      // @ts-ignore
-      const contract = new ethers.Contract(NGBwrapperAddr, NGBwrapperABI.abi, provider) as NgBwrapper
+    if (typeof (window as any).ethereum !== 'undefined') {
+      const provider = new ethers.providers.Web3Provider((window as any).ethereum)
+      const contract = new ethers.Contract(
+        NGBwrapperAddr, 
+        NGBwrapperABI.abi, 
+        provider
+      ) as NgBwrapper
       contract.approve(FixCapitalPoolAddr, '100000')
     }    
   }
+
   return (
     <Container>
       {/* <H1Text white>
         Browse Bonds Page
       </H1Text> */}
-      <Button>Test Deposit</Button>
+      <Button onClick={deposit}>Test Deposit</Button>
     </Container>
   );
 };

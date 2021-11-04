@@ -1,3 +1,4 @@
+/* eslint-disable no-undef */
 const dummyAToken = artifacts.require('dummyAToken');
 const NGBwrapperDelegate1 = artifacts.require('NGBwrapperDelegate1');
 const NGBwrapperDelegate2 = artifacts.require('NGBwrapperDelegate2');

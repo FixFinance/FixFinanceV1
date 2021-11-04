@@ -1,3 +1,4 @@
+/* eslint-disable no-undef */
 const IOrderbookExchange = artifacts.require("IOrderbookExchange");
 const fs = require('fs');
 const BN = web3.utils.BN;

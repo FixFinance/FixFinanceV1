@@ -1,3 +1,4 @@
+/* eslint-disable no-undef */
 const dummyAToken = artifacts.require('dummyAToken');
 const dummyVaultHealth = artifacts.require('DummyVaultHealth');
 const NGBwrapper = artifacts.require('NGBwrapper');

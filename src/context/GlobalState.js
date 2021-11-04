@@ -4,7 +4,7 @@ import AppReducer from './AppReducer';
 // TODO: delete all the template states & actions
 const initialState = {
    shoppingList : [],
-   NGBwrapperAddr: '0xBE5115D20ccdf5c041A27030FB3eAbd86C384579',
+   NGBwrapperAddr: '0xc71bB6B9B7Eba15Dc9bD4ABC90cF73E078ca3F6d',
    FixCapitalPoolAddr: '0xD12C5387108e4B75579f2EE3688eC4cD014A6E4A',
    OrderbookExchangeAddr: '0xc4ACaAc6B7F6cA1245F0a70F13C7C0836Dd82494'
 }

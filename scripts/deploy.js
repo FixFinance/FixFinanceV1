@@ -1,3 +1,4 @@
+/* eslint-disable no-undef */
 const NGBwrapper = artifacts.require('NGBwrapper');
 const FCPDelegate1 = artifacts.require('FCPDelegate1');
 const FCPDelegate2 = artifacts.require('FCPDelegate2');

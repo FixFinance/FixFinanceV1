@@ -1,4 +1,4 @@
-##Project Setup
+## Project Setup
 To use this project with truffle install truffle & ganache-cli with the following commands
 
 $ npm i -g truffle
@@ -9,7 +9,7 @@ to utilise ganache it is usually best to have a folder somewhere outside the pro
 
 $ echo "ganache-cli -s 0 -q" > ganachelauncher.sh && chmod +x ganachelauncher.sh
 
-you can now run ganahcelauncher.sh to start ganache-cli with the same arguments used every time
+you can now run ganachelauncher.sh to start ganache-cli with the same arguments used every time
 
 once ganache is running you can run truffle commands from within the project such as
 
@@ -20,6 +20,33 @@ or
 $ truffle exec \<insert path to script file\>
 
 hardhat is much more simple, with hardhat you don't need to run any external local instance of an ETH node.
+
+quick commands
+```
+<!-- // inside FIXFINANCEV1 -->
+truffle test
+truffle compile
+truffle exec ./scripts/deploy
+```
+
+then go to ./src/context/GlobalState, update this section with the new contract addresses:
+```
+const initialState = {
+   shoppingList : [],
+   NGBwrapper: '<new-address>',
+   FixCapitalPool: '<new-address>',
+   OrderbookExchange: '<new-address>'
+}
+```
+
+## Running frontend locally
+Below will generate any new typechains and run the react app
+
+```
+npm install
+npx hardhat compile
+npm start
+```
 
 # Fix Finance 
 0.1.0 
@@ -104,12 +131,4 @@ All fees other than AMM fees are split 50-50 between the Fix Finance treasury an
 ## Implications 
 When looked at in aggregate the components of Fix Finance create a trustless and fully comprehensive rate trading experience for any and all yield generating crypto assets. Fix Finance is optimised for deep liquidity and highly efficient markets. Fix Finance will make possible many new strategies with sophistication ranging from simple fixed rate lending to highly complex quant rate trading strategies. THE FUTURE OF FINANCE IS HERE.
 
-## Running locally
 
-Below will run the react app and generate any new typechains
-
-```
-npm install
-npx hardhat compile
-npm start
-```

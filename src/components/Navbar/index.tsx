@@ -9,31 +9,28 @@ import {
   NavIcon,
 } from './NavbarElements';
 import { ethers } from 'ethers'
-import { truncate } from '../../utils/truncate.ts'
+import { truncate } from '../../utils/truncate'
 
-const Navbar = () => {
+const Navbar = (): JSX.Element => {
   const [wallet, setWallet] = useState('')
 
+  // @ts-ignore
   const provider = new ethers.providers.Web3Provider(window.ethereum, "any");
 
-  useEffect(async () => {
-    const signer = provider.getSigner();
-    if (signer) {
-      setWallet(await signer.getAddress())
-    }
+  useEffect(() => {
+    // source: https://stackoverflow.com/questions/57238928/react-typescript-16-8-how-to-make-useeffect-async
+    (async () => {
+      const signer = provider.getSigner();
+      if (signer) {
+        setWallet(await signer.getAddress())
+      }
+    })();
   })
 
   const connecWallet = async () => {
     await provider.send("eth_requestAccounts", []);
     const signer = provider.getSigner();
     console.log("Account:", await signer.getAddress());
-  }
-
-  const displayTruncatedWalletAddr = () => {
-    if (!wallet) {
-      return null
-    }
-    return 
   }
 
   return (
@@ -60,7 +57,7 @@ const Navbar = () => {
           </NavLink>
         </NavMenu>
         <NavBtn>
-          <NavBtnLink onClick={connecWallet}>{ truncate(wallet, 15) || "Connect Wallet"}</NavBtnLink>
+          <NavBtnLink onClick={connecWallet}>{ truncate(wallet, 15, null) || "Connect Wallet"}</NavBtnLink>
         </NavBtn>
       </Nav>
     </div>

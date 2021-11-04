@@ -55,7 +55,7 @@ margin-right: 24px;
 }
 `;
 
-export const NavBtnLink = styled(Link)`
+export const NavBtnLink = styled.div`
 display: flex;
 font-size: 14px;
 background: ${props => props.black ? "#191A1A" : "#9DF368"};
@@ -76,7 +76,7 @@ transition: all 0.2s ease-in-out;
 }
 `;
 
-export const NavIcon = styled.div`
+export const NavIcon = styled(Link)`
   display: flex;
   align-items: center;
 `

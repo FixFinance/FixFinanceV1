@@ -4,9 +4,9 @@ import AppReducer from './AppReducer';
 // TODO: delete all the template states & actions
 const initialState = {
    shoppingList : [],
-   NGBwrapper: '0xBE5115D20ccdf5c041A27030FB3eAbd86C384579',
-   FixCapitalPool: '0xD12C5387108e4B75579f2EE3688eC4cD014A6E4A',
-   OrderbookExchange: '0xc4ACaAc6B7F6cA1245F0a70F13C7C0836Dd82494'
+   NGBwrapperAddr: '0xBE5115D20ccdf5c041A27030FB3eAbd86C384579',
+   FixCapitalPoolAddr: '0xD12C5387108e4B75579f2EE3688eC4cD014A6E4A',
+   OrderbookExchangeAddr: '0xc4ACaAc6B7F6cA1245F0a70F13C7C0836Dd82494'
 }
 
 export const GlobalContext = createContext(initialState);

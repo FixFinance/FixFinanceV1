@@ -17,17 +17,8 @@ const OrderbookDeployer = artifacts.require("OrderbookDeployer");
 const organizer = artifacts.require('Organizer');
 const IERC20 = artifacts.require("IERC20");
 const BigMath = artifacts.require("BigMath");
-const Ei = artifacts.require("Ei");
 const FixCapitalPoolDeployer = artifacts.require('FixCapitalPoolDeployer');
-const ZCBamm = artifacts.require('ZCBamm');
-const YTamm = artifacts.require('YTamm');
-const ZCBammDeployer = artifacts.require('ZCBammDeployer');
-const YTammDelegate = artifacts.require('YTammDelegate');
-const YTammDeployer = artifacts.require('YTammDeployer');
 const QuickDepositorDeployer = artifacts.require('QuickDepositorDeployer');
-const SwapRouterDeployer = artifacts.require('SwapRouterDeployer');
-const SwapRouterDelegate = artifacts.require('SwapRouterDelegate');
-const SwapRouter = artifacts.require("SwapRouter");
 const InfoOracle = artifacts.require("InfoOracle");
 
 const helper = require("../helper/helper.js");
@@ -44,20 +35,11 @@ contract('Organizer', function(accounts) {
 
 		zcbYtDeployerInstance = await zcbYtDeployer.new();
 		vaultHealthInstance = await dummyVaultHealth.new();
-		EiInstance = await Ei.new();
-		await BigMath.link(EiInstance);
 		BigMathInstance = await BigMath.new();
-		await ZCBammDeployer.link(BigMathInstance);
-		await YTammDeployer.link(BigMathInstance);
-		ZCBammDeployerInstance = await ZCBammDeployer.new();
-		YTammDelegateInstance = await YTammDelegate.new();
-		YTammDeployerInstance = await YTammDeployer.new(YTammDelegateInstance.address);
 		fcpDelegate1Instance = await FCPDelegate1.new();
 		fcpDelegate2Instance = await FCPDelegate2.new();
 		fixCapitalPoolDeployerInstance = await FixCapitalPoolDeployer.new(fcpDelegate1Instance.address, fcpDelegate2Instance.address);
-		swapRouterDelegateInstance = await SwapRouterDelegate.new();
-		swapRouterDeployerInstance = await SwapRouterDeployer.new(swapRouterDelegateInstance.address);
-		infoOracleInstance = await InfoOracle.new("0", treasuryAddress, true);
+		infoOracleInstance = await InfoOracle.new(treasuryAddress, true);
 		ngbwDelegate1Instance = await NGBwrapperDelegate1.new();
 		ngbwDelegate2Instance = await NGBwrapperDelegate2.new();
 		ngbwDelegate3Instance = await NGBwrapperDelegate3.new();
@@ -81,19 +63,13 @@ contract('Organizer', function(accounts) {
 			NGBwrapperDeployerInstance.address,
 			zcbYtDeployerInstance.address,
 			fixCapitalPoolDeployerInstance.address,
-			ZCBammDeployerInstance.address,
-			YTammDeployerInstance.address,
 			orderbookDeployerInstance.address,
 			quickDepositorDeployerInstance.address,
-			swapRouterDeployerInstance.address,
 			infoOracleInstance.address
 		);
 		assert.equal(await organizerInstance.InfoOracleAddress(), infoOracleInstance.address);
 		assert.notEqual(await organizerInstance.QuickDepositorAddress(), nullAddress);
-		await organizerInstance.DeploySwapRouter();
-		router = await SwapRouter.at(await organizerInstance.SwapRouterAddress());
 
-		assert.notEqual(router.address, nullAddress, "SwapRouter is non null");
 		maturity = (await web3.eth.getBlock('latest')).timestamp + 1000000;
 		asset0 = await dummyAToken.new("aCOIN");
 	});
@@ -111,62 +87,6 @@ contract('Organizer', function(accounts) {
 		yieldTokenInstance = await YieldToken.at(await fixCapitalPoolInstance.yieldTokenAddress());
 		zcbInstance = await IERC20.at(await fixCapitalPoolInstance.zeroCouponBondAddress());
 		assert.notEqual(fixCapitalPoolInstance.address, nullAddress, "organizer::fixCapitalPoolMapping[asset0] must be non-null");
-	});
-
-	it('deploy ZCBamm', async () => {
-		await organizerInstance.deployZCBamm(fixCapitalPoolInstance.address);
-		ZCBammInstance = await ZCBamm.at(await organizerInstance.ZCBamms(fixCapitalPoolInstance.address));
-	});
-
-	it('cannot override ZCBamm deployment', async () => {
-		let caught = false;
-		try {
-			await organizerInstance.deployZCBamm(fixCapitalPoolInstance.address);
-		} catch (err) {
-			caught = true
-		}
-		if (!caught) assert.fail('organizer::ZCBamms[fixCapitalPoolInstance] was overridden');
-
-
-		//set the rate in the ZCBamm so that they YT amm may be deployed
-		amm0 = await ZCBamm.at(await organizerInstance.ZCBamms(fixCapitalPoolInstance.address));
-
-		balance = _10To18BN;
-		await asset0.approve(wAsset0.address, balance);
-		await wAsset0.depositUnitAmount(accounts[0], balance);
-		await wAsset0.approve(fixCapitalPoolInstance.address, balance);
-		await fixCapitalPoolInstance.depositWrappedToken(accounts[0], balance);
-		await zcbInstance.approve(amm0.address, balance);
-		await yieldTokenInstance.approve(amm0.address, balance);
-
-		Uin = balance.div(new BN("10"));
-		ZCBin = balance.div(new BN("300"));
-		rec = await amm0.firstMint(Uin, ZCBin);
-		/*
-			set rate in amm0
-		*/
-		for (let i = 0; i < LENGTH_RATE_SERIES; i++) {
-			await amm0.forceRateDataUpdate();
-			//advance 2 minuites
-			helper.advanceTime(121);
-		}
-		let OracleRateString = (await amm0.getImpliedRateData())._impliedRates[0].toString();
-		await amm0.setOracleRate(OracleRateString);
-	});
-
-	it('deploy YTamm', async () => {
-		await organizerInstance.deployYTamm(fixCapitalPoolInstance.address);
-		YTammInstance = await YTamm.at(await organizerInstance.YTamms(fixCapitalPoolInstance.address));
-	});
-
-	it('cannot override YTamm deployment', async () => {
-		let caught = false;
-		try {
-			await organizerInstance.deployYTamm(fixCapitalPoolInstance.address);
-		} catch (err) {
-			caught = true
-		}
-		if (!caught) assert.fail('organizer::YTamms[fixCapitalPoolInstance] was overridden');
 	});
 
 });

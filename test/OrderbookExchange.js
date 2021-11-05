@@ -61,7 +61,7 @@ contract('OrderbookExchange', async function(accounts) {
 	it('before each', async () => {
 		aTokenInstance = await aToken.new("aCOIN");
 		rewardsAsset = await aToken.new("RWD");
-		infoOracleInstance = await InfoOracle.new(BipsToTreasury, treasuryAddress, true);
+		infoOracleInstance = await InfoOracle.new(treasuryAddress, true);
 		ngbwDelegate1Instance = await NGBwrapperDelegate1.new();
 		ngbwDelegate2Instance = await NGBwrapperDelegate2.new();
 		ngbwDelegate3Instance = await NGBwrapperDelegate3.new();

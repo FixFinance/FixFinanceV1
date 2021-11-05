@@ -37,7 +37,7 @@ contract('CTokenWrapper', async function(accounts){
 		dummyCTokenInstance = await dummyCToken.new();
 		rewardsAsset = await dummyCToken.new();
 		owner = accounts[4];
-		infoOracleInstance = await InfoOracle.new(0, owner, true);
+		infoOracleInstance = await InfoOracle.new(owner, true);
 		ctwDelegate1Instance = await CTokenWrapperDelegate1.new();
 		ctwDelegate2Instance = await CTokenWrapperDelegate2.new();
 		ctwDelegate3Instance = await CTokenWrapperDelegate3.new();

@@ -25,11 +25,7 @@ const OrderbookDeployer = artifacts.require("OrderbookDeployer");
 const OrderbookExchange = artifacts.require("OrderbookExchange");
 const IERC20 = artifacts.require("IERC20");
 const BigMath = artifacts.require("BigMath");
-const Ei = artifacts.require("Ei");
 const FixCapitalPoolDeployer = artifacts.require('FixCapitalPoolDeployer');
-const ZCBammDeployer = artifacts.require('ZCBammDeployer');
-const YTammDelegate = artifacts.require('YTammDelegate');
-const YTammDeployer = artifacts.require('YTammDeployer');
 const InfoOracle = artifacts.require("InfoOracle");
 
 const helper = require("../helper/helper.js");
@@ -84,7 +80,7 @@ contract('NSFVaultFactory', async function(accounts) {
 		nsfVaultFactoryDelegate4Instance = await NSFVaultFactoryDelegate4.new();
 		nsfVaultFactoryDelegate5Instance = await NSFVaultFactoryDelegate5.new();
 		treasuryAccount = accounts[5];
-		infoOracleInstance = await InfoOracle.new("0", treasuryAccount, true);
+		infoOracleInstance = await InfoOracle.new(treasuryAccount, true);
 		vaultFactoryInstance = await NSFVaultFactory.new(
 			vaultHealthInstance.address,
 			infoOracleInstance.address,
@@ -94,14 +90,7 @@ contract('NSFVaultFactory', async function(accounts) {
 			nsfVaultFactoryDelegate4Instance.address,
 			nsfVaultFactoryDelegate5Instance.address
 		);
-		EiInstance = await Ei.new();
-		await BigMath.link(EiInstance);
 		BigMathInstance = await BigMath.new();
-		await ZCBammDeployer.link(BigMathInstance);
-		await YTammDeployer.link(BigMathInstance);
-		ZCBammDeployerInstance = await ZCBammDeployer.new();
-		YTammDelegateInstance = await YTammDelegate.new();
-		YTammDeployerInstance = await YTammDeployer.new(YTammDelegateInstance.address);
 		fcpDelegate1Instance = await FCPDelegate1.new();
 		fcpDelegate2Instance = await FCPDelegate2.new();
 		fixCapitalPoolDeployerInstance = await FixCapitalPoolDeployer.new(fcpDelegate1Instance.address, fcpDelegate2Instance.address);
@@ -128,11 +117,8 @@ contract('NSFVaultFactory', async function(accounts) {
 			NGBwrapperDeployerInstance.address,
 			zcbYtDeployerInstance.address,
 			fixCapitalPoolDeployerInstance.address,
-			ZCBammDeployerInstance.address,
-			YTammDeployerInstance.address,
 			orderbookDeployerInstance.address,
 			quickDepositorDeployerInstance.address,
-			nullAddress,
 			infoOracleInstance.address
 		);
 

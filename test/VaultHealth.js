@@ -25,15 +25,10 @@ const OrderbookDeployer = artifacts.require("OrderbookDeployer");
 const OrderbookExchange = artifacts.require("OrderbookExchange");
 const IERC20 = artifacts.require("IERC20");
 const BigMath = artifacts.require("BigMath");
-const Ei = artifacts.require("Ei");
 const FixCapitalPoolDeployer = artifacts.require('FixCapitalPoolDeployer');
-const ZCBammDeployer = artifacts.require('ZCBammDeployer');
-const YTammDelegate = artifacts.require('YTammDelegate');
-const YTammDeployer = artifacts.require('YTammDeployer');
 const InfoOracle = artifacts.require("InfoOracle");
 const OracleContainer = artifacts.require("OracleContainer");
 const dummyAggregator = artifacts.require("dummyAggregator");
-const ZCBamm = artifacts.require("ZCBamm");
 
 const helper = require("../helper/helper.js");
 
@@ -132,18 +127,11 @@ contract('VaultHealth', async function(accounts) {
 			nsfVaultFactoryDelegate4Instance.address,
 			nsfVaultFactoryDelegate5Instance.address
 		);
-		EiInstance = await Ei.new();
-		await BigMath.link(EiInstance);
 		BigMathInstance = await BigMath.new();
-		await ZCBammDeployer.link(BigMathInstance);
-		await YTammDeployer.link(BigMathInstance);
-		ZCBammDeployerInstance = await ZCBammDeployer.new();
-		YTammDelegateInstance = await YTammDelegate.new();
-		YTammDeployerInstance = await YTammDeployer.new(YTammDelegateInstance.address);
 		fcpDelegate1Instance = await FCPDelegate1.new();
 		fcpDelegate2Instance = await FCPDelegate2.new();
 		FixCapitalPoolDeployerInstance = await FixCapitalPoolDeployer.new(fcpDelegate1Instance.address, fcpDelegate2Instance.address);
-		infoOracleInstance = await InfoOracle.new("0", nullAddress, true);
+		infoOracleInstance = await InfoOracle.new(nullAddress, true);
 		ngbwDelegate1Instance = await NGBwrapperDelegate1.new();
 		ngbwDelegate2Instance = await NGBwrapperDelegate2.new();
 		ngbwDelegate3Instance = await NGBwrapperDelegate3.new();
@@ -167,11 +155,8 @@ contract('VaultHealth', async function(accounts) {
 			NGBwrapperDeployerInstance.address,
 			zcbYtDeployerInstance.address,
 			FixCapitalPoolDeployerInstance.address,
-			ZCBammDeployerInstance.address,
-			YTammDeployerInstance.address,
 			orderbookDeployerInstance.address,
 			quickDepositorDeployerInstance.address,
-			nullAddress,
 			infoOracleInstance.address
 		);
 		await vaultHealthInstance.setOrganizerAddress(organizerInstance.address);

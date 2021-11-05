@@ -20,28 +20,11 @@ contract InfoOracle is IInfoOracle, Ownable {
 	// 1.0 in 64.64 format
 	int128 private constant ABDK_1 = 1<<64;
 
-	// the treasury should receive no more than 40% of total AMM fee revenue
-	uint16 private constant MaxBipsToTreasury = 4_000;
-
-	uint16 public override bipsToTreasury;
-
 	uint8 public override MinimumOrderbookFee; //denominated in bips
 
 	bool public override TreasuryFeeIsCollected;
 
 	address public immutable override sendTo;
-
-	mapping(address => uint) public override WrapperToYTSlippageConst;
-
-	mapping(address => uint) public override WrapperToZCBFeeConst;
-
-	mapping(address => uint) public override WrapperToYTFeeConst;
-
-	mapping(address => uint) public override YTammSlippageConstants;
-
-	mapping(address => uint) public override ZCBammFeeConstants;
-
-	mapping(address => uint) public override YTammFeeConstants;
 
 	mapping(address => uint8) public override WrapperOrderbookFeeBips;
 
@@ -66,11 +49,9 @@ contract InfoOracle is IInfoOracle, Ownable {
 		init
 	*/
 	constructor(
-		uint16 _bipsToTreasury,
 		address _sendTo,
 		bool _TreasuryFeeIsCollected
 	) public {
-		setToTreasuryFee(_bipsToTreasury);
 		sendTo = _sendTo;
 		TreasuryFeeIsCollected = _TreasuryFeeIsCollected;
 	}
@@ -103,21 +84,6 @@ contract InfoOracle is IInfoOracle, Ownable {
 	}
 
 	/*
-		@Description: owner of a wrapper may set the default fee constants for ZCB and YT amms that trade ZCB & YT
-			that utilise their wrapper
-
-		@param address _wrapper: the address of the wrapped asset that the owner would like to set the default
-			fee constants for
-		@param uint _ZCBammFeeConstant: the fee constant for ZCBamms, must be >= 1, inflated by (1 ether)
-		@param uint _YTammFeeConstant: the fee constant for YTamms, must be >= 1, inflated by (1 ether)
-	*/
-	function wrapperSetAmmFeeConstants(address _wrapper, uint _ZCBammFeeConstant, uint _YTammFeeConstant) external override  maySetContractParameters(_wrapper) {
-		require(_ZCBammFeeConstant >= 1 ether && _YTammFeeConstant >= 1 ether);
-		WrapperToZCBFeeConst[_wrapper] = _ZCBammFeeConstant;
-		WrapperToYTFeeConst[_wrapper] = _YTammFeeConstant;
-	}
-
-	/*
 		@Description: set the default spread in bips that will be taken from orderbook trades on orderbooks for FCPs on a specific wrapper asset
 
 		@param address _wrapper: the address of the wrapper contract for which to set the default orderbook fee
@@ -130,32 +96,6 @@ contract InfoOracle is IInfoOracle, Ownable {
 	}
 
 	/*
-		@Description: owner of a wrapper may set the default slippage constant, for the YTamm for all YTamms that
-			utilise their wrapper
-
-		@param address _wrapper: the address of the wrapped asset that the owner would like to set the default
-			slippage constant for
-		@param uint _SlippageConstant: the sliippage constant for YTamms, inflated by 1 ether
-	*/
-	function wrapperSetSlippageConst(address _wrapper, uint _SlippageConstant) external override maySetContractParameters(_wrapper) {
-		WrapperToYTSlippageConst[_wrapper] = _SlippageConstant;
-	}
-
-	/*
-		@Description: owner of a fix capital pool contract may override the default fee constants based on the
-			fix capital pool's wrapper and supplant it with their own fee constants
-
-		@param address _fixCapitalPoolAddress: address of fix capital pool contract for which to set amm fee consts
-		@param uint _ZCBammFeeConstant: the fee constant for the ZCBamm, must be >= 1, inflated by (1 ether)
-		@param uint _YTammFeeConstant: the fee constant for the YTamm, must be >= 1, inflated by (1 ether)
-	*/
-	function setAmmFeeConstants(address _fixCapitalPoolAddress, uint _ZCBammFeeConstant, uint _YTammFeeConstant) external override maySetContractParameters(_fixCapitalPoolAddress) {
-		require(_ZCBammFeeConstant >= 1 ether && _YTammFeeConstant >= 1 ether);
-		ZCBammFeeConstants[_fixCapitalPoolAddress] = _ZCBammFeeConstant;
-		YTammFeeConstants[_fixCapitalPoolAddress] = _YTammFeeConstant;
-	}
-
-	/*
 		@Description: set spread in bips that will be taken from orderbook trades on the orderbook for a specific FCP contract
 
 		@param address _fixCapitalPoolAddress: the address of the FCP for which to set the specific orderbook fee constant
@@ -165,17 +105,6 @@ contract InfoOracle is IInfoOracle, Ownable {
 	*/
 	function setOrderbookFeeConstant(address _fixCapitalPoolAddress, uint8 _orderbookFeeBips) external override maySetContractParameters(_fixCapitalPoolAddress) {
 		FCPOrderbookFeeBips[_fixCapitalPoolAddress] = _orderbookFeeBips;
-	}
-
-	/*
-		@Description: owner of a fix capital pool may override the default slippage constant for the YTamm that
-			utilises their fix capital pool contract.
-
-		@param address _fixCapitalPoolAddress: address of fix capital pool contract for which to set YTamm slippage
-		@param uint _SlippageConstant: the sliippage constant for YTamms, inflated by 1 ether
-	*/
-	function setSlippageConstant(address _fixCapitalPoolAddress, uint256 _SlippageConstant) external override maySetContractParameters(_fixCapitalPoolAddress) {
-		YTammSlippageConstants[_fixCapitalPoolAddress] = _SlippageConstant;
 	}
 
 	/*
@@ -225,57 +154,6 @@ contract InfoOracle is IInfoOracle, Ownable {
 	//--------------------------------------------v-i-e-w-s------------------------------
 
 	/*
-		@Description: based on swap inputs/outputs find the total fee and return the total amount of fee
-			that must be sent to the treasury
-
-		@param uint larger: the larger of the tx inputs/outputs
-		@param uint smaller: the smaller of the tx inputs/outputs
-
-		@return uint toTreasury: the amount of fee that must be sent to the treasury
-		@return address _sendTo: the address that shall receive the treasury fee
-	*/
-	function treasuryFee(uint larger, uint smaller) external view override returns (uint toTreasury, address _sendTo) {
-		require(larger >= smaller);
-		uint totalFee = larger - smaller;
-		toTreasury = totalFee * bipsToTreasury / totalBasisPoints;
-		_sendTo = sendTo;
-	}
-
-	/*
-		@Description: given a fix capital pool return its corresponding ZCBamm fee constant
-			if there is a specific constant for the fix capital pool return that,
-			otherwise return the default fee constant for the wrapper that the fix capital pool is associated with
-
-		@param address _fixCapitalPoolAddress: corresponds to the fix capital pool contract for which to find the
-			ZCBamm fee constant
-
-		@return uint FeeConstant: the ZCBamm fee constant corresponding to the fix capital pool contract
-	*/
-	function getZCBammFeeConstant(address _fixCapitalPoolAddress) external view override returns (uint FeeConstant) {
-		FeeConstant = ZCBammFeeConstants[_fixCapitalPoolAddress];
-		if (FeeConstant == 0) {
-			FeeConstant = WrapperToZCBFeeConst[address(IFixCapitalPool(_fixCapitalPoolAddress).wrapper())];
-		}
-	}
-
-	/*
-		@Description: given a fix capital pool return its corresponding YTamm fee constant
-			if there is a specific constant for the fix capital pool return that,
-			otherwise return the default fee constant for the wrapper that the fix capital pool is associated with
-
-		@param address _fixCapitalPoolAddress: corresponds to the fix capital pool contract for which to find the
-			YTamm fee constant
-
-		@return uint FeeConstant: the YTamm fee constant corresponding to the fix capital pool contract
-	*/
-	function getYTammFeeConstant(address _fixCapitalPoolAddress) external view override returns (uint FeeConstant) {
-		FeeConstant = YTammFeeConstants[_fixCapitalPoolAddress];
-		if (FeeConstant == 0) {
-			FeeConstant = WrapperToYTFeeConst[address(IFixCapitalPool(_fixCapitalPoolAddress).wrapper())];
-		}
-	}
-
-	/*
 		@Description: given a FCP return its corresponding orderbook fee, in basis points
 			if there is a specific fee for the FCP get that,
 			otherwise get the default fee constant for the wrapper that the FCP is associated with
@@ -298,23 +176,6 @@ contract InfoOracle is IInfoOracle, Ownable {
 		FeeBips = FeeBips < _minimumOrderbookFee ? _minimumOrderbookFee : FeeBips;
 	}
 
-	/*
-		@Description: given a fix capital pool return its corresponding YTamm slippage constant
-			if there is a specific constant for the fix capital pool return that,
-			otherwise return the default slippage constant for the wrapper that the fix capital pool is associated with
-
-		@param address _fixCapitalPoolAddress: corresponds to the fix capital pool contract for which to find the
-			YTamm slippage constant
-
-		@return uint FeeConstant: the YTamm slippage constant corresponding to the fix capital pool contract
-	*/
-	function getSlippageConstant(address _fixCapitalPoolAddress) external view override returns (uint SlippageConstant) {
-		SlippageConstant = YTammSlippageConstants[_fixCapitalPoolAddress];
-		if (SlippageConstant == 0) {
-			SlippageConstant = WrapperToYTSlippageConst[address(IFixCapitalPool(_fixCapitalPoolAddress).wrapper())];
-		}
-	}
-
 	//-----------------------I-n-f-o-O-r-a-c-l-e---a-d-m-i-n-----------------------------
 
 	/*
@@ -324,17 +185,6 @@ contract InfoOracle is IInfoOracle, Ownable {
 	*/
 	function setMinimumOrderbookFee(uint8 _minimumOrderbookFee) external override onlyOwner {
 		MinimumOrderbookFee = _minimumOrderbookFee;
-	}
-
-
-	/*
-		@Description: admin may set the % of LP fees that go to the treasury
-		
-		@param uint16 _bipsToTreasury: the % of LP fees that shall go the treasury (denominated in basis points)
-	*/
-	function setToTreasuryFee(uint16 _bipsToTreasury) public override onlyOwner {
-		require(_bipsToTreasury <= MaxBipsToTreasury);
-		bipsToTreasury = _bipsToTreasury;
 	}
 
 	/*

@@ -37,7 +37,7 @@ contract('NGBwrapper', async function(accounts){
 		dummyATokenInstance = await dummyAToken.new("DMY");
 		rewardsAsset = await dummyAToken.new("RWD");
 		owner = accounts[4];
-		infoOracleInstance = await InfoOracle.new(0, owner, true);
+		infoOracleInstance = await InfoOracle.new(owner, true);
 		ngbwDelegate1Instance = await NGBwrapperDelegate1.new();
 		ngbwDelegate2Instance = await NGBwrapperDelegate2.new();
 		ngbwDelegate3Instance = await NGBwrapperDelegate3.new();

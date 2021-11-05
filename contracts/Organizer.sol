@@ -2,12 +2,8 @@
 pragma solidity >=0.6.8 <0.7.0;
 import "./interfaces/IOrganizer.sol";
 import "./interfaces/IWrapperDeployer.sol";
-import "./amm/ZCBamm/ZCBammDeployer.sol";
-import "./amm/YTamm/YTammDeployer.sol";
 import "./FixCapitalPool/FixCapitalPoolDeployer.sol";
 import "./QuickDepositor/QuickDepositorDeployer.sol";
-import "./SwapRouter/SwapRouterDeployer.sol";
-import "./SwapRouter/SwapRouter.sol";
 import "./Orderbook/OrderbookDeployer.sol";
 import "./helpers/Ownable.sol";
 import "./InfoOracle.sol";
@@ -15,10 +11,6 @@ import "./InfoOracle.sol";
 contract Organizer is Ownable, IOrganizer {
 	//acts as a whitelist for fixCapitalPools that were deployed using this organiser
 	mapping(address => address) public override fixCapitalPoolToWrapper;
-	//FixCapitalPool => ZCBamm address
-	mapping(address => address) public override ZCBamms;
-	//FixCapitalPool => YTamm address
-	mapping(address => address) public override YTamms;
 	//FixCapitalPool => Orderbook address
 	mapping(address => address) public override Orderbooks;
 	//IWrapper => isVerified
@@ -27,14 +19,9 @@ contract Organizer is Ownable, IOrganizer {
 	address public override NGBwrapperDeployerAddress;
 	address public override ZCB_YT_DeployerAddress;
 	address public override FixCapitalPoolDeployerAddress;
-	address public override ZCBammDeployerAddress;
-	address public override YTammDeployerAddress;
 	address public override OrderbookDeployerAddress;
 	address public override QuickDepositorAddress;
-	address public override SwapRouterAddress;
 	address public override InfoOracleAddress;
-
-	address internal SwapRouterDeployerAddress;
 
 	address[] public override WrapperDeployers;
 
@@ -45,32 +32,17 @@ contract Organizer is Ownable, IOrganizer {
 		address _NGBwrapperDeployerAddress,
 		address _ZCB_YT_DeployerAddress,
 		address _fixCapitalPoolDeployerAddress,
-		address _ZCBammDeployerAddress,
-		address _YTammDeployerAddress,
 		address _OrderbookDeployerAddress,
 		address _QuickDepositorDeployerAddress,
-		address _SwapRouterDeployerAddress,
 		address _InfoOracleAddress
 	) public {
 		NGBwrapperDeployerAddress = _NGBwrapperDeployerAddress;
 		WrapperDeployers.push(_NGBwrapperDeployerAddress);
 		ZCB_YT_DeployerAddress = _ZCB_YT_DeployerAddress;	
 		FixCapitalPoolDeployerAddress = _fixCapitalPoolDeployerAddress;
-		ZCBammDeployerAddress = _ZCBammDeployerAddress;
-		YTammDeployerAddress = _YTammDeployerAddress;
 		OrderbookDeployerAddress = _OrderbookDeployerAddress;
 		QuickDepositorAddress = QuickDepositorDeployer(_QuickDepositorDeployerAddress).deploy(address(this));
-		SwapRouterDeployerAddress = _SwapRouterDeployerAddress;
 		InfoOracleAddress = _InfoOracleAddress;
-	}
-
-	/*
-		@Description: deploy SwapRouter contract,
-			this function only need be called once there is no need to redeploy another SwapRouter
-	*/
-	function DeploySwapRouter() external override {
-		require(SwapRouterAddress == address(0));
-		SwapRouterAddress = SwapRouterDeployer(SwapRouterDeployerAddress).deploy(address(this));		
 	}
 
 	/*
@@ -122,32 +94,6 @@ contract Organizer is Ownable, IOrganizer {
 	}
 
 	/*
-		@Description: deploy a ZCBamm for a specific fix capital pool
-			only one ZCBamm may only be deployed
-
-		@param address _fixCapitalPoolAddress: the address of the FixCapitalPool for which to deploy a ZCBamm
-	*/
-	function deployZCBamm(address _fixCapitalPoolAddress) external override {
-		require(ZCBamms[_fixCapitalPoolAddress] == address(0));
-		require(fixCapitalPoolToWrapper[_fixCapitalPoolAddress] != address(0));
-		ZCBamms[_fixCapitalPoolAddress] = ZCBammDeployer(ZCBammDeployerAddress).deploy(_fixCapitalPoolAddress, InfoOracleAddress);
-	}
-
-	/*
-		@Description: deploy a YTamm for a specific fix capital pool
-			only one YTamm may be deployed, a YTamm cannot be deployed until after the ZCBamm for the same
-			fix capital pool has been deployed and published the first rate in its native oracle
-
-		@param address _fixCapitalPoolAddress: the address of the FixCapitalPool for which to deploy a YTamm
-	*/
-	function deployYTamm(address _fixCapitalPoolAddress) external override {
-		require(YTamms[_fixCapitalPoolAddress] == address(0));
-		address ZCBammAddress = ZCBamms[_fixCapitalPoolAddress];
-		require(ZCBammAddress != address(0));
-		YTamms[_fixCapitalPoolAddress] = YTammDeployer(YTammDeployerAddress).deploy(ZCBammAddress, InfoOracleAddress);
-	}
-
-	/*
 		@Description: deploy an OrderbookExchange contract
 			only one orderbook exchange can be deployed for a specific FCP contract
 
@@ -159,6 +105,8 @@ contract Organizer is Ownable, IOrganizer {
 		Orderbooks[_fixCapitalPoolAddress] = orderbookAddr;
 		emit OrderbookDeployment(orderbookAddr, _fixCapitalPoolAddress);
 	}
+
+	//-----------------------------a-d-m-i-n-----------------------------
 
 	/*
 		@Description: owner of this contract may override is verified for a specific address

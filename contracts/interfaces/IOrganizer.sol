@@ -6,7 +6,7 @@ interface IOrganizer {
 		address indexed wrapperAddress,
 		address indexed underlyingAddress,
 		address indexed owner,
-		uint8 wrapperType
+		uint wrapperType
 	);
 
 	event FixCapitalPoolDeployment(
@@ -36,9 +36,11 @@ interface IOrganizer {
 	function QuickDepositorAddress() external view returns(address);
 	function SwapRouterAddress() external view returns(address);
 	function InfoOracleAddress() external view returns(address);
+	function WrapperDeployers(uint _index) external view returns(address deployerAddress);
 
 	function DeploySwapRouter() external;
 	function deployNGBWrapper(address _underlyingAssetAddress) external;
+	function deployWrapper(uint _deployerIndex, address _underlyingAssetAddress) external;
 	function deployFixCapitalPoolInstance(address _wrapperAddress, uint40 _maturity) external;
 	function deployZCBamm(address _fixCapitalPoolAddress) external;
 	function deployYTamm(address _fixCapitalPoolAddress) external;
@@ -46,5 +48,6 @@ interface IOrganizer {
 
 	//---------admin---------------
 	function setVerified(address _wrapperAddress, bool _setTo) external;
-
+	function whitelistWrapperDeployer(address _wrapperDeployerAddress) external;
+	function delistWrapperDeployer(uint _index) external;
 }

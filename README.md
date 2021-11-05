@@ -1,4 +1,4 @@
-##Project Setup
+## Project Setup
 To use this project with truffle install truffle & ganache-cli with the following commands
 
 $ npm i -g truffle

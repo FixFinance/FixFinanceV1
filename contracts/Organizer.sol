@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.6.8 <0.7.0;
 import "./interfaces/IOrganizer.sol";
-import "./Wrappers/NGBwrapper/NGBwrapperDeployer.sol";
+import "./interfaces/IWrapperDeployer.sol";
 import "./amm/ZCBamm/ZCBammDeployer.sol";
 import "./amm/YTamm/YTammDeployer.sol";
 import "./FixCapitalPool/FixCapitalPoolDeployer.sol";
@@ -36,6 +36,8 @@ contract Organizer is Ownable, IOrganizer {
 
 	address internal SwapRouterDeployerAddress;
 
+	address[] public override WrapperDeployers;
+
 	/*
 		init
 	*/
@@ -51,6 +53,7 @@ contract Organizer is Ownable, IOrganizer {
 		address _InfoOracleAddress
 	) public {
 		NGBwrapperDeployerAddress = _NGBwrapperDeployerAddress;
+		WrapperDeployers.push(_NGBwrapperDeployerAddress);
 		ZCB_YT_DeployerAddress = _ZCB_YT_DeployerAddress;	
 		FixCapitalPoolDeployerAddress = _fixCapitalPoolDeployerAddress;
 		ZCBammDeployerAddress = _ZCBammDeployerAddress;
@@ -76,10 +79,27 @@ contract Organizer is Ownable, IOrganizer {
 		@param address _underlyingAssetAddress: the NGB asset for which to deploy an NGBwrapper
 	*/
 	function deployNGBWrapper(address _underlyingAssetAddress) external override {
-		address temp = NGBwrapperDeployer(NGBwrapperDeployerAddress).deploy(_underlyingAssetAddress, msg.sender);
-		wrapperIsVerified[temp] = true;
-		emit WrapperDeployment(temp, _underlyingAssetAddress, msg.sender, 0);
+		address wrapperAddress = IWrapperDeployer(NGBwrapperDeployerAddress).deploy(_underlyingAssetAddress, msg.sender);
+		wrapperIsVerified[wrapperAddress] = true;
+		emit WrapperDeployment(wrapperAddress, _underlyingAssetAddress, msg.sender, 0);
 	}
+
+	/*
+		@Description: deploy a new IWrapper contract from a specific IWrapperDeployer contract
+			transfer ownership to msg.sender
+
+		@param uint _deployerIndex: the index of the IWrapperDeployer contract within the WrapperDeployers array
+		@param address _underlyingAssetAddress: the underlying asset for which to deploy a wrapper
+	*/
+	function deployWrapper(uint _deployerIndex, address _underlyingAssetAddress) external override {
+		require(WrapperDeployers.length > _deployerIndex, "invalid WrapperDeployers index");
+		address deployerAddress = WrapperDeployers[_deployerIndex];
+		require(deployerAddress != address(0), "Selected WrapperDeployer has been delisted");
+		address wrapperAddress = IWrapperDeployer(deployerAddress).deploy(_underlyingAssetAddress, msg.sender);
+		wrapperIsVerified[wrapperAddress] = true;
+		emit WrapperDeployment(wrapperAddress, _underlyingAssetAddress, msg.sender, _deployerIndex);
+	}
+
 
 	/*
 		@Description: deploy a new FixCapitalPool instance, whitelist it in fixCapitalPoolToWrapper mapping
@@ -89,6 +109,7 @@ contract Organizer is Ownable, IOrganizer {
 	*/
 	function deployFixCapitalPoolInstance(address _wrapperAddress, uint40 _maturity) external override {
 		require(_maturity > block.timestamp+(1 weeks), "maturity must be at least 1 weeks away");
+		require(wrapperIsVerified[_wrapperAddress], "base wrapper must be verified");
 		address fixCapitalPoolAddress = FixCapitalPoolDeployer(FixCapitalPoolDeployerAddress).deploy(
 			_wrapperAddress,
 			_maturity,
@@ -150,5 +171,25 @@ contract Organizer is Ownable, IOrganizer {
 	*/
 	function setVerified(address _wrapperAddress, bool _setTo) external override onlyOwner {
 		wrapperIsVerified[_wrapperAddress] = _setTo;
+	}
+
+	/*
+		@Description: whitelist an IWrapperDeployer contract to deploy new wrapper contracts that shall be whitelisted
+
+		@param address _wrapperDeployerAddress: the address of the IWrapperDeployer contract to whitelist
+	*/
+	function whitelistWrapperDeployer(address _wrapperDeployerAddress) external override onlyOwner {
+		require(IWrapperDeployer(_wrapperDeployerAddress).InfoOracleAddress() == InfoOracleAddress);
+		WrapperDeployers.push(_wrapperDeployerAddress);
+	}
+
+	/*
+		@Description: revoke whitelist status of an IWrapperDeployer contract
+
+		@param uint _index: the index within the WrapperDeployers array at which the IWrapperDeployer to delist is located
+	*/
+	function delistWrapperDeployer(uint _index) external override onlyOwner {
+		require(WrapperDeployers.length > _index);
+		WrapperDeployers[_index] = address(0);
 	}
 }

@@ -56,10 +56,13 @@ contract('NGBwrapper', async function(accounts){
 		assert.equal((await NGBwrapperInstance.totalSupply()).toString(), "0", "correct total supply");
 	});
 
+	// STEVENDEBUG
 	it('executes 1st deposit', async () => {
 		amount = _10To18.div(new BN(100)).toString();
+		// note: aETH approve
 		await dummyATokenInstance.approve(NGBwrapperInstance.address, amount);
 		await NGBwrapperInstance.depositUnitAmount(accounts[0], amount);
+		// gives back a wrapper asset
 		totalSupply = await NGBwrapperInstance.totalSupply();
 		assert.equal(totalSupply.toString(), amount, "correct total supply after 1st deposit");
 		assert.equal((await NGBwrapperInstance.balanceOf(accounts[0])).toString(), amount, "correct balance of account 0 after 1st deposit");
@@ -112,6 +115,9 @@ contract('NGBwrapper', async function(accounts){
 		assert.isBelow(AmountError(expected, actual), ErrorRange, "correct aToken balance for account");
 	});
 
+	// STEVENDEBUG
+	// withdraw specific amount of underlying aToken
+	// calculates amount of NGB balance to withdraw to get certain amount of aToken
 	it('executes withdrawAToken', async () => {
 		await helper.advanceTime(_1Month);
 		toWithdraw = new BN(amount);

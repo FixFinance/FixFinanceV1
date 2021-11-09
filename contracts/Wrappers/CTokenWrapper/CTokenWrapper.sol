@@ -13,11 +13,9 @@ import "../../helpers/nonReentrant.sol";
 import "../../helpers/Ownable.sol";
 import "./CTokenWrapperInternals.sol";
 /*
-	Native Growing Balance Wrapper
+	CToken Wrapper
 
-	Underlying Asset is native to the chain of the wrapper
-
-	The balances of the underlying asset automatically grow as yield is generated
+	Underlying asset is a compound cToken or another yield bearing asset that is static balance and implements the cToken interface
 */
 contract CTokenWrapper is ICTokenWrapper, CTokenWrapperInternals {
 	using SafeMath for uint256;

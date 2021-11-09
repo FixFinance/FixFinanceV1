@@ -8,12 +8,14 @@ import "../../libraries/SafeMath.sol";
 import "../../libraries/SignedSafeMath.sol";
 import "../../libraries/ABDKMath64x64.sol";
 import "../../libraries/BigMath.sol";
+import "../../libraries/SafeERC20.sol";
 import "./CTokenWrapperDelegateParent.sol";
 
 contract CTokenWrapperDelegate2 is CTokenWrapperDelegateParent {
 	using SafeMath for uint256;
 	using SignedSafeMath for int256;
 	using ABDKMath64x64 for int128;
+    using SafeERC20 for IERC20;
 
     /*
         @Description: change the amount of bond and yield in a subaccount
@@ -222,8 +224,7 @@ contract CTokenWrapperDelegate2 is CTokenWrapperDelegateParent {
                     internalDistributionAccountRewards[uint8(i)][_subAcct] = internalDistributionAccountRewards[uint8(i)][_subAcct].add(dividend);
                 }
                 else {
-                    bool success = IERC20(_rewardsAddr).transfer(_subAcct, dividend);
-                    require(success);
+                    IERC20(_rewardsAddr).safeTransfer(_subAcct, dividend);
                     internalPrevContractBalance[uint8(i)] = IERC20(_rewardsAddr).balanceOf(address(this));
                 }
             }

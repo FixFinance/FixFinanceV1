@@ -6,6 +6,7 @@ import "../../interfaces/IInfoOracle.sol";
 import "../../interfaces/IFixCapitalPool.sol";
 import "../../libraries/SafeMath.sol";
 import "../../libraries/ABDKMath64x64.sol";
+import "../../libraries/SafeERC20.sol";
 import "../../libraries/BigMath.sol";
 import "../../helpers/nonReentrant.sol";
 import "../../helpers/Ownable.sol";
@@ -21,6 +22,7 @@ import "./NGBwrapperInternals.sol";
 contract NGBwrapper is INGBWrapper, NGBwrapperInternals {
 	using SafeMath for uint256;
 	using ABDKMath64x64 for int128;
+	using SafeERC20 for IERC20;
 
 	address delegate1Address;
 	address delegate2Address;
@@ -347,7 +349,7 @@ contract NGBwrapper is INGBWrapper, NGBwrapperInternals {
 			address _rewardsAsset = internalImmutableRewardsAssets[i];
 			uint dividend = internalDistributionAccountRewards[i][msg.sender];
 			internalDistributionAccountRewards[i][msg.sender] = 0;
-			IERC20(_rewardsAsset).transfer(_rewardsAsset, dividend);
+			IERC20(_rewardsAsset).safeTransfer(_rewardsAsset, dividend);
 		}
 		internalIsDistributionAccount[msg.sender] = false;
 	}
@@ -659,14 +661,11 @@ contract NGBwrapper is INGBWrapper, NGBwrapperInternals {
 		if (iorc.TreasuryFeeIsCollected()) {
 			address sendTo = iorc.sendTo();
 			uint toOwner = currentBal >> 1;
-			bool success = IERC20(_assetAddr).transfer(msg.sender, toOwner);
-			require(success);
-			success = IERC20(_assetAddr).transfer(sendTo, currentBal - toOwner);
-			require(success);
+			IERC20(_assetAddr).safeTransfer(msg.sender, toOwner);
+			IERC20(_assetAddr).safeTransfer(sendTo, currentBal - toOwner);
 		}
 		else {
-			bool success = IERC20(_assetAddr).transfer(msg.sender, currentBal);
-			require(success);
+			IERC20(_assetAddr).safeTransfer(msg.sender, currentBal);
 		}
 	}
 }

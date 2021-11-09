@@ -41,7 +41,7 @@ contract QuickDepositor is IQuickDepositor {
 	) internal returns(uint wrappedDeposit, uint dynamicDeposit) {
 		IWrapper wrp = IFixCapitalPool(_fixCapitalPoolAddress).wrapper();
 		IERC20 underlying = IERC20(IFixCapitalPool(_fixCapitalPoolAddress).underlyingAssetAddress());
-		underlying.transferFrom(msg.sender, address(this), _amountUnderlying);
+		underlying.safeTransferFrom(msg.sender, address(this), _amountUnderlying);
 		underlying.safeApprove(address(wrp), _amountUnderlying);
 		if (wrp.underlyingIsStatic()) {
 			dynamicDeposit = wrp.depositWrappedAmount(address(this), _amountUnderlying);

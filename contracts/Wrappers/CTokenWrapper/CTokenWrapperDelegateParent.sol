@@ -4,11 +4,13 @@ pragma solidity >=0.6.8 <0.7.0;
 import "../../interfaces/IERC20.sol";
 import "../../libraries/SafeMath.sol";
 import "../../libraries/ABDKMath64x64.sol";
+import "../../libraries/SafeERC20.sol";
 import "./CTokenWrapperInternals.sol";
 
 contract CTokenWrapperDelegateParent is CTokenWrapperInternals {
 	using SafeMath for uint256;
 	using ABDKMath64x64 for int128;
+	using SafeERC20 for IERC20;
 
 	event FlashMint(
 		address indexed to,
@@ -82,8 +84,7 @@ contract CTokenWrapperDelegateParent is CTokenWrapperInternals {
 						internalDistributionAccountRewards[uint8(i)][_addr] = internalDistributionAccountRewards[uint8(i)][_addr].add(dividend);
 					}
 					else {
-						bool success = IERC20(_rewardsAddr).transfer(_addr, dividend);
-						require(success);
+						IERC20(_rewardsAddr).safeTransfer(_addr, dividend);
 						CBRA = CBRA.sub(dividend);
 					}
 				}
@@ -158,8 +159,7 @@ contract CTokenWrapperDelegateParent is CTokenWrapperInternals {
 					internalDistributionAccountRewards[uint8(i)][addr] = internalDistributionAccountRewards[uint8(i)][addr].add(dividend);
 				}
 				else {
-					bool success = IERC20(_rewardsAddr).transfer(addr, dividend);
-					require(success);
+					IERC20(_rewardsAddr).safeTransfer(addr, dividend);
 					CBRA = CBRA.sub(dividend);
 				}
 			}
@@ -174,8 +174,7 @@ contract CTokenWrapperDelegateParent is CTokenWrapperInternals {
 					internalDistributionAccountRewards[uint8(i)][addr] = internalDistributionAccountRewards[uint8(i)][addr].add(dividend);
 				}
 				else {
-					bool success = IERC20(_rewardsAddr).transfer(addr, dividend);
-					require(success);
+					IERC20(_rewardsAddr).safeTransfer(addr, dividend);
 					CBRA = CBRA.sub(dividend);
 				}
 			}

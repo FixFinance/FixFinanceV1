@@ -8,9 +8,11 @@ import "../interfaces/IERC20.sol";
 import "../interfaces/IInfoOracle.sol";
 import "../libraries/SafeMath.sol";
 import "../libraries/SignedSafeMath.sol";
+import "../libraries/SafeERC20.sol";
 import "./FCPDelegateParent.sol";
 
 contract FCPDelegate2 is FCPDelegateParent {
+	using SafeERC20 for IERC20;
 
 	event BalanceUpdate(
 		address indexed owner,
@@ -45,7 +47,7 @@ contract FCPDelegate2 is FCPDelegateParent {
 	function depositWrappedToken(address _to, uint _amountWrappedTkn) external beforePayoutPhase {
 		IWrapper wrp = internalWrapper;
 		uint yield = internalBalanceYield[_to];
-		wrp.transferFrom(msg.sender, address(this), _amountWrappedTkn);
+		IERC20(address(wrp)).safeTransferFrom(msg.sender, address(this), _amountWrappedTkn);
 		wrp.FCPDirectClaimSubAccountRewards(false, false, _to, yield, yield);
 		internalBalanceYield[_to] = yield.add(_amountWrappedTkn);
 		emit Deposit(_to, _amountWrappedTkn);
@@ -69,7 +71,7 @@ contract FCPDelegate2 is FCPDelegateParent {
 		if (_unwrap)
 			wrp.withdrawWrappedAmount(_to, _amountWrappedTkn, true);
 		else
-			wrp.transfer(_to, _amountWrappedTkn);
+			IERC20(address(wrp)).safeTransfer(_to, _amountWrappedTkn);
 
 		wrp.FCPDirectClaimSubAccountRewards(false, false, msg.sender, yield, yield);
 		internalBalanceYield[msg.sender] = yield.sub(_amountWrappedTkn);
@@ -96,7 +98,7 @@ contract FCPDelegate2 is FCPDelegateParent {
 		if (_unwrap)
 			wrp.withdrawWrappedAmount(_to, freeToMove, true);
 		else
-			wrp.transfer(_to, freeToMove);
+			IERC20(address(wrp)).safeTransfer(_to, freeToMove);
 		wrp.FCPDirectClaimSubAccountRewards(false, false, msg.sender, yield, yield);
 		internalBalanceYield[msg.sender] = yield.sub(freeToMove);
 		emit Withdrawal(msg.sender, freeToMove);

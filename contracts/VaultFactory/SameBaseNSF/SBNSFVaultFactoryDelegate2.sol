@@ -3,6 +3,7 @@ pragma solidity >=0.6.8 <0.7.0;
 
 import "../../libraries/SafeMath.sol";
 import "../../libraries/SignedSafeMath.sol";
+import "../../libraries/SafeERC20.sol";
 import "../../interfaces/IYTVaultManagerFlashReceiver.sol";
 import "../../interfaces/IFixCapitalPool.sol";
 import "../../interfaces/IVaultHealth.sol";
@@ -17,6 +18,7 @@ import "./SBNSFVaultFactoryDelegateParent.sol";
 contract SBNSFVaultFactoryDelegate2 is SBNSFVaultFactoryDelegateParent {
 	using SafeMath for uint;
 	using SignedSafeMath for int;
+	using SafeERC20 for IERC20;
 
 	/*
 		@Description: send a vault that is under the upper collateralization limit to the auction house
@@ -121,7 +123,7 @@ contract SBNSFVaultFactoryDelegate2 is SBNSFVaultFactoryDelegateParent {
 
 		delete _Liquidations[_index];
 
-		IERC20(liq.assetSupplied).transfer(_to, liq.bidAmount);
+		IERC20(liq.assetSupplied).safeTransfer(_to, liq.bidAmount);
 
 		(, SUPPLIED_ASSET_TYPE sType, address baseFCP, address baseWrapper) = suppliedAssetInfo(liq.assetSupplied);
 		require(liq.bidAmount <= uint(type(int256).max));
@@ -153,7 +155,7 @@ contract SBNSFVaultFactoryDelegate2 is SBNSFVaultFactoryDelegateParent {
 		address FCPborrowed = IZeroCouponBond(vault.assetBorrowed).FixCapitalPoolAddress();
 		IFixCapitalPool(FCPborrowed).burnZCBFrom(_to, vault.amountBorrowed);
 		lowerShortInterest(FCPborrowed, vault.amountBorrowed);
-		IERC20(_assetSupplied).transfer(_to, vault.amountSupplied);
+		IERC20(_assetSupplied).safeTransfer(_to, vault.amountSupplied);
 
 		{
 			SUPPLIED_ASSET_TYPE sType;
@@ -202,7 +204,7 @@ contract SBNSFVaultFactoryDelegate2 is SBNSFVaultFactoryDelegateParent {
 		address FCPborrowed = IZeroCouponBond(vault.assetBorrowed).FixCapitalPoolAddress();
 		IFixCapitalPool(FCPborrowed).burnZCBFrom(_to, _in);
 		lowerShortInterest(FCPborrowed, _in);
-		IERC20(_assetSupplied).transfer(_to, amtOut);
+		IERC20(_assetSupplied).safeTransfer(_to, amtOut);
 
 		{
 			SUPPLIED_ASSET_TYPE sType;
@@ -253,7 +255,7 @@ contract SBNSFVaultFactoryDelegate2 is SBNSFVaultFactoryDelegateParent {
 		address FCPborrowed = IZeroCouponBond(_assetBorrowed).FixCapitalPoolAddress();
 		IFixCapitalPool(FCPborrowed).burnZCBFrom(_to, amtIn);
 		lowerShortInterest(FCPborrowed, amtIn);
-		IERC20(_assetSupplied).transfer(_to, _out);
+		IERC20(_assetSupplied).safeTransfer(_to, _out);
 
 		{
 			SUPPLIED_ASSET_TYPE sType;

@@ -9,12 +9,14 @@ import "../../libraries/SafeMath.sol";
 import "../../libraries/SignedSafeMath.sol";
 import "../../libraries/ABDKMath64x64.sol";
 import "../../libraries/BigMath.sol";
+import "../../libraries/SafeERC20.sol";
 import "./CTokenWrapperDelegateParent.sol";
 
 contract CTokenWrapperDelegate3 is CTokenWrapperDelegateParent {
 	using SafeMath for uint256;
 	using SignedSafeMath for int256;
 	using ABDKMath64x64 for int128;
+    using SafeERC20 for IERC20;
 
     /*
         @Description: force rewards for an FCP direct sub account to be claimed
@@ -105,8 +107,7 @@ contract CTokenWrapperDelegate3 is CTokenWrapperDelegateParent {
                     internalDistributionAccountRewards[uint8(i)][_subAccts[0]] = internalDistributionAccountRewards[uint8(i)][_subAccts[0]].add(dividend);
                 }
                 else {
-                    bool success = IERC20(_rewardsAddr).transfer(_subAccts[0], dividend);
-                    require(success);
+                    IERC20(_rewardsAddr).safeTransfer(_subAccts[0], dividend);
                     internalPrevContractBalance[uint8(i)] = IERC20(_rewardsAddr).balanceOf(address(this));
                 }
             }
@@ -137,8 +138,7 @@ contract CTokenWrapperDelegate3 is CTokenWrapperDelegateParent {
                     internalDistributionAccountRewards[uint8(i)][_subAccts[1]] = internalDistributionAccountRewards[uint8(i)][_subAccts[1]].add(dividend);
                 }
                 else {
-                    bool success = IERC20(_rewardsAddr).transfer(_subAccts[1], dividend);
-                    require(success);
+                    IERC20(_rewardsAddr).safeTransfer(_subAccts[1], dividend);
                     internalPrevContractBalance[uint8(i)] = IERC20(_rewardsAddr).balanceOf(address(this));
                 }
             }
@@ -195,14 +195,11 @@ contract CTokenWrapperDelegate3 is CTokenWrapperDelegateParent {
         if (iorc.TreasuryFeeIsCollected()) {
             address sendTo = iorc.sendTo();
             uint toOwner = currentBal >> 1;
-            bool success = IERC20(_rewardsAsset).transfer(msg.sender, toOwner);
-            require(success);
-            success = IERC20(_rewardsAsset).transfer(sendTo, currentBal - toOwner);
-            require(success);
+            IERC20(_rewardsAsset).safeTransfer(msg.sender, toOwner);
+            IERC20(_rewardsAsset).safeTransfer(sendTo, currentBal - toOwner);
         }
         else {
-            bool success = IERC20(_rewardsAsset).transfer(msg.sender, currentBal);
-            require(success);
+            IERC20(_rewardsAsset).safeTransfer(msg.sender, currentBal);
         }
     }
 
@@ -222,14 +219,11 @@ contract CTokenWrapperDelegate3 is CTokenWrapperDelegateParent {
         if (iorc.TreasuryFeeIsCollected()) {
             address sendTo = IInfoOracle(internalInfoOracleAddress).sendTo();
             uint toOwner = contractBalance >> 1;
-            bool success = rewardAsset.transfer(msg.sender, toOwner);
-            require(success);
-            success = rewardAsset.transfer(sendTo, contractBalance - toOwner);
-            require(success);
+            rewardAsset.safeTransfer(msg.sender, toOwner);
+            rewardAsset.safeTransfer(sendTo, contractBalance - toOwner);
         }
         else {
-            bool success = rewardAsset.transfer(msg.sender, contractBalance);
-            require(success);
+            rewardAsset.safeTransfer(msg.sender, contractBalance);
         }
         internalPrevContractBalance[_index] = 0;
     }

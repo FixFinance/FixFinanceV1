@@ -4,6 +4,7 @@ pragma solidity >=0.6.8 <0.7.0;
 
 import "../../libraries/SafeMath.sol";
 import "../../libraries/SignedSafeMath.sol";
+import "../../libraries/SafeERC20.sol";
 import "../../interfaces/IVaultManagerFlashReceiver.sol";
 import "../../interfaces/IFixCapitalPool.sol";
 import "../../interfaces/IZeroCouponBond.sol";
@@ -16,6 +17,7 @@ import "./NSFVaultFactoryDelegateParent.sol";
 contract NSFVaultFactoryDelegate1 is NSFVaultFactoryDelegateParent {
 	using SafeMath for uint;
 	using SignedSafeMath for int;
+	using SafeERC20 for IERC20;
 
 	/*
 		@Description: create a new vault, deposit some asset and borrow some ZCB from it
@@ -51,7 +53,7 @@ contract NSFVaultFactoryDelegate1 is NSFVaultFactoryDelegateParent {
 		require(_assetSupplied != _assetBorrowed && _amountSupplied <= uint(type(int256).max));
 		require(_fixCapitalPoolToWrapper[_assetSupplied] != address(0) || _wrapperToUnderlyingAsset[_assetSupplied] != address(0));
 
-		IERC20(_assetSupplied).transferFrom(msg.sender, address(this), _amountSupplied);
+		IERC20(_assetSupplied).safeTransferFrom(msg.sender, address(this), _amountSupplied);
 		address FCPborrowed = IZeroCouponBond(_assetBorrowed).FixCapitalPoolAddress();
 		IFixCapitalPool(FCPborrowed).mintZCBTo(msg.sender, _amountBorrowed);
 		raiseShortInterest(FCPborrowed, _amountBorrowed);
@@ -84,8 +86,7 @@ contract NSFVaultFactoryDelegate1 is NSFVaultFactoryDelegateParent {
 		}
 		if (vault.amountSupplied > 0) {
 			require(vault.amountSupplied <= uint(type(int256).max));
-			bool success = IERC20(vault.assetSupplied).transfer(_to, vault.amountSupplied);
-			require(success);
+			IERC20(vault.assetSupplied).safeTransfer(_to, vault.amountSupplied);
 			(, SUPPLIED_ASSET_TYPE sType, address baseFCP, address baseWrapper) = suppliedAssetInfo(vault.assetSupplied);
 			editSubAccountStandardVault(false, msg.sender, sType, baseFCP, baseWrapper, -int(vault.amountSupplied));
 		}
@@ -167,15 +168,13 @@ contract NSFVaultFactoryDelegate1 is NSFVaultFactoryDelegateParent {
 		//------------------distribute funds----------------------
 		if (mVault.assetSupplied != _assetSupplied) {
 			if (mVault.amountSupplied != 0) {
-				bool success = IERC20(mVault.assetSupplied).transfer(_receiverAddr, mVault.amountSupplied);
-				require(success);
+				IERC20(mVault.assetSupplied).safeTransfer(_receiverAddr, mVault.amountSupplied);
 			}
 			sVault.assetSupplied =  newVault.assetSupplied;
 			sVault.amountSupplied = newVault.amountSupplied;
 		}
 		else if (mVault.amountSupplied > newVault.amountSupplied) {
-			bool succes = IERC20(_assetSupplied).transfer(_receiverAddr, mVault.amountSupplied - newVault.amountSupplied);
-			require(succes);
+			IERC20(newVault.assetSupplied).safeTransfer(_receiverAddr, mVault.amountSupplied - newVault.amountSupplied);
 			sVault.amountSupplied = newVault.amountSupplied;
 		}
 		else if (mVault.amountSupplied < newVault.amountSupplied) {
@@ -221,8 +220,7 @@ contract NSFVaultFactoryDelegate1 is NSFVaultFactoryDelegateParent {
 
 		//-----------------------------get funds-------------------------
 		if (mVault.assetSupplied != newVault.assetSupplied) {
-			bool success = IERC20(newVault.assetSupplied).transferFrom(msg.sender, address(this), newVault.amountSupplied);
-			require(success);
+			IERC20(newVault.assetSupplied).safeTransferFrom(msg.sender, address(this), newVault.amountSupplied);
 			require(newVault.amountSupplied <= uint(type(int256).max));
 			require(mVault.amountSupplied <= uint(type(int256).max));
 			int changeAmt = int(newVault.amountSupplied);
@@ -235,8 +233,7 @@ contract NSFVaultFactoryDelegate1 is NSFVaultFactoryDelegateParent {
 		}
 		else {
 			if (mVault.amountSupplied < newVault.amountSupplied) {
-				bool success = IERC20(newVault.assetSupplied).transferFrom(msg.sender, address(this), newVault.amountSupplied - mVault.amountSupplied);
-				require(success);
+				IERC20(newVault.assetSupplied).safeTransferFrom(msg.sender, address(this), newVault.amountSupplied - mVault.amountSupplied);
 			}
 			require(newVault.amountSupplied <= uint(type(int256).max));
 			require(mVault.amountSupplied <= uint(type(int256).max));

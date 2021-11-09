@@ -4,6 +4,7 @@ pragma solidity >=0.6.8 <0.7.0;
 
 import "../../libraries/SafeMath.sol";
 import "../../libraries/SignedSafeMath.sol";
+import "../../libraries/SafeERC20.sol";
 import "../../interfaces/IVaultManagerFlashReceiver.sol";
 import "../../interfaces/IFixCapitalPool.sol";
 import "../../interfaces/IZeroCouponBond.sol";
@@ -16,6 +17,7 @@ import "./NSFVaultFactoryDelegateParent.sol";
 contract NSFVaultFactoryDelegate5 is NSFVaultFactoryDelegateParent {
 	using SafeMath for uint;
 	using SignedSafeMath for int;
+	using SafeERC20 for IERC20;
 
 	/*
 		@Description: assign a vault/YTvault to a new owner
@@ -81,7 +83,7 @@ contract NSFVaultFactoryDelegate5 is NSFVaultFactoryDelegateParent {
 		uint amt = _liquidationRebates[msg.sender][_asset];
 		require(amt <= uint(type(int256).max));
 		(, SUPPLIED_ASSET_TYPE sType, address baseFCP, address baseWrapper) = suppliedAssetInfo(_asset);
-		IERC20(_asset).transfer(msg.sender, amt);
+		IERC20(_asset).safeTransfer(msg.sender, amt);
 		editSubAccountStandardVault(false, msg.sender, sType, baseFCP, baseWrapper, -int(amt));
 		delete _liquidationRebates[msg.sender][_asset];
 	}
@@ -155,11 +157,11 @@ contract NSFVaultFactoryDelegate5 is NSFVaultFactoryDelegateParent {
 		IInfoOracle iorc = IInfoOracle(_infoOracleAddress);
 		address treasuryAddr = iorc.sendTo();
 		if (iorc.TreasuryFeeIsCollected()) {
-			IERC20(_asset).transfer(treasuryAddr, toTreasury);
-			IERC20(_asset).transfer(msg.sender, rev - toTreasury);
+			IERC20(_asset).safeTransfer(treasuryAddr, toTreasury);
+			IERC20(_asset).safeTransfer(msg.sender, rev - toTreasury);
 		}
 		else {
-			IERC20(_asset).transfer(msg.sender, rev);
+			IERC20(_asset).safeTransfer(msg.sender, rev);
 		}
 		(, SUPPLIED_ASSET_TYPE sType, address baseFCP, address baseWrapper) = suppliedAssetInfo(_asset);
 

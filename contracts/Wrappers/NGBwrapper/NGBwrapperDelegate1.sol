@@ -6,11 +6,13 @@ import "../../interfaces/IInfoOracle.sol";
 import "../../libraries/SafeMath.sol";
 import "../../libraries/ABDKMath64x64.sol";
 import "../../libraries/BigMath.sol";
+import "../../libraries/SafeERC20.sol";
 import "./NGBwrapperDelegateParent.sol";
 
 contract NGBwrapperDelegate1 is NGBwrapperDelegateParent {
 	using SafeMath for uint256;
 	using ABDKMath64x64 for int128;
+	using SafeERC20 for IERC20;
 
 	function harvestToTreasury() external {
 		internalHarvestToTreasury(IERC20(internalUnderlyingAssetAddress));
@@ -101,8 +103,7 @@ contract NGBwrapperDelegate1 is NGBwrapperDelegateParent {
 		@return uint _amountWrappedToken: the amount of wrapped tokens that were minted
 	*/
 	function firstDeposit(address _to, uint _amountUnit, IERC20 _underlyingAsset) internal returns (uint _amountWrappedToken) {
-		bool success = _underlyingAsset.transferFrom(msg.sender, address(this), _amountUnit);
-		require(success);
+		_underlyingAsset.safeTransferFrom(msg.sender, address(this), _amountUnit);
 		internalBalanceOf[_to] = _amountUnit;
 		internalTotalSupply = _amountUnit;
 		_amountWrappedToken = _amountUnit;
@@ -124,8 +125,7 @@ contract NGBwrapperDelegate1 is NGBwrapperDelegateParent {
 		if (_totalSupply == 0) {
 			return firstDeposit(_to, _amountUnit, underlying);
 		}
-		bool success = underlying.transferFrom(msg.sender, address(this), _amountUnit);
-		require(success);
+		underlying.safeTransferFrom(msg.sender, address(this), _amountUnit);
 		_amountWrappedToken = internalTotalSupply.mul(_amountUnit).div(contractBalance);
 		internalBalanceOf[_to] = internalBalanceOf[_to].add(_amountWrappedToken);
 		//we cannot use _totalSupply as the value of internalTotalSupply may have been changed in internalHarvestToTreasury()
@@ -170,7 +170,7 @@ contract NGBwrapperDelegate1 is NGBwrapperDelegateParent {
 		require(internalBalanceOf[msg.sender] >= _amountWrappedToken);
 		internalBalanceOf[msg.sender] = internalBalanceOf[msg.sender].sub(_amountWrappedToken);
 		internalTotalSupply = _totalSupply.sub(_amountWrappedToken);
-		underlying.transfer(_to, _amountUnit);
+		underlying.safeTransfer(_to, _amountUnit);
 	}
 
 	/*
@@ -188,7 +188,7 @@ contract NGBwrapperDelegate1 is NGBwrapperDelegateParent {
 		_amountUnit = contractBalance.mul(_amountWrappedToken).div(_totalSupply);
 		internalBalanceOf[msg.sender] = internalBalanceOf[msg.sender].sub(_amountWrappedToken);
 		internalTotalSupply = _totalSupply.sub(_amountWrappedToken);
-		underlying.transfer(_to, _amountUnit);
+		underlying.safeTransfer(_to, _amountUnit);
 	}
 
 	function forceRewardsCollection() external claimRewards(true, msg.sender) {}

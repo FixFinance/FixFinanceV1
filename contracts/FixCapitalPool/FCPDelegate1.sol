@@ -8,9 +8,11 @@ import "../interfaces/IERC20.sol";
 import "../interfaces/IInfoOracle.sol";
 import "../libraries/SafeMath.sol";
 import "../libraries/SignedSafeMath.sol";
+import "../libraries/SafeERC20.sol";
 import "./FCPDelegateParent.sol";
 
 contract FCPDelegate1 is FCPDelegateParent {
+	using SafeERC20 for IERC20;
 
 	event BalanceUpdate(
 		address indexed owner,
@@ -53,7 +55,7 @@ contract FCPDelegate1 is FCPDelegateParent {
 		if (_unwrap)
 			wrp.withdrawWrappedAmount(_to, payout, false);
 		else
-			wrp.transfer(_to, payout);
+			IERC20(address(wrp)).safeTransfer(_to, payout);
 
 		emit ClaimPayout(msg.sender);
 

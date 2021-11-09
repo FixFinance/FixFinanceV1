@@ -7,11 +7,13 @@ import "../../interfaces/ICToken.sol";
 import "../../libraries/SafeMath.sol";
 import "../../libraries/ABDKMath64x64.sol";
 import "../../libraries/BigMath.sol";
+import "../../libraries/SafeERC20.sol";
 import "./CTokenWrapperDelegateParent.sol";
 
 contract CTokenWrapperDelegate1 is CTokenWrapperDelegateParent {
 	using SafeMath for uint256;
 	using ABDKMath64x64 for int128;
+	using SafeERC20 for IERC20;
 
 	function harvestToTreasury() external {
 		internalHarvestToTreasury(ICToken(internalUnderlyingAssetAddress));
@@ -109,8 +111,7 @@ contract CTokenWrapperDelegate1 is CTokenWrapperDelegateParent {
 		@return uint _amountWrappedToken: the amount of wrapped tokens that were minted
 	*/
 	function firstDeposit(address _to, uint _amountCToken, ICToken _cToken) internal returns (uint _amountWrappedToken) {
-		bool success = _cToken.transferFrom(msg.sender, address(this), _amountCToken);
-		require(success);
+		IERC20(address(_cToken)).safeTransferFrom(msg.sender, address(this), _amountCToken);
 		internalBalanceOf[_to] = _amountCToken;
 		internalTotalSupply = _amountCToken;
 		_amountWrappedToken = _amountCToken;
@@ -137,8 +138,7 @@ contract CTokenWrapperDelegate1 is CTokenWrapperDelegateParent {
 		internalBalanceOf[toCopy] = internalBalanceOf[toCopy].add(_amountWrapped);
 		//we cannot use _totalSupply as internalTotalSupply was set in harvestToTreasury
 		internalTotalSupply = internalTotalSupply.add(_amountWrapped);
-		bool success = cToken.transferFrom(msg.sender, address(this), cTokenIn);
-		require(success);
+		IERC20(address(cToken)).safeTransferFrom(msg.sender, address(this), cTokenIn);
 	}
 
 	/*
@@ -160,8 +160,7 @@ contract CTokenWrapperDelegate1 is CTokenWrapperDelegateParent {
 		internalBalanceOf[toCopy] = internalBalanceOf[toCopy].add(_amount);
 		//we cannot use _totalSupply as internalTotalSupply was set in harvestToTreasury
 		internalTotalSupply = internalTotalSupply.add(_amount);
-		bool success = cToken.transferFrom(msg.sender, address(this), cTokenIn);
-		require(success);
+		IERC20(address(cToken)).safeTransferFrom(msg.sender, address(this), cTokenIn);
 	}
 
 	event EVNT(uint its);
@@ -185,7 +184,7 @@ contract CTokenWrapperDelegate1 is CTokenWrapperDelegateParent {
 		internalBalanceOf[msg.sender] = bal.sub(_amountWrappedToken);
 		internalTotalSupply = internalTotalSupply.sub(_amountWrappedToken);
 		address copyTo = _to; //prevent stack too deep
-		cToken.transfer(copyTo, amountCToken.sub(1)); //subtract 1 to offset any rounding errors
+		IERC20(address(cToken)).safeTransfer(copyTo, amountCToken.sub(1)); //subtract 1 to offset any rounding errors
 	}
 
 	/*
@@ -204,7 +203,7 @@ contract CTokenWrapperDelegate1 is CTokenWrapperDelegateParent {
 		uint cTokenOut = contractBalance.mul(_amountWrappedToken).div(internalTotalSupply);
 		internalBalanceOf[msg.sender] = internalBalanceOf[msg.sender].sub(_amountWrappedToken);
 		internalTotalSupply = internalTotalSupply.sub(_amountWrappedToken);
-		cToken.transfer(_to, cTokenOut);
+		IERC20(address(cToken)).safeTransfer(_to, cTokenOut);
 		_amountUnit = cTokenOut.mul(cToken.exchangeRateStored()).div(1 ether);
 	}
 

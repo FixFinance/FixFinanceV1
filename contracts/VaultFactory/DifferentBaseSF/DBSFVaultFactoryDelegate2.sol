@@ -5,6 +5,7 @@ pragma solidity >=0.6.8 <0.7.0;
 import "../../libraries/SafeMath.sol";
 import "../../libraries/SignedSafeMath.sol";
 import "../../libraries/BigMath.sol";
+import "../../libraries/SafeERC20.sol";
 import "../../interfaces/IFixCapitalPool.sol";
 import "../../interfaces/IZeroCouponBond.sol";
 import "../../interfaces/IVaultHealth.sol";
@@ -17,6 +18,7 @@ import "./DBSFVaultFactoryDelegateParent.sol";
 contract DBSFVaultFactoryDelegate2 is DBSFVaultFactoryDelegateParent {
 	using SafeMath for uint;
 	using SignedSafeMath for int;
+	using SafeERC20 for IERC20;
 
 
 	/*
@@ -159,7 +161,7 @@ contract DBSFVaultFactoryDelegate2 is DBSFVaultFactoryDelegateParent {
 
 		delete _Liquidations[_index];
 
-		IERC20(liq.assetSupplied).transfer(_to, liq.bidAmount);
+		IERC20(liq.assetSupplied).safeTransfer(_to, liq.bidAmount);
 
 		(, SUPPLIED_ASSET_TYPE sType, address baseFCP, address baseWrapper) = suppliedAssetInfo(liq.assetSupplied, IInfoOracle(_infoOracleAddress));
 		require(liq.bidAmount <= uint(type(int256).max));
@@ -195,7 +197,7 @@ contract DBSFVaultFactoryDelegate2 is DBSFVaultFactoryDelegateParent {
 		address FCPborrowed = IZeroCouponBond(vault.assetBorrowed).FixCapitalPoolAddress();
 		IFixCapitalPool(FCPborrowed).burnZCBFrom(_to, vault.amountBorrowed);
 		lowerShortInterest(FCPborrowed, vault.amountBorrowed);
-		IERC20(_assetSupplied).transfer(_to, vault.amountSupplied);
+		IERC20(_assetSupplied).safeTransfer(_to, vault.amountSupplied);
 
 		{
 			SUPPLIED_ASSET_TYPE sType;
@@ -248,7 +250,7 @@ contract DBSFVaultFactoryDelegate2 is DBSFVaultFactoryDelegateParent {
 		address FCPborrowed = IZeroCouponBond(vault.assetBorrowed).FixCapitalPoolAddress();
 		IFixCapitalPool(FCPborrowed).burnZCBFrom(_to, _in);
 		lowerShortInterest(FCPborrowed, _in);
-		IERC20(_assetSupplied).transfer(_to, amtOut);
+		IERC20(_assetSupplied).safeTransfer(_to, amtOut);
 
 		{
 			SUPPLIED_ASSET_TYPE sType;
@@ -307,7 +309,7 @@ contract DBSFVaultFactoryDelegate2 is DBSFVaultFactoryDelegateParent {
 		address FCPborrowed = IZeroCouponBond(_assetBorrowed).FixCapitalPoolAddress();
 		IFixCapitalPool(FCPborrowed).burnZCBFrom(_to, amtIn);
 		lowerShortInterest(FCPborrowed, amtIn);
-		IERC20(_assetSupplied).transfer(_to, _out);
+		IERC20(_assetSupplied).safeTransfer(_to, _out);
 
 		{
 			SUPPLIED_ASSET_TYPE sType;

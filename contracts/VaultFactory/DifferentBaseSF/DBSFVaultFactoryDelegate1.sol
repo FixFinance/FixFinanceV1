@@ -5,6 +5,7 @@ pragma solidity >=0.6.8 <0.7.0;
 import "../../libraries/SafeMath.sol";
 import "../../libraries/SignedSafeMath.sol";
 import "../../libraries/BigMath.sol";
+import "../../libraries/SafeERC20.sol";
 import "../../interfaces/IDBSFVaultManagerFlashReceiver.sol";
 import "../../interfaces/IFixCapitalPool.sol";
 import "../../interfaces/IZeroCouponBond.sol";
@@ -18,6 +19,7 @@ import "./DBSFVaultFactoryDelegateParent.sol";
 contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryDelegateParent {
 	using SafeMath for uint;
 	using SignedSafeMath for int;
+	using SafeERC20 for IERC20;
 
 
 	/*
@@ -60,18 +62,25 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryDelegateParent {
 		uint64 wrapperFee = info.StabilityFeeAPR(address(this), address(baseBorrowed));
 		Vault memory vault = Vault(_assetSupplied, _assetBorrowed, _amountSupplied, _amountBorrowed, 0, timestampOpened, wrapperFee);
 
-		IERC20(_assetSupplied).transferFrom(msg.sender, address(this), _amountSupplied);
+		{
+			address copyAssetSupplied = _assetSupplied; //prevent stack too deep
+			IERC20(copyAssetSupplied).safeTransferFrom(msg.sender, address(this), _amountSupplied);
+		}
 		IFixCapitalPool(FCPborrowed).mintZCBTo(msg.sender, _amountBorrowed);
 		raiseShortInterest(FCPborrowed, _amountBorrowed);
 
+		SUPPLIED_ASSET_TYPE sType;
+		address baseFCP;
+		address baseWrapper;
 		{
-			(bool withstands, SUPPLIED_ASSET_TYPE sType, address baseFCP, address baseWrapper)
+			//scope structure is such that withstands goes out of scope after we require(withstands), prevents stack too deep
+			bool withstands;
+			(withstands, sType, baseFCP, baseWrapper)
 				= vaultWithstandsChange(vault, _priceMultiplier, _suppliedRateChange, _borrowRateChange, info);
 			require(withstands);
-			require(_amountSupplied <= uint(type(int256).max));
-			int changeAmt = int(_amountSupplied);
-			editSubAccountStandardVault(false, msg.sender, sType, baseFCP, baseWrapper, changeAmt);
 		}
+		int changeAmt = _amountSupplied.toInt();
+		editSubAccountStandardVault(false, msg.sender, sType, baseFCP, baseWrapper, changeAmt);
 
 		_vaults[msg.sender].push(vault);
 	}
@@ -100,7 +109,7 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryDelegateParent {
 			}
 		}
 		if (vault.amountSupplied > 0) {
-			IERC20(vault.assetSupplied).transfer(_to, vault.amountSupplied);
+			IERC20(vault.assetSupplied).safeTransfer(_to, vault.amountSupplied);
 			(, SUPPLIED_ASSET_TYPE sType, address baseFCP, address baseWrapper) = suppliedAssetInfo(vault.assetSupplied, IInfoOracle(_infoOracleAddress));
 			require(vault.amountSupplied <= uint(type(int256).max));
 			editSubAccountStandardVault(false, msg.sender, sType, baseFCP, baseWrapper, -int(vault.amountSupplied));
@@ -289,15 +298,13 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryDelegateParent {
 		//------------------distribute funds----------------------
 		if (mVault.assetSupplied != _assetSupplied) {
 			if (mVault.amountSupplied != 0) {
-				bool success = IERC20(mVault.assetSupplied).transfer(_receiverAddr, mVault.amountSupplied);
-				require(success);
+				IERC20(mVault.assetSupplied).safeTransfer(_receiverAddr, mVault.amountSupplied);
 			}
 			sVault.assetSupplied = _assetSupplied;
 			sVault.amountSupplied = _amountSupplied;
 		}
 		else if (mVault.amountSupplied > _amountSupplied) {
-			bool succes = IERC20(_assetSupplied).transfer(_receiverAddr, mVault.amountSupplied - _amountSupplied);
-			require(succes);
+			IERC20(_assetSupplied).safeTransfer(_receiverAddr, mVault.amountSupplied - _amountSupplied);
 			sVault.amountSupplied = _amountSupplied;
 		}
 		else if (mVault.amountSupplied < _amountSupplied) {
@@ -365,12 +372,10 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryDelegateParent {
 
 		//-----------------------------get funds-------------------------
 		if (mVault.assetSupplied != _assetSupplied) {
-			bool success = IERC20(_assetSupplied).transferFrom(msg.sender, address(this), _amountSupplied);
-			require(success);
+			IERC20(_assetSupplied).safeTransferFrom(msg.sender, address(this), _amountSupplied);
 		}
 		else if (mVault.amountSupplied < _amountSupplied) {
-			bool success = IERC20(_assetSupplied).transferFrom(msg.sender, address(this), _amountSupplied - mVault.amountSupplied);
-			require(success);
+			IERC20(_assetSupplied).safeTransferFrom(msg.sender, address(this), _amountSupplied - mVault.amountSupplied);
 		}
 
 		if (mVault.amountBorrowed > _amountBorrowed) {
@@ -410,15 +415,13 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryDelegateParent {
 		//------------------distribute funds----------------------
 		if (mVault.assetSupplied != _assetSupplied) {
 			if (mVault.amountSupplied != 0) {
-				bool success = IERC20(mVault.assetSupplied).transfer(_receiverAddr, mVault.amountSupplied);
-				require(success);
+				IERC20(mVault.assetSupplied).safeTransfer(_receiverAddr, mVault.amountSupplied);
 			}
 			sVault.assetSupplied = _assetSupplied;
 			sVault.amountSupplied = _amountSupplied;
 		}
 		else if (mVault.amountSupplied > _amountSupplied) {
-			bool succes = IERC20(_assetSupplied).transfer(_receiverAddr, mVault.amountSupplied - _amountSupplied);
-			require(succes);
+			IERC20(_assetSupplied).safeTransfer(_receiverAddr, mVault.amountSupplied - _amountSupplied);
 			sVault.amountSupplied = _amountSupplied;
 		}
 		else if (mVault.amountSupplied < _amountSupplied) {
@@ -462,12 +465,10 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryDelegateParent {
 
 		//-----------------------------get funds-------------------------
 		if (mVault.assetSupplied != _assetSupplied) {
-			bool success = IERC20(_assetSupplied).transferFrom(msg.sender, address(this), _amountSupplied);
-			require(success);
+			IERC20(_assetSupplied).safeTransferFrom(msg.sender, address(this), _amountSupplied);
 		}
 		else if (mVault.amountSupplied < _amountSupplied) {
-			bool success = IERC20(_assetSupplied).transferFrom(msg.sender, address(this), _amountSupplied - mVault.amountSupplied);
-			require(success);
+			IERC20(_assetSupplied).safeTransferFrom(msg.sender, address(this), _amountSupplied - mVault.amountSupplied);
 		}
 
 		if (mVault.amountBorrowed > 0) {

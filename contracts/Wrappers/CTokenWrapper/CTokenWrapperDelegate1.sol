@@ -111,6 +111,7 @@ contract CTokenWrapperDelegate1 is CTokenWrapperDelegateParent {
 		@return uint _amountWrappedToken: the amount of wrapped tokens that were minted
 	*/
 	function firstDeposit(address _to, uint _amountCToken, ICToken _cToken) internal returns (uint _amountWrappedToken) {
+		require(_amountCToken >= 10**_cToken.decimals());
 		IERC20(address(_cToken)).safeTransferFrom(msg.sender, address(this), _amountCToken);
 		internalBalanceOf[_to] = _amountCToken;
 		internalTotalSupply = _amountCToken;

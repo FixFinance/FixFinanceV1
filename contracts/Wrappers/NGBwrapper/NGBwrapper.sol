@@ -294,7 +294,15 @@ contract NGBwrapper is INGBWrapper, NGBwrapperInternals {
     ) external view override returns (uint256) {
     	require(token == address(this));
     	uint _flashLoanFee = internalFlashLoanFee;
-    	return (uint256(-1) - internalTotalSupply).div(_flashLoanFee == 0 ? 1 : _flashLoanFee);
+    	/*
+			Theoretically it would be safe to have the maxFlashLoan be
+			(uint256(-1) - internalTotalSupply).div(_flashLoanFee.add(totalSBPS)).mul(totalSBPS)
+			but it doesn't hurt to have a lower maximum than the theoretical absolute maximum
+			having a lower maximum flash loan amount may help prevent the occurance of edge case scenerios
+			thus it may be beneficial to have maxFlashLoan return
+			(uint256(-1) - internalTotalSupply).div(_flashLoanFee.add(totalSBPS))
+    	*/
+    	return (uint256(-1) - internalTotalSupply).div(_flashLoanFee.add(totalSBPS));
     }
 
     function flashFee(

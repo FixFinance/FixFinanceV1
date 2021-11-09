@@ -243,7 +243,7 @@ contract CTokenWrapperDelegate2 is CTokenWrapperDelegateParent {
         require(token == address(this));
         require(amount + internalTotalSupply <= uint256(-1));
         uint _flashLoanFee = internalFlashLoanFee;
-        require(amount <= (uint256(-1) - internalTotalSupply) / (_flashLoanFee == 0 ? 1 : _flashLoanFee));
+        require(amount <= (uint256(-1) - internalTotalSupply).div(_flashLoanFee.add(totalSBPS)));
         uint fee = amount.mul(_flashLoanFee) / totalSBPS;        
         address recAddr = address(receiver);
         internalBalanceOf[recAddr] = internalBalanceOf[recAddr].add(amount);

@@ -2,6 +2,7 @@
 pragma solidity >=0.6.8 <0.7.0;
 
 import "../libraries/SafeMath.sol";
+import "../libraries/SafeERC20.sol";
 import "../libraries/SignedSafeMath.sol";
 import "../interfaces/IWrapper.sol";
 import "../interfaces/IFixCapitalPool.sol";
@@ -12,11 +13,12 @@ import "../interfaces/IQuickDepositor.sol";
 
 contract QuickDepositor is IQuickDepositor {
 	using SafeMath for uint256;
+	using SafeERC20 for IERC20;
 
 	//data
 	IOrganizer org;
 
-	uint bufferAmount = 0x1000; //used to offset rounding errors
+	uint constant bufferAmount = 0x1000; //used to offset rounding errors
 
 	/*
 		init
@@ -40,7 +42,7 @@ contract QuickDepositor is IQuickDepositor {
 		IWrapper wrp = IFixCapitalPool(_fixCapitalPoolAddress).wrapper();
 		IERC20 underlying = IERC20(IFixCapitalPool(_fixCapitalPoolAddress).underlyingAssetAddress());
 		underlying.transferFrom(msg.sender, address(this), _amountUnderlying);
-		underlying.approve(address(wrp), _amountUnderlying);
+		underlying.safeApprove(address(wrp), _amountUnderlying);
 		if (wrp.underlyingIsStatic()) {
 			dynamicDeposit = wrp.depositWrappedAmount(address(this), _amountUnderlying);
 			wrappedDeposit = _amountUnderlying;
@@ -49,7 +51,7 @@ contract QuickDepositor is IQuickDepositor {
 			wrappedDeposit = wrp.depositUnitAmount(address(this), _amountUnderlying);
 			dynamicDeposit = _amountUnderlying;
 		}
-		wrp.approve(_fixCapitalPoolAddress, wrappedDeposit);
+		IERC20(address(wrp)).safeApprove(_fixCapitalPoolAddress, wrappedDeposit);
 		IFixCapitalPool(_fixCapitalPoolAddress).depositWrappedToken(_depositTo, wrappedDeposit);
 	}
 

@@ -248,18 +248,20 @@ contract CTokenWrapperDelegate2 is CTokenWrapperDelegateParent {
         address recAddr = address(receiver);
         internalBalanceOf[recAddr] = internalBalanceOf[recAddr].add(amount);
         emit FlashMint(recAddr, amount);
-        uint256 _allowance = internalAllowance[recAddr][address(this)];
         uint toRepay = amount.add(fee);
-        require(
-            _allowance >= toRepay,
-            "FlashMinter: Repay not approved"
-        );
-        internalAllowance[recAddr][address(this)] = _allowance.sub(toRepay);
         address copyToken = token;
         uint copyAmount = amount;
         bytes memory copyData = data;
-        bytes32 out = IERC3156FlashBorrower(recAddr).onFlashLoan(msg.sender, copyToken, copyAmount, fee, copyData);
-        require(CALLBACK_SUCCESS == out);
+
+        {
+            bytes32 out = IERC3156FlashBorrower(recAddr).onFlashLoan(msg.sender, copyToken, copyAmount, fee, copyData);
+            require(CALLBACK_SUCCESS == out);
+        }
+
+        uint256 _allowance = internalAllowance[recAddr][address(this)];
+        require(_allowance >= toRepay, "FlashMinter: Repay not approved");
+        internalAllowance[recAddr][address(this)] = _allowance.sub(toRepay);
+
         uint balance = internalBalanceOf[recAddr];
         require(balance >= toRepay);
         internalBalanceOf[recAddr] = balance.sub(toRepay);

@@ -214,12 +214,12 @@ contract FCPDelegate2 is FCPDelegateParent {
 			effectiveZCB = effectiveZCB.sub(_amountBond.mul(-1).toUint());
 		}
 
+		bytes32 out = _receiver.onFlashLoan(msg.sender, _amountYield, _amountBond, yieldFee, bondFee, _data);
+		require(out == CALLBACK_SUCCESS);
+
 		//decrement allowances
 		IZeroCouponBond(internalZeroCouponBondAddress).decrementAllowance(address(_receiver), address(this), effectiveZCB);
 		IYieldToken(internalYieldTokenAddress).decrementAllowance(address(_receiver), address(this), _amountYield);
-
-		bytes32 out = _receiver.onFlashLoan(msg.sender, _amountYield, _amountBond, yieldFee, bondFee, _data);
-		require(out == CALLBACK_SUCCESS);
 
 		{
 			address recAddr = address(_receiver);

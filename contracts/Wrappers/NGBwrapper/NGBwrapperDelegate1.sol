@@ -103,6 +103,7 @@ contract NGBwrapperDelegate1 is NGBwrapperDelegateParent {
 		@return uint _amountWrappedToken: the amount of wrapped tokens that were minted
 	*/
 	function firstDeposit(address _to, uint _amountUnit, IERC20 _underlyingAsset) internal returns (uint _amountWrappedToken) {
+		require(_amountUnit >= 10**uint(_underlyingAsset.decimals()));
 		_underlyingAsset.safeTransferFrom(msg.sender, address(this), _amountUnit);
 		internalBalanceOf[_to] = _amountUnit;
 		internalTotalSupply = _amountUnit;

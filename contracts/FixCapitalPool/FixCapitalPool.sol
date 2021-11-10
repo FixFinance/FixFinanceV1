@@ -412,7 +412,7 @@ contract FixCapitalPool is IFixCapitalPool, FCPDelegateParent {
         uint256 _amountYield,
         int256 _amountBond,
         bytes calldata _data
-    ) external override /*beforePayoutPhase noReentry*/ returns (bool) {
+    ) external override returns (bool) {
     	(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
     		"flashLoan(address,uint256,int256,bytes)",
     		_receiver,

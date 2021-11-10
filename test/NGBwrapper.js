@@ -52,12 +52,13 @@ contract('NGBwrapper', async function(accounts){
 		inflation = await dummyATokenInstance.inflation();
 		treasuryAddress = owner;
 		await NGBwrapperInstance.transferOwnership(treasuryAddress);
+		await dummyATokenInstance.mintTo(accounts[0], _10To18.mul(new BN(100)));
 		assert.equal(await NGBwrapperInstance.underlyingAssetAddress(), dummyATokenInstance.address, 'correct address for aToken');
 		assert.equal((await NGBwrapperInstance.totalSupply()).toString(), "0", "correct total supply");
 	});
 
 	it('executes 1st deposit', async () => {
-		amount = _10To18.div(new BN(100)).toString();
+		amount = _10To18.toString();
 		await dummyATokenInstance.approve(NGBwrapperInstance.address, amount);
 		await NGBwrapperInstance.depositUnitAmount(accounts[0], amount);
 		totalSupply = await NGBwrapperInstance.totalSupply();

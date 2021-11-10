@@ -7,7 +7,7 @@ import "../interfaces/IERC20.sol";
     increase all balances of users by a factor which increases over time
 */
 contract dummyAToken is IERC20 {
-	uint8 public override decimals = 18;
+	uint8 public override decimals;
 
 	uint public override totalSupply = 1e18;
 
@@ -24,6 +24,7 @@ contract dummyAToken is IERC20 {
     constructor (string memory _symbol) public {
         symbol = _symbol;
     	balanceOfInternal[msg.sender] = totalSupply;
+        decimals = 18;
     }
 
     function mintTo(address _to, uint _amount) public {

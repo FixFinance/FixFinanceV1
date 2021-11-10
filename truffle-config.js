@@ -34,7 +34,7 @@ const UNSECURE_PKs = [
   `0xbef24829cd8f3f60ef5a19be366b3b0311f1a23879949a270cae90b4b0e16abe`
 ];
 
-*/
+//*/
 
 module.exports = {
   /**
@@ -59,7 +59,7 @@ module.exports = {
       port: 8545,            // Standard Ethereum port (default: none)
       network_id: "*",       // Any network (default: none)
       gas: 6000000
-    }//,
+    },
 /*
     matic: {
       provider: () => new HDWalletProvider(UNSECURE_PKs, 'https://polygon-mumbai.infura.io/v3/130607aa3e804a5a9feab69f92045243'),
@@ -95,7 +95,6 @@ module.exports = {
     },
     optimism: {
       provider: () => new HDWalletProvider(UNSECURE_PKs, 'https://kovan.optimism.io'),
-//      provider: () => new HDWalletProvider(UNSECURE_PKs, 'https://optimism-kovan.infura.io/v3/3675fefa54e649fb8b7b21b9544eb6dd'),
       network_id: 69,
       confirmations: 1,
       timeoutBlocks: 200,

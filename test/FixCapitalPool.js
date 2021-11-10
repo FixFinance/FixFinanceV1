@@ -16,7 +16,7 @@ const nullAddress = "0x0000000000000000000000000000000000000000";
 const BN = web3.utils.BN;
 const _10To18 = (new BN('10')).pow(new BN('18'));
 
-const SBPSretained = 999_000;
+const TOTAL_SBPS = 1_000_000;
 
 contract('FixCapitalPool', async function(accounts){
 	it('before each', async () => {
@@ -34,7 +34,7 @@ contract('FixCapitalPool', async function(accounts){
 			ngbwDelegate1Instance.address,
 			ngbwDelegate2Instance.address,
 			ngbwDelegate3Instance.address,
-			SBPSretained
+			TOTAL_SBPS
 		);
 		zcbYtDeployerInstance = await zcbYtDeployer.new();
 		timeNow = (await web3.eth.getBlock('latest')).timestamp;
@@ -54,7 +54,8 @@ contract('FixCapitalPool', async function(accounts){
 		await NGBwrapperInstance.addRewardAsset(rewardsAsset0.address);
 		await rewardsAsset0.mintTo(NGBwrapperInstance.address, _10To18);
 		//wrap aTokens
-		amount = '100000';
+		amountBN = _10To18;
+		amount = _10To18.toString();
 		await dummyATokenInstance.approve(NGBwrapperInstance.address, amount);
 		await NGBwrapperInstance.depositUnitAmount(accounts[0], amount);
 	});
@@ -66,7 +67,7 @@ contract('FixCapitalPool', async function(accounts){
 	});
 
 	it('has correct bond sending limits', async () => {
-		amountPlusOne = '100001';
+		amountPlusOne = (new BN(amount)).add(new BN(1)).toString();
 		caught = false;
 		await zcbInstance.transfer(accounts[1], amountPlusOne).catch(() => {
 			caught = true;
@@ -96,11 +97,11 @@ contract('FixCapitalPool', async function(accounts){
 	});
 
 	it('withdraws funds unwrap:false', async () => {
-		toWithdraw = (parseInt(amount)/8)+"";
+		toWithdraw = amountBN.div(new BN(8));
 		prevBalanceYield = await fixCapitalPoolInstance.balanceYield(accounts[0]);
 		await fixCapitalPoolInstance.withdraw(accounts[1], toWithdraw, false);
-		assert.equal((await NGBwrapperInstance.balanceOf(accounts[1])).toString(), toWithdraw, "corect balance wrapped token for account 1");
-		assert.equal((await fixCapitalPoolInstance.balanceYield(accounts[0])).toString(), prevBalanceYield.sub(new BN(toWithdraw)).toString(), "correct balance yield for account 0");
+		assert.equal((await NGBwrapperInstance.balanceOf(accounts[1])).toString(), toWithdraw.toString(), "corect balance wrapped token for account 1");
+		assert.equal((await fixCapitalPoolInstance.balanceYield(accounts[0])).toString(), prevBalanceYield.sub(toWithdraw).toString(), "correct balance yield for account 0");
 	});
 
 	it('transfers yield', async () => {
@@ -122,12 +123,12 @@ contract('FixCapitalPool', async function(accounts){
 	});
 
 	it('withdraws funds unwrap:true', async () => {
-		toWithdraw = (parseInt(amount)/8)+"";
+		toWithdraw = amountBN.div(new BN(8));
 		prevBalanceYield = await fixCapitalPoolInstance.balanceYield(accounts[0]);
 		await fixCapitalPoolInstance.withdraw(accounts[1], toWithdraw, true);
-		expectedAToken = inflation.mul(new BN(toWithdraw)).div(_10To18);
-		assert.equal((await dummyATokenInstance.balanceOf(accounts[1])).toString(), expectedAToken, "corect balance wrapped token for account 1");
-		assert.equal((await fixCapitalPoolInstance.balanceYield(accounts[0])).toString(), prevBalanceYield.sub(new BN(toWithdraw)).toString(), "correct balance yield for account 0");		
+		expectedAToken = inflation.mul(toWithdraw).div(_10To18);
+		assert.equal((await dummyATokenInstance.balanceOf(accounts[1])).toString(), expectedAToken.toString(), "corect balance underlying token for account 1");
+		assert.equal((await fixCapitalPoolInstance.balanceYield(accounts[0])).toString(), prevBalanceYield.sub(toWithdraw).toString(), "correct balance yield for account 0");		
 		//because neglidgeble time has elapsed the actual fee in the wrapper contract is -
 		//thus the ratio of wrapped to unwrapped asset is == inflation
 		adjustedInflation = inflation;
@@ -207,10 +208,10 @@ contract('FixCapitalPool', async function(accounts){
 
 		let err = expectedRewardsChange0.sub(changeRewards0);
 		assert.equal(err.cmp(new BN(-1)), 1, "actual rewards is not greater than the expected");
-		assert.equal(err.cmp(new BN(2)), -1, "error is within one unit");
+		assert.equal(err.cmp(new BN(5)), -1, "error is within 4 units");
 		err = expectedRewardsChange1.sub(changeRewards1);
 		assert.equal(err.cmp(new BN(-1)), 1, "actual rewards is not greater than the expected");
-		assert.equal(err.cmp(new BN(2)), -1, "error is within one unit");
+		assert.equal(err.cmp(new BN(5)), -1, "error is within 4 units");
 	});
 
 	it('FCP direct double claim, prior to payout phase from, transferZCB()', async () => {

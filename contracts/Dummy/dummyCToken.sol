@@ -20,6 +20,7 @@ contract dummyCToken is ICToken {
     	exchangeRateStored = (1 ether);
         balanceOf[msg.sender] = (1 ether);
         totalSupply = (1 ether);
+        decimals = 6;
     }
 
     function mintTo(address _to, uint _amount) public {

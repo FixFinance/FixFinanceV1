@@ -7,7 +7,7 @@ import "../../interfaces/IZeroCouponBond.sol";
 import "../../libraries/SafeMath.sol";
 
 contract ZeroCouponBond is IZeroCouponBond {
-    using SafeMath for uint;
+    using SafeMath for uint256;
 
 	IFixCapitalPool immutable fcp;
 	IWrapper immutable wrapper;

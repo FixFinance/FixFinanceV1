@@ -354,7 +354,7 @@ contract CTokenWrapper is ICTokenWrapper, CTokenWrapperInternals {
 			address _rewardsAsset = internalImmutableRewardsAssets[i];
 			uint dividend = internalDistributionAccountRewards[i][msg.sender];
 			internalDistributionAccountRewards[i][msg.sender] = 0;
-			IERC20(_rewardsAsset).safeTransfer(_rewardsAsset, dividend);
+			IERC20(_rewardsAsset).safeTransfer(msg.sender, dividend);
 		}
 		internalIsDistributionAccount[msg.sender] = false;
 	}

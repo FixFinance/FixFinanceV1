@@ -7,6 +7,7 @@ import "../../interfaces/IERC20.sol";
 import "../../libraries/SafeMath.sol";
 
 contract YieldToken is IYieldToken {
+    using SafeMath for uint256;
 
 	IFixCapitalPool immutable fcp;
 	IWrapper immutable wrapper;

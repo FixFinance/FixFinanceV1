@@ -1,9 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.6.8 <0.7.0;
-
 import "./IERC20.sol";
 
 interface IZeroCouponBond is IERC20 {
+	event DecrementAllowance(
+		address indexed owner,
+		address indexed spender,
+		uint amount
+	);
+
 	function FixCapitalPoolAddress() external view returns(address);
 	function WrapperAddress() external view returns(address);
 	function maturity() external view returns(uint);

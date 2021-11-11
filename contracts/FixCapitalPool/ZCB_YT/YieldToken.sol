@@ -77,8 +77,10 @@ contract YieldToken is IYieldToken {
     */
     function decrementAllowance(address _owner, address _spender, uint _amount) external override {
         require(msg.sender == address(fcp));
-        require(allowance[_owner][_spender] >= _amount);
-        allowance[_owner][_spender] -= _amount;
+        uint allowed = allowance[_owner][_spender];
+        allowance[_owner][_spender] = allowed.sub(_amount);
+
+        emit DecrementAllowance(_owner, _spender, _amount);
     }
 
     /*

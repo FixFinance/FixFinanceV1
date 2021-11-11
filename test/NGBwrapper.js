@@ -188,7 +188,8 @@ contract('NGBwrapper', async function(accounts){
 		let expectedRewardsChange = mintAmt.mul(bal0).div(ts);
 		TRPW = await NGBwrapperInstance.totalRewardsPerWasset(0);
 		TRPWuponActivation = await NGBwrapperInstance.totalRewardsPerWassetUponActivation(0);
-		assert.equal(rewardsChange0.toString(), expectedRewardsChange.toString());
+		assert.ok(rewardsChange0.lte(expectedRewardsChange));
+		assert.ok(rewardsChange0.sub(expectedRewardsChange).abs().lt(new BN(3)));
 		assert.equal(TRPW.cmp(TRPWuponActivation), 1);
 	});
 

@@ -15,7 +15,7 @@ contract CTokenWrapperDelegate1 is CTokenWrapperDelegateParent {
 	using ABDKMath64x64 for int128;
 	using SafeERC20 for IERC20;
 
-	function harvestToTreasury() external {
+	function harvestToTreasury() external noReentry {
 		internalHarvestToTreasury(ICToken(internalUnderlyingAssetAddress));
 	}
 
@@ -127,7 +127,7 @@ contract CTokenWrapperDelegate1 is CTokenWrapperDelegateParent {
 		@param address _to: the address that shall receive the newly minted wrapped tokens
 		@param uint _amount: the amount of underlying asset units to deposit
 	*/
-	function depositUnitAmount(address _to, uint _amount) external claimRewards(true, _to) returns (uint _amountWrapped) {
+	function depositUnitAmount(address _to, uint _amount) external noReentry claimRewards(true, _to) returns (uint _amountWrapped) {
 		ICToken cToken = ICToken(internalUnderlyingAssetAddress);
 		(uint _totalSupply, uint exchangeRate, uint contractBalance) = extractRetsHarvestToTreasury(cToken);
 		uint cTokenIn = _amount.mul(1 ether).div(exchangeRate);
@@ -148,7 +148,7 @@ contract CTokenWrapperDelegate1 is CTokenWrapperDelegateParent {
 		@param address _to: the address that shall receive the newly minted wrapped tokens
 		@param uint _amount: the amount of wrapped asset units to mint
 	*/
-	function depositWrappedAmount(address _to, uint _amount) external claimRewards(true, _to) returns (uint _amountUnit) {
+	function depositWrappedAmount(address _to, uint _amount) external noReentry claimRewards(true, _to) returns (uint _amountUnit) {
 		ICToken cToken = ICToken(internalUnderlyingAssetAddress);
 		(uint _totalSupply, uint exchangeRate, uint contractBalance) = extractRetsHarvestToTreasury(cToken);
 		if (_totalSupply == 0) {
@@ -174,7 +174,7 @@ contract CTokenWrapperDelegate1 is CTokenWrapperDelegateParent {
 
 		@return uint _amountWrappedToken: the amount of units of wrapped asset that were burned
 	*/
-	function withdrawUnitAmount(address _to, uint _amountUnit, bool _claimRewards) external claimRewards(_claimRewards, msg.sender) returns (uint _amountWrappedToken) {
+	function withdrawUnitAmount(address _to, uint _amountUnit, bool _claimRewards) external noReentry claimRewards(_claimRewards, msg.sender) returns (uint _amountWrappedToken) {
 		ICToken cToken = ICToken(internalUnderlyingAssetAddress);
 		(uint _totalSupply, uint exchangeRate, uint contractBalance) = extractRetsHarvestToTreasury(cToken);
 		//_amountWrappedToken == ceil(internalTotalSupply*_amountUnit/contractBalance)
@@ -196,7 +196,7 @@ contract CTokenWrapperDelegate1 is CTokenWrapperDelegateParent {
 
 		@return uint _amountUnit: the amount of underlying asset received
 	*/
-	function withdrawWrappedAmount(address _to, uint _amountWrappedToken, bool _claimRewards) external claimRewards(_claimRewards, msg.sender) returns (uint _amountUnit) {
+	function withdrawWrappedAmount(address _to, uint _amountWrappedToken, bool _claimRewards) external noReentry claimRewards(_claimRewards, msg.sender) returns (uint _amountUnit) {
 		require(internalBalanceOf[msg.sender] >= _amountWrappedToken);
 		ICToken cToken = ICToken(internalUnderlyingAssetAddress);
 		internalHarvestToTreasury(cToken);
@@ -208,7 +208,7 @@ contract CTokenWrapperDelegate1 is CTokenWrapperDelegateParent {
 		_amountUnit = cTokenOut.mul(cToken.exchangeRateStored()).div(1 ether);
 	}
 
-	function forceRewardsCollection() external claimRewards(true, msg.sender) {}
+	function forceRewardsCollection() external noReentry claimRewards(true, msg.sender) {}
 
 	/*
 		@Description: convert an amount of underlying asset to its corresponding amount of wrapped asset, round down

@@ -35,7 +35,7 @@ contract CTokenWrapperDelegate2 is CTokenWrapperDelegateParent {
         address _FCPaddr,
         int changeYield,
         int changeBond
-    ) external claimRewards(_claimRewards, (_FCPaddr == address(0) ? msg.sender : _FCPaddr)) {
+    ) external noReentry claimRewards(_claimRewards, (_FCPaddr == address(0) ? msg.sender : _FCPaddr)) {
         require(msg.sender != _FCPaddr); //must not be an FCP direct subaccount
         //msg.sender is the distributionAccount
         if (_FCPaddr != address(0) && _claimRewards) {
@@ -69,7 +69,7 @@ contract CTokenWrapperDelegate2 is CTokenWrapperDelegateParent {
         address _distributionAccount,
         address _subAccount,
         address _FCPaddr
-    ) external claimRewards(_claimRewards, _distributionAccount) {
+    ) external noReentry claimRewards(_claimRewards, _distributionAccount) {
         require(msg.sender == _distributionAccount || msg.sender == _subAccount);
         claimSubAccountRewardsRetPos(_distributionAccount, _subAccount, _FCPaddr);
     }
@@ -91,7 +91,7 @@ contract CTokenWrapperDelegate2 is CTokenWrapperDelegateParent {
         address _subAcct,
         uint _yield,
         uint _wrappedClaim
-    ) external claimRewards(_claimRewards, msg.sender) {
+    ) external noReentry claimRewards(_claimRewards, msg.sender) {
         uint len = internalRewardsAssets.length;
         if (len > 0) {
             len = len > type(uint8).max ? type(uint8).max : len;

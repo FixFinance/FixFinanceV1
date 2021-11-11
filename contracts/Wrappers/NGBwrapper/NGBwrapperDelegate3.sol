@@ -35,7 +35,7 @@ contract NGBwrapperDelegate3 is NGBwrapperDelegateParent {
         address[2] calldata _subAccts,
         uint[2] calldata _yieldArr,
         uint[2] calldata _wrappedClaims
-    ) external claimRewards(_claimRewards, msg.sender) {
+    ) external noReentry claimRewards(_claimRewards, msg.sender) {
         uint len = internalRewardsAssets.length;
         if (len > 0) {
             len = len > type(uint8).max ? type(uint8).max : len;

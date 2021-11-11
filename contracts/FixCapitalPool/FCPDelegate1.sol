@@ -75,7 +75,7 @@ contract FCPDelegate1 is FCPDelegateParent {
 		IWrapper wrp = internalWrapper; //gas savings
 		bool _inPayoutPhase = internalInPayoutPhase; //gas savings
 		uint ratio = _inPayoutPhase ? internalMaturityConversionRate : wrp.WrappedAmtToUnitAmt_RoundDown(1 ether);
-		require(_bond >= 0 || _yield.mul(ratio)/(1 ether) >= uint(-_bond));
+		require(isValidPosition(_yield, _bond, ratio));
 
 		int bondSender = internalBalanceBonds[msg.sender];
 		int bondRec = internalBalanceBonds[_to];
@@ -92,7 +92,7 @@ contract FCPDelegate1 is FCPDelegateParent {
 		}
 		address[2] memory subAccts = [msg.sender, _to];
 		wrp.FCPDirectDoubleClaimSubAccountRewards(_inPayoutPhase, true, subAccts, prevYields, wrappedClaims);
-		require(bondSender >= _bond || prevYields[0].sub(_yield).mul(ratio)/(1 ether) >= uint(bondSender.sub(_bond).abs()));
+		require(isValidPosition(prevYields[0].sub(_yield), bondSender.sub(_bond), ratio));
 
 		uint newYield = prevYields[0].sub(_yield);
 		int newBond = bondSender.sub(_bond);
@@ -125,8 +125,8 @@ contract FCPDelegate1 is FCPDelegateParent {
 			: yieldArr;
 		address[2] memory subAccts = [_from, _to];
 		wrp.FCPDirectDoubleClaimSubAccountRewards(_inPayoutPhase, true, subAccts, yieldArr, wrappedClaims);
-
-		require(bondArr[0] >= _bond || yieldArr[0].sub(_yield).mul(ratio)/(1 ether) >= uint(bondArr[0].sub(_bond).abs()));
+		require(isValidPosition(yieldArr[0].sub(_yield), bondArr[0].sub(_bond), ratio));
+		//require(bondArr[0] >= _bond || yieldArr[0].sub(_yield).mul(ratio)/(1 ether) >= uint(bondArr[0].sub(_bond).abs()));
 
 		if (_yield > 0) {
 			//decrement approval of YT
@@ -137,6 +137,7 @@ contract FCPDelegate1 is FCPDelegateParent {
 			internalBalanceYield[_to] = yieldArr[1];
 		}
 
+		require(isValidPosition(_yield, _bond, ratio));
 		uint unitAmtYield = _yield.mul(ratio)/(1 ether);
 		require(_bond >= 0 || unitAmtYield >= uint(-_bond));
 		//decrement approval of ZCB

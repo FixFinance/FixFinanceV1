@@ -85,4 +85,17 @@ contract FCPDelegateParent is FCPData {
 			return _yield;
 		}
 	}
+
+	/*
+		@Description: return true if and only if a ZCB-YT position has a non negative balance of ZCB & YT
+
+		@param uint yield: the yield value of the ZCB-YT position
+		@param int bond: the bond value of the ZCB-YT position
+		@param uint ratio: the conversion multiplier for static to dynamic amounts
+
+		@return bool: true if and only if there is a non negative balance of ZCB & YT
+	*/
+	function isValidPosition(uint yield, int bond, uint ratio) internal pure returns(bool) {
+		return bond >= 0 || yield.mul(ratio) / (1 ether) >= bond.abs().toUint();
+	}
 }

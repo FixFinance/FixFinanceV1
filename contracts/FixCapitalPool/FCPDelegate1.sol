@@ -190,7 +190,6 @@ contract FCPDelegate1 is FCPDelegateParent {
 		//ensure that _from address's position may be cashed out to a positive amount of wrappedToken
 		//if it cannot the following call will revert this tx
 		require(isValidPosition(internalBalanceYield[_from], newFromBond, conversionRate));
-		//minimumUnitAmountAtMaturity(internalBalanceYield[_from], newFromBond, conversionRate);
 
 		internalBalanceBonds[_from] = newFromBond;
 		int newBondTo = internalBalanceBonds[_to].add(intAmount);
@@ -235,7 +234,6 @@ contract FCPDelegate1 is FCPDelegateParent {
 		//ensure that _from address's position may be cashed out to a positive amount of wrappedToken
 		//if it cannot the following call will revert this tx
 		require(isValidPosition(yieldArr[0].sub(_amount), bondArr[0].add(amountBondChange), conversionRate));
-		//minimumUnitAmountAtMaturity(yieldArr[0].sub(_amount), bondArr[0].add(amountBondChange), conversionRate);
 
 		internalBalanceYield[_from] = yieldArr[0].sub(_amount);
 		internalBalanceBonds[_from] = bondArr[0].add(amountBondChange);

@@ -47,9 +47,9 @@ contract FCPDelegate2 is FCPDelegateParent {
 	function depositWrappedToken(address _to, uint _amountWrappedTkn) external beforePayoutPhase {
 		IWrapper wrp = internalWrapper;
 		uint yield = internalBalanceYield[_to];
+		internalBalanceYield[_to] = yield.add(_amountWrappedTkn);
 		IERC20(address(wrp)).safeTransferFrom(msg.sender, address(this), _amountWrappedTkn);
 		wrp.FCPDirectClaimSubAccountRewards(false, false, _to, yield, yield);
-		internalBalanceYield[_to] = yield.add(_amountWrappedTkn);
 		emit Deposit(_to, _amountWrappedTkn);
 	}
 
@@ -68,13 +68,15 @@ contract FCPDelegate2 is FCPDelegateParent {
 		//conversionRate doesn't matter if bond >= 0, save gas if we can by not fetching the conv rate
 		uint conversionRate = bond < 0 ? wrp.WrappedAmtToUnitAmt_RoundDown(1 ether) : 0;
 		require(maxWrappedWithdrawAmt(yield, bond, conversionRate) >= _amountWrappedTkn);
+
+		wrp.FCPDirectClaimSubAccountRewards(false, false, msg.sender, yield, yield);
+		internalBalanceYield[msg.sender] = yield.sub(_amountWrappedTkn);
+
 		if (_unwrap)
 			wrp.withdrawWrappedAmount(_to, _amountWrappedTkn, true);
 		else
 			IERC20(address(wrp)).safeTransfer(_to, _amountWrappedTkn);
 
-		wrp.FCPDirectClaimSubAccountRewards(false, false, msg.sender, yield, yield);
-		internalBalanceYield[msg.sender] = yield.sub(_amountWrappedTkn);
 		emit Withdrawal(msg.sender, _amountWrappedTkn);
 	}
 
@@ -95,12 +97,15 @@ contract FCPDelegate2 is FCPDelegateParent {
 		//conversionRate doesn't matter if bond >= 0, save gas if we can by not fetching the conv rate
 		uint conversionRate = bond < 0 ? wrp.WrappedAmtToUnitAmt_RoundDown(1 ether) : 0;
 		uint freeToMove = maxWrappedWithdrawAmt(yield, bond, conversionRate);
+
+		wrp.FCPDirectClaimSubAccountRewards(false, false, msg.sender, yield, yield);
+		internalBalanceYield[msg.sender] = yield.sub(freeToMove);
+
 		if (_unwrap)
 			wrp.withdrawWrappedAmount(_to, freeToMove, true);
 		else
 			IERC20(address(wrp)).safeTransfer(_to, freeToMove);
-		wrp.FCPDirectClaimSubAccountRewards(false, false, msg.sender, yield, yield);
-		internalBalanceYield[msg.sender] = yield.sub(freeToMove);
+
 		emit Withdrawal(msg.sender, freeToMove);
 	}
 

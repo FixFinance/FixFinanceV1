@@ -612,7 +612,6 @@ contract CTokenWrapper is ICTokenWrapper, CTokenWrapperInternals {
 		@Description: add an asset for which wrapped asset holders will earn LM rewards
 
 		@param address _rewardsAsset: the new asset for which to start distribution of LM rewards
-		@param uint8 _index: the index within the rewardsAddr array where the new rewards asset will be
     */
     function addRewardAsset(address _rewardsAsset) external override {
     	(bool success, ) = delegate3Address.delegatecall(abi.encodeWithSignature(

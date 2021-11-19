@@ -137,7 +137,7 @@ contract FixCapitalPool is IFixCapitalPool, FCPDelegateParent {
 		@param bool _unwrap: if true - wrapped asset will be sent to _to address
 			otherwise underlyingAsset will be sent
 	*/
-	function withdraw(address _to, uint _amountWrappedTkn, bool _unwrap) external override beforePayoutPhase {
+	function withdraw(address _to, uint _amountWrappedTkn, bool _unwrap) external override {
 		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
 			"withdraw(address,uint256,bool)",
 			_to,

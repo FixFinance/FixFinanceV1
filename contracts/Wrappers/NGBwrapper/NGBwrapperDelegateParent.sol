@@ -149,10 +149,8 @@ contract NGBwrapperDelegateParent is NGBwrapperInternals {
 			uint prevTRPW = internalPrevTotalRewardsPerWasset[uint8(i)][_addr0];
 			uint activationTRPW = internalTRPWuponActivation[uint8(i)];
 			prevTRPW = prevTRPW > activationTRPW ? prevTRPW : activationTRPW;
-			bool getContractBalanceAgain = false;
 			if (prevTRPW < newTRPW) {
 				uint dividend = (newTRPW - prevTRPW).mul(balanceAddr0) / (1 ether);
-				getContractBalanceAgain = dividend > 0;
 				address addr = _addr0; // prevent stack too deep
 				internalPrevTotalRewardsPerWasset[uint8(i)][addr] = newTRPW;
 				if (i >> 15 > 0) {
@@ -167,14 +165,12 @@ contract NGBwrapperDelegateParent is NGBwrapperInternals {
 			prevTRPW = prevTRPW > activationTRPW ? prevTRPW : activationTRPW;
 			if (prevTRPW < newTRPW) {
 				uint dividend = (newTRPW - prevTRPW).mul(balanceAddr1) / (1 ether);
-				getContractBalanceAgain = getContractBalanceAgain || dividend > 0;
-				address addr = _addr1; // prevent stack too deep
-				internalPrevTotalRewardsPerWasset[uint8(i)][addr] = newTRPW;
+				internalPrevTotalRewardsPerWasset[uint8(i)][_addr1] = newTRPW;
 				if (1 & (i >> 14) > 0) {
-					internalDistributionAccountRewards[uint8(i)][addr] = internalDistributionAccountRewards[uint8(i)][addr].add(dividend);
+					internalDistributionAccountRewards[uint8(i)][_addr1] = internalDistributionAccountRewards[uint8(i)][_addr1].add(dividend);
 				}
 				else {
-					IERC20(_rewardsAddr).safeTransfer(addr, dividend);
+					IERC20(_rewardsAddr).safeTransfer(_addr1, dividend);
 					CBRA = CBRA.sub(dividend);
 				}
 			}

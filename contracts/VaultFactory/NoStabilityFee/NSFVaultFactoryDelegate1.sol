@@ -51,7 +51,12 @@ contract NSFVaultFactoryDelegate1 is NSFVaultFactoryDelegateParent {
 	) external {
 
 		require(_assetSupplied != _assetBorrowed && _amountSupplied <= uint(type(int256).max));
-		require(_fixCapitalPoolToWrapper[_assetSupplied] != address(0) || _wrapperToUnderlyingAsset[_assetSupplied] != address(0));
+		/*
+			if asset supplied is a wrapper asset, _wrapperToUnderlyingAsset[_assetSupplied] will be the address of the underlying
+			otherwise if the supplied asset is a ZCB or standard ERC20 _wrapperToUnderlyingAsset[_assetSupplied] will be address(1)
+			_wrapperToUnderlyingAsset[_assetSupplied] will only be address(0) if the supplied asset is invalid collateral
+		*/
+		require(_wrapperToUnderlyingAsset[_assetSupplied] != address(0));
 
 		IERC20(_assetSupplied).safeTransferFrom(msg.sender, address(this), _amountSupplied);
 		address FCPborrowed = IZeroCouponBond(_assetBorrowed).FixCapitalPoolAddress();

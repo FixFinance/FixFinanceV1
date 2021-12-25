@@ -157,7 +157,7 @@ contract FCPDelegate1 is FCPDelegateParent {
 		{
 			uint[2] memory oldYieldArr = [yieldArr[0].add(_yield), yieldArr[1].sub(_yield)];
 			uint[2] memory wrappedClaims = _inPayoutPhase ? 
-				[payoutAmount(oldYieldArr[0], bondArr[0], ratio), payoutAmount(oldYieldArr[1], bondArr[1], ratio)]
+				[payoutAmount(oldYieldArr[0], bondArr[0].add(_bond), ratio), payoutAmount(oldYieldArr[1], bondArr[1].sub(_bond), ratio)]
 				: oldYieldArr;
 			wrp.FCPDirectDoubleClaimSubAccountRewards(_inPayoutPhase, true, subAccts, oldYieldArr, wrappedClaims);
 		}

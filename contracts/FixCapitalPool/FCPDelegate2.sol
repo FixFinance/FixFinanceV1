@@ -269,8 +269,8 @@ contract FCPDelegate2 is FCPDelegateParent {
 				int dividend = bondFee / 2;
 				bondArr[0] = internalBalanceBonds[sendTo].add(dividend);
 				bondArr[1] = internalBalanceBonds[_owner].add(bondFee - dividend);
-				internalBalanceBonds[sendTo] = internalBalanceBonds[sendTo];
-				internalBalanceBonds[_owner] = internalBalanceBonds[_owner];
+				internalBalanceBonds[sendTo] = bondArr[0];
+				internalBalanceBonds[_owner] = bondArr[1];
 			}
 			emit BalanceUpdate(sendTo, yieldArr[0], bondArr[0]);
 			emit BalanceUpdate(_owner, yieldArr[1], bondArr[1]);

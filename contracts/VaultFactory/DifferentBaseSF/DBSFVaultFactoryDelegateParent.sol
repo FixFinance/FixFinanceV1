@@ -340,8 +340,10 @@ contract DBSFVaultFactoryDelegateParent is DBSFVaultFactoryData {
 			the vault health contract rather than the address of the wrapper asset
 			also ensure that we adjust the amount from the wrapped amount to the non wrapped amount
 			if necessary
+
 		@param Vault memory _vault: the vault for which to find the info to pass to the vault health contract
 		@param address _whitelistAddr: the output of the collateralWhitelist mapping when the supplied asset is passed
+
 		@return address addr: the address for assetSupplied to pass to the vault health contract
 		@return uint sAmt: the amount for amountSupplied to pass to the vault health contract
 		@return uint bAmt: the amounf for amountBorrowed to pass to the vault health contract

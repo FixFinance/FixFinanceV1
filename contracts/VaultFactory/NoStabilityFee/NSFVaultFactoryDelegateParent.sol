@@ -143,8 +143,8 @@ contract NSFVaultFactoryDelegateParent is NSFVaultFactoryData {
 		@return uint amt: the amount for amountSupplied to pass to the vault health contract
 	*/
 	function passInfoToVaultManager(address _suppliedAsset, uint _suppliedAmount) internal view returns (address addr, uint amt) {
-		address wrapperAddr = _wrapperToUnderlyingAsset[_suppliedAsset];
-		return passInfoToVaultManagerPassWhitelistAddr(_suppliedAsset, _suppliedAmount, wrapperAddr);
+		address whitelistAddr = _wrapperToUnderlyingAsset[_suppliedAsset];
+		return passInfoToVaultManagerPassWhitelistAddr(_suppliedAsset, _suppliedAmount, whitelistAddr);
 	}
 
 	/*

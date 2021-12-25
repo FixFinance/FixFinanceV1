@@ -199,8 +199,8 @@ contract OrderbookDelegateParent is OrderbookData {
 		@param uint _amountZCB: the amount of ZCB bought
 		@param uint _amountWrappedYT: the static amount of YT sold
 		@param uint _ratio: the current static to dynamic conversion multiplier
-		@param bool _useInternalBalances: pass true to ue YieldDeposited and BondDeposited to cover costs and receive payment
-			otherwise use transferPositionFrom and transferPosition on the baseFCP to get required input and send required output
+		@param bool _useInternalBalances: pass true to use YieldDeposited and BondDeposited to cover costs and receive payment
+			pass false to use transferPositionFrom and transferPosition on the baseFCP to get required input and send required output
 	*/
 	function manageCollateral_BuyZCB_takeOrder(
 		address[4] memory vitals,
@@ -267,8 +267,8 @@ contract OrderbookDelegateParent is OrderbookData {
 		@param uint _amountZCB: the amount of ZCB sold
 		@param uint _amountWrappedYT: the static amount of YT bought
 		@param uint _ratio: the current static to dynamic conversion multiplier
-		@param bool _useInternalBalances: pass true to ue YieldDeposited and BondDeposited to cover costs and receive payment
-			otherwise use transferPositionFrom and transferPosition on the baseFCP to get required input and send required output
+		@param bool _useInternalBalances: pass true to use YieldDeposited and BondDeposited to cover costs and receive payment
+			pass false to use transferPositionFrom and transferPosition on the baseFCP to get required input and send required output
 	*/
 	function manageCollateral_BuyYT_takeOrder(
 		address[4] memory vitals,

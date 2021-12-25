@@ -44,7 +44,7 @@ contract FCPDelegate1 is FCPDelegateParent {
 
 		@param address _to: the address that shall receive the wrapped asset
 		@param bool _unwrap: if true - wrapped asset will be sent to _to address
-			otherwise underlyingAsset will be sent
+			if false - underlyingAsset will be sent
 	*/
 	function claimBondPayout(address _to, bool _unwrap) external isInPayoutPhase {
 		IWrapper wrp = internalWrapper;

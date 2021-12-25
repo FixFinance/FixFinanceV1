@@ -135,7 +135,7 @@ contract FixCapitalPool is IFixCapitalPool, FCPDelegateParent {
 		@param address _to: the address that shall receive the output
 		@param uint _amountWrappedTkn: the amount of wrapped asset to withdraw
 		@param bool _unwrap: if true - wrapped asset will be sent to _to address
-			otherwise underlyingAsset will be sent
+			if false - underlyingAsset will be sent
 	*/
 	function withdraw(address _to, uint _amountWrappedTkn, bool _unwrap) external override {
 		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
@@ -154,7 +154,7 @@ contract FixCapitalPool is IFixCapitalPool, FCPDelegateParent {
 
 		@param address _to: the address that shall receive the output
 		@param bool _unwrap: if true - wrapped asset will be sent to _to address
-			otherwise underlyingAsset will be sent
+			if false - underlyingAsset will be sent
 	*/
 	function withdrawAll(address _to, bool _unwrap) external override {
 		(bool success, ) = delegate2Address.delegatecall(abi.encodeWithSignature(
@@ -171,7 +171,7 @@ contract FixCapitalPool is IFixCapitalPool, FCPDelegateParent {
 
 		@param address _to: the address that shall receive the wrapped asset
 		@param bool _unwrap: if true - wrapped asset will be sent to _to address
-			otherwise underlyingAsset will be sent
+			if false - underlyingAsset will be sent
 	*/
 	function claimBondPayout(address _to, bool _unwrap) external override {
 		(bool success, ) = delegate1Address.delegatecall(abi.encodeWithSignature(

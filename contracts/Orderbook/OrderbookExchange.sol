@@ -240,8 +240,8 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 		@param uint _maxMaturityConversionRate: the maximum MCR of the head order to continue purchasing more YT
 		@param uint _maxCumulativeMaturityConversionRate: if this is smaller than the effective MCR based on ZCB in and YT out at end of execution revert
 		@param uint16 _maxIterations: the maximum amount of limit orders to fully fill, important for gas considerations
-		@param bool _useInternalBalances: pass true to ue YieldDeposited and BondDeposited to cover costs and receive payment
-			otherwise use transferPositionFrom and transferPosition on the baseFCP to get required input and send required output
+		@param bool _useInternalBalances: pass true to use YieldDeposited and BondDeposited to cover costs and receive payment
+			pass false to use transferPositionFrom and transferPosition on the baseFCP to get required input and send required output
 	*/
 	function marketBuyYT(
 		uint _amountYT,
@@ -281,8 +281,8 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 		@param uint _minMaturityConversionRate: the minimum MCR of the head order to continue selling more YT
 		@param uint _minCumulativeMaturityConversionRate: if this is greater than the effective MCR based on YT in and ZCB out at end of execution revert
 		@param uint16 _maxIterations: the maximum amount of limit orders to fully fill, important for gas considerations
-		@param bool _useInternalBalances: pass true to ue YieldDeposited and BondDeposited to cover costs and receive payment
-			otherwise use transferPositionFrom and transferPosition on the baseFCP to get required input and send required output
+		@param bool _useInternalBalances: pass true to use YieldDeposited and BondDeposited to cover costs and receive payment
+			pass false to use transferPositionFrom and transferPosition on the baseFCP to get required input and send required output
 	*/
 	function marketSellYT(
 		uint _amountYT,
@@ -321,8 +321,8 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 		@param uint _minMaturityConversionRate: the minimum MCR of the head order to continue purchasing more ZCB
 		@param uint _minCumulativeMaturityConversionRate: if this is greater than the effective MCR based on YT in and ZCB out at end of execution revert
 		@param uint16 _maxIterations: the maximum amount of limit orders to fully fill, important for gas considerations
-		@param bool _useInternalBalances: pass true to ue YieldDeposited and BondDeposited to cover costs and receive payment
-			otherwise use transferPositionFrom and transferPosition on the baseFCP to get required input and send required output
+		@param bool _useInternalBalances: pass true to use YieldDeposited and BondDeposited to cover costs and receive payment
+			pass false to use transferPositionFrom and transferPosition on the baseFCP to get required input and send required output
 	*/
 	function marketBuyZCB(
 		uint _amountZCB,
@@ -361,8 +361,8 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 		@param uint _maxMaturityConversionRate: the maximum MCR of the head order to continue selling more ZCB
 		@param uint _maxCumulativeMaturityConversionRate: if this is smaller than the effective MCR based on ZCB in and YT out at end of execution revert
 		@param uint16 _maxIterations: the maximum amount of limit orders to fully fill, important for gas considerations
-		@param bool _useInternalBalances: pass true to ue YieldDeposited and BondDeposited to cover costs and receive payment
-			otherwise use transferPositionFrom and transferPosition on the baseFCP to get required input and send required output
+		@param bool _useInternalBalances: pass true to use YieldDeposited and BondDeposited to cover costs and receive payment
+			pass false to use transferPositionFrom and transferPosition on the baseFCP to get required input and send required output
 	*/
 	function marketSellZCB(
 		uint _amountZCB,
@@ -401,8 +401,8 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 		@param uint _maxMaturityConversionRate: the maximum MCR of the head order to continue selling more ZCB
 		@param uint _maxCumulativeMaturityConversionRate: if this is smaller than the effective MCR based on ZCB in and YT out at end of execution revert
 		@param uint16 _maxIterations: the maximum amount of limit orders to fully fill, important for gas considerations
-		@param bool _useInternalBalances: pass true to ue YieldDeposited and BondDeposited to cover costs and receive payment
-			otherwise use transferPositionFrom and transferPosition on the baseFCP to get required input and send required output
+		@param bool _useInternalBalances: pass true to use YieldDeposited and BondDeposited to cover costs and receive payment
+			pass false to use transferPositionFrom and transferPosition on the baseFCP to get required input and send required output
 	*/
 	function marketSellZCBtoU(
 		uint _amountZCB,
@@ -441,8 +441,8 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 		@param uint _minMaturityConversionRate: the minimum MCR of the head order to continue selling more YT
 		@param uint _minCumulativeMaturityConversionRate: if this is greater than the effective MCR based on YT in and ZCB out at end of execution revert
 		@param uint16 _maxIterations: the maximum amount of limit orders to fully fill, important for gas considerations
-		@param bool _useInternalBalances: pass true to ue YieldDeposited and BondDeposited to cover costs and receive payment
-			otherwise use transferPositionFrom and transferPosition on the baseFCP to get required input and send required output
+		@param bool _useInternalBalances: pass true to use YieldDeposited and BondDeposited to cover costs and receive payment
+			pass false to use transferPositionFrom and transferPosition on the baseFCP to get required input and send required output
 	*/
 	function marketSellUnitYTtoU(
 		uint _unitAmountYT,

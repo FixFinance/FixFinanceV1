@@ -81,11 +81,10 @@ contract NSFVaultFactoryDelegate5 is NSFVaultFactoryDelegateParent {
 	*/
 	function claimRebate(address _asset) external {
 		uint amt = _liquidationRebates[msg.sender][_asset];
-		require(amt <= uint(type(int256).max));
 		(, SUPPLIED_ASSET_TYPE sType, address baseFCP, address baseWrapper) = suppliedAssetInfo(_asset);
-		IERC20(_asset).safeTransfer(msg.sender, amt);
-		editSubAccountStandardVault(false, msg.sender, sType, baseFCP, baseWrapper, -int(amt));
+		editSubAccountStandardVault(false, msg.sender, sType, baseFCP, baseWrapper, amt.toInt().neg());
 		delete _liquidationRebates[msg.sender][_asset];
+		IERC20(_asset).safeTransfer(msg.sender, amt);
 	}
 
 	/*
@@ -96,11 +95,10 @@ contract NSFVaultFactoryDelegate5 is NSFVaultFactoryDelegateParent {
 	*/
 	function claimYTRebate(address _FCP) external {
 		YTPosition memory position = _YTLiquidationRebates[msg.sender][_FCP];
-		require(position.amountYield <= uint(type(int256).max));
-		IFixCapitalPool(_FCP).transferPosition(msg.sender, position.amountYield, position.amountBond);
 		address baseWrapper = address(IFixCapitalPool(_FCP).wrapper());
-		editSubAccountYTVault(false, msg.sender, _FCP, baseWrapper, -int(position.amountYield), position.amountBond.mul(-1));
+		editSubAccountYTVault(false, msg.sender, _FCP, baseWrapper, position.amountYield.toInt().neg(), position.amountBond.neg());
 		delete _YTLiquidationRebates[msg.sender][_FCP];
+		IFixCapitalPool(_FCP).transferPosition(msg.sender, position.amountYield, position.amountBond);
 	}
 
 	/*

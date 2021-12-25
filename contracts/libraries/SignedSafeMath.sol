@@ -97,6 +97,11 @@ library SignedSafeMath {
         return -a;
     }
 
+    function neg(int256 a) internal pure returns (int256) {
+        require(a != _INT256_MIN);
+        return -a;
+    }
+
     function toUint(int256 a) internal pure returns (uint256 b) {
         require(a > -1, "SignedSafeMath: invalid int to uint conversion");
         b = uint256(a);

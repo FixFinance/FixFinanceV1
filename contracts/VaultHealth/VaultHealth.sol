@@ -1108,6 +1108,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 		@Description: ensure that a vault will not be sent into liquidation zone if price changes a specified amount
 			and rates change by a multiplier
 
+		@param bool _reqSameBase: if true require that base wrapper of supplied and borrowed are the same
 		@param address _FCPsupplied: the address of the Capitalhandler supplied to the vault
 		@param address _FCPborrowed: the address of the asset borrowed from the vault
 		@param uint _amountYield: the amount of YT being supplied to the vault (in unit amount)

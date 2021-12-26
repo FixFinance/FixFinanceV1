@@ -12,9 +12,10 @@ import "../../interfaces/IWrapper.sol";
 import "../../interfaces/IERC20.sol";
 import "../../interfaces/IInfoOracle.sol";
 import "../../helpers/Ownable.sol";
+import "../../helpers/nonReentrant.sol";
 import "./SBNSFVaultFactoryData.sol";
 
-contract SBNSFVaultFactoryDelegateParent is SBNSFVaultFactoryData {
+contract SBNSFVaultFactoryDelegateParent is SBNSFVaultFactoryData, nonReentrant {
 	using SafeMath for uint;
 	using SignedSafeMath for int;
 

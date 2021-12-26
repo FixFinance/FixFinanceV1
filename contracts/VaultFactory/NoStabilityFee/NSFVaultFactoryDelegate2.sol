@@ -30,7 +30,7 @@ contract NSFVaultFactoryDelegate2 is NSFVaultFactoryDelegateParent {
 		@param uint _bid: the first bid (in _assetSupplied) made by msg.sender
 		@param uint _amtIn: the amount of _assetBorrowed to send in
 	*/
-	function auctionLiquidation(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _bid, uint _amtIn) external {
+	function auctionLiquidation(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _bid, uint _amtIn) external noReentry {
 		require(_vaults[_owner].length > _index);
 		Vault memory vault = _vaults[_owner][_index];
 		require(vault.assetBorrowed == _assetBorrowed);
@@ -76,7 +76,7 @@ contract NSFVaultFactoryDelegate2 is NSFVaultFactoryDelegateParent {
 			in reward if the liquidator wins this auction
 		@param uint _amtIn: the amount of borrowed asset that the liquidator will be sending in
 	*/
-	function bidOnLiquidation(uint _index, uint _bid, uint _amtIn) external {
+	function bidOnLiquidation(uint _index, uint _bid, uint _amtIn) external noReentry {
 		require(_Liquidations.length > _index);
 		Liquidation memory liq = _Liquidations[_index];
 		require(0 < _amtIn && _amtIn <= liq.amountBorrowed);
@@ -115,7 +115,7 @@ contract NSFVaultFactoryDelegate2 is NSFVaultFactoryDelegateParent {
 		@param uint _index: the index in Liquidations[] of the auction
 		@param address _to: the address to which to send the proceeds
 	*/
-	function claimLiquidation(uint _index, address _to) external {
+	function claimLiquidation(uint _index, address _to) external noReentry {
 		require(_Liquidations.length > _index);
 		Liquidation memory liq = _Liquidations[_index];
 		require(msg.sender == liq.bidder);
@@ -143,7 +143,7 @@ contract NSFVaultFactoryDelegate2 is NSFVaultFactoryDelegateParent {
 		@param uint _minOut: the minimum amount of assetSupplied that msg.sender wants to receive from this liquidation
 		@param address _to: the address to which to send all of the collateral from the vault
 	*/
-	function instantLiquidation(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _maxIn, uint _minOut, address _to) external {
+	function instantLiquidation(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _maxIn, uint _minOut, address _to) external noReentry {
 		require(_vaults[_owner].length > _index);
 		Vault memory vault = _vaults[_owner][_index];
 		require(vault.assetBorrowed == _assetBorrowed);
@@ -191,7 +191,7 @@ contract NSFVaultFactoryDelegate2 is NSFVaultFactoryDelegateParent {
 		@param uint _minOut: the minimum amount of assetSupplied that msg.sender wants to receive from this liquidation
 		@param address _to: the address to which to send all of the collateral from the vault
 	*/
-	function partialLiquidationSpecificIn(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _in, uint _minOut, address _to) external {
+	function partialLiquidationSpecificIn(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _in, uint _minOut, address _to) external noReentry {
 		require(_vaults[_owner].length > _index);
 		Vault memory vault = _vaults[_owner][_index];
 		require(vault.assetBorrowed == _assetBorrowed);
@@ -241,7 +241,7 @@ contract NSFVaultFactoryDelegate2 is NSFVaultFactoryDelegateParent {
 		@param uint _maxIn: the maximum amount of assetBorrowed that msg.sender is willing to bid on the vault
 		@param address _to: the address to which to send all of the collateral from the vault
 	*/
-	function partialLiquidationSpecificOut(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _out, uint _maxIn, address _to) external {
+	function partialLiquidationSpecificOut(address _owner, uint _index, address _assetBorrowed, address _assetSupplied, uint _out, uint _maxIn, address _to) external noReentry {
 		require(_vaults[_owner].length > _index);
 		Vault memory vault = _vaults[_owner][_index];
 		require(vault.assetBorrowed == _assetBorrowed);

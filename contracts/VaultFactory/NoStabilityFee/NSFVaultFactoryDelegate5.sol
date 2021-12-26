@@ -26,7 +26,7 @@ contract NSFVaultFactoryDelegate5 is NSFVaultFactoryDelegateParent {
 		@param address _to: the new owner of the vault/YTvault
 		@param bool _isYTVault: true when the vault to transfer is a YTvault, false otherwise
 	*/
-	function transferVault(uint _index, address _to, bool _isYTVault) external {
+	function transferVault(uint _index, address _to, bool _isYTVault) external noReentry {
 		if (_isYTVault) {
 			transferYTVault(_index, _to);
 		}

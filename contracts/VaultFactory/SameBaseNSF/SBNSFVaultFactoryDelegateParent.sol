@@ -68,7 +68,7 @@ contract SBNSFVaultFactoryDelegateParent is SBNSFVaultFactoryData {
 		_revenue[_asset] = _revenue[_asset].add(fee);
 		IInfoOracle iorc = IInfoOracle(_infoOracleAddress);
 		(, SUPPLIED_ASSET_TYPE sType, address baseFCP, address baseWrapper) = suppliedAssetInfo(_asset);
-		editSubAccountStandardVault(_claimRewards, _vaultOwner, sType, baseFCP, baseWrapper, fee.toInt().mul(-1));
+		editSubAccountStandardVault(_claimRewards, _vaultOwner, sType, baseFCP, baseWrapper, fee.toInt().neg());
 		address feeRecipientSubAcct;
 		if (iorc.TreasuryFeeIsCollected()) {
 			feeRecipientSubAcct = iorc.sendTo();
@@ -388,7 +388,7 @@ contract SBNSFVaultFactoryDelegateParent is SBNSFVaultFactoryData {
 		int bondRevenue = _bondAmount - bondRebate;
 		revenue.amountYield = revenue.amountYield.add(yieldRevenue);
 		revenue.amountBond = revenue.amountBond.add(bondRevenue);
-		editSubAccountYTVault(true, _vaultOwner, _FCPaddr, _baseWrapper, yieldRevenue.toInt().mul(-1), bondRevenue.mul(-1));
+		editSubAccountYTVault(true, _vaultOwner, _FCPaddr, _baseWrapper, yieldRevenue.toInt().neg(), bondRevenue.neg());
 		IInfoOracle iorc = IInfoOracle(_infoOracleAddress);
 		address feeRecipientSubAcct;
 		if (iorc.TreasuryFeeIsCollected()) {

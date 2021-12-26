@@ -66,7 +66,7 @@ contract DBSFVaultFactoryDelegate5 is DBSFVaultFactoryDelegateParent {
 		YTVault memory vault = _YTvaults[msg.sender][_index];
 		require(vault.yieldSupplied <= uint(type(int256).max));
 		address baseWrapper = address(IFixCapitalPool(vault.FCPsupplied).wrapper());
-		editSubAccountYTVault(true, msg.sender, vault.FCPsupplied, baseWrapper, -int(vault.yieldSupplied), vault.bondSupplied.mul(-1));
+		editSubAccountYTVault(true, msg.sender, vault.FCPsupplied, baseWrapper, -int(vault.yieldSupplied), vault.bondSupplied.neg());
 		editSubAccountYTVault(false, _to, vault.FCPsupplied, baseWrapper, int(vault.yieldSupplied), vault.bondSupplied);
 		_YTvaults[_to].push(vault);
 		delete _YTvaults[msg.sender][_index];
@@ -99,10 +99,10 @@ contract DBSFVaultFactoryDelegate5 is DBSFVaultFactoryDelegateParent {
 			uint treasurySubAcctAmt = rev.sub(ownerSubAcctAmt);
 
 			if (treasurySubAcctAmt > 0) {
-				editSubAccountStandardVault(true, treasuryAddr, sType, baseFCP, baseWrapper, treasurySubAcctAmt.toInt().mul(-1));
+				editSubAccountStandardVault(true, treasuryAddr, sType, baseFCP, baseWrapper, treasurySubAcctAmt.toInt().neg());
 			}
 			if (ownerSubAcctAmt > 0) {
-				editSubAccountStandardVault(false, msg.sender, sType, baseFCP, baseWrapper, ownerSubAcctAmt.toInt().mul(-1));
+				editSubAccountStandardVault(false, msg.sender, sType, baseFCP, baseWrapper, ownerSubAcctAmt.toInt().neg());
 			}
 		}
 
@@ -141,13 +141,13 @@ contract DBSFVaultFactoryDelegate5 is DBSFVaultFactoryDelegateParent {
 		);
 
 		if (ownerSubAcctPos.amountYield != 0 || ownerSubAcctPos.amountBond != 0) {
-			int changeYield = ownerSubAcctPos.amountYield.toInt().mul(-1);
-			int changeBond = ownerSubAcctPos.amountBond.mul(-1);
+			int changeYield = ownerSubAcctPos.amountYield.toInt().neg();
+			int changeBond = ownerSubAcctPos.amountBond.neg();
 			editSubAccountYTVault(true, msg.sender, _FCP, address(wrp), changeYield, changeBond);
 		}
 		if (treasurySubAcctPos.amountYield != 0 || treasurySubAcctPos.amountBond != 0) {
-			int changeYield = treasurySubAcctPos.amountYield.toInt().mul(-1);
-			int changeBond = treasurySubAcctPos.amountBond.mul(-1);
+			int changeYield = treasurySubAcctPos.amountYield.toInt().neg();
+			int changeBond = treasurySubAcctPos.amountBond.neg();
 			editSubAccountYTVault(true, sendTo, _FCP, address(wrp), changeYield, changeBond);
 		}
 

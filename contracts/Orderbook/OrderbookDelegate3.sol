@@ -37,7 +37,7 @@ contract OrderbookDelegate3 is OrderbookDelegateParent {
 		requireValidCollateral(resultantYD, resultantBD, wrappedAmtLockedYT, _lockedZCB, ratio);
 		fcp.transferPosition(msg.sender, _amountYield, _amountBond);
 		int yieldChange = -int(_amountYield);
-		int bondChange = _amountBond.mul(-1);
+		int bondChange = _amountBond.neg();
 		internalWrapper.editSubAccountPosition(false, msg.sender, address(fcp), yieldChange, bondChange);
 
 		internalYieldDeposited[msg.sender] = resultantYD;
@@ -442,7 +442,7 @@ contract OrderbookDelegate3 is OrderbookDelegateParent {
 				require(prevID != 0); //prevID must be found in order to delete order
 				internalZCBSells[prevID].nextID = internalZCBSells[currentID].nextID;
 				delete internalZCBSells[currentID];
-				return prevAmt.toInt().mul(-1);
+				return prevAmt.toInt().neg();
 			}
 			else {
 				if (prevAmt <= _minimumAmount) {
@@ -450,11 +450,11 @@ contract OrderbookDelegate3 is OrderbookDelegateParent {
 				}
 				//prevAmt - uint(-_amount) <= _minimumAmount
 				//prevAmt <= _minimumAmount + uint(-_amount)
-				else if (prevAmt <= _minimumAmount.add(_amount.mul(-1).toUint())) {
+				else if (prevAmt <= _minimumAmount.add(_amount.neg().toUint())) {
 					internalZCBSells[currentID].amount = _minimumAmount;
 					return _minimumAmount.toInt().sub(prevAmt.toInt());
 				}
-				internalZCBSells[currentID].amount = prevAmt.sub(_amount.mul(-1).toUint());
+				internalZCBSells[currentID].amount = prevAmt.sub(_amount.neg().toUint());
 				return _amount;
 			}
 		}
@@ -498,13 +498,13 @@ contract OrderbookDelegate3 is OrderbookDelegateParent {
 				require(prevID != 0); //prevID must be found in order to delete order
 				internalYTSells[prevID].nextID = internalYTSells[currentID].nextID;
 				delete internalYTSells[currentID];
-				return prevAmt.toInt().mul(-1);
+				return prevAmt.toInt().neg();
 			}
 			else {
 				if (prevAmt <= _minimumAmount) {
 					return 0;
 				}
-				else if (prevAmt <= _minimumAmount.add(_amount.mul(-1).toUint())) {
+				else if (prevAmt <= _minimumAmount.add(_amount.neg().toUint())) {
 					internalYTSells[currentID].amount = _minimumAmount;
 					return _minimumAmount.toInt().sub(prevAmt.toInt());
 				}

@@ -601,11 +601,11 @@ contract OrderbookExchange is OrderbookData, IOrderbookExchange {
 		}
 
 		if (yieldTreasury != 0 || bondTreasury != 0) {
-			internalWrapper.editSubAccountPosition(false, treasury, address(fcp), yieldTreasury.toInt().mul(-1), bondTreasury.mul(-1));
+			internalWrapper.editSubAccountPosition(false, treasury, address(fcp), yieldTreasury.toInt().neg(), bondTreasury.neg());
 		}
 
 		if (yieldOwner != 0 || bondOwner != 0) {
-			internalWrapper.editSubAccountPosition(false, msg.sender, address(fcp), yieldOwner.toInt().mul(-1), bondOwner.mul(-1));
+			internalWrapper.editSubAccountPosition(false, msg.sender, address(fcp), yieldOwner.toInt().neg(), bondOwner.neg());
 		}
 	}
 

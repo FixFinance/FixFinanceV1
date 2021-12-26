@@ -219,7 +219,7 @@ contract OrderbookDelegateParent is OrderbookData {
 			int BD = internalBondDeposited[_addr];
 			uint wrappedAmtLockedYT = internalLockedYT[_addr];
 			uint _lockedZCB = internalLockedZCB[_addr];
-			int changeYield = int(_amountWrappedYT+1).mul(-1);
+			int changeYield = int(_amountWrappedYT+1).neg();
 			IWrapper(vitals[0]).editSubAccountPosition(false, _addr, vitals[1], changeYield, int(bondValChange));
 			uint resultantYD = YD.sub(_amountWrappedYT+1); //+1 to prevent off by 1 errors
 			int resultantBD = BD.add(int(bondValChange));
@@ -384,7 +384,7 @@ contract OrderbookDelegateParent is OrderbookData {
 		uint prevYD = internalYieldDeposited[_addr];
 		int prevBD = internalBondDeposited[_addr];
 		uint prevLockedZCB = internalLockedZCB[_addr];
-		int changeBond = int(unitAmtYT).add(int(_ZCBsold)).mul(-1);
+		int changeBond = int(unitAmtYT).add(int(_ZCBsold)).neg();
 		internalYieldDeposited[_addr] = prevYD.add(_YTreceived);
 		internalBondDeposited[_addr] = prevBD.add(changeBond);
 		internalLockedZCB[_addr] = prevLockedZCB.sub(_ZCBsold);

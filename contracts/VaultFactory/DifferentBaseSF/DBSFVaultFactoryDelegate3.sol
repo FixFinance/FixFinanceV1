@@ -115,7 +115,7 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryDelegateParent {
 			//we already know the vault would pass the check so no need to check
 			IFixCapitalPool(vault.FCPsupplied).transferPosition(_to, vault.yieldSupplied, vault.bondSupplied);
 			address baseWrapperSupplied = address(IFixCapitalPool(vault.FCPsupplied).wrapper());
-			editSubAccountYTVault(false, msg.sender, vault.FCPsupplied, baseWrapperSupplied, -int(vault.yieldSupplied), vault.bondSupplied.mul(-1));
+			editSubAccountYTVault(false, msg.sender, vault.FCPsupplied, baseWrapperSupplied, -int(vault.yieldSupplied), vault.bondSupplied.neg());
 		}
 
 		delete _YTvaults[msg.sender][_index];
@@ -252,7 +252,7 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryDelegateParent {
 			editSubAccountYTVault(false, copyVaultOwner, copyFCPsupplied, baseWrapperSupplied, yieldChange, bondChange);
 			if (mVault.FCPsupplied != address(0)) {
 				yieldChange = -int(mVault.yieldSupplied);
-				bondChange = mVault.bondSupplied.mul(-1);
+				bondChange = mVault.bondSupplied.neg();
 				baseWrapperSupplied = address(IFixCapitalPool(mVault.FCPsupplied).wrapper());
 				editSubAccountYTVault(false, copyVaultOwner, mVault.FCPsupplied, baseWrapperSupplied, yieldChange, bondChange);
 			}

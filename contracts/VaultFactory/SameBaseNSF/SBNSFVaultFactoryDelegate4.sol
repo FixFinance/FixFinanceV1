@@ -141,7 +141,7 @@ contract SBNSFVaultFactoryDelegate4 is SBNSFVaultFactoryDelegateParent {
 		int bondBid = (liq.bondRatio-1).mul(int(bidAmt)) / (1 ether);
 		IFixCapitalPool(liq.FCPsupplied).transferPosition(_to, bidAmt, bondBid);
 		address baseWrapper = address(IFixCapitalPool(liq.FCPsupplied).wrapper());
-		editSubAccountYTVault(false, liq.vaultOwner, liq.FCPsupplied, baseWrapper, -int(bidAmt), bondBid.mul(-1));
+		editSubAccountYTVault(false, liq.vaultOwner, liq.FCPsupplied, baseWrapper, -int(bidAmt), bondBid.neg());
 		delete _YTLiquidations[_index];
 	}
 
@@ -192,7 +192,7 @@ contract SBNSFVaultFactoryDelegate4 is SBNSFVaultFactoryDelegateParent {
 		IFixCapitalPool(_FCPborrowed).burnZCBFrom(_to, vault.amountBorrowed);
 		lowerShortInterest(_FCPborrowed, vault.amountBorrowed);
 		IFixCapitalPool(_FCPsupplied).transferPosition(_to, vault.yieldSupplied, vault.bondSupplied);
-		editSubAccountYTVault(false, _owner, vault.FCPsupplied, baseWrapperSupplied, -int(vault.yieldSupplied), vault.bondSupplied.mul(-1));
+		editSubAccountYTVault(false, _owner, vault.FCPsupplied, baseWrapperSupplied, -int(vault.yieldSupplied), vault.bondSupplied.neg());
 
 		delete _YTvaults[_owner][_index];
 	}
@@ -247,7 +247,7 @@ contract SBNSFVaultFactoryDelegate4 is SBNSFVaultFactoryDelegateParent {
 		IFixCapitalPool(_FCPborrowed).burnZCBFrom(_to, _in);
 		lowerShortInterest(_FCPborrowed, _in);
 		IFixCapitalPool(_FCPsupplied).transferPosition(_to, yieldOut, bondOut);
-		editSubAccountYTVault(false, _owner, vault.FCPsupplied, baseWrapperSupplied, -int(yieldOut), bondOut.mul(-1));
+		editSubAccountYTVault(false, _owner, vault.FCPsupplied, baseWrapperSupplied, -int(yieldOut), bondOut.neg());
 
 		_YTvaults[_owner][_index].amountBorrowed -= _in;
 		_YTvaults[_owner][_index].yieldSupplied -= yieldOut;
@@ -301,7 +301,7 @@ contract SBNSFVaultFactoryDelegate4 is SBNSFVaultFactoryDelegateParent {
 		IFixCapitalPool(_FCPborrowed).burnZCBFrom(_to, amtIn);
 		lowerShortInterest(_FCPborrowed, amtIn);
 		IFixCapitalPool(_FCPsupplied).transferPosition(_to, _out, bondOut);
-		editSubAccountYTVault(false, _owner, vault.FCPsupplied, baseWrapperSupplied, -int(_out), bondOut.mul(-1));
+		editSubAccountYTVault(false, _owner, vault.FCPsupplied, baseWrapperSupplied, -int(_out), bondOut.neg());
 
 		_YTvaults[_owner][_index].amountBorrowed -= amtIn;
 		_YTvaults[_owner][_index].yieldSupplied -= _out;

@@ -237,7 +237,7 @@ contract DBSFVaultFactoryDelegateParent is DBSFVaultFactoryData {
 		_revenue[_asset] = _revenue[_asset].add(fee);
 		IInfoOracle iorc = IInfoOracle(_infoOracleAddress);
 		(, SUPPLIED_ASSET_TYPE sType, address baseFCP, address baseWrapper) = suppliedAssetInfo(_asset, iorc);
-		editSubAccountStandardVault(_claimRewards, _vaultOwner, sType, baseFCP, baseWrapper, fee.toInt().mul(-1));
+		editSubAccountStandardVault(_claimRewards, _vaultOwner, sType, baseFCP, baseWrapper, fee.toInt().neg());
 		address feeRecipientSubAcct;
 		if (iorc.TreasuryFeeIsCollected()) {
 			feeRecipientSubAcct = iorc.sendTo();

@@ -67,7 +67,7 @@ contract SBNSFVaultFactoryDelegate5 is SBNSFVaultFactoryDelegateParent {
 		YTVault memory vault = _YTvaults[msg.sender][_index];
 		require(vault.yieldSupplied <= uint(type(int256).max));
 		address baseWrapper = address(IFixCapitalPool(vault.FCPsupplied).wrapper());
-		editSubAccountYTVault(true, msg.sender, vault.FCPsupplied, baseWrapper, -int(vault.yieldSupplied), vault.bondSupplied.mul(-1));
+		editSubAccountYTVault(true, msg.sender, vault.FCPsupplied, baseWrapper, -int(vault.yieldSupplied), vault.bondSupplied.neg());
 		editSubAccountYTVault(false, _to, vault.FCPsupplied, baseWrapper, int(vault.yieldSupplied), vault.bondSupplied);
 		_YTvaults[_to].push(vault);
 		delete _YTvaults[msg.sender][_index];
@@ -169,10 +169,10 @@ contract SBNSFVaultFactoryDelegate5 is SBNSFVaultFactoryDelegateParent {
 			uint treasurySubAcctAmt = rev.sub(ownerSubAcctAmt);
 
 			if (treasurySubAcctAmt > 0) {
-				editSubAccountStandardVault(true, treasuryAddr, sType, baseFCP, baseWrapper, treasurySubAcctAmt.toInt().mul(-1));
+				editSubAccountStandardVault(true, treasuryAddr, sType, baseFCP, baseWrapper, treasurySubAcctAmt.toInt().neg());
 			}
 			if (ownerSubAcctAmt > 0) {
-				editSubAccountStandardVault(false, msg.sender, sType, baseFCP, baseWrapper, ownerSubAcctAmt.toInt().mul(-1));
+				editSubAccountStandardVault(false, msg.sender, sType, baseFCP, baseWrapper, ownerSubAcctAmt.toInt().neg());
 			}
 		}
 		delete _revenue[_asset];

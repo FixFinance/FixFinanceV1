@@ -216,7 +216,7 @@ contract FCPDelegate2 is FCPDelegateParent {
 			effectiveZCB = effectiveZCB.add(_amountBond.toUint());
 		}
 		else {
-			effectiveZCB = effectiveZCB.sub(_amountBond.mul(-1).toUint());
+			effectiveZCB = effectiveZCB.sub(_amountBond.neg().toUint());
 		}
 
 		bytes32 out = _receiver.onFlashLoan(msg.sender, _amountYield, _amountBond, yieldFee, bondFee, _data);

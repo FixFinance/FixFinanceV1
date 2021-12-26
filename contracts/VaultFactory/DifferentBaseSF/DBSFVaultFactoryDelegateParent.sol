@@ -11,9 +11,10 @@ import "../../interfaces/IInfoOracle.sol";
 import "../../interfaces/IWrapper.sol";
 import "../../interfaces/IERC20.sol";
 import "../../helpers/Ownable.sol";
+import "../../helpers/nonReentrant.sol";
 import "./DBSFVaultFactoryData.sol";
 
-contract DBSFVaultFactoryDelegateParent is DBSFVaultFactoryData {
+contract DBSFVaultFactoryDelegateParent is DBSFVaultFactoryData, nonReentrant {
 	using SafeMath for uint;
 	using SignedSafeMath for int;
 

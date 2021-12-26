@@ -94,7 +94,7 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryDelegateParent {
 		@param uint _index: the YT vault to close is at YTvaults[msg.sender][_index]
 		@param address _to: the address to which to send all collateral after closing the vault
 	*/
-	function closeYTVault(uint _index, address _to) external {
+	function closeYTVault(uint _index, address _to) external noReentry {
 		uint len = _YTvaults[msg.sender].length;
 		require(_index < len);
 		YTVault memory vault = _YTvaults[msg.sender][_index];
@@ -159,7 +159,7 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryDelegateParent {
 		int128[3] calldata _multipliers,
 		bytes calldata _data,
 		address _receiverAddr
-	) external {
+	) external noReentry {
 		require(_index < _YTvaults[_owner].length);
 
 		YTVault memory mVault = _YTvaults[_owner][_index];

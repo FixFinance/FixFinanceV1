@@ -18,6 +18,32 @@ contract DBSFVaultFactoryDelegate5 is DBSFVaultFactoryDelegateParent {
 	using SignedSafeMath for int;
 	using SafeERC20 for IERC20;
 
+
+	//------------------------remaining YTVault Liquidation functionality--------------
+
+	/*
+		@Description: claim the collateral of a YT vault from an auction that was won by msg.sender
+
+		@param uint _index: the index in YTLiquidations[] of the auction
+		@param address _to: the address to which to send the proceeds
+	*/
+	function claimYTLiquidation(uint _index, address _to) external noReentry {
+		require(_YTLiquidations.length > _index);
+		YTLiquidation storage liq = _YTLiquidations[_index];
+		require(msg.sender == liq.bidder);
+		require(block.timestamp >= AUCTION_COOLDOWN + liq.bidTimestamp);
+		uint bidAmt = liq.bidAmount;
+		require(bidAmt <= uint(type(int256).max));
+		int bondBid = (liq.bondRatio-1).mul(int(bidAmt)) / (1 ether);
+		address FCPsupplied = liq.FCPsupplied;
+		IFixCapitalPool(FCPsupplied).transferPosition(_to, bidAmt, bondBid);
+		address baseWrapper = address(IFixCapitalPool(FCPsupplied).wrapper());
+		editSubAccountYTVault(false, liq.vaultOwner, FCPsupplied, baseWrapper, -int(bidAmt), bondBid.neg());
+		delete _YTLiquidations[_index];
+	}
+
+	//------------------------Vault & YTVault Transfers--------------
+
 	/*
 		@Description: assign a vault/YTvault to a new owner
 
@@ -25,7 +51,7 @@ contract DBSFVaultFactoryDelegate5 is DBSFVaultFactoryDelegateParent {
 		@param address _to: the new owner of the vault/YTvault
 		@param bool _isYTVault: true when the vault to transfer is a YTvault, false otherwise
 	*/
-	function transferVault(uint _index, address _to, bool _isYTVault) external {
+	function transferVault(uint _index, address _to, bool _isYTVault) external noReentry {
 		if (_isYTVault) {
 			transferYTVault(_index, _to);
 		}

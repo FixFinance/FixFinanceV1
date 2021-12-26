@@ -129,7 +129,7 @@ contract DBSFVaultFactoryDelegate4 is DBSFVaultFactoryDelegateParent {
 			if ratio is below _minBondRatio tx will revert
 		@param uint _amtIn: the amount of the borrowed ZCB to send in
 	*/
-	function auctionYTLiquidation(address _owner, uint _index, address _FCPborrowed, address _FCPsupplied, uint _bidYield, int _minBondRatio, uint _amtIn) external {
+	function auctionYTLiquidation(address _owner, uint _index, address _FCPborrowed, address _FCPsupplied, uint _bidYield, int _minBondRatio, uint _amtIn) external noReentry {
 		require(_YTvaults[_owner].length > _index);
 		YTVault memory vault = _YTvaults[_owner][_index];
 		address baseWrapper = autopayYTVault(_owner, _index, vault);
@@ -189,7 +189,7 @@ contract DBSFVaultFactoryDelegate4 is DBSFVaultFactoryDelegateParent {
 			ZCB of bid is calculated by finding the corresponding amount of ZCB based on the ratio of YT to ZCB
 		@param uint _amtIn: the amount of borrowed asset that the liquidator will be sending in
 	*/
-	function bidOnYTLiquidation(uint _index, uint _bidYield, uint _amtIn) external {
+	function bidOnYTLiquidation(uint _index, uint _bidYield, uint _amtIn) external noReentry {
 		require(_YTLiquidations.length > _index);
 		YTLiquidation memory liq = _YTLiquidations[_index];
 		require(0 < _amtIn && _amtIn <= liq.amountBorrowed);
@@ -227,27 +227,6 @@ contract DBSFVaultFactoryDelegate4 is DBSFVaultFactoryDelegateParent {
 	}
 
 	/*
-		@Description: claim the collateral of a YT vault from an auction that was won by msg.sender
-
-		@param uint _index: the index in YTLiquidations[] of the auction
-		@param address _to: the address to which to send the proceeds
-	*/
-	function claimYTLiquidation(uint _index, address _to) external {
-		require(_YTLiquidations.length > _index);
-		YTLiquidation storage liq = _YTLiquidations[_index];
-		require(msg.sender == liq.bidder);
-		require(block.timestamp >= AUCTION_COOLDOWN + liq.bidTimestamp);
-		uint bidAmt = liq.bidAmount;
-		require(bidAmt <= uint(type(int256).max));
-		int bondBid = (liq.bondRatio-1).mul(int(bidAmt)) / (1 ether);
-		address FCPsupplied = liq.FCPsupplied;
-		IFixCapitalPool(FCPsupplied).transferPosition(_to, bidAmt, bondBid);
-		address baseWrapper = address(IFixCapitalPool(FCPsupplied).wrapper());
-		editSubAccountYTVault(false, liq.vaultOwner, FCPsupplied, baseWrapper, -int(bidAmt), bondBid.neg());
-		delete _YTLiquidations[_index];
-	}
-
-	/*
 		@Description: when there is less than 1 day until maturity or vaults are under the lower collateralisation limit 
 			vaults may be liquidated instantly without going through the auction process, this is intended to help the VaultFactory
 			keep solvency in the event of a market crisis
@@ -262,7 +241,7 @@ contract DBSFVaultFactoryDelegate4 is DBSFVaultFactoryDelegateParent {
 		@param uint _minOut: the minimum amount of YT from _FCPsupplied that msg.sender wants to receive from this liquidation
 		@param address _to: the address to which to send all of the collateral from the vault
 	*/
-	function instantYTLiquidation(address _owner, uint _index, address _FCPborrowed, address _FCPsupplied, uint _maxIn, uint _minOut, int _minBondRatio, address _to) external {
+	function instantYTLiquidation(address _owner, uint _index, address _FCPborrowed, address _FCPsupplied, uint _maxIn, uint _minOut, int _minBondRatio, address _to) external noReentry {
 		require(_YTvaults[_owner].length > _index);
 		YTVault memory vault = _YTvaults[_owner][_index];
 		address baseWrapperSupplied = autopayYTVault(_owner, _index, vault);
@@ -321,7 +300,7 @@ contract DBSFVaultFactoryDelegate4 is DBSFVaultFactoryDelegateParent {
 		@param uint _minOut: the minimum amount of YT from _FCPsupplied that msg.sender wants to receive from this liquidation
 		@param address _to: the address to which to send all of the collateral from the vault
 	*/
-	function partialYTLiquidationSpecificIn(address _owner, uint _index, address _FCPborrowed, address _FCPsupplied, uint _in, uint _minOut, int _minBondRatio, address _to) external {
+	function partialYTLiquidationSpecificIn(address _owner, uint _index, address _FCPborrowed, address _FCPsupplied, uint _in, uint _minOut, int _minBondRatio, address _to) external noReentry {
 		require(_YTvaults[_owner].length > _index);
 		YTVault memory vault = _YTvaults[_owner][_index];
 		address baseWrapperSupplied = autopayYTVault(_owner, _index, vault);
@@ -381,7 +360,7 @@ contract DBSFVaultFactoryDelegate4 is DBSFVaultFactoryDelegateParent {
 		@param uint _maxIn: the maximum amount of assetBorrowed that msg.sender is willing to bid on the vault
 		@param address _to: the address to which to send all of the collateral from the vault
 	*/
-	function partialYTLiquidationSpecificOut(address _owner, uint _index, address _FCPborrowed, address _FCPsupplied, uint _out, int _minBondOut, uint _maxIn, address _to) external {
+	function partialYTLiquidationSpecificOut(address _owner, uint _index, address _FCPborrowed, address _FCPsupplied, uint _out, int _minBondOut, uint _maxIn, address _to) external noReentry {
 		require(_YTvaults[_owner].length > _index);
 		require(_out <= uint(type(int256).max));
 		YTVault memory vault = _YTvaults[_owner][_index];

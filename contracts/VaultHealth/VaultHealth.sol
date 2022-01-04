@@ -9,6 +9,7 @@ import "../interfaces/IFixCapitalPool.sol";
 import "../interfaces/IZeroCouponBond.sol";
 import "../libraries/ABDKMath64x64.sol";
 import "../libraries/SafeMath.sol";
+import "../libraries/SignedSafeMath.sol";
 import "../libraries/BigMath.sol";
 import "../oracle/interfaces/IOracleContainer.sol";
 
@@ -16,6 +17,7 @@ import "../oracle/interfaces/IOracleContainer.sol";
 contract VaultHealth is IVaultHealth, Ownable {
 	using ABDKMath64x64 for int128;
 	using SafeMath for uint256;
+	using SignedSafeMath for int256;
 
 	uint private constant SecondsPerYear = 31556926;
 
@@ -625,7 +627,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 
 		//if !positiveBond there are essentially 2 ZCBs being borrowed from the vault with _baseSupplied as the supplied asset
 		//thus we change the rate adjuster to borrow if the "supplied" ZCB is negative
-		uint ZCBvalue = uint(positiveBond ? _amountBond : -_amountBond)
+		uint ZCBvalue = uint(positiveBond ? _amountBond : _amountBond.neg())
 			.mul(getRateMultiplier(_FCPsupplied, _baseSupplied, positiveBond ? RateAdjuster.UPPER_DEPOSIT : RateAdjuster.UPPER_BORROW, _suppliedRateChange))
 			.div(1 ether);
 
@@ -713,7 +715,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 		uint totalToBorrowAgainst  = _amountYield
 			.mul(1 ether)
 			.div(getRateMultiplier(_FCP, base, RateAdjuster.UPPER_BORROW, _borrowedRateChange));
-		return positiveBond ? totalToBorrowAgainst.add(uint(_amountBond)) : totalToBorrowAgainst.sub(uint(-_amountBond));
+		return positiveBond ? totalToBorrowAgainst.add(uint(_amountBond)) : totalToBorrowAgainst.sub(uint(_amountBond.neg()));
 	}
 
 	/*
@@ -748,7 +750,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 
 		//if !positiveBond there are essentially 2 ZCBs being borrowed from the vault with _baseSupplied as the supplied asset
 		//thus we change the rate adjuster to borrow if the "supplied" ZCB is negative
-		uint ZCBvalue = uint(positiveBond ? _amountBond : -_amountBond)
+		uint ZCBvalue = uint(positiveBond ? _amountBond : _amountBond.neg())
 			.mul(getRateMultiplier(_FCPsupplied, _baseSupplied, positiveBond ? RateAdjuster.LOW_DEPOSIT : RateAdjuster.LOW_BORROW, _suppliedRateChange))
 			.div(1 ether);
 
@@ -836,7 +838,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 		uint totalToBorrowAgainst  = _amountYield
 			.mul(1 ether)
 			.div(getRateMultiplier(_FCP, base, RateAdjuster.LOW_BORROW, _borrowedRateChange));
-		return positiveBond ? totalToBorrowAgainst.add(uint(_amountBond)) : totalToBorrowAgainst.sub(uint(-_amountBond));
+		return positiveBond ? totalToBorrowAgainst.add(uint(_amountBond)) : totalToBorrowAgainst.sub(uint(_amountBond.neg()));
 	}
 
 	/*

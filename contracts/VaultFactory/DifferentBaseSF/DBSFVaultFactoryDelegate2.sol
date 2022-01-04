@@ -335,31 +335,4 @@ contract DBSFVaultFactoryDelegate2 is DBSFVaultFactoryDelegateParent {
 		*/
 		_vaults[_owner][_index].amountSFee = 0;
 	}
-
-	/*
-		@Description: assign a vault to a new owner
-
-		@param uint _index: the index within vaults[msg.sender] at which the vault to transfer is located
-		@param address _to: the new owner of the vault
-	*/
-	function transferStandardVault(uint _index, address _to) internal {
-		require(_vaults[msg.sender].length > _index);
-		Vault memory vault = _vaults[msg.sender][_index];
-		_vaults[_to].push(vault);
-		delete _vaults[msg.sender][_index];
-	}
-
-	/*
-		@Description: assign a YT vault to a new owner
-
-		@param uint _index: the index within YTvaults[msg.sender] at which the YT vault to transfer is located
-		@param address _to: the new owner of the YT vault
-	*/
-	function transferYTVault(uint _index, address _to) internal {
-		require(_YTvaults[msg.sender].length > _index);
-		YTVault memory vault = _YTvaults[msg.sender][_index];
-		_YTvaults[_to].push(vault);
-		delete _YTvaults[msg.sender][_index];
-	}
-
 }

@@ -198,6 +198,7 @@ contract FCPDelegate2 is FCPDelegateParent {
 			IWrapper wrp = internalWrapper;
 			wrp.FCPDirectClaimSubAccountRewards(false, true, recAddr, prevYield, prevYield);
 			ratio = wrp.WrappedAmtToUnitAmt_RoundDown(1 ether);
+			require(isValidPosition(copyAmtYield, copyAmtBond, ratio));
 
 			uint newYield =  prevYield.add(copyAmtYield);
 			int newBond = internalBalanceBonds[recAddr].add(copyAmtBond);

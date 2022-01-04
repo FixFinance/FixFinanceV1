@@ -153,7 +153,7 @@ contract SBNSFVaultFactoryDelegate2 is SBNSFVaultFactoryDelegateParent {
 
 		//burn borrowed ZCB
 		address FCPborrowed = IZeroCouponBond(vault.assetBorrowed).FixCapitalPoolAddress();
-		IFixCapitalPool(FCPborrowed).burnZCBFrom(_to, vault.amountBorrowed);
+		IFixCapitalPool(FCPborrowed).burnZCBFrom(msg.sender, vault.amountBorrowed);
 		lowerShortInterest(FCPborrowed, vault.amountBorrowed);
 		IERC20(_assetSupplied).safeTransfer(_to, vault.amountSupplied);
 
@@ -202,7 +202,7 @@ contract SBNSFVaultFactoryDelegate2 is SBNSFVaultFactoryDelegateParent {
 
 		//burn borrowed ZCB
 		address FCPborrowed = IZeroCouponBond(vault.assetBorrowed).FixCapitalPoolAddress();
-		IFixCapitalPool(FCPborrowed).burnZCBFrom(_to, _in);
+		IFixCapitalPool(FCPborrowed).burnZCBFrom(msg.sender, _in);
 		lowerShortInterest(FCPborrowed, _in);
 		IERC20(_assetSupplied).safeTransfer(_to, amtOut);
 
@@ -253,7 +253,7 @@ contract SBNSFVaultFactoryDelegate2 is SBNSFVaultFactoryDelegateParent {
 
 		//burn borrowed ZCB
 		address FCPborrowed = IZeroCouponBond(_assetBorrowed).FixCapitalPoolAddress();
-		IFixCapitalPool(FCPborrowed).burnZCBFrom(_to, amtIn);
+		IFixCapitalPool(FCPborrowed).burnZCBFrom(msg.sender, amtIn);
 		lowerShortInterest(FCPborrowed, amtIn);
 		IERC20(_assetSupplied).safeTransfer(_to, _out);
 

@@ -274,7 +274,7 @@ contract DBSFVaultFactoryDelegate4 is DBSFVaultFactoryDelegateParent {
 		}
 
 		//burn borrowed ZCB
-		IFixCapitalPool(_FCPborrowed).burnZCBFrom(_to, vault.amountBorrowed);
+		IFixCapitalPool(_FCPborrowed).burnZCBFrom(msg.sender, vault.amountBorrowed);
 		lowerShortInterest(_FCPborrowed, vault.amountBorrowed);
 		IFixCapitalPool(_FCPsupplied).transferPosition(_to, vault.yieldSupplied, vault.bondSupplied);
 		editSubAccountYTVault(false, _owner, vault.FCPsupplied, baseWrapperSupplied, -int(vault.yieldSupplied), vault.bondSupplied.neg());
@@ -333,7 +333,7 @@ contract DBSFVaultFactoryDelegate4 is DBSFVaultFactoryDelegateParent {
 			));
 		}
 		//burn borrowed ZCB
-		IFixCapitalPool(_FCPborrowed).burnZCBFrom(_to, _in);
+		IFixCapitalPool(_FCPborrowed).burnZCBFrom(msg.sender, _in);
 		lowerShortInterest(_FCPborrowed, _in);
 		IFixCapitalPool(_FCPsupplied).transferPosition(_to, yieldOut, bondOut);
 		editSubAccountYTVault(false, _owner, vault.FCPsupplied, baseWrapperSupplied, -int(yieldOut), bondOut.neg());
@@ -392,7 +392,7 @@ contract DBSFVaultFactoryDelegate4 is DBSFVaultFactoryDelegateParent {
 		}
 
 		//burn borrowed ZCB
-		IFixCapitalPool(_FCPborrowed).burnZCBFrom(_to, amtIn);
+		IFixCapitalPool(_FCPborrowed).burnZCBFrom(msg.sender, amtIn);
 		lowerShortInterest(_FCPborrowed, amtIn);
 		IFixCapitalPool(_FCPsupplied).transferPosition(_to, _out, bondOut);
 		editSubAccountYTVault(false, _owner, vault.FCPsupplied, baseWrapperSupplied, -int(_out), bondOut.neg());

@@ -172,7 +172,7 @@ contract NSFVaultFactoryDelegate5 is NSFVaultFactoryDelegateParent {
 				editSubAccountStandardVault(true, treasuryAddr, sType, baseFCP, baseWrapper, treasurySubAcctAmt.toInt().neg());
 			}
 			if (ownerSubAcctAmt > 0) {
-				editSubAccountStandardVault(false, msg.sender, sType, baseFCP, baseWrapper, ownerSubAcctAmt.toInt().neg());
+				editSubAccountStandardVault(treasurySubAcctAmt == 0, msg.sender, sType, baseFCP, baseWrapper, ownerSubAcctAmt.toInt().neg());
 			}
 		}
 		delete _revenue[_asset];

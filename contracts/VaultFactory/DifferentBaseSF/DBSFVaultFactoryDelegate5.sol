@@ -33,12 +33,11 @@ contract DBSFVaultFactoryDelegate5 is DBSFVaultFactoryDelegateParent {
 		require(msg.sender == liq.bidder);
 		require(block.timestamp >= AUCTION_COOLDOWN + liq.bidTimestamp);
 		uint bidAmt = liq.bidAmount;
-		require(bidAmt <= uint(type(int256).max));
-		int bondBid = (liq.bondRatio-1).mul(int(bidAmt)) / (1 ether);
+		int bondBid = (liq.bondRatio-1).mul(bidAmt.toInt()) / (1 ether);
 		address FCPsupplied = liq.FCPsupplied;
 		IFixCapitalPool(FCPsupplied).transferPosition(_to, bidAmt, bondBid);
 		address baseWrapper = address(IFixCapitalPool(FCPsupplied).wrapper());
-		editSubAccountYTVault(false, liq.vaultOwner, FCPsupplied, baseWrapper, -int(bidAmt), bondBid.neg());
+		editSubAccountYTVault(false, liq.vaultOwner, FCPsupplied, baseWrapper, bidAmt.toInt().neg(), bondBid.neg());
 		delete _YTLiquidations[_index];
 	}
 
@@ -72,9 +71,8 @@ contract DBSFVaultFactoryDelegate5 is DBSFVaultFactoryDelegateParent {
 		_vaults[_to].push(vault);
 		if (vault.amountSupplied > 0) {
 			(, SUPPLIED_ASSET_TYPE sType, address baseFCP, address baseWrapper) = suppliedAssetInfo(vault.assetSupplied, IInfoOracle(_infoOracleAddress));
-			require(vault.amountSupplied <= uint(type(int256).max));
-			int intSupplied = int(vault.amountSupplied);
-			editSubAccountStandardVault(true, msg.sender, sType, baseFCP, baseWrapper, -intSupplied);
+			int intSupplied = vault.amountSupplied.toInt();
+			editSubAccountStandardVault(true, msg.sender, sType, baseFCP, baseWrapper, intSupplied.neg());
 			//passing claimRewards:true a second time would needlessly waste gas
 			editSubAccountStandardVault(false, _to, sType, baseFCP, baseWrapper, intSupplied);
 		}
@@ -90,10 +88,9 @@ contract DBSFVaultFactoryDelegate5 is DBSFVaultFactoryDelegateParent {
 	function transferYTVault(uint _index, address _to) internal {
 		require(_YTvaults[msg.sender].length > _index);
 		YTVault memory vault = _YTvaults[msg.sender][_index];
-		require(vault.yieldSupplied <= uint(type(int256).max));
 		address baseWrapper = address(IFixCapitalPool(vault.FCPsupplied).wrapper());
-		editSubAccountYTVault(true, msg.sender, vault.FCPsupplied, baseWrapper, -int(vault.yieldSupplied), vault.bondSupplied.neg());
-		editSubAccountYTVault(false, _to, vault.FCPsupplied, baseWrapper, int(vault.yieldSupplied), vault.bondSupplied);
+		editSubAccountYTVault(true, msg.sender, vault.FCPsupplied, baseWrapper, vault.yieldSupplied.toInt().neg(), vault.bondSupplied.neg());
+		editSubAccountYTVault(false, _to, vault.FCPsupplied, baseWrapper, vault.yieldSupplied.toInt(), vault.bondSupplied);
 		_YTvaults[_to].push(vault);
 		delete _YTvaults[msg.sender][_index];
 	}
@@ -128,7 +125,7 @@ contract DBSFVaultFactoryDelegate5 is DBSFVaultFactoryDelegateParent {
 				editSubAccountStandardVault(true, treasuryAddr, sType, baseFCP, baseWrapper, treasurySubAcctAmt.toInt().neg());
 			}
 			if (ownerSubAcctAmt > 0) {
-				editSubAccountStandardVault(false, msg.sender, sType, baseFCP, baseWrapper, ownerSubAcctAmt.toInt().neg());
+				editSubAccountStandardVault(treasurySubAcctAmt == 0, msg.sender, sType, baseFCP, baseWrapper, ownerSubAcctAmt.toInt().neg());
 			}
 		}
 
@@ -154,7 +151,7 @@ contract DBSFVaultFactoryDelegate5 is DBSFVaultFactoryDelegateParent {
 			uint yieldToTreasury = pos.amountYield >> 1;
 			int bondToTreasury = pos.amountBond.add(_bondIn) / 2;
 			IFixCapitalPool(_FCP).transferPosition(sendTo, yieldToTreasury, bondToTreasury);
-			IFixCapitalPool(_FCP).transferPosition(msg.sender, pos.amountYield - yieldToTreasury, pos.amountBond.add(_bondIn) - bondToTreasury);
+			IFixCapitalPool(_FCP).transferPosition(msg.sender, pos.amountYield.sub(yieldToTreasury), pos.amountBond.add(_bondIn).sub(bondToTreasury));
 		}
 		else {
 			IFixCapitalPool(_FCP).transferPosition(msg.sender, pos.amountYield, pos.amountBond.add(_bondIn));

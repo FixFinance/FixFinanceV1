@@ -164,8 +164,6 @@ contract CTokenWrapperDelegate1 is CTokenWrapperDelegateParent {
 		IERC20(address(cToken)).safeTransferFrom(msg.sender, address(this), cTokenIn);
 	}
 
-	event EVNT(uint its);
-
 	/*
 		@Description: burn wrapped asset to receive an amount of underlying asset of _amountUnit
 

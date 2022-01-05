@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
 Nav,
 NavLink,
@@ -9,7 +9,10 @@ NavBtnLink,
 NavIcon,
 } from './NavbarElements';
 
+import Modal from '../Modal'
+
 const Navbar = () => {
+  const [show, setShow] = useState(false)
   return (
     <div style={{'position': 'fixed', 'top': 0, 'width': '100vw'}}>
       <Nav>
@@ -34,9 +37,10 @@ const Navbar = () => {
           </NavLink>
         </NavMenu>
         <NavBtn>
-          <NavBtnLink to='/wallet'>Connect Wallet</NavBtnLink>
+          <NavBtnLink onClick={() => setShow(true)}>Connect Wallet</NavBtnLink>
         </NavBtn>
       </Nav>
+      <Modal onClose={() => setShow(false)} show={show}/>
     </div>
   );
 };

@@ -16,11 +16,14 @@ color: #EDF0EB;
 display: flex;
 align-items: center;
 text-decoration: none;
-padding: 0 1rem;
+margin: 0 1rem;
 height: 100%;
 cursor: pointer;
 &.active {
 	color: #7D8282;
+  border-bottom:1.8px solid #7D8282;
+  padding-bottom: 5px;
+  padding-top: 6.8px;
 }
 `;
 
@@ -55,7 +58,7 @@ margin-right: 24px;
 }
 `;
 
-export const NavBtnLink = styled(Link)`
+export const NavBtnLink = styled.button`
 display: flex;
 font-size: 14px;
 background: ${props => props.black ? "#191A1A" : "#9DF368"};
@@ -66,8 +69,7 @@ height: 50px;
 justify-content: center;
 align-items: center;
 border: none;
-outline: none;
-text-decoration: none;
+cursor: pointer;
 transition: all 0.2s ease-in-out;
 &:hover {
 	transition: all 0.2s ease-in-out;
@@ -79,4 +81,4 @@ transition: all 0.2s ease-in-out;
 export const NavIcon = styled.div`
   display: flex;
   align-items: center;
-`
+` 

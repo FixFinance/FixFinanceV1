@@ -7,6 +7,7 @@ import Landing from './landing';
 import Community from './community';
 import Wallet from './wallet';
 import Margin from './margin';
+import BrowseBonds from './browseBonds'
 
 function App() {
   return (
@@ -14,7 +15,7 @@ function App() {
       <Navbar />
       <Switch>
         <Route path='/' exact component={Landing} />
-        <Route path='/browse_bonds' exact component={About} />
+        <Route path='/browse_bonds' exact component={BrowseBonds} />
         <Route path='/docs' exact component={UIKit} />
         <Route path='/margin_systems' exact component={Margin} />
         <Route path='/community' exact component={Community} />

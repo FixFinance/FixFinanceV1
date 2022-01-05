@@ -213,25 +213,51 @@ contract SBNSFVaultFactoryDelegate1 is SBNSFVaultFactoryDelegateParent {
 
 		//-----------------------------flashloan------------------
 		if (_data.length > 0) {
+
+			address copyReceiverAddr = _receiverAddr; //prevent stack too deep
+
+			address mVaultAssetSupplied = mVault.assetSupplied;
+			address mVaultAssetBorrowed = mVault.assetBorrowed;
+
 			bytes memory copyData = _data; //prevent stack too deep
-			IVaultManagerFlashReceiver(_receiverAddr).onFlashLoan(msg.sender,
-				mVault.assetSupplied,
-				mVault.assetBorrowed,
-				mVault.amountSupplied,
-				mVault.amountBorrowed,
+
+			uint mVaultAmountSupplied = mVault.amountSupplied;
+			uint mVaultAmountBorrowed = mVault.amountBorrowed;
+
+			Vault memory copyMVault = mVault;
+			Vault memory copyNewVault = newVault;
+			address newVaultAssetSupplied = copyNewVault.assetSupplied;
+			address newVaultAssetBorrowed = copyNewVault.assetBorrowed;
+			uint newVaultAmountSupplied = copyNewVault.amountSupplied;
+			uint newVaultAmountBorrowed = copyNewVault.amountBorrowed;
+
+			IVaultManagerFlashReceiver(copyReceiverAddr).onFlashLoan(
+				msg.sender,
+				mVaultAssetSupplied,
+				mVaultAssetBorrowed,
+				mVaultAmountSupplied,
+				mVaultAmountBorrowed,
 				copyData
 			);
+
+			//prevent memory tampering attack
+			copyNewVault.assetSupplied = newVaultAssetSupplied;
+			copyNewVault.assetBorrowed = newVaultAssetBorrowed;
+			copyNewVault.amountSupplied = newVaultAmountSupplied;
+			copyNewVault.amountBorrowed = newVaultAmountBorrowed;
+			copyMVault.assetSupplied = mVaultAssetSupplied;
+			copyMVault.assetBorrowed = mVaultAssetBorrowed;
+			copyMVault.amountSupplied = mVaultAmountSupplied;
+			copyMVault.amountBorrowed = mVaultAmountBorrowed;
 		}
 
 		//-----------------------------get funds-------------------------
 		if (mVault.assetSupplied != newVault.assetSupplied) {
 			IERC20(newVault.assetSupplied).safeTransferFrom(msg.sender, address(this), newVault.amountSupplied);
-			require(newVault.amountSupplied <= uint(type(int256).max));
-			require(mVault.amountSupplied <= uint(type(int256).max));
-			int changeAmt = int(newVault.amountSupplied);
+			int changeAmt = newVault.amountSupplied.toInt();
 			editSubAccountStandardVault(false, copyVaultOwner, sType, baseFCPsupplied, baseWrapperSupplied, changeAmt);
 			if (mVault.assetSupplied != address(0)) {
-				changeAmt = -int(mVault.amountSupplied);
+				changeAmt = mVault.amountSupplied.toInt().neg();
 				(, sType, baseFCPsupplied, baseWrapperSupplied) = suppliedAssetInfo(mVault.assetSupplied);
 				editSubAccountStandardVault(false, copyVaultOwner, sType, baseFCPsupplied, baseWrapperSupplied, changeAmt);
 			}
@@ -240,9 +266,7 @@ contract SBNSFVaultFactoryDelegate1 is SBNSFVaultFactoryDelegateParent {
 			if (mVault.amountSupplied < newVault.amountSupplied) {
 				IERC20(newVault.assetSupplied).safeTransferFrom(msg.sender, address(this), newVault.amountSupplied - mVault.amountSupplied);
 			}
-			require(newVault.amountSupplied <= uint(type(int256).max));
-			require(mVault.amountSupplied <= uint(type(int256).max));
-			int changeAmt = int(newVault.amountSupplied).sub(int(mVault.amountSupplied));
+			int changeAmt = newVault.amountSupplied.toInt().sub(mVault.amountSupplied.toInt());
 			editSubAccountStandardVault(false, copyVaultOwner, sType, baseFCPsupplied, baseWrapperSupplied, changeAmt);
 		}
 

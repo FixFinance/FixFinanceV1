@@ -64,6 +64,12 @@ contract DBSFVaultFactoryData is Ownable {
 		int amountBond;
 	}
 
+	uint internal constant STRUCT_SIZE_VAULT = 0xe0;
+	uint internal constant STRUCT_SIZE_LIQUIDATION = 0xe0;
+	uint internal constant STRUCT_SIZE_YTVAULT = 0x100;
+	uint internal constant STRUCT_SIZE_YTLIQUIDATION = 0x100;
+	uint internal constant STRUCT_SIZE_YTPOSITION = 0x40;
+
 	uint internal constant MAX_TIME_TO_MATURITY = 7 days;
 
 	uint internal constant CRITICAL_TIME_TO_MATURITY = 1 days;

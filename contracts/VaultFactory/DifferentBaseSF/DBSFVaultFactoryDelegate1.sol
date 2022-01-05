@@ -356,18 +356,28 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryDelegateParent {
 
 		//-----------------------------flashloan------------------
 		if (_data.length > 0) {
-			address assetSupplied = mVault.assetSupplied;
-			address assetBorrowed = mVault.assetBorrowed;
-			uint amountSupplied = mVault.amountSupplied;
-			int changeBorrowed = change == 0 ? 0 : (mVault.amountBorrowed < _amountBorrowed ? int(change) : -int(change));
-			IDBSFVaultManagerFlashReceiver(_receiverAddr).onFlashLoan(
-				msg.sender,
-				assetSupplied,
-				assetBorrowed,
-				amountSupplied,
-				changeBorrowed,
-				_data
-			);
+			address mVaultAssetSupplied = mVault.assetSupplied;
+			address mVaultAssetBorrowed = mVault.assetBorrowed;
+			uint mVaultAmountSupplied = mVault.amountSupplied;
+			uint mVaultAmountBorrowed = mVault.amountBorrowed;
+			{
+				//new scope to prevent stack too deep
+				int changeBorrowed = change == 0 ? 0 : (mVaultAmountBorrowed < _amountBorrowed ? change.toInt() : change.toInt().neg());
+				bytes memory copyData = _data;
+				IDBSFVaultManagerFlashReceiver(_receiverAddr).onFlashLoan(
+					msg.sender,
+					mVaultAssetSupplied,
+					mVaultAssetBorrowed,
+					mVaultAmountSupplied,
+					changeBorrowed,
+					copyData
+				);
+			}
+			//ensure memory wasn't tampered with during callback
+			mVault.assetSupplied = mVaultAssetSupplied;
+			mVault.assetBorrowed = mVaultAssetBorrowed;
+			mVault.amountSupplied = mVaultAmountSupplied;
+			mVault.amountBorrowed = mVaultAmountBorrowed;
 		}
 
 		//-----------------------------get funds-------------------------
@@ -453,14 +463,20 @@ contract DBSFVaultFactoryDelegate1 is DBSFVaultFactoryDelegateParent {
 
 		//-----------------------------flashloan------------------
 		if (_data.length > 0) {
+			bytes32 prevMVaultHash;
+			assembly { prevMVaultHash := keccak256(mVault, STRUCT_SIZE_VAULT) }
+			int borrowChange = mVault.amountBorrowed.toInt().neg();
 			IDBSFVaultManagerFlashReceiver(_receiverAddr).onFlashLoan(
 				msg.sender,
 				mVault.assetSupplied,
 				mVault.assetBorrowed,
 				mVault.amountSupplied,
-				-int(mVault.amountBorrowed),
+				borrowChange,
 				_data
 			);
+			bytes32 newMVaultHash;
+			assembly { newMVaultHash := keccak256(mVault, STRUCT_SIZE_VAULT) }
+			require(prevMVaultHash == newMVaultHash);
 		}
 
 		//-----------------------------get funds-------------------------

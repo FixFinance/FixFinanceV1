@@ -368,31 +368,46 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryDelegateParent {
 
 		//-----------------------------flashloan------------------
 		if (_data.length > 0) {
-			address FCPsupplied = mVault.FCPsupplied;
-			address FCPborrowed = mVault.FCPborrowed;
-			bytes32[3] memory toPass;
-			toPass[0] = bytes32(mVault.yieldSupplied);
-			toPass[1] = bytes32(mVault.bondSupplied);
-			toPass[2] = bytes32(mVault.amountBorrowed);
-			if (change == 0) {
-				toPass[2] = bytes32(0);
+
+			bytes32 prevMVaultHash;
+			assembly { prevMVaultHash := keccak256(mVault, STRUCT_SIZE_YTVAULT) }
+			YTVault memory mVaultCopy = mVault;
+
+			{
+				//new scope to prevent stack too deep
+				address FCPsupplied = mVaultCopy.FCPsupplied;
+				address FCPborrowed = mVaultCopy.FCPborrowed;
+
+				bytes32[3] memory toPass;
+				toPass[0] = bytes32(mVaultCopy.yieldSupplied);
+				toPass[1] = bytes32(mVaultCopy.bondSupplied);
+				toPass[2] = bytes32(mVaultCopy.amountBorrowed);
+				if (change == 0) {
+					toPass[2] = bytes32(0);
+				}
+				else if (uint(toPass[2]) > _amountBorrowed) {
+					toPass[2] = bytes32(change.toInt());
+				}
+				else {
+					toPass[2] = bytes32(change.toInt().neg());
+				}
+
+				bytes memory data = _data;
+
+				IDBSFYTVaultManagerFlashReceiver(_receiverAddr).onFlashLoan(
+					msg.sender,
+					FCPsupplied,
+					FCPborrowed,
+					uint(toPass[0]),
+					int(toPass[1]),
+					int(toPass[2]),
+					data
+				);
 			}
-			else if (uint(toPass[2]) > _amountBorrowed) {
-				toPass[2] = bytes32(int(change));
-			}
-			else {
-				toPass[2] = bytes32(-int(change));
-			}
-			bytes memory data = _data;
-			IDBSFYTVaultManagerFlashReceiver(_receiverAddr).onFlashLoan(
-				msg.sender,
-				FCPsupplied,
-				FCPborrowed,
-				uint(toPass[0]),
-				int(toPass[1]),
-				int(toPass[2]),
-				data
-			);
+
+			bytes32 newMVaultHash;
+			assembly { newMVaultHash := keccak256(mVault, STRUCT_SIZE_YTVAULT) }
+			require(prevMVaultHash == newMVaultHash);
 		}
 
 		//-----------------------------get funds-------------------------
@@ -497,20 +512,32 @@ contract DBSFVaultFactoryDelegate3 is DBSFVaultFactoryDelegateParent {
 
 		//-----------------------------flashloan------------------
 		if (_data.length > 0) {
-			address FCPsupplied = mVault.FCPsupplied;
-			address FCPborrowed = mVault.FCPborrowed;
-			uint yieldSupplied = mVault.yieldSupplied;
-			int bondSupplied = mVault.bondSupplied;
-			int changeBorrowed = -int(mVault.amountBorrowed);
-			IDBSFYTVaultManagerFlashReceiver(_receiverAddr).onFlashLoan(
-				msg.sender,
-				FCPsupplied,
-				FCPborrowed,
-				yieldSupplied,
-				bondSupplied,
-				changeBorrowed,
-				_data
-			);
+			bytes32 prevMVaultHash;
+			assembly { prevMVaultHash := keccak256(mVault, STRUCT_SIZE_YTVAULT) }
+			YTVault memory mVaultCopy = mVault;
+
+			{
+				//new scope to prevent stack too deep
+				address FCPsupplied = mVaultCopy.FCPsupplied;
+				address FCPborrowed = mVaultCopy.FCPborrowed;
+				uint yieldSupplied = mVaultCopy.yieldSupplied;
+				int bondSupplied = mVaultCopy.bondSupplied;
+				int changeBorrowed = mVaultCopy.amountBorrowed.toInt().neg();
+				bytes memory data = _data;
+				IDBSFYTVaultManagerFlashReceiver(_receiverAddr).onFlashLoan(
+					msg.sender,
+					FCPsupplied,
+					FCPborrowed,
+					yieldSupplied,
+					bondSupplied,
+					changeBorrowed,
+					data
+				);
+			}
+
+			bytes32 newMVaultHash;
+			assembly { newMVaultHash := keccak256(mVault, STRUCT_SIZE_YTVAULT) }
+			require(prevMVaultHash == newMVaultHash);
 		}
 
 		//-----------------------------get funds-------------------------

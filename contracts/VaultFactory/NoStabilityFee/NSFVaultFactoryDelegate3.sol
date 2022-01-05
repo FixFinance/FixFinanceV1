@@ -188,14 +188,14 @@ contract NSFVaultFactoryDelegate3 is NSFVaultFactoryDelegateParent {
 			uint conversionRate = IFixCapitalPool(_FCPsupplied).currentConversionRate();
 			require(_bondSupplied >= 0 || _yieldSupplied.mul(conversionRate) / (1 ether) >= uint(-_bondSupplied));
 			//write change in YT & ZCB into yield supplied & bond supplied respectively on mVault to save stack space
-			changeYTsupplied = int(_yieldSupplied).sub(int(mVault.yieldSupplied));
-			changeZCBsupplied = _bondSupplied.sub(mVault.bondSupplied).add(changeYTsupplied.mul(int(conversionRate)) / (1 ether));
+			changeYTsupplied = _yieldSupplied.toInt().sub(mVault.yieldSupplied.toInt());
+			changeZCBsupplied = _bondSupplied.sub(mVault.bondSupplied).add(changeYTsupplied.mul(conversionRate.toInt()) / (1 ether));
 			if (changeYTsupplied < 0) {
-				IFixCapitalPool(_FCPsupplied).transferYT(address(this), msg.sender, uint(-changeYTsupplied));
+				IFixCapitalPool(_FCPsupplied).transferYT(address(this), msg.sender, changeYTsupplied.neg().toUint());
 				changeZCBsupplied++; //offset rounding error when updating bond balance amounts
 			}
 			if (changeZCBsupplied < 0) {
-				IFixCapitalPool(_FCPsupplied).transferZCB(address(this), msg.sender, uint(-changeZCBsupplied));
+				IFixCapitalPool(_FCPsupplied).transferZCB(address(this), msg.sender, changeZCBsupplied.neg().toUint());
 			}
 			if (mVault.yieldSupplied != _yieldSupplied) {
 				sVault.yieldSupplied = _yieldSupplied;
@@ -227,15 +227,28 @@ contract NSFVaultFactoryDelegate3 is NSFVaultFactoryDelegateParent {
 
 		//-----------------------------flashloan------------------
 		if (_data.length > 0) {
+			bytes memory data = _data; //prevent stack too deep
+			address mVaultFCPsupplied = mVault.FCPsupplied;
+			address mVaultFCPborrowed = mVault.FCPborrowed;
+			uint mVaultYieldSupplied = mVault.yieldSupplied;
+			int mVaultBondSupplied = mVault.bondSupplied;
+			uint mVaultAmountBorrowed = mVault.amountBorrowed;
 			IYTVaultManagerFlashReceiver(_receiverAddr).onFlashLoan(
 				msg.sender,
-				mVault.FCPsupplied,
-				mVault.FCPborrowed,
-				mVault.yieldSupplied,
-				mVault.bondSupplied,
-				mVault.amountBorrowed,
-				_data
+				mVaultFCPsupplied,
+				mVaultFCPborrowed,
+				mVaultYieldSupplied,
+				mVaultBondSupplied,
+				mVaultAmountBorrowed,
+				data
 			);
+
+			//prevent memory tempering attack
+			mVault.FCPsupplied = mVaultFCPsupplied;
+			mVault.FCPborrowed = mVaultFCPborrowed;
+			mVault.yieldSupplied = mVaultYieldSupplied;
+			mVault.bondSupplied = mVaultBondSupplied;
+			mVault.amountBorrowed = mVaultAmountBorrowed;
 		}
 
 		//-----------------------------get funds-------------------------
@@ -257,16 +270,15 @@ contract NSFVaultFactoryDelegate3 is NSFVaultFactoryDelegateParent {
 			}
 		}
 		else if (mVault.amountBorrowed > _amountBorrowed) {
-			lowerShortInterest(_FCPborrowed, mVault.amountBorrowed - _amountBorrowed);
-			IFixCapitalPool(_FCPborrowed).burnZCBFrom(msg.sender,  mVault.amountBorrowed - _amountBorrowed);
+			lowerShortInterest(_FCPborrowed, mVault.amountBorrowed.sub(_amountBorrowed));
+			IFixCapitalPool(_FCPborrowed).burnZCBFrom(msg.sender,  mVault.amountBorrowed.sub(_amountBorrowed));
 		}
 
 		require(_yieldSupplied <= uint(type(int256).max));
-		require(mVault.yieldSupplied <= uint(type(int256).max));
 		address copyVaultOwner = _owner; //prevent stack too deep
 		address copyFCPsupplied = _FCPsupplied; //prevent stack too deep
 		if (mVault.FCPsupplied == _FCPsupplied || mVault.FCPsupplied == address(0)) {
-			int yieldChange = int(_yieldSupplied).sub(int(mVault.yieldSupplied));
+			int yieldChange = int(_yieldSupplied).sub(mVault.yieldSupplied.toInt());
 			int bondChange = _bondSupplied.sub(mVault.bondSupplied);
 			address baseWrapperSupplied = address(IFixCapitalPool(copyFCPsupplied).wrapper());
 			editSubAccountYTVault(false, copyVaultOwner, copyFCPsupplied, baseWrapperSupplied, yieldChange, bondChange);
@@ -277,7 +289,7 @@ contract NSFVaultFactoryDelegate3 is NSFVaultFactoryDelegateParent {
 			address baseWrapperSupplied = _fixCapitalPoolToWrapper[copyFCPsupplied];
 			editSubAccountYTVault(false, copyVaultOwner, copyFCPsupplied, baseWrapperSupplied, yieldChange, bondChange);
 			if (mVault.FCPsupplied != address(0)) {
-				yieldChange = -int(mVault.yieldSupplied);
+				yieldChange = mVault.yieldSupplied.toInt().neg();
 				bondChange = mVault.bondSupplied.neg();
 				baseWrapperSupplied = address(IFixCapitalPool(mVault.FCPsupplied).wrapper());
 				editSubAccountYTVault(false, copyVaultOwner, mVault.FCPsupplied, baseWrapperSupplied, yieldChange, bondChange);

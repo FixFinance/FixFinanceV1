@@ -3,7 +3,7 @@ import { Container, H1Text } from '../components/Components';
   
 const Community = () => {
   return (
-    <Container>
+    <Container black>
       <H1Text white>
         Community Page
       </H1Text>

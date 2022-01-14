@@ -57,7 +57,7 @@ contract NGBwrapper is INGBWrapper, NGBwrapperInternals {
 		@param address _to: the address that shall receive the newly minted wrapped tokens
 		@param uint _amount: the amount of underlying asset units to deposit
 	*/
-	function depositUnitAmount(address _to, uint _amount) external override returns (uint _amountWrapped) {
+	function depositUnitAmount(address _to, uint _amount) public override returns (uint _amountWrapped) {
 		address _delegateAddress = delegate1Address;
 		bytes memory sig = abi.encodeWithSignature("depositUnitAmount(address,uint256)", _to, _amount);
 
@@ -95,6 +95,14 @@ contract NGBwrapper is INGBWrapper, NGBwrapperInternals {
 		}
 
 		emit Deposit(_to, _amount);
+	}
+
+	/*
+		@Description: send in specific amount of the underlying to receive the wrapped asset
+			this function does exactly the same thing as depositUnitAmount in NGBwrapper though it is needed to keep compatiability with IWrapper
+	*/
+	function depositUnderlying(address _to, uint _amount) external override returns (uint _amountWrapped) {
+		_amountWrapped = depositUnitAmount(_to, _amount);
 	}
 
 	/*

@@ -165,6 +165,25 @@ contract CTokenWrapperDelegate1 is CTokenWrapperDelegateParent {
 	}
 
 	/*
+		@Description: send specific amount of the underlying asset and receive the wrapped asset
+
+		@param address _to: the address that shall receive the newly minted wrapped tokens
+		@param uint _amount: the amount of the underlying to deposit
+	*/
+	function depositUnderlying(address _to, uint _amount) external noReentry claimRewards(true, _to) returns (uint _amountWrapped) {
+		ICToken cToken = ICToken(internalUnderlyingAssetAddress);
+		(uint _totalSupply, , uint contractBalance) = extractRetsHarvestToTreasury(cToken);
+		if (_totalSupply == 0) {
+			return firstDeposit(_to, _amount, cToken);
+		}
+		_amountWrapped = _totalSupply.mul(_amount).div(contractBalance);
+		internalBalanceOf[_to] = internalBalanceOf[_to].add(_amountWrapped);
+		//we cannot use _totalSupply as internalTotalSupply was set in harvestToTreasury
+		internalTotalSupply = internalTotalSupply.add(_amountWrapped);
+		IERC20(address(cToken)).safeTransferFrom(msg.sender, address(this), _amount);
+	}
+
+	/*
 		@Description: burn wrapped asset to receive an amount of underlying asset of _amountUnit
 
 		@param address _to: the address that shall receive the underlying asset

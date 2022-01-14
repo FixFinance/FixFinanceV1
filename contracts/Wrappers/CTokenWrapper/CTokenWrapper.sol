@@ -96,6 +96,29 @@ contract CTokenWrapper is ICTokenWrapper, CTokenWrapperInternals {
 	}
 
 	/*
+		@Description: send specific amount of the underlying asset and receive the wrapped asset
+
+		@param address _to: the address that shall receive the newly minted wrapped tokens
+		@param uint _amount: the amount of the underlying to deposit
+	*/
+	function depositUnderlying(address _to, uint _amount) external override returns (uint _amountWrapped) {
+		address _delegateAddress = delegate1Address;
+		bytes memory sig = abi.encodeWithSignature("depositUnderlying(address,uint256)", _to, _amount);
+
+		assembly {
+			let retPtr := mload(0x40)
+
+			let success := delegatecall(gas(), _delegateAddress, add(sig, 0x20), mload(sig), retPtr, 0x20)
+
+			if iszero(success) { revert(0,0) }
+
+			_amountWrapped := mload(retPtr)
+		}
+
+		emit Deposit(_to, _amountWrapped);
+	}
+
+	/*
 		@Description: get the time at which the amount of yield generated in this wrapper was last updated
 			because there is a limit of 20% of interest generated since last harvest that may be collected
 			as fees we will always be able to get a wrapped asset to underlying asset ratio that accounts

@@ -12,7 +12,7 @@ contract DummyVaultHealth is IVaultHealth {
 	*/
 
 	//underlyingAsset => maximum amount of short interest *all duations combined*
-	mapping(address => uint) public override maximumShortInterest;
+	mapping(address => uint) public override MaximumShortInterest;
 
 	//asset supplied => asset borrowed => ratio
 	mapping(address => mapping(address => uint)) public upperRatio;
@@ -103,14 +103,14 @@ contract DummyVaultHealth is IVaultHealth {
 		return true && toReturn;
 	}
 
-	function upperMinimumRateAdjustment(address _underlyingAssetAddress) external view override returns (uint120) {
+	function UpperMinimumRateAdjustment(address _underlyingAssetAddress) external view override returns (uint120) {
 		if (_underlyingAssetAddress == address(0)) {
 			return 0;
 		}
 		return 1;
 	}
 
-	function lowerMinimumRateAdjustment(address _underlyingAssetAddress) external view override returns (uint120) {
+	function LowerMinimumRateAdjustment(address _underlyingAssetAddress) external view override returns (uint120) {
 		if (_underlyingAssetAddress == address(0)) {
 			return 0;
 		}
@@ -213,19 +213,19 @@ contract DummyVaultHealth is IVaultHealth {
 
 	}
 
-	function setMaximumShortInterest(address _underlyingAssetAddress, uint _maximumShortInterest) external override {
-		maximumShortInterest[_underlyingAssetAddress] = _maximumShortInterest;
+	function setMaximumShortInterest(address _underlyingAssetAddress, uint _MaximumShortInterest) external override {
+		MaximumShortInterest[_underlyingAssetAddress] = _MaximumShortInterest;
 	}
 	function setCollateralizationRatios(address _underlyingAssetAddress, uint120 _upper, uint120 _lower) external override {
-		maximumShortInterest[_underlyingAssetAddress] = maximumShortInterest[_upper == _lower ? _underlyingAssetAddress : _underlyingAssetAddress];
+		MaximumShortInterest[_underlyingAssetAddress] = MaximumShortInterest[_upper == _lower ? _underlyingAssetAddress : _underlyingAssetAddress];
 	}
 	function setRateThresholds(address _underlyingAssetAddress, uint120 _upper, uint120 _lower) external override {
-		maximumShortInterest[_underlyingAssetAddress] = maximumShortInterest[_upper == _lower ? _underlyingAssetAddress : _underlyingAssetAddress];
+		MaximumShortInterest[_underlyingAssetAddress] = MaximumShortInterest[_upper == _lower ? _underlyingAssetAddress : _underlyingAssetAddress];
 	}
 	function setOrganizerAddress(address _organizerAddress) external override {
-		maximumShortInterest[_organizerAddress] = maximumShortInterest[_organizerAddress];
+		MaximumShortInterest[_organizerAddress] = MaximumShortInterest[_organizerAddress];
 	}
 	function setMinimumRateAdjustments(address _wrapperAddress, uint120 _upper, uint120 _lower) external override {
-		maximumShortInterest[_wrapperAddress] = maximumShortInterest[_upper == _lower+1 ? _wrapperAddress : _wrapperAddress];		
+		MaximumShortInterest[_wrapperAddress] = MaximumShortInterest[_upper == _lower+1 ? _wrapperAddress : _wrapperAddress];		
 	}
 }

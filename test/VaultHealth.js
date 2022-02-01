@@ -1391,6 +1391,6 @@ contract('VaultHealth', async function(accounts) {
 
 		await vaultHealthInstance.setMaximumShortInterest(asset0.address, setTo);
 
-		assert.equal((await vaultHealthInstance.maximumShortInterest(asset0.address)).toString(), setTo, "correct value for maximum short interest");
+		assert.equal((await vaultHealthInstance.MaximumShortInterest(asset0.address)).toString(), setTo, "correct value for maximum short interest");
 	});
 });

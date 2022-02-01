@@ -37,7 +37,7 @@ contract NSFVaultFactoryDelegateParent is NSFVaultFactoryData, nonReentrant {
 	function raiseShortInterest(address _fixCapitalPoolAddress, uint _amount) internal {
 		address underlyingAssetAddress = IFixCapitalPool(_fixCapitalPoolAddress).underlyingAssetAddress();
 		uint temp = _shortInterestAllDurations[underlyingAssetAddress].add(_amount);
-		require(vaultHealthContract.maximumShortInterest(underlyingAssetAddress) >= temp);
+		require(vaultHealthContract.MaximumShortInterest(underlyingAssetAddress) >= temp);
 		_shortInterestAllDurations[underlyingAssetAddress] = temp;
 	}
 

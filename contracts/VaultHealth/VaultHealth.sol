@@ -9,119 +9,14 @@ import "../interfaces/IFixCapitalPool.sol";
 import "../interfaces/IZeroCouponBond.sol";
 import "../libraries/ABDKMath64x64.sol";
 import "../libraries/SafeMath.sol";
-import "../libraries/SignedSafeMath.sol";
 import "../libraries/BigMath.sol";
 import "../oracle/interfaces/IOracleContainer.sol";
+import "./VaultHealthData.sol";
 
 
-contract VaultHealth is IVaultHealth, Ownable {
+contract VaultHealth is IVaultHealth, VaultHealthData {
 	using ABDKMath64x64 for int128;
 	using SafeMath for uint256;
-	using SignedSafeMath for int256;
-
-	uint private constant SecondsPerYear = 31556926;
-
-	uint private constant TOTAL_BASIS_POINTS = 10_000;
-
-	int128 private constant ABDK_1 = 1<<64;
-
-	/*
-		the RateAdjuster enum holds information about how to change the APY
-		when calculating required collateralisation ratios.
-
-		UPPER means that you are checking the upper collateralisation limit
-		LOWER means that you are checking the lower collateralisation limit
-
-		DEPOSIT means that you are finding the rate multiplier for a ZCB that has been supplied to a vault
-		BORROW means that you are finding the rate multiplier for a ZCB that has been borrowed from a vault
-
-		BASE means that you are not adjusting the APY to find a collateralisation limit
-		BASE means that you are finding the rate multiplier to get as best an approximation of market value
-			of the ZCBs as possible
-	*/
-	enum RateAdjuster {
-		UPPER_DEPOSIT,
-		LOW_DEPOSIT,
-		BASE,
-		LOW_BORROW,
-		UPPER_BORROW
-	}
-
-	/*
-		the Safety enum holds information about which collateralsation limit is in question
-
-		as you may have inferred
-		UPPER means that the upper collateralisation ratio is in use
-		LOWER means that the lower collateralisation ratio is in use
-	*/
-	enum Safety {
-		UPPER,
-		LOW
-	}
-
-	/*
-		When a user deposits bonds we take the Maximum of the rate shown in the oracle +
-		(upper/lower)MinimumRateAdjustment[baseWrapperAsset] and the rate shown in the oracle adjusted with the
-		corresponding rate threshold as the rate for which collateralization requirements
-		will be calculated for the (upper/lower) limit
-
-		When a user borrowes bonds we take the Maximum of the rate shown in the oracle -
-		(upper/lower)MinimumRateAdjustment[baseWrapperAsset] and the rate shown in the oracle adjusted with the
-		corresponding rate threshold as the rate for which collateralization requirements
-		will be calculated for the (upper/lower) limit
-	*/
-	mapping(address => uint120) public override upperMinimumRateAdjustment;
-	mapping(address => uint120) public override lowerMinimumRateAdjustment;
-
-	/*
-		The Collateralisation Ratio mappings hold information about the % which any vault
-		containing a asset must be overcollateralised.
-
-		For example if
-		UpperCollateralizationRatio[_assetSupplied] == 1.0 and
-		UpperCollateralizationRatio[_assetBorrowed] == 1.5
-
-		the total overcollateralisation % required for the vault due to volatility of asset prices
-		is (1.0 * 1.5 - 1.0) == 50% for the upper collateralization limit
-
-		these mappings take in an underlying asset, they do not account for overcollateralisation
-		required due to rate volatility
-
-		When ZCBs are used in a vault to find the collateralization ratio due to underlying asset
-		you must find UpperCollateralzationRatio[org.fixCapitalPoolToWrapper(_ZCBaddress)]
-
-		In ABDK64.64 format
-	*/
-	mapping(address => uint120) public override LowerCollateralizationRatio;
-
-	mapping(address => uint120) public override UpperCollateralizationRatio;
-
-
-	/*
-		Because rates are always over 1.0 (meaning the % notation of the rate is always positive)
-		the rate thresholds refer to the % change in the rate minus 1.
-		All rate thresholds must be above 1.0 as well,to get the resultant threshold adjusted rate for
-		borrowing we find 1 + (rate - 1)/threshold
-		to get the resultatn threshold adjusted rate for depositing we find
-		1 + (rate - 1)*threshold
-		For example if there is a rate treshold of 1.25 and the current rate for that asset is 
-		3% the rate used when calculating borrow requirements for that asset will be
-		(1.03-1) / 1.25 == 3% / 1.25 == 2.4%
-		To calculate the rate for deposit calculations for that asset we would do the following
-		(1.03-1) * 1.25 == 3% * 1.25 == 3.75%
-	*/
-	mapping(address => uint120) public override LowerRateThreshold;
-
-	mapping(address => uint120) public override UpperRateThreshold;
-
-	/*
-		Set by contract owner this mapping shows the maximum amount of any underlying asset (at all durations combined)
-		that may be shorted via the VaultFactory contract
-	*/
-	mapping(address => uint) public override maximumShortInterest;
-
-	address organizerAddress;
-	address oracleContainerAddress;
 
 	constructor(address _oracleContainerAddress) public {
 		oracleContainerAddress = _oracleContainerAddress;
@@ -170,16 +65,16 @@ contract VaultHealth is IVaultHealth, Ownable {
 	*/
 	function getRateThresholdMultiplier(address _underlyingAssetAddress, RateAdjuster _rateAdjuster) internal view returns (int128 multiplier) {
 		if (_rateAdjuster == RateAdjuster.UPPER_BORROW) {
-			multiplier = ABDK_1.div(int128(UpperRateThreshold[_underlyingAssetAddress]));
+			multiplier = ABDK_1.div(int128(upperRateThreshold[_underlyingAssetAddress]));
 		}
 		else if (_rateAdjuster == RateAdjuster.LOW_BORROW) {
-			multiplier = ABDK_1.div(int128(LowerRateThreshold[_underlyingAssetAddress]));
+			multiplier = ABDK_1.div(int128(lowerRateThreshold[_underlyingAssetAddress]));
 		}
 		else if (_rateAdjuster == RateAdjuster.UPPER_DEPOSIT) {
-			multiplier = ABDK_1.mul(int128(UpperRateThreshold[_underlyingAssetAddress]));
+			multiplier = ABDK_1.mul(int128(upperRateThreshold[_underlyingAssetAddress]));
 		}
 		else if (_rateAdjuster == RateAdjuster.LOW_DEPOSIT) {
-			multiplier = ABDK_1.mul(int128(LowerRateThreshold[_underlyingAssetAddress]));
+			multiplier = ABDK_1.mul(int128(lowerRateThreshold[_underlyingAssetAddress]));
 		}
 		else {
 			multiplier = ABDK_1;
@@ -503,9 +398,9 @@ contract VaultHealth is IVaultHealth, Ownable {
 			return (1 ether);
 		}
 		if (_safety == Safety.UPPER) {
-			return uint(int128(UpperCollateralizationRatio[_deposited]).mul(int128(UpperCollateralizationRatio[_borrowed]))).mul(1 ether) >> 64;
+			return uint(int128(upperCollateralizationRatio[_deposited]).mul(int128(upperCollateralizationRatio[_borrowed]))).mul(1 ether) >> 64;
 		}
-		return uint(int128(LowerCollateralizationRatio[_deposited]).mul(int128(LowerCollateralizationRatio[_borrowed]))).mul(1 ether) >> 64;
+		return uint(int128(lowerCollateralizationRatio[_deposited]).mul(int128(lowerCollateralizationRatio[_borrowed]))).mul(1 ether) >> 64;
 	}
 
 	/*
@@ -529,7 +424,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 		address fcpBorrowed
 	) {
 		IOrganizer org = IOrganizer(organizerAddress);
-		if (UpperRateThreshold[_deposited] == 0) { //deposited is ZCB
+		if (upperRateThreshold[_deposited] == 0) { //deposited is ZCB
 			fcpDeposited = IZeroCouponBond(_deposited).FixCapitalPoolAddress();
 			baseDepositedAsset = org.fixCapitalPoolToWrapper(fcpDeposited);
 		}
@@ -627,7 +522,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 
 		//if !positiveBond there are essentially 2 ZCBs being borrowed from the vault with _baseSupplied as the supplied asset
 		//thus we change the rate adjuster to borrow if the "supplied" ZCB is negative
-		uint ZCBvalue = uint(positiveBond ? _amountBond : _amountBond.neg())
+		uint ZCBvalue = uint(positiveBond ? _amountBond : -_amountBond)
 			.mul(getRateMultiplier(_FCPsupplied, _baseSupplied, positiveBond ? RateAdjuster.UPPER_DEPOSIT : RateAdjuster.UPPER_BORROW, _suppliedRateChange))
 			.div(1 ether);
 
@@ -715,7 +610,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 		uint totalToBorrowAgainst  = _amountYield
 			.mul(1 ether)
 			.div(getRateMultiplier(_FCP, base, RateAdjuster.UPPER_BORROW, _borrowedRateChange));
-		return positiveBond ? totalToBorrowAgainst.add(uint(_amountBond)) : totalToBorrowAgainst.sub(uint(_amountBond.neg()));
+		return positiveBond ? totalToBorrowAgainst.add(uint(_amountBond)) : totalToBorrowAgainst.sub(uint(-_amountBond));
 	}
 
 	/*
@@ -750,7 +645,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 
 		//if !positiveBond there are essentially 2 ZCBs being borrowed from the vault with _baseSupplied as the supplied asset
 		//thus we change the rate adjuster to borrow if the "supplied" ZCB is negative
-		uint ZCBvalue = uint(positiveBond ? _amountBond : _amountBond.neg())
+		uint ZCBvalue = uint(positiveBond ? _amountBond : -_amountBond)
 			.mul(getRateMultiplier(_FCPsupplied, _baseSupplied, positiveBond ? RateAdjuster.LOW_DEPOSIT : RateAdjuster.LOW_BORROW, _suppliedRateChange))
 			.div(1 ether);
 
@@ -838,7 +733,7 @@ contract VaultHealth is IVaultHealth, Ownable {
 		uint totalToBorrowAgainst  = _amountYield
 			.mul(1 ether)
 			.div(getRateMultiplier(_FCP, base, RateAdjuster.LOW_BORROW, _borrowedRateChange));
-		return positiveBond ? totalToBorrowAgainst.add(uint(_amountBond)) : totalToBorrowAgainst.sub(uint(_amountBond.neg()));
+		return positiveBond ? totalToBorrowAgainst.add(uint(_amountBond)) : totalToBorrowAgainst.sub(uint(-_amountBond));
 	}
 
 	/*
@@ -1169,8 +1064,8 @@ contract VaultHealth is IVaultHealth, Ownable {
 		require(_upper >= _lower && _lower > ABDK_1);
 		//ensure that the contract at _wrapperAddress is not a fix capital pool contract
 		require(IOrganizer(organizerAddress).fixCapitalPoolToWrapper(_wrapperAddress) == address(0));
-		UpperCollateralizationRatio[_wrapperAddress] = _upper;
-		LowerCollateralizationRatio[_wrapperAddress] = _lower;
+		upperCollateralizationRatio[_wrapperAddress] = _upper;
+		lowerCollateralizationRatio[_wrapperAddress] = _lower;
 	}
 
 	/*
@@ -1186,8 +1081,8 @@ contract VaultHealth is IVaultHealth, Ownable {
 		require(_upper >= _lower && _lower > ABDK_1);
 		//ensure that the contract at _wrapperAddress is not a fix capital pool contract
 		require(IOrganizer(organizerAddress).fixCapitalPoolToWrapper(_wrapperAddress) == address(0));
-		UpperRateThreshold[_wrapperAddress] = _upper;
-		LowerRateThreshold[_wrapperAddress] = _lower;
+		upperRateThreshold[_wrapperAddress] = _upper;
+		lowerRateThreshold[_wrapperAddress] = _lower;
 	}
 
 	/*
@@ -1220,5 +1115,34 @@ contract VaultHealth is IVaultHealth, Ownable {
 		upperMinimumRateAdjustment[_wrapperAddress] = _upperMinimumRateAdjustment;
 		lowerMinimumRateAdjustment[_wrapperAddress] = _lowerMinimumRateAdjustment;
 	}
-}
 
+	//--------V-I-E-W---D-A-T-A-------------
+
+	function MaximumShortInterest(address _underlyingAssetAddress) external view override returns (uint) {
+		return maximumShortInterest[_underlyingAssetAddress];
+	}
+
+	function UpperCollateralizationRatio(address _wrapperAddress) external view override returns(uint120) {
+		return upperCollateralizationRatio[_wrapperAddress];
+	}
+
+	function LowerCollateralizationRatio(address _wrapperAddress) external view override returns(uint120) {
+		return lowerCollateralizationRatio[_wrapperAddress];
+	}
+
+	function UpperRateThreshold(address _wrapperAddress) external view override returns(uint120) {
+		return upperRateThreshold[_wrapperAddress];
+	}
+
+	function LowerRateThreshold(address _wrapperAddress) external view override returns(uint120) {
+		return lowerRateThreshold[_wrapperAddress];
+	}
+
+	function UpperMinimumRateAdjustment(address _wrapperAddress) external view override returns (uint120) {
+		return upperMinimumRateAdjustment[_wrapperAddress];
+	}
+
+	function LowerMinimumRateAdjustment(address _wrapperAddress) external view override returns (uint120) {
+		return lowerMinimumRateAdjustment[_wrapperAddress];
+	}
+}

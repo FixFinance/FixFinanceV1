@@ -41,13 +41,13 @@ interface IVaultHealth {
 		int128 _borrowRateChange
 	) external view returns (bool);	
 
-	function maximumShortInterest(address _underlyingAssetAddress) external view returns (uint);
+	function MaximumShortInterest(address _underlyingAssetAddress) external view returns (uint);
 	function UpperCollateralizationRatio(address _wrapperAddress) external view returns(uint120);
 	function LowerCollateralizationRatio(address _wrapperAddress) external view returns(uint120);
 	function UpperRateThreshold(address _wrapperAddress) external view returns(uint120);
 	function LowerRateThreshold(address _wrapperAddress) external view returns(uint120);
-	function upperMinimumRateAdjustment(address _wrapperAddress) external view returns (uint120);
-	function lowerMinimumRateAdjustment(address _wrapperAddress) external view returns (uint120);
+	function UpperMinimumRateAdjustment(address _wrapperAddress) external view returns (uint120);
+	function LowerMinimumRateAdjustment(address _wrapperAddress) external view returns (uint120);
 
 	//-------------a-d-m-i-n---------------
 	function setCollateralizationRatios(address _wrapperAddress, uint120 _upper, uint120 _lower) external;

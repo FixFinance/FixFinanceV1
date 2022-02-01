@@ -1055,17 +1055,22 @@ contract VaultHealth is IVaultHealth, VaultHealthData {
 		@Description: admin may set the values in the CollateralizationRatio mappings
 		
 		@param address _wrapperAddress: the wrapper asset for which to set the a collateralisation ratio
-		@param uint128 _upper: the upper collateralisation ratio
+		@param uint120 _upper: the upper collateralisation ratio
 			in ABDK64.64 format
-		@param uint128 _lower: the upper collateralisation ratio
+		@param uint120 _lower: the upper collateralisation ratio
 			in ABDK64.64 format
+		@param uint120 _liqBonus: the bonus % of collateral given to the liquidator upon liquidation
+		@param uint120 _liqProtocolFee: the fee collected for the protocol on liquidations
 	*/
-	function setCollateralizationRatios(address _wrapperAddress, uint120 _upper, uint120 _lower) external override onlyOwner {
+	function setCollateralizationRatios(address _wrapperAddress, uint120 _upper, uint120 _lower, uint120 _liqBonus, uint120 _liqProtocolFee) external override onlyOwner {
 		require(_upper >= _lower && _lower > ABDK_1);
+		require(_upper > uint(_liqBonus).add(uint(_liqProtocolFee)).add(uint(MIN_THRESHOLD)) && _liqBonus > ABDK_1);
 		//ensure that the contract at _wrapperAddress is not a fix capital pool contract
 		require(IOrganizer(organizerAddress).fixCapitalPoolToWrapper(_wrapperAddress) == address(0));
 		upperCollateralizationRatio[_wrapperAddress] = _upper;
 		lowerCollateralizationRatio[_wrapperAddress] = _lower;
+		liquidatorBonus[_wrapperAddress] = _liqBonus;
+		protocolLiqFee[_wrapperAddress] = _liqProtocolFee;
 	}
 
 	/*
@@ -1144,5 +1149,11 @@ contract VaultHealth is IVaultHealth, VaultHealthData {
 
 	function LowerMinimumRateAdjustment(address _wrapperAddress) external view override returns (uint120) {
 		return lowerMinimumRateAdjustment[_wrapperAddress];
+	}
+	function LiquidatorBonus(address _assetAddress) external view override returns (uint120) {
+		return liquidatorBonus[_assetAddress];
+	}
+	function ProtocolLiqFee(address _assetAddress) external view override returns (uint120) {
+		return protocolLiqFee[_assetAddress];
 	}
 }

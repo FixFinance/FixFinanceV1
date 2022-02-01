@@ -182,6 +182,15 @@ contract DummyVaultHealth is IVaultHealth {
 		return true && toReturn;		
 	}
 
+	function LiquidatorBonus(address _assetAddress) external view override returns (uint120) {
+		uint120 ret; assembly{ret:=_assetAddress}
+		return ret;
+	}
+
+	function ProtocolLiqFee(address _assetAddress) external override view returns (uint120) {
+		uint120 ret; assembly{ret:=_assetAddress}
+		return ret;
+	}
 
 	function setUpper(
 		address _assetSupplied,
@@ -216,8 +225,8 @@ contract DummyVaultHealth is IVaultHealth {
 	function setMaximumShortInterest(address _underlyingAssetAddress, uint _MaximumShortInterest) external override {
 		MaximumShortInterest[_underlyingAssetAddress] = _MaximumShortInterest;
 	}
-	function setCollateralizationRatios(address _underlyingAssetAddress, uint120 _upper, uint120 _lower) external override {
-		MaximumShortInterest[_underlyingAssetAddress] = MaximumShortInterest[_upper == _lower ? _underlyingAssetAddress : _underlyingAssetAddress];
+	function setCollateralizationRatios(address _underlyingAssetAddress, uint120 _upper, uint120 _lower, uint120 _liqBonus, uint120 _liqProtocolFee) external override {
+		MaximumShortInterest[_underlyingAssetAddress] = (MaximumShortInterest[_upper == _lower ? _underlyingAssetAddress : _underlyingAssetAddress]) + _liqBonus + _liqProtocolFee;
 	}
 	function setRateThresholds(address _underlyingAssetAddress, uint120 _upper, uint120 _lower) external override {
 		MaximumShortInterest[_underlyingAssetAddress] = MaximumShortInterest[_upper == _lower ? _underlyingAssetAddress : _underlyingAssetAddress];

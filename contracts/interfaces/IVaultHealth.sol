@@ -48,9 +48,11 @@ interface IVaultHealth {
 	function LowerRateThreshold(address _wrapperAddress) external view returns(uint120);
 	function UpperMinimumRateAdjustment(address _wrapperAddress) external view returns (uint120);
 	function LowerMinimumRateAdjustment(address _wrapperAddress) external view returns (uint120);
+	function LiquidatorBonus(address _assetAddress) external view returns (uint120);
+	function ProtocolLiqFee(address _assetAddress) external view returns (uint120);
 
 	//-------------a-d-m-i-n---------------
-	function setCollateralizationRatios(address _wrapperAddress, uint120 _upper, uint120 _lower) external;
+	function setCollateralizationRatios(address _wrapperAddress, uint120 _upper, uint120 _lower, uint120 _liqBonus, uint120 _protocolLiqFee) external;
 	function setRateThresholds(address _wrapperAddress, uint120 _upper, uint120 _lower) external;
 	function setOrganizerAddress(address _organizerAddress) external;
 	function setMaximumShortInterest(address _underlyingAssetAddress, uint _maximumShortInterest) external;

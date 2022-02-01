@@ -102,6 +102,23 @@ contract VaultHealthData is Ownable {
 	*/
 	mapping(address => uint) internal maximumShortInterest;
 
+	/*
+		To get the total liquidatorBonus multiplier get liquidatorBonus[_collateralBase] + liquidatorBonus[_debtBase]
+		the liquidationBonus multiplier is used to get the amount of the collateral to give to the liquidator
+
+		collateralToLiquidator == debtAssetFromLiquidator * debtToCollateralPrice_fromOracle * (totalLiquidatorBonus + 1)
+
+		To get the total protocolLiqFee multiplier get protocolLiqFee[_collateralBase] + protocolLiqFee[_debtBase]
+		the protocolLiqFee multiplier is used to get the amount of the collateral to give to be split between the treasury and admin
+
+		protocolLiqFee == debtAssetFromLiquidator * debtToCollateralPrice_fromOracle * totalProtocolLiqFee
+		Both liquidatorBonus and protocolLiqFee are in ABDK format
+	*/
+	mapping(address => uint120) internal liquidatorBonus;
+	mapping(address => uint120) internal protocolLiqFee;
+	uint120 internal constant MIN_THRESHOLD = uint120(ABDK_1) / 100; // 1%
+	// liquidatorBonus + protocolLiqFee must always be at least 1% less than the collateralization factor for that asset
+
 	address organizerAddress;
 	address oracleContainerAddress;
 }

@@ -13,6 +13,7 @@ const zcbYtDeployer = artifacts.require('ZCB_YT_Deployer');
 const OracleContainer = artifacts.require('OracleContainer');
 const OracleDeployer = artifacts.require('OracleDeployer');
 const VaultHealth = artifacts.require("VaultHealth");
+const VaultHealthDelegate1 = artifacts.require('VaultHealthDelegate1');
 const VaultHealthDeployer = artifacts.require("VaultHealthDeployer");
 //NSFVaultFactory
 const NSFVaultFactoryDelegate1 = artifacts.require("NSFVaultFactoryDelegate1");
@@ -117,7 +118,8 @@ module.exports = async function(deployer) {
 	oracleDeployerInstance = await deployer.deploy(OracleDeployer);
 	let rec = await oracleDeployerInstance.deploy(WETH);
 	oracleContainerInstance = await OracleContainer.at(rec.logs[0].args.addr);
-	vhDeployerInstance = await deployer.deploy(VaultHealthDeployer);
+	vhDel1 = await VaultHealthDelegate1.new();
+	vhDeployerInstance = await deployer.deploy(VaultHealthDeployer, vhDel1.address);
 	rec = await vhDeployerInstance.deploy(oracleContainerInstance.address);
 	vhInstance = await VaultHealth.at(rec.logs[0].args.addr);	
 	rec = await nsfvfDeployerInstance.deploy(vhInstance.address);

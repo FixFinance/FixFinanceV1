@@ -1,5 +1,6 @@
 const dummyAToken = artifacts.require('dummyAToken');
 const VaultHealth = artifacts.require('VaultHealth');
+const VaultHealthDelegate1 = artifacts.require('VaultHealthDelegate1');
 const NGBwrapper = artifacts.require('NGBwrapper');
 const FCPDelegate1 = artifacts.require('FCPDelegate1');
 const FCPDelegate2 = artifacts.require('FCPDelegate2');
@@ -112,7 +113,8 @@ contract('VaultHealth', async function(accounts) {
 		price = 0;
 		OracleContainerInstance = await OracleContainer.new(nullAddress.substring(0, nullAddress.length-1)+"1");
 		zcbYtDeployerInstance = await zcbYtDeployer.new();
-		vaultHealthInstance = await VaultHealth.new(OracleContainerInstance.address);
+		vaultHealthDelegate1Instance = await VaultHealthDelegate1.new();
+		vaultHealthInstance = await VaultHealth.new(OracleContainerInstance.address, vaultHealthDelegate1Instance.address);
 		nsfVaultFactoryDelegate1Instance = await NSFVaultFactoryDelegate1.new();
 		nsfVaultFactoryDelegate2Instance = await NSFVaultFactoryDelegate2.new();
 		nsfVaultFactoryDelegate3Instance = await NSFVaultFactoryDelegate3.new();
@@ -297,24 +299,40 @@ contract('VaultHealth', async function(accounts) {
 		//asset0 ratios
 		upperRatio0 = 1.07;
 		lowerRatio0 = 1.05;
+		liqBonus0 = 0.03;
+		protocolLiqFee0 = 0.02;
 		UpperRatio0Str = basisPointsToABDKString(10700);	//107%
 		LowerRatio0Str = basisPointsToABDKString(10500);	//105%
-		await vaultHealthInstance.setCollateralizationRatios(wAsset0.address, UpperRatio0Str, LowerRatio0Str);
+		liqBonusStr0 = basisPointsToABDKString(300);		//3%
+		protocolLiqFeeStr0 = basisPointsToABDKString(200);	//2%
+		await vaultHealthInstance.setCollateralizationRatios(wAsset0.address, UpperRatio0Str, LowerRatio0Str, liqBonusStr0, protocolLiqFeeStr0);
 		let _upper = await vaultHealthInstance.UpperCollateralizationRatio(wAsset0.address);
 		let _lower = await vaultHealthInstance.LowerCollateralizationRatio(wAsset0.address);
+		let _liqBonus = await vaultHealthInstance.LiquidatorBonus(wAsset0.address);
+		let _protocolLiqFee = await vaultHealthInstance.ProtocolLiqFee(wAsset0.address);
 		assert.equal(_upper.toString(), UpperRatio0Str, "correct lower rate threshold");
 		assert.equal(_lower.toString(), LowerRatio0Str, "correct lower rate threshold");
+		assert.equal(_liqBonus.toString(), liqBonusStr0);
+		assert.equal(_protocolLiqFee.toString(), protocolLiqFeeStr0);
 
 		//asset1 ratios
 		upperRatio1 = 1.12;
 		lowerRatio1 = 1.09;
+		liqBonus1 = 0.04;
+		protocolLiqFee1 = 0.04;
 		UpperRatio1Str = basisPointsToABDKString(11200);	//112%
 		LowerRatio1Str = basisPointsToABDKString(10900);	//109%
-		await vaultHealthInstance.setCollateralizationRatios(wAsset1.address, UpperRatio1Str, LowerRatio1Str);
+		liqBonusStr1 = basisPointsToABDKString(400);		//4%
+		protocolLiqFeeStr1 = basisPointsToABDKString(400);	//4%
+		await vaultHealthInstance.setCollateralizationRatios(wAsset1.address, UpperRatio1Str, LowerRatio1Str, liqBonusStr1, protocolLiqFeeStr1);
 		_upper = await vaultHealthInstance.UpperCollateralizationRatio(wAsset1.address);
 		_lower = await vaultHealthInstance.LowerCollateralizationRatio(wAsset1.address);
+		_liqBonus = await vaultHealthInstance.LiquidatorBonus(wAsset1.address);
+		_protocolLiqFee = await vaultHealthInstance.ProtocolLiqFee(wAsset1.address);
 		assert.equal(_upper.toString(), UpperRatio1Str, "correct lower rate threshold");
 		assert.equal(_lower.toString(), LowerRatio1Str, "correct lower rate threshold");
+		assert.equal(_liqBonus.toString(), liqBonusStr1);
+		assert.equal(_protocolLiqFee.toString(), protocolLiqFeeStr1);
 	});
 
 	it('set rate thresholds', async () => {

@@ -41,6 +41,8 @@ interface IVaultHealth {
 		int128 _borrowRateChange
 	) external view returns (bool);	
 
+//	function OrganizerAddress() external view returns(address);
+//	function OracleContainerAddress() external view returns(address);
 	function MaximumShortInterest(address _underlyingAssetAddress) external view returns (uint);
 	function UpperCollateralizationRatio(address _wrapperAddress) external view returns(uint120);
 	function LowerCollateralizationRatio(address _wrapperAddress) external view returns(uint120);

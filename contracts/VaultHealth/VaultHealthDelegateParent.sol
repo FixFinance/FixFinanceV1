@@ -14,7 +14,7 @@ import "../oracle/interfaces/IOracleContainer.sol";
 import "./VaultHealthData.sol";
 
 
-contract VaultHealthParent is VaultHealthData {
+contract VaultHealthDelegateParent is VaultHealthData {
 	using ABDKMath64x64 for int128;
 	using SafeMath for uint256;
 
@@ -89,9 +89,9 @@ contract VaultHealthParent is VaultHealthData {
 
 		@return int128: the market implied total yield of the FCP up to maturity, fetched from oracle
 	*/
-	function getYieldToMaturityFromOracle(address _fixCapitalPoolAddress) internal view returns (int128) {
-		uint ytm = IOrderbookExchange(IOrganizer(organizerAddress).Orderbooks(_fixCapitalPoolAddress)).impliedYieldToMaturity();
-		uint converted = ytm.mul(1**64).div(1 ether);
+	function getABDKYieldToMaturityFromOracle(address _fixCapitalPoolAddress) internal view returns (int128) {
+		uint yieldToMaturity = getInflatedYieldToMaturityFromOracle(_fixCapitalPoolAddress);
+		uint converted = yieldToMaturity.mul(1**64).div(1 ether);
 		require(converted <= uint(type(int128).max));
 		return int128(converted);
 	}
@@ -105,6 +105,31 @@ contract VaultHealthParent is VaultHealthData {
 	*/
 	function getAPYFromOracle(address _fixCapitalPoolAddress) internal view returns (int128) {
 		return IOrderbookExchange(IOrganizer(organizerAddress).Orderbooks(_fixCapitalPoolAddress)).getAPYFromOracle();
+	}
+
+	/*
+		@Description: fetch the implied yield to maturity of a specific FixCapitalPool
+
+		@param address _fixCapitalPoolAddress: address of the FixCapitalPool contract in question
+
+		@return uint: the implied yield to maturity on the base wrapper, inflated by (1 ether)
+	*/
+	function getInflatedYieldToMaturityFromOracle(address _fixCapitalPoolAddress) internal view returns (uint) {
+		return IOrderbookExchange(IOrganizer(organizerAddress).Orderbooks(_fixCapitalPoolAddress)).impliedYieldToMaturity();
+	}
+
+	/*
+		@Description: fetch the rate multiplier for an FCP when no rate adjuster or a base rate adjuster and no rate change are applied
+
+		@param address _fixCapitalPoolAddress: address of the FixCapitalPool contract in question
+
+		@return uint: the implied yield to maturity on the base wrapper, inflated by (1 ether)
+	*/
+	function getRateMultiplier_NoAdjuster(address _fixCapitalPoolAddress, address _underlyingAssetAddress) internal view returns(uint) {
+		if (getYearsRemaining(_fixCapitalPoolAddress, _underlyingAssetAddress) <= 0) {
+			return getYieldSinceMaturity(_fixCapitalPoolAddress, _underlyingAssetAddress);
+		}
+		return uint((1 ether)**2).div(getInflatedYieldToMaturityFromOracle(_fixCapitalPoolAddress));
 	}
 
 	/*
@@ -139,7 +164,6 @@ contract VaultHealthParent is VaultHealthData {
 		}
 		return rateToRateMultiplier(getAPYFromOracle(_fixCapitalPoolAddress), yearsRemaining, _underlyingAssetAddress, _rateAdjuster, _rateChange);
 	}
-
 
 	/*
 		@Description: given a startingAPY for a FCP fetched from the oracle and some other info get a rate multiplier
@@ -222,8 +246,8 @@ contract VaultHealthParent is VaultHealthData {
 		@return int128 spreadTime: the magnitude in years of the time between the two maturities, ABDK format
 	*/
 	function impliedAPYBetweenMaturities(address _supplied, address _borrowed, int128 _ytmSupplied, int128 _ytmBorrowed) internal view returns (int128 spreadAPY, int128 spreadTime) {
-		int128 totalYieldSupplied = getYieldToMaturityFromOracle(_supplied);
-		int128 totalYieldBorrowed = getYieldToMaturityFromOracle(_borrowed);
+		int128 totalYieldSupplied = getABDKYieldToMaturityFromOracle(_supplied);
+		int128 totalYieldBorrowed = getABDKYieldToMaturityFromOracle(_borrowed);
 		int128 yieldSpread;
 		if (_ytmSupplied > _ytmBorrowed) {
 			spreadTime = _ytmSupplied.sub(_ytmBorrowed);
@@ -256,6 +280,78 @@ contract VaultHealthParent is VaultHealthData {
 		spreadAPY = yieldSpread.log_2().div(spreadTime).exp_2();
 	}
 
+	/*
+		@Description: given two FCPs of the same base wrapper find the implied yield between the maturities of the FCPs
+
+		@param address _supplied: the address of the FCP for which ZCB &/ YT are being provided as collateral
+		@param address _borrowed: the address of the FCP for which ZCB is being borrowed
+		@param int128 _ytmSupplied: years til maturity (ytm) for the supplied FCP, ABDK format
+		@param int128 _ytmBorrowed: years til maturity (ytm) for the borrowed FCP, ABDK format
+
+		@return uint yieldBetweenMaturitieis: the yield between maturities of the supplied and borrowed assets
+	*/
+	function impliedYieldBetweenMaturities(address _supplied, address _borrowed, int128 _ytmSupplied, int128 _ytmBorrowed) internal view returns (uint yieldBetweenMaturities) {
+		uint totalYieldSupplied = getInflatedYieldToMaturityFromOracle(_supplied);
+		uint totalYieldBorrowed = getInflatedYieldToMaturityFromOracle(_borrowed);
+		if (_ytmSupplied > _ytmBorrowed) {
+			yieldBetweenMaturities = totalYieldBorrowed >= totalYieldSupplied ? (1 ether) : totalYieldSupplied.mul(1 ether).div(totalYieldBorrowed);
+		}
+		else {
+			yieldBetweenMaturities = totalYieldBorrowed <= totalYieldSupplied ? (1 ether) : totalYieldBorrowed.mul(1 ether).div(totalYieldSupplied);
+		}
+	}
+
+	/*
+		@Description: given both the supplied and borrowed assets find the composite rate multiplier for the vault
+			no rate adjusters or rate changes
+
+		@param bool _positiveSupplied: true if and only if a positve number of ZCB corresponding to the supplied FCP has been supplied
+		@param address _supplied: the asset or FCP that is being supplied as collateral to the vault
+		@param address _baseSupplied: the wrapper corresponding to the asset that has been supplied
+		@param address _borrowed: the address of the FCP at which ZCB is being borrowed
+		@param address _baseBorrowed: the wrapper corresponding to the borrowed FCP
+
+		@return uint: the amount of yield between maturities, inflated by (1 ether)
+	*/
+	function combinedRateMultipliers_noAdjuster(
+		bool _positiveSupplied,
+		address _supplied,
+		address _baseSupplied,
+		address _borrowed,
+		address _baseBorrowed
+	) internal view returns(uint) {
+		uint suppliedMultiplier;
+		uint borrowedMultiplier;
+		if (_baseSupplied == _baseBorrowed && _positiveSupplied) {
+			require(_supplied != _borrowed);
+			if (_supplied != _baseSupplied) { //supplied is zcb
+				int128 ytmSupplied = getYearsRemaining(_supplied, _baseSupplied);
+				if (ytmSupplied > 0) { //supplied zcb has yet to reach maturity
+					//find implied market rate between maturity dates and calculate
+					int128 ytmBorrowed = getYearsRemaining(_borrowed, _baseBorrowed);
+					uint yieldBetweenMaturities = impliedYieldBetweenMaturities(_supplied, _borrowed, ytmSupplied, ytmBorrowed);
+					return yieldBetweenMaturities;
+				}
+				else { //supplied zcb has matured
+					suppliedMultiplier = getYieldSinceMaturity(_supplied, _baseSupplied);
+				}
+			}
+			else { //supplied is a wrapped asset
+				suppliedMultiplier = (1 ether);
+			}
+			borrowedMultiplier = getRateMultiplier_NoAdjuster(_borrowed, _baseBorrowed);
+		}
+		else { //base assets are different or supplied is negative, do not calculate time spread
+			if (_supplied != _baseSupplied) { //supplied is zcb
+				suppliedMultiplier = getRateMultiplier_NoAdjuster(_supplied, _baseSupplied);
+			}
+			else {
+				suppliedMultiplier = (1 ether);
+			}
+			borrowedMultiplier = getRateMultiplier_NoAdjuster(_borrowed, _baseBorrowed);
+		}
+		return suppliedMultiplier.mul(1 ether).div(borrowedMultiplier);
+	}
 
 	/*
 		@Description: given both the supplied and borrowed assets find the composite rate multiplier for the vault

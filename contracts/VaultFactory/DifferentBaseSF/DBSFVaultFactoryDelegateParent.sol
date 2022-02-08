@@ -146,7 +146,7 @@ contract DBSFVaultFactoryDelegateParent is DBSFVaultFactoryData, nonReentrant {
 		int128 _suppliedRateChange,
 		int128 _borrowRateChange,
 		IInfoOracle _info
-	) internal view returns (
+	) internal returns (
 		bool withstands,
 		SUPPLIED_ASSET_TYPE suppliedType,
 		address baseFCP,
@@ -191,7 +191,7 @@ contract DBSFVaultFactoryDelegateParent is DBSFVaultFactoryData, nonReentrant {
 		uint _priceMultiplier,
 		int128 _suppliedRateChange,
 		int128 _borrowRateChange
-	) internal view returns(bool withstands) {
+	) internal returns(bool withstands) {
 		(withstands, , , ) = vaultWithstandsChange(vault, _priceMultiplier, _suppliedRateChange, _borrowRateChange, IInfoOracle(_infoOracleAddress));
 	}
 
@@ -436,7 +436,7 @@ contract DBSFVaultFactoryDelegateParent is DBSFVaultFactoryData, nonReentrant {
 			asset decreases by a factor of _borrowRateChange
 			(in ABDK format)
 	*/
-	function YTvaultWithstandsChange(YTVault memory vault, uint _priceMultiplier, int128 _suppliedRateChange, int128 _borrowRateChange) internal view returns (bool) {
+	function YTvaultWithstandsChange(YTVault memory vault, uint _priceMultiplier, int128 _suppliedRateChange, int128 _borrowRateChange) internal returns (bool) {
 		validateYTvaultMultipliers(_priceMultiplier, _suppliedRateChange, _borrowRateChange, vault.bondSupplied > 0);
 		return vaultHealthContract.YTvaultWithstandsChange(
 			false,

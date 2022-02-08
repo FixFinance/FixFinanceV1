@@ -34,7 +34,7 @@ contract DBSFVaultFactoryDelegate2 is DBSFVaultFactoryDelegateParent {
 	function satisfiesLimit(
 		Vault memory _vault,
 		bool _upper
-	) internal view returns (
+	) internal returns (
 		bool withstands,
 		SUPPLIED_ASSET_TYPE sType,
 		address baseFCP,

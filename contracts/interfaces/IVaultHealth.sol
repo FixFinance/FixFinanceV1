@@ -3,20 +3,45 @@ pragma solidity >=0.6.8 <0.7.0;
 
 interface IVaultHealth {
 	//return true if collateral is above limit
-	function satisfiesUpperLimit(address _assetSupplied, address _assetBorrowed, uint _amountSupplied, uint _amountBorrowed) external view returns (bool);
-	function satisfiesLowerLimit(address _assetSupplied, address _assetBorrowed, uint _amountSupplied, uint _amountBorrowed) external view returns (bool);
+	function satisfiesUpperLimit(address _assetSupplied, address _assetBorrowed, uint _amountSupplied, uint _amountBorrowed) external returns (bool);
+	function satisfiesLowerLimit(address _assetSupplied, address _assetBorrowed, uint _amountSupplied, uint _amountBorrowed) external returns (bool);
 
-	function amountSuppliedAtUpperLimit(address _assetSupplied, address _assetBorrowed, uint _amountBorrowed) external view returns (uint);
-	function amountSuppliedAtLowerLimit(address _assetSupplied, address _assetBorrowed, uint _amountBorrowed) external view returns (uint);
+	function amountSuppliedAtUpperLimit(address _assetSupplied, address _assetBorrowed, uint _amountBorrowed) external returns (uint);
+	function amountSuppliedAtLowerLimit(address _assetSupplied, address _assetBorrowed, uint _amountBorrowed) external returns (uint);
 
-	function amountBorrowedAtUpperLimit(address _assetSupplied, address _assetBorrowed, uint _amountSupplied) external view returns (uint);
-	function amountBorrowedAtLowerLimit(address _assetSupplied, address _assetBorrowed, uint _amountSupplied) external view returns (uint);
+	function amountBorrowedAtUpperLimit(address _assetSupplied, address _assetBorrowed, uint _amountSupplied) external returns (uint);
+	function amountBorrowedAtLowerLimit(address _assetSupplied, address _assetBorrowed, uint _amountSupplied) external returns (uint);
 
-	function YTvaultAmountBorrowedAtUpperLimit(address _FCPsupplied, address _FCPborrowed, uint _amountYield, int _amountBond) external view returns (uint);
-	function YTvaultAmountBorrowedAtLowerLimit(address _FCPsupplied, address _FCPborrowed, uint _amountYield, int _amountBond) external view returns (uint);
+	function YTvaultAmountBorrowedAtUpperLimit(address _FCPsupplied, address _FCPborrowed, uint _amountYield, int _amountBond) external returns (uint);
+	function YTvaultAmountBorrowedAtLowerLimit(address _FCPsupplied, address _FCPborrowed, uint _amountYield, int _amountBond) external returns (uint);
 
-	function YTvaultSatisfiesUpperLimit(address _FCPsupplied, address _FCPborrowed, uint _amountYield, int _amountBond, uint _amountBorrowed) external view returns (bool);
-	function YTvaultSatisfiesLowerLimit(address _FCPsupplied, address _FCPborrowed, uint _amountYield, int _amountBond, uint _amountBorrowed) external view returns (bool);
+	function YTvaultSatisfiesUpperLimit(address _FCPsupplied, address _FCPborrowed, uint _amountYield, int _amountBond, uint _amountBorrowed) external returns (bool);
+	function YTvaultSatisfiesLowerLimit(address _FCPsupplied, address _FCPborrowed, uint _amountYield, int _amountBond, uint _amountBorrowed) external returns (bool);
+
+	function upperLimitLiquidationDetails(
+		address _assetSupplied,
+		address _assetBorrowed,
+		uint _amountSupplied,
+		uint _amountBorrowed
+	) external returns(
+		bool satisfies,
+		uint amountToLiquidator,
+		uint amountToProtocol
+	);
+
+/*
+	function upperLimitYTLiquidationDetails(
+		address _assetSupplied,
+		address _assetBorrowed,
+		uint _amountYield,
+		int _amountBond,
+		uint _amountBorrowed
+	) external returns(
+		bool satisfies,
+		uint amountYieldToLiquidator,
+		uint amountYieldToProtocol
+	);
+*/
 
 	function vaultWithstandsChange(
 		bool _reqSameBase,
@@ -27,7 +52,7 @@ interface IVaultHealth {
 		uint _pctPriceChange,
 		int128 _suppliedRateChange,
 		int128 _borrowRateChange
-	) external view returns (bool);
+	) external returns (bool);
 
 	function YTvaultWithstandsChange(
 		bool _reqSameBase,
@@ -39,7 +64,7 @@ interface IVaultHealth {
 		uint _pctPriceChange,
 		int128 _suppliedRateChange,
 		int128 _borrowRateChange
-	) external view returns (bool);	
+	) external returns (bool);	
 
 //	function OrganizerAddress() external view returns(address);
 //	function OracleContainerAddress() external view returns(address);

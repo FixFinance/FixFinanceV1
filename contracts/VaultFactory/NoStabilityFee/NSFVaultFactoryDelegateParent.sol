@@ -174,7 +174,7 @@ contract NSFVaultFactoryDelegateParent is NSFVaultFactoryData, nonReentrant {
 		uint _priceMultiplier,
 		int128 _suppliedRateChange,
 		int128 _borrowRateChange
-	) internal view returns (
+	) internal returns (
 		bool withstands,
 		SUPPLIED_ASSET_TYPE suppliedType,
 		address baseFCP,
@@ -320,7 +320,7 @@ contract NSFVaultFactoryDelegateParent is NSFVaultFactoryData, nonReentrant {
 		uint _amountSupplied,
 		uint _amountBorrowed,
 		bool _upper
-	) internal view returns (
+	) internal returns (
 		bool satisfies,
 		SUPPLIED_ASSET_TYPE sType,
 		address baseFCP,
@@ -357,7 +357,7 @@ contract NSFVaultFactoryDelegateParent is NSFVaultFactoryData, nonReentrant {
 		uint _amountSupplied,
 		uint _amountBorrowed,
 		bool _upper
-	) internal view returns (bool satisfies) {
+	) internal returns (bool satisfies) {
 		(satisfies, , , ) = satisfiesLimitRetAllData(_assetSupplied, _assetBorrowed, _amountSupplied, _amountBorrowed, _upper);
 	}
 

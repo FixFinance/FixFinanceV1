@@ -11,18 +11,17 @@ import "../libraries/ABDKMath64x64.sol";
 import "../libraries/SafeMath.sol";
 import "../libraries/BigMath.sol";
 import "../oracle/interfaces/IOracleContainer.sol";
-import "./VaultHealthParent.sol";
+import "./VaultHealthCoreParent.sol";
 
 
-contract VaultHealth is IVaultHealth, VaultHealthParent {
+contract VaultHealth is IVaultHealth, VaultHealthCoreParent {
 	using ABDKMath64x64 for int128;
 	using SafeMath for uint256;
 
-	address delegate1;
-
-	constructor(address _oracleContainerAddress, address _delegate1) public {
+	constructor(address _oracleContainerAddress, address _delegate1, address _delegate2) public {
 		oracleContainerAddress = _oracleContainerAddress;
 		delegate1 = _delegate1;
+		delegate2 = _delegate2;
 	}
 
 	//-----------------------i-m-p-l-e-m-e-n-t---I-V-a-u-l-t-H-e-a-l-t-h--------------------------
@@ -30,6 +29,8 @@ contract VaultHealth is IVaultHealth, VaultHealthParent {
 
 	/*
 		@Description: check if a vault is above the upper collateralisation limit
+
+			- Function is Pseudo View function, no state is changed but view flag cannot be added because of delegatecall opcode use
 
 		@param address _assetSupplied: the address of the asset supplied to the vault
 		@param address _assetBorrowed: the address of the asset borrowed from the vault
@@ -39,8 +40,14 @@ contract VaultHealth is IVaultHealth, VaultHealthParent {
 		@return bool: returns true if the vault is above the upper collateralisation limit
 			false otherwise
 	*/
-	function satisfiesUpperLimit(address _assetSupplied, address _assetBorrowed, uint _amountSupplied, uint _amountBorrowed) external override view returns (bool) {
-		return _amountSupplied > _amountSuppliedAtUpperLimit(_assetSupplied, _assetBorrowed, _amountBorrowed);
+	function satisfiesUpperLimit(address _assetSupplied, address _assetBorrowed, uint _amountSupplied, uint _amountBorrowed) external override returns (bool) {
+		return decodeBool(abi.encodeWithSignature(
+			"satisfiesUpperLimit(address,address,uint256,uint256)",
+			_assetSupplied,
+			_assetBorrowed,
+			_amountSupplied,
+			_amountBorrowed
+		));
 	}
 
 	/*
@@ -54,8 +61,14 @@ contract VaultHealth is IVaultHealth, VaultHealthParent {
 		@return bool: returns true if the vault is above the lower collateralisation limit
 			false otherwise
 	*/
-	function satisfiesLowerLimit(address _assetSupplied, address _assetBorrowed, uint _amountSupplied, uint _amountBorrowed) external override view returns (bool) {
-		return _amountSupplied > _amountSuppliedAtLowerLimit(_assetSupplied, _assetBorrowed, _amountBorrowed);
+	function satisfiesLowerLimit(address _assetSupplied, address _assetBorrowed, uint _amountSupplied, uint _amountBorrowed) external override returns (bool) {
+		return decodeBool(abi.encodeWithSignature(
+			"satisfiesLowerLimit(address,address,uint256,uint256)",
+			_assetSupplied,
+			_assetBorrowed,
+			_amountSupplied,
+			_amountBorrowed
+		));
 	}
 
 	/*
@@ -71,8 +84,15 @@ contract VaultHealth is IVaultHealth, VaultHealthParent {
 		@return bool: returns true if the vault is above the upper collateralisation limit
 			false otherwise
 	*/
-	function YTvaultSatisfiesUpperLimit(address _FCPsupplied, address _FCPborrowed, uint _amountYield, int _amountBond, uint _amountBorrowed) external override view returns (bool) {
-		return _amountBorrowed < _YTvaultAmountBorrowedAtUpperLimit(_FCPsupplied, _FCPborrowed, _amountYield, _amountBond);
+	function YTvaultSatisfiesUpperLimit(address _FCPsupplied, address _FCPborrowed, uint _amountYield, int _amountBond, uint _amountBorrowed) external override returns (bool) {
+		return decodeBool(abi.encodeWithSignature(
+			"YTvaultSatisfiesUpperLimit(address,address,uint256,int256,uint256)",
+			_FCPsupplied,
+			_FCPborrowed,
+			_amountYield,
+			_amountBond,
+			_amountBorrowed
+		));
 	}
 
 	/*
@@ -88,22 +108,39 @@ contract VaultHealth is IVaultHealth, VaultHealthParent {
 		@return bool: returns true if the vault is above the lower collateralisation limit
 			false otherwise
 	*/
-	function YTvaultSatisfiesLowerLimit(address _FCPsupplied, address _FCPborrowed, uint _amountYield, int _amountBond, uint _amountBorrowed) external override view returns (bool) {
-		return _amountBorrowed < _YTvaultAmountBorrowedAtLowerLimit(_FCPsupplied, _FCPborrowed, _amountYield, _amountBond);
+	function YTvaultSatisfiesLowerLimit(address _FCPsupplied, address _FCPborrowed, uint _amountYield, int _amountBond, uint _amountBorrowed) external override returns (bool) {
+		return decodeBool(abi.encodeWithSignature(
+			"YTvaultSatisfiesLowerLimit(address,address,uint256,int256,uint256)",
+			_FCPsupplied,
+			_FCPborrowed,
+			_amountYield,
+			_amountBond,
+			_amountBorrowed
+		));
 	}
 
 	/*
 		@Description: returns value from _amountSuppliedAtUpperLimit() externally
 	*/
-	function amountSuppliedAtUpperLimit(address _assetSupplied, address _assetBorrowed, uint _amountBorrowed) external override view returns (uint) {
-		return _amountSuppliedAtUpperLimit(_assetSupplied, _assetBorrowed, _amountBorrowed);
+	function amountSuppliedAtUpperLimit(address _assetSupplied, address _assetBorrowed, uint _amountBorrowed) external override returns (uint) {
+		return decodeUint(abi.encodeWithSignature(
+			"amountSuppliedAtUpperLimit(address,address,uint256)",
+			_assetSupplied,
+			_assetBorrowed,
+			_amountBorrowed
+		));
 	}
 
 	/*
 		@Description: returns value from _amountSuppliedAtLowerLimit() externally
 	*/
-	function amountSuppliedAtLowerLimit(address _assetSupplied, address _assetBorrowed, uint _amountBorrowed) external override view returns (uint) {
-		return _amountSuppliedAtLowerLimit(_assetSupplied, _assetBorrowed, _amountBorrowed);
+	function amountSuppliedAtLowerLimit(address _assetSupplied, address _assetBorrowed, uint _amountBorrowed) external override returns (uint) {
+		return decodeUint(abi.encodeWithSignature(
+			"amountSuppliedAtLowerLimit(address,address,uint256)",
+			_assetSupplied,
+			_assetBorrowed,
+			_amountBorrowed
+		));
 	}
 
 	/*
@@ -116,15 +153,13 @@ contract VaultHealth is IVaultHealth, VaultHealthParent {
 		@return uint: the maximum amount of borrowed asset that must be borrowed from a vault in order for the vault to stay above the
 			upper collateralisation limit
 	*/
-	function amountBorrowedAtUpperLimit(address _assetSupplied, address _assetBorrowed, uint _amountSupplied) external override view returns (uint) {
-		(address _baseSupplied, address _baseBorrowed, address fcpSupplied, address fcpBorrowed) = baseAssetAddresses(_assetSupplied, _assetBorrowed);
-
-		uint term1 = _amountSupplied
-			.mul(1 ether)
-			.mul(combinedRateMultipliers_onlyMultiplier(true, true, fcpSupplied, _baseSupplied, fcpBorrowed, _baseBorrowed, ABDK_1, ABDK_1));
-		return term1
-			.div(crossAssetPrice(_baseSupplied, _baseBorrowed))
-			.div(crossCollateralizationRatio(_baseSupplied, _baseBorrowed, Safety.UPPER));
+	function amountBorrowedAtUpperLimit(address _assetSupplied, address _assetBorrowed, uint _amountSupplied) external override returns (uint) {
+		return decodeUint(abi.encodeWithSignature(
+			"amountBorrowedAtUpperLimit(address,address,uint256)",
+			_assetSupplied,
+			_assetBorrowed,
+			_amountSupplied
+		));
 	}
 
 	/*
@@ -137,15 +172,13 @@ contract VaultHealth is IVaultHealth, VaultHealthParent {
 		@return uint: the maximum amount of borrowed asset that must be borrowed from a vault in order for the vault to stay above the
 			lower collateralisation limit
 	*/
-	function amountBorrowedAtLowerLimit(address _assetSupplied, address _assetBorrowed, uint _amountSupplied) external override view returns (uint) {
-		(address _baseSupplied, address _baseBorrowed, address fcpSupplied, address fcpBorrowed) = baseAssetAddresses(_assetSupplied, _assetBorrowed);
-
-		uint term1 = _amountSupplied
-			.mul(1 ether)
-			.mul(combinedRateMultipliers_onlyMultiplier(true, false, fcpSupplied, _baseSupplied, fcpBorrowed, _baseBorrowed, ABDK_1, ABDK_1));
-		return term1
-			.div(crossAssetPrice(_baseSupplied, _baseBorrowed))
-			.div(crossCollateralizationRatio(_baseSupplied, _baseBorrowed, Safety.LOW));
+	function amountBorrowedAtLowerLimit(address _assetSupplied, address _assetBorrowed, uint _amountSupplied) external override returns (uint) {
+		return decodeUint(abi.encodeWithSignature(
+			"amountBorrowedAtLowerLimit(address,address,uint256)",
+			_assetSupplied,
+			_assetBorrowed,
+			_amountSupplied
+		));
 	}
 
 	/*
@@ -156,8 +189,14 @@ contract VaultHealth is IVaultHealth, VaultHealthParent {
 		address _FCPborrowed,
 		uint _amountYield,
 		int _amountBond
-	) external view override returns (uint) {
-		return _YTvaultAmountBorrowedAtUpperLimit(_FCPsupplied, _FCPborrowed, _amountYield, _amountBond);
+	) external override returns (uint) {
+		return decodeUint(abi.encodeWithSignature(
+			"YTvaultAmountBorrowedAtUpperLimit(address,address,uint256,int256)",
+			_FCPsupplied,
+			_FCPborrowed,
+			_amountYield,
+			_amountBond
+		));
 	}
 
 	/*
@@ -168,8 +207,49 @@ contract VaultHealth is IVaultHealth, VaultHealthParent {
 		address _FCPborrowed,
 		uint _amountYield,
 		int _amountBond
-	) external view override returns (uint) {
-		return _YTvaultAmountBorrowedAtLowerLimit(_FCPsupplied, _FCPborrowed, _amountYield, _amountBond);
+	) external override returns (uint) {
+		return decodeUint(abi.encodeWithSignature(
+			"YTvaultAmountBorrowedAtLowerLimit(address,address,uint256,int256)",
+			_FCPsupplied,
+			_FCPborrowed,
+			_amountYield,
+			_amountBond
+		));
+	}
+
+	/*
+		@Description: based on the state of a vault return info necessary for standard liquidations
+
+			- Function is Pseudo View function, no state is changed but view flag cannot be added because of delegatecall opcode use
+
+		@param address _assetSupplied: the address of the asset supplied to the vault
+		@param address _assetBorrowed: the address of the asset borrowed from the vault
+		@param uint _amountSupplied: the amount of _assetSupplied that has been supplied to the vault
+		@param uint _amountBorrowed: the amount of _assetBorrowed that has been borrowed from the vault
+
+		@return bool satisfies: true if the vault state satisfies the upper limit, false if it does not
+		@return uint amountToLiquidator: the amount of the collateral that shall go to the liquidator if the entire vault is liquidated
+		@return uint amountToProtocol: the amount of the collatearl that shall go to the protocol if the entire vault is liquidated
+	*/
+	function upperLimitLiquidationDetails(
+		address _assetSupplied,
+		address _assetBorrowed,
+		uint _amountSupplied,
+		uint _amountBorrowed
+	) external override returns(
+		bool satisfies,
+		uint amountToLiquidator,
+		uint amountToProtocol
+	) {
+		(bool success, bytes memory data) = delegate2.delegatecall(abi.encodeWithSignature(
+			"upperLimitLiquidationDetails(address,address,uint256,uint256)",
+			_assetSupplied,
+			_assetBorrowed,
+			_amountSupplied,
+			_amountBorrowed
+		));
+		require(success);
+		(satisfies, amountToLiquidator, amountToProtocol) = abi.decode(data, (bool, uint256, uint256));
 	}
 
 	/*
@@ -200,23 +280,18 @@ contract VaultHealth is IVaultHealth, VaultHealthParent {
 		uint _priceMultiplier,
 		int128 _suppliedRateChange,
 		int128 _borrowRateChange
-	) public view override returns(bool) {
-
-		(address _baseSupplied, address _baseBorrowed, address fcpSupplied, address fcpBorrowed) = baseAssetAddresses(_assetSupplied, _assetBorrowed);
-		require(!_reqSameBase || _baseSupplied == _baseBorrowed);
-
-		//wierd hack to prevent stack too deep
-		_amountBorrowed = _amountBorrowed
-			.mul(crossAssetPrice(_baseSupplied, _baseBorrowed));
-		_amountBorrowed = _amountBorrowed
-			.div(combinedRateMultipliers_onlyMultiplier(true, true, fcpSupplied, _baseSupplied, fcpBorrowed, _baseBorrowed, _suppliedRateChange, _borrowRateChange));
-		_amountBorrowed = _amountBorrowed
-			.mul(crossCollateralizationRatio(_baseSupplied, _baseBorrowed, Safety.UPPER));
-		_amountBorrowed = _amountBorrowed
-			.mul(_priceMultiplier)
-			.div((1 ether)*TOTAL_BASIS_POINTS);
-
-		return _amountBorrowed < _amountSupplied;
+	) public override returns(bool) {
+		return decodeBool(abi.encodeWithSignature(
+			"vaultWithstandsChange(bool,address,address,uint256,uint256,uint256,int128,int128)",
+			_reqSameBase,
+			_assetSupplied,
+			_assetBorrowed,
+			_amountSupplied,
+			_amountBorrowed,
+			_priceMultiplier,
+			_suppliedRateChange,
+			_borrowRateChange
+		));
 	}
 
 	/*
@@ -250,21 +325,19 @@ contract VaultHealth is IVaultHealth, VaultHealthParent {
 		uint _priceMultiplier,
 		int128 _suppliedRateChange,
 		int128 _borrowedRateChange
-	) external view override returns (bool) {
-		(address _baseSupplied, address _baseBorrowed) = bothFCPtoBaseAddresses(_FCPsupplied, _FCPborrowed);
-		require(!_reqSameBase || _baseSupplied == _baseBorrowed);
-
-		bool positiveBond = _amountBond >= 0;
-		uint maxBorrowed;
-		if (!positiveBond && _baseSupplied == _baseBorrowed && getYearsRemaining(_FCPsupplied, _baseSupplied) > 0) {
-			maxBorrowed = YTvaultAmtBorrowedUL_1(_FCPsupplied, _baseSupplied, _FCPborrowed, _baseBorrowed, _amountYield, _amountBond, _suppliedRateChange, _borrowedRateChange);
-		}
-		else {
-			maxBorrowed = YTvaultAmtBorrowedUL_0(_FCPsupplied, _baseSupplied, _FCPborrowed, _baseBorrowed, _amountYield, _amountBond, _suppliedRateChange, _borrowedRateChange);
-		}
-		//account for price multiplier
-		uint adjMaxBorrowed = maxBorrowed.mul(TOTAL_BASIS_POINTS).div(_priceMultiplier);
-		return _amountBorrowed < adjMaxBorrowed;
+	) external override returns (bool) {
+		return decodeBool(abi.encodeWithSignature(
+			"YTvaultWithstandsChange(bool,address,address,uint256,int256,uint256,uint256,int128,int128)",
+			_reqSameBase,
+			_FCPsupplied,
+			_FCPborrowed,
+			_amountYield,
+			_amountBond,
+			_amountBorrowed,
+			_priceMultiplier,
+			_suppliedRateChange,
+			_borrowedRateChange
+		));
 	}
 
 	//-----------------------a-d-m-i-n---o-p-e-r-a-t-i-o-n-s---------------------------
@@ -313,10 +386,14 @@ contract VaultHealth is IVaultHealth, VaultHealthParent {
 
 	/*
 		@Description: admin may set the organizer contract address
+			this may only be done once
 	*/
-	function setOrganizerAddress(address _organizerAddress) external override onlyOwner {
-		require(organizerAddress == address(0));
-		organizerAddress = _organizerAddress;
+	function setOrganizerAddress(address _organizerAddress) external override {
+		(bool success, ) = delegate1.delegatecall(abi.encodeWithSignature(
+			"setOrganizerAddress(address)",
+			_organizerAddress
+		));
+		require(success);
 	}
 
 	/*
@@ -325,8 +402,13 @@ contract VaultHealth is IVaultHealth, VaultHealthParent {
 		@param address _underlyingAssetAddress: the address of the underlying asset for which to set a short interest cap
 		@param uint _maximumShortInterest: the maximum amount of units of the underlying asset that may sold short via ZCBs
 	*/
-	function setMaximumShortInterest(address _underlyingAssetAddress, uint _maximumShortInterest) external override onlyOwner {
-		maximumShortInterest[_underlyingAssetAddress] = _maximumShortInterest;
+	function setMaximumShortInterest(address _underlyingAssetAddress, uint _maximumShortInterest) external override {
+		(bool success, ) = delegate1.delegatecall(abi.encodeWithSignature(
+			"setMaximumShortInterest(address,uint256)",
+			_underlyingAssetAddress,
+			_maximumShortInterest
+		));
+		require(success);
 	}
 
 	/*
@@ -337,9 +419,14 @@ contract VaultHealth is IVaultHealth, VaultHealthParent {
 		@param uint120 _upperMinimumRateAdjustment: the new upper minimum rate adjustment for _wrapperAsset
 		@param uint120 _lowerMinimumRateAdjustment: the new lower minimum rate adjustment for _wrapperAsset
 	*/
-	function setMinimumRateAdjustments(address _wrapperAddress, uint120 _upperMinimumRateAdjustment, uint120 _lowerMinimumRateAdjustment) external override onlyOwner {
-		upperMinimumRateAdjustment[_wrapperAddress] = _upperMinimumRateAdjustment;
-		lowerMinimumRateAdjustment[_wrapperAddress] = _lowerMinimumRateAdjustment;
+	function setMinimumRateAdjustments(address _wrapperAddress, uint120 _upperMinimumRateAdjustment, uint120 _lowerMinimumRateAdjustment) external override {
+		(bool success, ) = delegate1.delegatecall(abi.encodeWithSignature(
+			"setMinimumRateAdjustments(address,uint120,uint120)",
+			_wrapperAddress,
+			_upperMinimumRateAdjustment,
+			_lowerMinimumRateAdjustment
+		));
+		require(success);
 	}
 
 	//--------V-I-E-W---D-A-T-A-------------

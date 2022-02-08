@@ -11,13 +11,16 @@ import "../libraries/ABDKMath64x64.sol";
 import "../libraries/SafeMath.sol";
 import "../libraries/BigMath.sol";
 import "../oracle/interfaces/IOracleContainer.sol";
-import "./VaultHealthParent.sol";
+import "./VaultHealthDelegateParent.sol";
 
 
-contract VaultHealthDelegate1 is VaultHealthParent {
+contract VaultHealthDelegate1 is VaultHealthDelegateParent {
 	using ABDKMath64x64 for int128;
 	using SafeMath for uint256;
 
+	/*
+		@Description: find description in VaultHealth contract
+	*/
 	function setCollateralizationRatios(address _wrapperAddress, uint120 _upper, uint120 _lower, uint120 _liqBonus, uint120 _liqProtocolFee) external onlyOwner {
 		require(_upper >= _lower && _lower > ABDK_1);
 		require(_upper > uint(_liqBonus).add(uint(_liqProtocolFee)).add(uint(MIN_THRESHOLD) + uint(ABDK_1)));
@@ -76,5 +79,4 @@ contract VaultHealthDelegate1 is VaultHealthParent {
 		upperMinimumRateAdjustment[_wrapperAddress] = _upperMinimumRateAdjustment;
 		lowerMinimumRateAdjustment[_wrapperAddress] = _lowerMinimumRateAdjustment;
 	}
-
 }

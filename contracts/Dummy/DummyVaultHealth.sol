@@ -3,7 +3,7 @@ pragma solidity >=0.6.8 <0.7.0;
 import '../interfaces/IVaultHealth.sol';
 import '../interfaces/IWrapper.sol';
 
-contract DummyVaultHealth is IVaultHealth {
+contract DummyVaultHealth {
 
 	/*
 		In this contract we assume that all assets being supplied are wrapped A Tokens
@@ -12,17 +12,17 @@ contract DummyVaultHealth is IVaultHealth {
 	*/
 
 	//underlyingAsset => maximum amount of short interest *all duations combined*
-	mapping(address => uint) public override MaximumShortInterest;
+	mapping(address => uint) public MaximumShortInterest;
 
 	//asset supplied => asset borrowed => ratio
 	mapping(address => mapping(address => uint)) public upperRatio;
 	mapping(address => mapping(address => uint)) public middleRatio;
 	mapping(address => mapping(address => uint)) public lowerRatio;
 
-	mapping(address => uint120) public override LowerCollateralizationRatio;
-	mapping(address => uint120) public override UpperCollateralizationRatio;
-	mapping(address => uint120) public override LowerRateThreshold;
-	mapping(address => uint120) public override UpperRateThreshold;
+	mapping(address => uint120) public LowerCollateralizationRatio;
+	mapping(address => uint120) public UpperCollateralizationRatio;
+	mapping(address => uint120) public LowerRateThreshold;
+	mapping(address => uint120) public UpperRateThreshold;
 
 	//collateral above return value of this function may be withdrawn from vault
 	function satisfiesUpperLimit(
@@ -30,7 +30,7 @@ contract DummyVaultHealth is IVaultHealth {
 		address _assetBorrowed,
 		uint _amountSupplied,
 		uint _amountBorrowed
-		) external view override returns (bool) {
+		) external view returns (bool) {
 
 		return upperRatio[_assetSupplied][_assetBorrowed] * _amountBorrowed / 1e18 < _amountSupplied;
 	}
@@ -40,47 +40,27 @@ contract DummyVaultHealth is IVaultHealth {
 		address _assetBorrowed,
 		uint _amountSupplied,
 		uint _amountBorrowed
-		) external view override returns (bool) {
+		) external view returns (bool) {
 
 		return lowerRatio[_assetSupplied][_assetBorrowed] * _amountBorrowed / 1e18 < _amountSupplied;
 	}
 
-	function amountSuppliedAtUpperLimit(address _assetSupplied, address _assetBorrowed, uint _amountBorrowed) external view override returns (uint) {
+	function amountSuppliedAtUpperLimit(address _assetSupplied, address _assetBorrowed, uint _amountBorrowed) external view returns (uint) {
 		return upperRatio[_assetSupplied][_assetBorrowed] * _amountBorrowed / 1e18;
 	}
-	function amountSuppliedAtLowerLimit(address _assetSupplied, address _assetBorrowed, uint _amountBorrowed) external view override returns (uint) {
+	function amountSuppliedAtLowerLimit(address _assetSupplied, address _assetBorrowed, uint _amountBorrowed) external view returns (uint) {
 		return lowerRatio[_assetSupplied][_assetBorrowed] * _amountBorrowed / 1e18;
 	}
 
-	function amountBorrowedAtUpperLimit(address _assetSupplied, address _assetBorrowed, uint _amountSupplied) external view override returns (uint) {
+	function amountBorrowedAtUpperLimit(address _assetSupplied, address _assetBorrowed, uint _amountSupplied) external view returns (uint) {
 		return _amountSupplied * 1e18 / upperRatio[_assetSupplied][_assetBorrowed];
 	}
-	function amountBorrowedAtLowerLimit(address _assetSupplied, address _assetBorrowed, uint _amountSupplied) external view override returns (uint) {
+	function amountBorrowedAtLowerLimit(address _assetSupplied, address _assetBorrowed, uint _amountSupplied) external view returns (uint) {
 		return _amountSupplied * 1e18 / lowerRatio[_assetSupplied][_assetBorrowed];
 	}
 
-	function YTvaultAmountBorrowedAtUpperLimit(address _FCPsupplied, address _FCPborrowed, uint _amountYield, int _amountBond) external view override returns (uint) {
-		if (
-			_FCPsupplied == address(0) ||
-			_FCPborrowed == address(0) ||
-			_amountYield == 0 ||
-			_amountBond == 0
-			)
-			return 0;
-		return 1;
-	}
-	function YTvaultAmountBorrowedAtLowerLimit(address _FCPsupplied, address _FCPborrowed, uint _amountYield, int _amountBond) external view override returns (uint) {
-		if (
-			_FCPsupplied == address(0) ||
-			_FCPborrowed == address(0) ||
-			_amountYield == 0 ||
-			_amountBond == 0
-			)
-			return 0;
-		return 1;
-	}
-
-	function YTvaultSatisfiesUpperLimit(address _FCPsupplied, address _FCPborrowed, uint _amountYield, int _amountBond, uint _amountBorrowed) external view override returns (bool) {
+	function YTvaultSatisfiesUpperLimit(address _FCPsupplied, address _FCPborrowed, uint _amountYield, int _amountBond, uint _amountBorrowed) external view returns (bool) {
+		//trick to silence no use of params warning
 		if (
 			_FCPsupplied	== address(0) ||
 			_FCPborrowed == address(0) ||
@@ -91,7 +71,8 @@ contract DummyVaultHealth is IVaultHealth {
 			return false || toReturn;
 		return true && toReturn;
 	}
-	function YTvaultSatisfiesLowerLimit(address _FCPsupplied, address _FCPborrowed, uint _amountYield, int _amountBond, uint _amountBorrowed) external view override returns (bool) {
+	function YTvaultSatisfiesLowerLimit(address _FCPsupplied, address _FCPborrowed, uint _amountYield, int _amountBond, uint _amountBorrowed) external view returns (bool) {
+		//trick to silence no use of params warning
 		if (
 			_FCPsupplied	== address(0) ||
 			_FCPborrowed == address(0) ||
@@ -101,20 +82,6 @@ contract DummyVaultHealth is IVaultHealth {
 			)
 			return false || toReturn;
 		return true && toReturn;
-	}
-
-	function UpperMinimumRateAdjustment(address _underlyingAssetAddress) external view override returns (uint120) {
-		if (_underlyingAssetAddress == address(0)) {
-			return 0;
-		}
-		return 1;
-	}
-
-	function LowerMinimumRateAdjustment(address _underlyingAssetAddress) external view override returns (uint120) {
-		if (_underlyingAssetAddress == address(0)) {
-			return 0;
-		}
-		return 1;
 	}
 
 	bool toReturn;
@@ -135,7 +102,7 @@ contract DummyVaultHealth is IVaultHealth {
 		uint _pctPriceChange,
 		int128 _suppliedRateChange,
 		int128 _borrowRateChange
-		) external view override returns (bool) {
+		) external view returns (bool) {
 		/*
 			silence warnings about not using parameters
 		*/
@@ -163,7 +130,7 @@ contract DummyVaultHealth is IVaultHealth {
 		uint _pctPriceChange,
 		int128 _suppliedRateChange,
 		int128 _borrowRateChange
-	) external view override returns (bool) {
+	) external view returns (bool) {
 		/*
 			silence warnings about not using parameters
 		*/
@@ -180,16 +147,6 @@ contract DummyVaultHealth is IVaultHealth {
 			)
 			return false || toReturn;
 		return true && toReturn;		
-	}
-
-	function LiquidatorBonus(address _assetAddress) external view override returns (uint120) {
-		uint120 ret; assembly{ret:=_assetAddress}
-		return ret;
-	}
-
-	function ProtocolLiqFee(address _assetAddress) external override view returns (uint120) {
-		uint120 ret; assembly{ret:=_assetAddress}
-		return ret;
 	}
 
 	function setUpper(
@@ -222,19 +179,19 @@ contract DummyVaultHealth is IVaultHealth {
 
 	}
 
-	function setMaximumShortInterest(address _underlyingAssetAddress, uint _MaximumShortInterest) external override {
+	function setMaximumShortInterest(address _underlyingAssetAddress, uint _MaximumShortInterest) external {
 		MaximumShortInterest[_underlyingAssetAddress] = _MaximumShortInterest;
 	}
-	function setCollateralizationRatios(address _underlyingAssetAddress, uint120 _upper, uint120 _lower, uint120 _liqBonus, uint120 _liqProtocolFee) external override {
+	function setCollateralizationRatios(address _underlyingAssetAddress, uint120 _upper, uint120 _lower, uint120 _liqBonus, uint120 _liqProtocolFee) external {
 		MaximumShortInterest[_underlyingAssetAddress] = (MaximumShortInterest[_upper == _lower ? _underlyingAssetAddress : _underlyingAssetAddress]) + _liqBonus + _liqProtocolFee;
 	}
-	function setRateThresholds(address _underlyingAssetAddress, uint120 _upper, uint120 _lower) external override {
+	function setRateThresholds(address _underlyingAssetAddress, uint120 _upper, uint120 _lower) external {
 		MaximumShortInterest[_underlyingAssetAddress] = MaximumShortInterest[_upper == _lower ? _underlyingAssetAddress : _underlyingAssetAddress];
 	}
-	function setOrganizerAddress(address _organizerAddress) external override {
+	function setOrganizerAddress(address _organizerAddress) external {
 		MaximumShortInterest[_organizerAddress] = MaximumShortInterest[_organizerAddress];
 	}
-	function setMinimumRateAdjustments(address _wrapperAddress, uint120 _upper, uint120 _lower) external override {
+	function setMinimumRateAdjustments(address _wrapperAddress, uint120 _upper, uint120 _lower) external {
 		MaximumShortInterest[_wrapperAddress] = MaximumShortInterest[_upper == _lower+1 ? _wrapperAddress : _wrapperAddress];		
 	}
 }

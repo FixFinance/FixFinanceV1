@@ -14,6 +14,7 @@ const OracleContainer = artifacts.require('OracleContainer');
 const OracleDeployer = artifacts.require('OracleDeployer');
 const VaultHealth = artifacts.require("VaultHealth");
 const VaultHealthDelegate1 = artifacts.require('VaultHealthDelegate1');
+const VaultHealthDelegate2 = artifacts.require('VaultHealthDelegate2');
 const VaultHealthDeployer = artifacts.require("VaultHealthDeployer");
 //NSFVaultFactory
 const NSFVaultFactoryDelegate1 = artifacts.require("NSFVaultFactoryDelegate1");
@@ -119,7 +120,8 @@ module.exports = async function(deployer) {
 	let rec = await oracleDeployerInstance.deploy(WETH);
 	oracleContainerInstance = await OracleContainer.at(rec.logs[0].args.addr);
 	vhDel1 = await VaultHealthDelegate1.new();
-	vhDeployerInstance = await deployer.deploy(VaultHealthDeployer, vhDel1.address);
+	vhDel2 = await VaultHealthDelegate2.new();
+	vhDeployerInstance = await deployer.deploy(VaultHealthDeployer, vhDel1.address, vhDel2.address);
 	rec = await vhDeployerInstance.deploy(oracleContainerInstance.address);
 	vhInstance = await VaultHealth.at(rec.logs[0].args.addr);	
 	rec = await nsfvfDeployerInstance.deploy(vhInstance.address);
